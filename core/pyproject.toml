@@ -22,3 +22,22 @@ pydantic-settings = "^2.12.0"
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
+[dependency-groups]
+dev = [
+    "ruff (>=0.14.11,<0.15.0)",
+    "mypy (>=1.19.1,<2.0.0)",
+    "pre-commit (>=4.5.1,<5.0.0)",
+    "pytest (>=9.0.2,<10.0.0)"
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+

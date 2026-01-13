@@ -12,13 +12,13 @@ app = FastAPI(
 
 
 @app.get("/health")
-def health_check():
+def health_check() -> dict[str, str]:
     """Return health status."""
     return {"status": "ok", "version": __version__}
 
 
 @app.get("/")
-def root():
+def root() -> dict[str, str]:
     """Return API information."""
     return {
         "name": "Nola Core",

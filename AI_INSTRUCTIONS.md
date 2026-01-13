@@ -1,26 +1,13 @@
 # AI Instructions - Nola Project
 
-> This file helps AI quickly understand the project structure and status.
-> Update after each development phase.
+> This file helps AI quickly understand the project structure.
 
 ## Project Overview
 
 | Key | Value |
 |-----|-------|
+| Name | Nola - Speech-to-text Software |
 | Stack | Python (FastAPI) + React (Tauri) |
-| Current Phase | Phase 1.1 - Project Init |
-| Last Updated | 2026-01-10 |
-
----
-
-## Workflow Principles
-
-> [!IMPORTANT]
-> 1. `target/implementation_plan.md` is the master plan, keep unchanged
-> 2. Create `target/phase_X_plan.md` before each Phase
-> 3. Wait for user review and confirmation before execution
-> 4. Explain and confirm major decisions during execution
-> 5. Update this file after each phase
 
 ---
 
@@ -39,23 +26,18 @@
 ```
 Nola/
 ├── core/                      # Python backend (Flat Layout)
-│   ├── pyproject.toml         # Poetry config
+│   ├── pyproject.toml         # Poetry config + ruff/mypy settings
 │   ├── README.md              # Backend docs
 │   ├── nola/                  # Main package
 │   │   ├── __init__.py        # Version info (v0.1.0)
 │   │   ├── main.py            # FastAPI entry point
-│   │   └── config.py          # Config management (pydantic-settings)
+│   │   └── config.py          # Config management
 │   └── tests/                 # Test directory
-│       ├── __init__.py
-│       └── conftest.py        # pytest fixtures
 ├── app/                       # Frontend GUI (TODO)
-├── target/                    # Project docs (git ignored, Chinese)
-│   ├── ROADMAP.md             # Development roadmap
-│   └── implementation_plan.md # Master plan
-├── task_plan.md               # Task tracking (Chinese)
-├── notes.md                   # Research notes (Chinese)
+├── .pre-commit-config.yaml    # Pre-commit hooks (root level)
+├── .editorconfig              # Editor config
 ├── .gitignore
-└── AI_INSTRUCTIONS.md         # This file (English)
+└── AI_INSTRUCTIONS.md         # This file
 ```
 
 ---
@@ -69,6 +51,15 @@ Nola/
 | faster-whisper | 1.2.1 |
 | pydantic-settings | 2.12.0 |
 | Python | ^3.10 |
+
+### Dev Dependencies
+
+| Package | Version |
+|---------|---------|
+| ruff | 0.14.11 |
+| mypy | 1.19.1 |
+| pre-commit | 4.5.1 |
+| pytest | 9.0.2 |
 
 ---
 
@@ -95,6 +86,12 @@ cd core && poetry install
 
 # Start dev server
 poetry run uvicorn nola.main:app --reload
+
+# Run linter
+poetry run ruff check .
+
+# Run type checker
+poetry run mypy nola
 
 # Run tests
 poetry run pytest
