@@ -31,7 +31,13 @@ Nola/
 │   ├── nola/                  # Main package
 │   │   ├── __init__.py        # Version info (v0.1.0)
 │   │   ├── main.py            # FastAPI entry point
-│   │   └── config.py          # Config management
+│   │   ├── core/              # Config and utilities
+│   │   │   └── config.py      # Settings via pydantic-settings
+│   │   ├── engines/           # Transcription engines
+│   │   │   ├── base.py        # Segment, EngineConfig, TranscriptionEngine
+│   │   │   └── faster_whisper.py  # (TODO) FasterWhisperEngine
+│   │   ├── services/          # Business logic
+│   │   └── models/            # Pydantic schemas
 │   └── tests/                 # Test directory
 ├── app/                       # Frontend GUI (TODO)
 ├── .pre-commit-config.yaml    # Pre-commit hooks (root level)
