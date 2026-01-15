@@ -1,6 +1,10 @@
 """Test transcription engine base interface."""
 
-from nola.engines import Segment, TranscriptionEngine
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from nola.engines import EngineConfig, FasterWhisperEngine, Segment, TranscriptionEngine
 
 
 class TestSegment:
@@ -22,12 +26,78 @@ class TestSegment:
         assert seg1 == seg2
 
 
+class TestEngineConfig:
+    """Test EngineConfig dataclass."""
+
+    def test_config_defaults(self) -> None:
+        """Verify default configuration values."""
+        config = EngineConfig()
+
+        assert config.model_size == "base"
+        assert config.device == "auto"
+        assert config.compute_type == "default"
+
+    def test_config_custom_values(self) -> None:
+        """Create config with custom values."""
+        config = EngineConfig(
+            model_size="large-v3", device="cuda", compute_type="float16"
+        )
+
+        assert config.model_size == "large-v3"
+        assert config.device == "cuda"
+        assert config.compute_type == "float16"
+
+
 class TestTranscriptionEngine:
     """Test TranscriptionEngine abstract interface."""
 
     def test_engine_is_abstract(self) -> None:
         """Verify TranscriptionEngine cannot be instantiated."""
-        import pytest
-
         with pytest.raises(TypeError):
             TranscriptionEngine()  # type: ignore[abstract]
+
+
+class TestFasterWhisperEngine:
+    """Test FasterWhisperEngine implementation."""
+
+    @patch("nola.engines.faster_whisper.WhisperModel")
+    def test_engine_creation_default_config(self, mock_model: MagicMock) -> None:
+        """Create engine with default configuration."""
+        engine = FasterWhisperEngine()
+
+        mock_model.assert_called_once_with(
+            "base", device="auto", compute_type="default"
+        )
+        assert engine._config.model_size == "base"
+
+    @patch("nola.engines.faster_whisper.WhisperModel")
+    def test_engine_creation_custom_config(self, mock_model: MagicMock) -> None:
+        """Create engine with custom configuration."""
+        config = EngineConfig(model_size="small", device="cpu", compute_type="int8")
+        engine = FasterWhisperEngine(config)
+
+        mock_model.assert_called_once_with("small", device="cpu", compute_type="int8")
+        assert engine._config.model_size == "small"
+
+    @patch("nola.engines.faster_whisper.WhisperModel")
+    def test_transcribe_yields_segments(self, mock_model: MagicMock) -> None:
+        """Verify transcribe method yields Segment objects."""
+        # Mock segment objects from faster-whisper
+        mock_seg1 = MagicMock(start=0.0, end=1.5, text=" Hello ")
+        mock_seg2 = MagicMock(start=1.5, end=3.0, text=" World ")
+        mock_model.return_value.transcribe.return_value = ([mock_seg1, mock_seg2], None)
+
+        engine = FasterWhisperEngine()
+        segments = list(engine.transcribe("test.mp3"))
+
+        assert len(segments) == 2
+        assert segments[0] == Segment(start=0.0, end=1.5, text="Hello")
+        assert segments[1] == Segment(start=1.5, end=3.0, text="World")
+
+    @patch("nola.engines.faster_whisper.WhisperModel")
+    def test_transcribe_stream_not_implemented(self, mock_model: MagicMock) -> None:
+        """Verify transcribe_stream raises NotImplementedError."""
+        engine = FasterWhisperEngine()
+
+        with pytest.raises(NotImplementedError, match="Streaming"):
+            engine.transcribe_stream(b"audio_data")
