@@ -35,7 +35,7 @@ Nola/
 │   │   │   └── config.py      # Settings via pydantic-settings
 │   │   ├── engines/           # Transcription engines
 │   │   │   ├── base.py        # Segment, EngineConfig, TranscriptionEngine
-│   │   │   └── faster_whisper.py  # (TODO) FasterWhisperEngine
+│   │   │   └── faster_whisper.py  # FasterWhisperEngine implementation
 │   │   ├── services/          # Business logic
 │   │   └── models/            # Pydantic schemas
 │   └── tests/                 # Test directory
@@ -76,11 +76,18 @@ FastAPI entry point:
 - `GET /` - API info
 - `GET /health` - Health check
 
-### core/nola/config.py
+### core/nola/core/config.py
 Config management via `pydantic-settings`:
 - `model_size`: Whisper model size (default "base")
 - `device`: Runtime device (default "auto")
 - `host/port`: Server config
+
+### core/nola/engines/
+Transcription engine layer:
+- `Segment`: Data class for transcribed segment with timing
+- `EngineConfig`: Engine initialization configuration
+- `TranscriptionEngine`: Abstract interface for transcription engines
+- `FasterWhisperEngine`: Faster-Whisper implementation
 
 ---
 
