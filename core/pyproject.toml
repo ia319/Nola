@@ -17,6 +17,7 @@ fastapi = "^0.128.0"
 uvicorn = "^0.40.0"
 faster-whisper = "^1.2.1"
 pydantic-settings = "^2.12.0"
+nvidia-cublas-cu12 = "^12.9.1.4"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -40,4 +41,9 @@ select = ["E", "F", "I", "UP"]
 [tool.mypy]
 python_version = "3.10"
 strict = true
+
+[[tool.mypy.overrides]]
+module = ["faster_whisper", "faster_whisper.*"]
+ignore_missing_imports = true
+
 
