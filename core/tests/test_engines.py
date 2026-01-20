@@ -101,3 +101,57 @@ class TestFasterWhisperEngine:
 
         with pytest.raises(NotImplementedError, match="Streaming"):
             engine.transcribe_stream(b"audio_data")
+
+    @patch("nola.engines.faster_whisper.WhisperModel")
+    def test_transcribe_with_options(self, mock_model: MagicMock) -> None:
+        """Verify transcribe passes options to model."""
+        from nola.engines import TranscribeOptions
+
+        mock_seg = MagicMock(start=0.0, end=1.0, text="Test")
+        mock_model.return_value.transcribe.return_value = ([mock_seg], None)
+
+        engine = FasterWhisperEngine()
+        options = TranscribeOptions(language="zh", beam_size=10, vad_filter=True)
+        list(engine.transcribe("test.mp3", options))
+
+        # Verify options were passed to model.transcribe
+        call_kwargs = mock_model.return_value.transcribe.call_args[1]
+        assert call_kwargs["language"] == "zh"
+        assert call_kwargs["beam_size"] == 10
+        assert call_kwargs["vad_filter"] is True
+
+
+class TestTranscribeOptions:
+    """Test TranscribeOptions dataclass."""
+
+    def test_options_defaults(self) -> None:
+        """Verify default option values."""
+        from nola.engines import TranscribeOptions
+
+        opts = TranscribeOptions()
+
+        assert opts.language is None
+        assert opts.task == "transcribe"
+        assert opts.beam_size == 5
+        assert opts.vad_filter is False
+        assert opts.word_timestamps is False
+
+    def test_options_custom_values(self) -> None:
+        """Create options with custom values."""
+        from nola.engines import TranscribeOptions
+
+        opts = TranscribeOptions(
+            language="en",
+            task="translate",
+            beam_size=10,
+            vad_filter=True,
+            word_timestamps=True,
+            initial_prompt="This is a test.",
+        )
+
+        assert opts.language == "en"
+        assert opts.task == "translate"
+        assert opts.beam_size == 10
+        assert opts.vad_filter is True
+        assert opts.word_timestamps is True
+        assert opts.initial_prompt == "This is a test."
