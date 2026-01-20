@@ -1,10 +1,16 @@
 """Implement FasterWhisperEngine for transcription."""
 
 from collections.abc import Generator
+from dataclasses import asdict
 
 from faster_whisper import WhisperModel
 
-from nola.engines.base import EngineConfig, Segment, TranscriptionEngine
+from nola.engines.base import (
+    EngineConfig,
+    Segment,
+    TranscribeOptions,
+    TranscriptionEngine,
+)
 
 
 class FasterWhisperEngine(TranscriptionEngine):
@@ -24,16 +30,26 @@ class FasterWhisperEngine(TranscriptionEngine):
         )
         self._config = cfg
 
-    def transcribe(self, file_path: str) -> Generator[Segment, None, None]:
+    def transcribe(
+        self,
+        file_path: str,
+        options: TranscribeOptions | None = None,
+    ) -> Generator[Segment, None, None]:
         """Transcribe audio file and yield segments.
 
         Args:
             file_path: Path to the audio file.
+            options: Transcription options. Uses defaults if None.
 
         Yields:
             Segment objects with start time, end time, and text.
         """
-        segments, _ = self.model.transcribe(file_path, vad_filter=True)
+        opts = options or TranscribeOptions()
+
+        # Convert dataclass to dict, excluding None values for optional params
+        opts_dict = {k: v for k, v in asdict(opts).items() if v is not None}
+
+        segments, _ = self.model.transcribe(file_path, **opts_dict)
         for seg in segments:
             yield Segment(start=seg.start, end=seg.end, text=seg.text.strip())
 
