@@ -86,6 +86,7 @@ Config management via `pydantic-settings`:
 Transcription engine layer:
 - `Segment`: Data class for transcribed segment with timing
 - `EngineConfig`: Engine initialization configuration
+- `TranscribeOptions`: Full transcription options (language, beam_size, vad_filter, etc.)
 - `TranscriptionEngine`: Abstract interface for transcription engines
 - `FasterWhisperEngine`: Faster-Whisper implementation
 
