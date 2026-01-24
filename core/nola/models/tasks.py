@@ -159,47 +159,41 @@ class TaskDatabase:
             should_retry: If True, requeue if retries available
         """
         with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-
-            # Get current task state
-            task = conn.execute(
-                "SELECT retry_count, max_retries FROM transcription_tasks WHERE id = ?",
-                (task_id,),
-            ).fetchone()
-
-            if not task:
-                return
-
-            retry_count = task["retry_count"]
-            max_retries = task["max_retries"]
-
-            # Determine if should retry
-            if should_retry and retry_count < max_retries:
-                # Requeue for retry
-                conn.execute(
+            # Atomic conditional update:
+            # 1. Try to requeue if retries available
+            if should_retry:
+                cursor = conn.execute(
                     """
                     UPDATE transcription_tasks
                     SET status = ?, retry_count = retry_count + 1, 
                         error = ?, worker_id = NULL, started_at = NULL
-                    WHERE id = ?
+                    WHERE id = ? AND retry_count < max_retries
                     """,
                     (TaskStatus.PENDING.value, error, task_id),
                 )
-            else:
-                # Mark as permanently failed
-                conn.execute(
-                    """
-                    UPDATE transcription_tasks
-                    SET status = ?, error = ?, completed_at = ?
-                    WHERE id = ?
-                    """,
-                    (
-                        TaskStatus.FAILED.value,
-                        error,
-                        datetime.now().isoformat(),
-                        task_id,
-                    ),
-                )
+
+                # If updated, return successfully
+                if cursor.rowcount > 0:
+                    conn.commit()
+                    return
+
+            # 2. If we reached here, either:
+            #    - should_retry is False
+            #    - OR retry_count >= max_retries (atomic check failed)
+            # So mark as permanently failed
+            conn.execute(
+                """
+                UPDATE transcription_tasks
+                SET status = ?, error = ?, completed_at = ?
+                WHERE id = ?
+                """,
+                (
+                    TaskStatus.FAILED.value,
+                    error,
+                    datetime.now().isoformat(),
+                    task_id,
+                ),
+            )
 
             conn.commit()
 
@@ -251,6 +245,7 @@ class TaskDatabase:
                 """
                 UPDATE transcription_tasks
                 SET status = ?, worker_id = NULL, started_at = NULL,
+                    retry_count = retry_count + 1,
                     error = 'Task timeout - requeued'
                 WHERE status = ? 
                   AND started_at < ?
@@ -284,6 +279,7 @@ class TaskDatabase:
                 """
                 UPDATE transcription_tasks
                 SET status = ?, worker_id = NULL, started_at = NULL,
+                    retry_count = retry_count + 1,
                     error = 'Worker heartbeat timeout - requeued'
                 WHERE status = ?
                   AND last_heartbeat < ?

@@ -142,6 +142,29 @@ class TestTaskDatabase:
         assert task["retry_count"] == 1
         assert task["error"] == "Test error"
 
+    def test_fail_max_retries_reached(self, test_db):
+        """Test task failure when max retries are reached."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+        # Create task with 0 retries allowed
+        task_db.enqueue("task-001", "file-001", max_retries=0)
+        task_db.dequeue("worker-001")
+
+        task_db.fail("task-001", "Final error", should_retry=True)
+        task = task_db.get_task("task-001")
+
+        assert task["status"] == TaskStatus.FAILED.value
+        assert task["retry_count"] == 0
+        assert task["error"] == "Final error"
+        assert task["completed_at"] is not None
+
+    def test_fail_non_existent_task(self, test_db):
+        """Test failing a non-existent task."""
+        _, task_db = test_db
+        # Should not raise error
+        task_db.fail("non-existent", "Error")
+
     def test_cancel_task(self, test_db):
         """Test task cancellation."""
         file_db, task_db = test_db
@@ -170,3 +193,36 @@ class TestTaskDatabase:
         task = task_db.get_task("task-001")
         assert task["status"] == TaskStatus.PENDING.value
         assert "timeout" in task["error"].lower()
+        assert task["retry_count"] == 1  # Verify retry count incremented
+
+    def test_requeue_poison_pill(self, test_db):
+        """Test that poison pill tasks stop being requeued after max retries."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+        task_db.enqueue("task-poison", "file-001", max_retries=2)
+
+        # 1. First run -> Timeout
+        task_db.dequeue("worker-001")
+        task_db.requeue_timeout_tasks(timeout_seconds=0)
+        task = task_db.get_task("task-poison")
+        assert task["status"] == TaskStatus.PENDING.value
+        assert task["retry_count"] == 1
+
+        # 2. Second run -> Timeout
+        task_db.dequeue("worker-001")
+        task_db.requeue_timeout_tasks(timeout_seconds=0)
+        task = task_db.get_task("task-poison")
+        assert task["status"] == TaskStatus.PENDING.value
+        assert task["retry_count"] == 2
+
+        # 3. Third run -> Timeout (Max retries reached)
+        task_db.dequeue("worker-001")
+        count = task_db.requeue_timeout_tasks(timeout_seconds=0)
+
+        # Should NOT requeue anymore
+        assert count == 0
+        task = task_db.get_task("task-poison")
+        # Task remains in PROCESSING state (or could be cleaned up by another process)
+        # Key is it's not reset to PENDING, avoiding infinite loop
+        assert task["status"] == TaskStatus.PROCESSING.value
