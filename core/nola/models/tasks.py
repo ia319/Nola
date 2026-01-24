@@ -42,24 +42,23 @@ class TaskDatabase:
             priority: Task priority (higher = sooner)
             max_retries: Maximum retry attempts
         """
-        conn = sqlite3.connect(self.db_path)
-        conn.execute(
-            """
-            INSERT INTO transcription_tasks 
-            (id, file_id, status, priority, max_retries, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                task_id,
-                file_id,
-                TaskStatus.PENDING.value,
-                priority,
-                max_retries,
-                datetime.now().isoformat(),
-            ),
-        )
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO transcription_tasks 
+                (id, file_id, status, priority, max_retries, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    task_id,
+                    file_id,
+                    TaskStatus.PENDING.value,
+                    priority,
+                    max_retries,
+                    datetime.now().isoformat(),
+                ),
+            )
+            conn.commit()
 
     def dequeue(self, worker_id: str) -> dict[str, Any] | None:
         """Atomically get and lock next pending task.
@@ -70,34 +69,33 @@ class TaskDatabase:
         Returns:
             Task dict or None if queue is empty
         """
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
 
-        # Atomic get + lock operation
-        cursor = conn.execute(
-            """
-            UPDATE transcription_tasks
-            SET status = ?, worker_id = ?, started_at = ?, last_heartbeat = ?
-            WHERE id IN (
-                SELECT id FROM transcription_tasks
-                WHERE status = ?
-                ORDER BY priority DESC, created_at ASC
-                LIMIT 1
+            # Atomic get + lock operation
+            cursor = conn.execute(
+                """
+                UPDATE transcription_tasks
+                SET status = ?, worker_id = ?, started_at = ?, last_heartbeat = ?
+                WHERE id IN (
+                    SELECT id FROM transcription_tasks
+                    WHERE status = ?
+                    ORDER BY priority DESC, created_at ASC
+                    LIMIT 1
+                )
+                RETURNING *
+                """,
+                (
+                    TaskStatus.PROCESSING.value,
+                    worker_id,
+                    datetime.now().isoformat(),
+                    datetime.now().isoformat(),
+                    TaskStatus.PENDING.value,
+                ),
             )
-            RETURNING *
-            """,
-            (
-                TaskStatus.PROCESSING.value,
-                worker_id,
-                datetime.now().isoformat(),
-                datetime.now().isoformat(),
-                TaskStatus.PENDING.value,
-            ),
-        )
 
-        row = cursor.fetchone()
-        conn.commit()
-        conn.close()
+            row = cursor.fetchone()
+            conn.commit()
 
         if row is None:
             return None
@@ -113,17 +111,16 @@ class TaskDatabase:
             task_id: Task identifier
             progress: Current progress (0-100)
         """
-        conn = sqlite3.connect(self.db_path)
-        conn.execute(
-            """
-            UPDATE transcription_tasks
-            SET last_heartbeat = ?, progress = ?
-            WHERE id = ?
-            """,
-            (datetime.now().isoformat(), progress, task_id),
-        )
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                UPDATE transcription_tasks
+                SET last_heartbeat = ?, progress = ?
+                WHERE id = ?
+                """,
+                (datetime.now().isoformat(), progress, task_id),
+            )
+            conn.commit()
 
     def complete(
         self, task_id: str, segments: list[dict[str, Any]], duration: float
@@ -135,24 +132,23 @@ class TaskDatabase:
             segments: Transcription segments
             duration: Audio duration in seconds
         """
-        conn = sqlite3.connect(self.db_path)
-        conn.execute(
-            """
-            UPDATE transcription_tasks
-            SET status = ?, segments = ?, duration = ?, 
-                progress = 100.0, completed_at = ?
-            WHERE id = ?
-            """,
-            (
-                TaskStatus.COMPLETED.value,
-                json.dumps(segments),
-                duration,
-                datetime.now().isoformat(),
-                task_id,
-            ),
-        )
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                UPDATE transcription_tasks
+                SET status = ?, segments = ?, duration = ?, 
+                    progress = 100.0, completed_at = ?
+                WHERE id = ?
+                """,
+                (
+                    TaskStatus.COMPLETED.value,
+                    json.dumps(segments),
+                    duration,
+                    datetime.now().isoformat(),
+                    task_id,
+                ),
+            )
+            conn.commit()
 
     def fail(self, task_id: str, error: str, should_retry: bool = True) -> None:
         """Mark task as failed with optional retry.
@@ -162,47 +158,50 @@ class TaskDatabase:
             error: Error message
             should_retry: If True, requeue if retries available
         """
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
 
-        # Get current task state
-        task = conn.execute(
-            "SELECT retry_count, max_retries FROM transcription_tasks WHERE id = ?",
-            (task_id,),
-        ).fetchone()
+            # Get current task state
+            task = conn.execute(
+                "SELECT retry_count, max_retries FROM transcription_tasks WHERE id = ?",
+                (task_id,),
+            ).fetchone()
 
-        if not task:
-            conn.close()
-            return
+            if not task:
+                return
 
-        retry_count = task["retry_count"]
-        max_retries = task["max_retries"]
+            retry_count = task["retry_count"]
+            max_retries = task["max_retries"]
 
-        # Determine if should retry
-        if should_retry and retry_count < max_retries:
-            # Requeue for retry
-            conn.execute(
-                """
-                UPDATE transcription_tasks
-                SET status = ?, retry_count = retry_count + 1, 
-                    error = ?, worker_id = NULL, started_at = NULL
-                WHERE id = ?
-                """,
-                (TaskStatus.PENDING.value, error, task_id),
-            )
-        else:
-            # Mark as permanently failed
-            conn.execute(
-                """
-                UPDATE transcription_tasks
-                SET status = ?, error = ?, completed_at = ?
-                WHERE id = ?
-                """,
-                (TaskStatus.FAILED.value, error, datetime.now().isoformat(), task_id),
-            )
+            # Determine if should retry
+            if should_retry and retry_count < max_retries:
+                # Requeue for retry
+                conn.execute(
+                    """
+                    UPDATE transcription_tasks
+                    SET status = ?, retry_count = retry_count + 1, 
+                        error = ?, worker_id = NULL, started_at = NULL
+                    WHERE id = ?
+                    """,
+                    (TaskStatus.PENDING.value, error, task_id),
+                )
+            else:
+                # Mark as permanently failed
+                conn.execute(
+                    """
+                    UPDATE transcription_tasks
+                    SET status = ?, error = ?, completed_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        TaskStatus.FAILED.value,
+                        error,
+                        datetime.now().isoformat(),
+                        task_id,
+                    ),
+                )
 
-        conn.commit()
-        conn.close()
+            conn.commit()
 
     def cancel(self, task_id: str) -> bool:
         """Cancel a task.
@@ -213,27 +212,26 @@ class TaskDatabase:
         Returns:
             True if cancelled, False if not found or already completed
         """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.execute(
-            """
-            UPDATE transcription_tasks
-            SET status = ?, completed_at = ?
-            WHERE id = ? AND status IN (?, ?)
-            """,
-            (
-                TaskStatus.CANCELLED.value,
-                datetime.now().isoformat(),
-                task_id,
-                TaskStatus.PENDING.value,
-                TaskStatus.PROCESSING.value,
-            ),
-        )
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """
+                UPDATE transcription_tasks
+                SET status = ?, completed_at = ?
+                WHERE id = ? AND status IN (?, ?)
+                """,
+                (
+                    TaskStatus.CANCELLED.value,
+                    datetime.now().isoformat(),
+                    task_id,
+                    TaskStatus.PENDING.value,
+                    TaskStatus.PROCESSING.value,
+                ),
+            )
 
-        cancelled = cursor.rowcount > 0
-        conn.commit()
-        conn.close()
+            cancelled = cursor.rowcount > 0
+            conn.commit()
 
-        return cancelled
+            return cancelled
 
     # === Maintenance Operations ===
 
@@ -246,30 +244,29 @@ class TaskDatabase:
         Returns:
             Number of tasks requeued
         """
-        conn = sqlite3.connect(self.db_path)
-        timeout_at = datetime.now() - timedelta(seconds=timeout_seconds)
+        with sqlite3.connect(self.db_path) as conn:
+            timeout_at = datetime.now() - timedelta(seconds=timeout_seconds)
 
-        cursor = conn.execute(
-            """
-            UPDATE transcription_tasks
-            SET status = ?, worker_id = NULL, started_at = NULL,
-                error = 'Task timeout - requeued'
-            WHERE status = ? 
-              AND started_at < ?
-              AND retry_count < max_retries
-            """,
-            (
-                TaskStatus.PENDING.value,
-                TaskStatus.PROCESSING.value,
-                timeout_at.isoformat(),
-            ),
-        )
+            cursor = conn.execute(
+                """
+                UPDATE transcription_tasks
+                SET status = ?, worker_id = NULL, started_at = NULL,
+                    error = 'Task timeout - requeued'
+                WHERE status = ? 
+                  AND started_at < ?
+                  AND retry_count < max_retries
+                """,
+                (
+                    TaskStatus.PENDING.value,
+                    TaskStatus.PROCESSING.value,
+                    timeout_at.isoformat(),
+                ),
+            )
 
-        count = cursor.rowcount
-        conn.commit()
-        conn.close()
+            count = cursor.rowcount
+            conn.commit()
 
-        return count
+            return count
 
     def requeue_dead_workers(self, heartbeat_timeout: int = 300) -> int:
         """Requeue tasks from workers with stale heartbeat.
@@ -280,30 +277,29 @@ class TaskDatabase:
         Returns:
             Number of tasks requeued
         """
-        conn = sqlite3.connect(self.db_path)
-        timeout_at = datetime.now() - timedelta(seconds=heartbeat_timeout)
+        with sqlite3.connect(self.db_path) as conn:
+            timeout_at = datetime.now() - timedelta(seconds=heartbeat_timeout)
 
-        cursor = conn.execute(
-            """
-            UPDATE transcription_tasks
-            SET status = ?, worker_id = NULL, started_at = NULL,
-                error = 'Worker heartbeat timeout - requeued'
-            WHERE status = ?
-              AND last_heartbeat < ?
-              AND retry_count < max_retries
-            """,
-            (
-                TaskStatus.PENDING.value,
-                TaskStatus.PROCESSING.value,
-                timeout_at.isoformat(),
-            ),
-        )
+            cursor = conn.execute(
+                """
+                UPDATE transcription_tasks
+                SET status = ?, worker_id = NULL, started_at = NULL,
+                    error = 'Worker heartbeat timeout - requeued'
+                WHERE status = ?
+                  AND last_heartbeat < ?
+                  AND retry_count < max_retries
+                """,
+                (
+                    TaskStatus.PENDING.value,
+                    TaskStatus.PROCESSING.value,
+                    timeout_at.isoformat(),
+                ),
+            )
 
-        count = cursor.rowcount
-        conn.commit()
-        conn.close()
+            count = cursor.rowcount
+            conn.commit()
 
-        return count
+            return count
 
     # === Query Operations ===
 
@@ -316,13 +312,12 @@ class TaskDatabase:
         Returns:
             Task dictionary or None if not found
         """
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.execute(
-            "SELECT * FROM transcription_tasks WHERE id = ?", (task_id,)
-        )
-        row = cursor.fetchone()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM transcription_tasks WHERE id = ?", (task_id,)
+            )
+            row = cursor.fetchone()
 
         if row is None:
             return None
@@ -341,19 +336,18 @@ class TaskDatabase:
     def get_next_pending_task(self) -> dict[str, Any] | None:
         """Legacy: Get next pending task (use dequeue instead)."""
         # Note: This doesn't lock the task, for testing only
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.execute(
-            """
-            SELECT * FROM transcription_tasks
-            WHERE status = ?
-            ORDER BY priority DESC, created_at ASC
-            LIMIT 1
-            """,
-            (TaskStatus.PENDING.value,),
-        )
-        row = cursor.fetchone()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                """
+                SELECT * FROM transcription_tasks
+                WHERE status = ?
+                ORDER BY priority DESC, created_at ASC
+                LIMIT 1
+                """,
+                (TaskStatus.PENDING.value,),
+            )
+            row = cursor.fetchone()
 
         return dict(row) if row else None
 
@@ -361,29 +355,31 @@ class TaskDatabase:
         self, task_id: str, status: TaskStatus, error: str | None = None
     ) -> None:
         """Legacy: Update task status (use specific methods instead)."""
-        conn = sqlite3.connect(self.db_path)
+        with sqlite3.connect(self.db_path) as conn:
+            if status in (
+                TaskStatus.COMPLETED,
+                TaskStatus.FAILED,
+                TaskStatus.CANCELLED,
+            ):
+                conn.execute(
+                    """
+                    UPDATE transcription_tasks
+                    SET status = ?, error = ?, completed_at = ?
+                    WHERE id = ?
+                    """,
+                    (status.value, error, datetime.now().isoformat(), task_id),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE transcription_tasks
+                    SET status = ?, error = ?
+                    WHERE id = ?
+                    """,
+                    (status.value, error, task_id),
+                )
 
-        if status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
-            conn.execute(
-                """
-                UPDATE transcription_tasks
-                SET status = ?, error = ?, completed_at = ?
-                WHERE id = ?
-                """,
-                (status.value, error, datetime.now().isoformat(), task_id),
-            )
-        else:
-            conn.execute(
-                """
-                UPDATE transcription_tasks
-                SET status = ?, error = ?
-                WHERE id = ?
-                """,
-                (status.value, error, task_id),
-            )
-
-        conn.commit()
-        conn.close()
+            conn.commit()
 
     def update_progress(self, task_id: str, progress: float) -> None:
         """Legacy: Update progress (use heartbeat instead)."""

@@ -34,16 +34,22 @@ class FileDatabase:
             size: File size in bytes
             content_type: MIME type
         """
-        conn = sqlite3.connect(self.db_path)
-        conn.execute(
-            """
-            INSERT INTO files (id, filename, path, size, content_type, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (file_id, filename, path, size, content_type, datetime.now().isoformat()),
-        )
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO files (id, filename, path, size, content_type, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    file_id,
+                    filename,
+                    path,
+                    size,
+                    content_type,
+                    datetime.now().isoformat(),
+                ),
+            )
+            conn.commit()
 
     def get_file(self, file_id: str) -> dict[str, Any] | None:
         """Get file metadata by ID.
@@ -54,16 +60,15 @@ class FileDatabase:
         Returns:
             File dictionary or None if not found
         """
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.execute("SELECT * FROM files WHERE id = ?", (file_id,))
-        row = cursor.fetchone()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT * FROM files WHERE id = ?", (file_id,))
+            row = cursor.fetchone()
 
-        if row is None:
-            return None
+            if row is None:
+                return None
 
-        return dict(row)
+            return dict(row)
 
     def get_file_path(self, file_id: str) -> str | None:
         """Get file storage path for transcription.
@@ -86,10 +91,9 @@ class FileDatabase:
         Returns:
             True if deleted, False if not found
         """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
-        deleted = cursor.rowcount > 0
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
+            deleted = cursor.rowcount > 0
+            conn.commit()
 
-        return deleted
+            return deleted
