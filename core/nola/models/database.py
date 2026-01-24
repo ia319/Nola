@@ -1,13 +1,15 @@
-"""Database initialization and schema."""
-
 import sqlite3
 from pathlib import Path
+
+from .utils import ensure_sqlite_version
 
 DB_PATH = Path("data/nola.db")
 
 
-def init_db() -> None:
+def init_db(db_path: str | Path = DB_PATH) -> None:
     """Initialize database schema with files and tasks tables."""
+    ensure_sqlite_version()
+
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     with sqlite3.connect(DB_PATH) as conn:
