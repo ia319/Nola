@@ -1,80 +1,172 @@
-"""Test production-grade task queue system."""
+"""Pytest tests for database models."""
+
+import tempfile
+from pathlib import Path
+
+import pytest
 
 from nola.models import FileDatabase, TaskDatabase, TaskStatus, init_db
 
-# Initialize database
-print("Initializing database with enhanced schema...")
-init_db()
 
-# Test FileDatabase
-print("\n=== FileDatabase Tests ===")
-file_db = FileDatabase()
-file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024, "audio/mpeg")
-assert file_db.get_file_path("file-001") == "/tmp/test.mp3"
-print("✓ File operations work")
+@pytest.fixture
+def test_db():
+    """Create isolated test database."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
 
-# Test production-grade TaskDatabase
-print("\n=== Production Queue Tests ===")
-task_db = TaskDatabase()
+        # Monkeypatch database path
+        import nola.models.database as db_module
 
-# Test 1: Enqueue with priority
-print("\n1. Enqueue with priority...")
-task_db.enqueue("task-low", "file-001", priority=0)
-task_db.enqueue("task-high", "file-001", priority=10)
-task_db.enqueue("task-mid", "file-001", priority=5)
-print("✓ Enqueued 3 tasks with different priorities")
+        original_path = db_module.DB_PATH
+        db_module.DB_PATH = db_path
 
-# Test 2: Atomic dequeue (should get highest priority)
-print("\n2. Atomic dequeue...")
-task = task_db.dequeue("worker-001")
-assert task is not None
-assert task["id"] == "task-high"  # Highest priority first
-assert task["status"] == TaskStatus.PROCESSING.value
-assert task["worker_id"] == "worker-001"
-print(f"✓ Dequeued task: {task['id']} (priority={task['priority']})")
+        # Initialize schema
+        init_db()
 
-# Test 3: Heartbeat
-print("\n3. Heartbeat...")
-task_db.heartbeat("task-high", progress=50.0)
-updated = task_db.get_task("task-high")
-assert updated["progress"] == 50.0
-print("✓ Heartbeat updated progress")
+        # Provide database instances
+        file_db = FileDatabase(db_path)
+        task_db = TaskDatabase(db_path)
 
-# Test 4: Complete task
-print("\n4. Complete task...")
-segments = [{"start": 0.0, "end": 2.5, "text": "Test"}]
-task_db.complete("task-high", segments, 2.5)
-completed = task_db.get_task("task-high")
-assert completed["status"] == TaskStatus.COMPLETED.value
-assert len(completed["segments"]) == 1
-print("✓ Task completed successfully")
+        try:
+            yield file_db, task_db
+        finally:
+            # Ensure all connections are closed before cleanup
+            import gc
 
-# Test 5: Fail with retry
-print("\n5. Fail with retry...")
-task2 = task_db.dequeue("worker-002")
-assert task2["id"] == "task-mid"
-task_db.fail("task-mid", "Test error", should_retry=True)
-failed = task_db.get_task("task-mid")
-assert failed["status"] == TaskStatus.PENDING.value  # Requeued for retry
-assert failed["retry_count"] == 1
-print("✓ Failed task requeued for retry")
+            gc.collect()
 
-# Test 6: Cancel task
-print("\n6. Cancel task...")
-cancelled = task_db.cancel("task-low")
-assert cancelled is True
-task = task_db.get_task("task-low")
-assert task["status"] == TaskStatus.CANCELLED.value
-print("✓ Task cancelled successfully")
+            # Restore original path
+            db_module.DB_PATH = original_path
 
-# Test 7: Maintenance operations
-print("\n7. Maintenance operations...")
-# Requeue timeout tasks
-requeued = task_db.requeue_timeout_tasks(timeout_seconds=0)
-print(f"✓ Requeued {requeued} timeout tasks")
 
-# Requeue dead workers
-requeued = task_db.requeue_dead_workers(heartbeat_timeout=0)
-print(f"✓ Requeued {requeued} dead worker tasks")
+class TestFileDatabase:
+    """Test file management operations."""
 
-print("\n✅ All production-grade queue tests passed!")
+    def test_create_and_get_file(self, test_db):
+        """Test file creation and retrieval."""
+        file_db, _ = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024, "audio/mpeg")
+        file = file_db.get_file("file-001")
+
+        assert file is not None
+        assert file["filename"] == "test.mp3"
+        assert file["size"] == 1024
+
+    def test_get_file_path(self, test_db):
+        """Test file path retrieval."""
+        file_db, _ = test_db
+
+        file_db.create_file("file-002", "test.mp3", "/tmp/test.mp3", 1024)
+        path = file_db.get_file_path("file-002")
+
+        assert path == "/tmp/test.mp3"
+
+    def test_delete_file(self, test_db):
+        """Test file deletion."""
+        file_db, _ = test_db
+
+        file_db.create_file("file-003", "test.mp3", "/tmp/test.mp3", 1024)
+        deleted = file_db.delete_file("file-003")
+
+        assert deleted is True
+        assert file_db.get_file("file-003") is None
+
+
+class TestTaskDatabase:
+    """Test task queue operations."""
+
+    def test_enqueue_and_dequeue(self, test_db):
+        """Test priority-based task queueing."""
+        file_db, task_db = test_db
+
+        # Create file
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+
+        # Enqueue with different priorities
+        task_db.enqueue("task-low", "file-001", priority=0)
+        task_db.enqueue("task-high", "file-001", priority=10)
+        task_db.enqueue("task-mid", "file-001", priority=5)
+
+        # Dequeue should get highest priority
+        task = task_db.dequeue("worker-001")
+        assert task is not None
+        assert task["id"] == "task-high"
+        assert task["priority"] == 10
+        assert task["status"] == TaskStatus.PROCESSING.value
+        assert task["worker_id"] == "worker-001"
+
+    def test_heartbeat(self, test_db):
+        """Test worker heartbeat updates."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+        task_db.enqueue("task-001", "file-001")
+        task_db.dequeue("worker-001")
+
+        task_db.heartbeat("task-001", progress=50.0)
+        task = task_db.get_task("task-001")
+
+        assert task["progress"] == 50.0
+        assert task["last_heartbeat"] is not None
+
+    def test_complete_task(self, test_db):
+        """Test task completion."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+        task_db.enqueue("task-001", "file-001")
+        task_db.dequeue("worker-001")
+
+        segments = [{"start": 0.0, "end": 2.5, "text": "Test"}]
+        task_db.complete("task-001", segments, 2.5)
+
+        task = task_db.get_task("task-001")
+        assert task["status"] == TaskStatus.COMPLETED.value
+        assert task["duration"] == 2.5
+        assert len(task["segments"]) == 1
+        assert task["completed_at"] is not None
+
+    def test_fail_with_retry(self, test_db):
+        """Test task failure with retry."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+        task_db.enqueue("task-001", "file-001", max_retries=3)
+        task_db.dequeue("worker-001")
+
+        task_db.fail("task-001", "Test error", should_retry=True)
+        task = task_db.get_task("task-001")
+
+        assert task["status"] == TaskStatus.PENDING.value  # Requeued
+        assert task["retry_count"] == 1
+        assert task["error"] == "Test error"
+
+    def test_cancel_task(self, test_db):
+        """Test task cancellation."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+        task_db.enqueue("task-001", "file-001")
+
+        cancelled = task_db.cancel("task-001")
+        assert cancelled is True
+
+        task = task_db.get_task("task-001")
+        assert task["status"] == TaskStatus.CANCELLED.value
+
+    def test_requeue_timeout_tasks(self, test_db):
+        """Test timeout task recovery."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+        task_db.enqueue("task-001", "file-001")
+        task_db.dequeue("worker-001")
+
+        # Requeue with zero timeout (immediate)
+        count = task_db.requeue_timeout_tasks(timeout_seconds=0)
+        assert count == 1
+
+        task = task_db.get_task("task-001")
+        assert task["status"] == TaskStatus.PENDING.value
+        assert "timeout" in task["error"].lower()
