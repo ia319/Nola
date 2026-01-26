@@ -386,3 +386,38 @@ class TaskDatabase:
     ) -> None:
         """Legacy: Update result (use complete instead)."""
         self.complete(task_id, segments, duration)
+
+    def list_tasks(
+        self,
+        status: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """List tasks with optional filtering."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            if status:
+                cursor = conn.execute(
+                    "SELECT * FROM transcription_tasks WHERE status = ? "
+                    "ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    (status, limit, offset),
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT * FROM transcription_tasks "
+                    "ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    (limit, offset),
+                )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def count_tasks(self, status: str | None = None) -> int:
+        """Count tasks with optional filtering."""
+        with sqlite3.connect(self.db_path) as conn:
+            if status:
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM transcription_tasks WHERE status = ?",
+                    (status,),
+                )
+            else:
+                cursor = conn.execute("SELECT COUNT(*) FROM transcription_tasks")
+            return int(cursor.fetchone()[0])
