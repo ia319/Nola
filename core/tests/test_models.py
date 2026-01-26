@@ -20,8 +20,8 @@ def test_db():
         original_path = db_module.DB_PATH
         db_module.DB_PATH = db_path
 
-        # Initialize schema
-        init_db()
+        # Initialize schema with explicit path
+        init_db(db_path)
 
         # Provide database instances
         file_db = FileDatabase(db_path)

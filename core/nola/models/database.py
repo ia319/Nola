@@ -10,9 +10,10 @@ def init_db(db_path: str | Path = DB_PATH) -> None:
     """Initialize database schema with files and tasks tables."""
     ensure_sqlite_version()
 
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    path = Path(db_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(path) as conn:
         # Enable foreign key constraints
         conn.execute("PRAGMA foreign_keys = ON")
 
@@ -69,7 +70,7 @@ def init_db(db_path: str | Path = DB_PATH) -> None:
             "ON transcription_tasks(status, priority DESC, created_at ASC)"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_worker " "ON transcription_tasks(worker_id)"
+            "CREATE INDEX IF NOT EXISTS idx_worker ON transcription_tasks(worker_id)"
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_heartbeat "
