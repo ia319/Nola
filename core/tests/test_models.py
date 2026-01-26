@@ -226,3 +226,62 @@ class TestTaskDatabase:
         # Task remains in PROCESSING state (or could be cleaned up by another process)
         # Key is it's not reset to PENDING, avoiding infinite loop
         assert task["status"] == TaskStatus.PROCESSING.value
+
+    def test_list_tasks(self, test_db):
+        """Test listing tasks with filtering."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+
+        # Create multiple tasks
+        task_db.enqueue("task-001", "file-001")
+        task_db.enqueue("task-002", "file-001")
+        task_db.enqueue("task-003", "file-001")
+
+        # Complete one task
+        task_db.dequeue("worker-001")
+        task_db.complete("task-001", [], 0.0)
+
+        # List all tasks
+        all_tasks = task_db.list_tasks()
+        assert len(all_tasks) == 3
+
+        # List pending tasks
+        pending = task_db.list_tasks(status="pending")
+        assert len(pending) == 2
+
+        # List completed tasks
+        completed = task_db.list_tasks(status="completed")
+        assert len(completed) == 1
+        assert completed[0]["id"] == "task-001"
+
+        # Test pagination
+        first_page = task_db.list_tasks(limit=2, offset=0)
+        assert len(first_page) == 2
+
+        second_page = task_db.list_tasks(limit=2, offset=2)
+        assert len(second_page) == 1
+
+    def test_count_tasks(self, test_db):
+        """Test counting tasks with filtering."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+
+        # Create tasks
+        task_db.enqueue("task-001", "file-001")
+        task_db.enqueue("task-002", "file-001")
+
+        # Count all
+        assert task_db.count_tasks() == 2
+
+        # Count pending
+        assert task_db.count_tasks(status="pending") == 2
+
+        # Complete one
+        task_db.dequeue("worker-001")
+        task_db.complete("task-001", [], 0.0)
+
+        # Count by status
+        assert task_db.count_tasks(status="pending") == 1
+        assert task_db.count_tasks(status="completed") == 1
