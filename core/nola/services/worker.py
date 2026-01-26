@@ -32,30 +32,6 @@ def get_worker_id() -> str:
     return f"worker-{socket.gethostname()}-{threading.current_thread().ident}"
 
 
-def heartbeat_loop(
-    task_db: TaskDatabase,
-    task_id: str,
-    stop_event: threading.Event,
-    interval: int = 30,
-) -> None:
-    """Update heartbeat periodically.
-
-    Args:
-        task_db: Task database instance
-        task_id: Current task ID
-        stop_event: Event to signal stop
-        interval: Heartbeat interval in seconds
-    """
-    progress = 0.0
-    while not stop_event.is_set():
-        try:
-            task_db.heartbeat(task_id, progress)
-            logger.debug(f"Heartbeat sent for task {task_id}")
-        except Exception as e:
-            logger.warning(f"Heartbeat failed: {e}")
-        stop_event.wait(interval)
-
-
 def run_transcription(
     task: dict[str, Any],
     file_db: FileDatabase,
@@ -83,14 +59,10 @@ def run_transcription(
         task_db.fail(task_id, f"File does not exist: {file_path}", should_retry=False)
         return
 
-    # Start heartbeat thread
-    stop_heartbeat = threading.Event()
-    heartbeat_thread = threading.Thread(
-        target=heartbeat_loop,
-        args=(task_db, task_id, stop_heartbeat),
-        daemon=True,
-    )
-    heartbeat_thread.start()
+    # Progress callback to update database
+    def on_progress(progress: float) -> None:
+        task_db.heartbeat(task_id, progress)
+        logger.debug(f"Progress: {progress:.1f}%")
 
     try:
         # Initialize engine and run transcription
@@ -101,12 +73,11 @@ def run_transcription(
         logger.info("Starting transcription with default options")
         segments_list = []
         duration = 0.0
-        for segment in engine.transcribe(file_path, options):
+
+        # Pass progress callback to engine
+        for segment in engine.transcribe(file_path, options, on_progress=on_progress):
             segments_list.append(asdict(segment))
             duration = max(duration, segment.end)
-            logger.debug(
-                f"Segment: {segment.start:.2f}-{segment.end:.2f}: {segment.text}"
-            )
 
         # Log warning if no segments found
         if not segments_list:
@@ -125,10 +96,6 @@ def run_transcription(
     except Exception as e:
         logger.error(f"Transcription failed for task {task_id}: {e}")
         task_db.fail(task_id, str(e), should_retry=True)
-
-    finally:
-        stop_heartbeat.set()
-        heartbeat_thread.join(timeout=1)
 
 
 def worker_loop(db_path: str | Path = "data/nola.db") -> None:

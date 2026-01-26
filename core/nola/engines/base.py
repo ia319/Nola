@@ -1,8 +1,11 @@
 """Define base transcription engine interface."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
+
+# Progress callback type: receives progress percentage (0-100)
+ProgressCallback = Callable[[float], None]
 
 
 @dataclass
@@ -89,12 +92,14 @@ class TranscriptionEngine(ABC):
         self,
         file_path: str,
         options: TranscribeOptions | None = None,
+        on_progress: ProgressCallback | None = None,
     ) -> Generator[Segment, None, None]:
         """Transcribe audio file and yield segments.
 
         Args:
             file_path: Path to the audio file.
             options: Transcription options. Uses defaults if None.
+            on_progress: Optional callback for progress updates (0-100).
 
         Yields:
             Segment objects with start time, end time, and text.
