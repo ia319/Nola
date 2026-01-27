@@ -287,3 +287,51 @@ class TestTaskDatabase:
         # Count by status
         assert task_db.count_tasks(status="pending") == 1
         assert task_db.count_tasks(status="completed") == 1
+
+    def test_complete_cancelled_task(self, test_db):
+        """complete() should not overwrite cancelled status."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+        task_db.enqueue("task-001", "file-001")
+        task_db.dequeue("worker-001")
+        task_db.cancel("task-001")
+
+        result = task_db.complete("task-001", [{"text": "test"}], 10.0)
+
+        assert result is False
+        task = task_db.get_task("task-001")
+        assert task["status"] == "cancelled"
+        assert task["segments"] is None
+
+    def test_fail_cancelled_task(self, test_db):
+        """fail() should not overwrite cancelled status."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+        task_db.enqueue("task-001", "file-001")
+        task_db.dequeue("worker-001")
+        task_db.cancel("task-001")
+
+        result = task_db.fail("task-001", "Some error")
+
+        assert result is False
+        task = task_db.get_task("task-001")
+        assert task["status"] == "cancelled"
+
+    def test_heartbeat_cancelled_task(self, test_db):
+        """heartbeat() should not update cancelled task."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+        task_db.enqueue("task-001", "file-001")
+        task_db.dequeue("worker-001")
+
+        original = task_db.get_task("task-001")
+        task_db.cancel("task-001")
+        task_db.heartbeat("task-001", 50.0)
+
+        task = task_db.get_task("task-001")
+        assert task["status"] == "cancelled"
+        assert task["progress"] == original["progress"]
+        assert task["last_heartbeat"] == original["last_heartbeat"]
