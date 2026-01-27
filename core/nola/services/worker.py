@@ -70,6 +70,12 @@ def run_transcription(
 
         # Pass progress callback to engine
         for segment in engine.transcribe(file_path, options, on_progress=on_progress):
+            # Check cancellation every segment for faster abort
+            current = task_db.get_task(task_id)
+            if current and current["status"] == "cancelled":
+                logger.warning(f"Task {task_id} cancelled mid-transcription")
+                return
+
             segments_list.append(asdict(segment))
             duration = max(duration, segment.end)
 
