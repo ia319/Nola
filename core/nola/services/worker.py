@@ -44,22 +44,25 @@ def run_transcription(
 
     logger.info(f"Starting transcription for task {task_id}")
 
-    file_path = file_db.get_file_path(file_id)
-    if not file_path:
-        task_db.fail(task_id, f"File not found: {file_id}", should_retry=False)
-        return
-
-    if not Path(file_path).exists():
-        task_db.fail(task_id, f"File does not exist: {file_path}", should_retry=False)
-        return
-
-    # Progress callback to update database
     def on_progress(progress: float) -> None:
-        task_db.heartbeat(task_id, progress)
+        try:
+            task_db.heartbeat(task_id, progress)
+        except Exception:
+            pass  # Ignore transient heartbeat failures
         logger.debug(f"Progress: {progress:.1f}%")
 
     try:
-        # Initialize engine and run transcription
+        file_path = file_db.get_file_path(file_id)
+        if not file_path:
+            task_db.fail(task_id, f"File not found: {file_id}", should_retry=False)
+            return
+
+        if not Path(file_path).exists():
+            task_db.fail(
+                task_id, f"File does not exist: {file_path}", should_retry=False
+            )
+            return
+
         logger.info(f"Loading Whisper model for file: {file_path}")
         engine = FasterWhisperEngine()
         options = TranscribeOptions()
@@ -68,9 +71,7 @@ def run_transcription(
         segments_list = []
         duration = 0.0
 
-        # Pass progress callback to engine
         for segment in engine.transcribe(file_path, options, on_progress=on_progress):
-            # Check cancellation every segment for faster abort
             current = task_db.get_task(task_id)
             if current and current["status"] == "cancelled":
                 logger.warning(f"Task {task_id} cancelled mid-transcription")
@@ -79,7 +80,6 @@ def run_transcription(
             segments_list.append(asdict(segment))
             duration = max(duration, segment.end)
 
-        # Log warning if no segments found
         if not segments_list:
             logger.warning(
                 f"No segments found for task {task_id}. "
@@ -120,7 +120,6 @@ def worker_loop(db_path: str | Path = "data/nola.db") -> None:
             if task:
                 run_transcription(task, file_db, task_db)
             else:
-                # No task, wait before polling again
                 time.sleep(1)
 
         except KeyboardInterrupt:
@@ -141,20 +140,15 @@ def signal_handler(signum: int, frame: Any) -> None:
 
 def main() -> None:
     """Worker entry point."""
-    # Configure logging (only when run directly)
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # Initialize database
     init_db()
-
-    # Start worker loop
     worker_loop()
 
 

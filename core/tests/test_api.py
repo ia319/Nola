@@ -16,12 +16,18 @@ def client():
     """Create test client with isolated database."""
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
+        upload_dir = Path(tmpdir) / "uploads"
 
-        # Mock database path in deps module
-        with patch("nola.api.deps.DB_PATH", db_path):
-            # Initialize schema
-            init_db(db_path)
+        # Pre-initialize before lifespan runs
+        init_db(db_path)
+        upload_dir.mkdir(parents=True, exist_ok=True)
 
+        with (
+            patch("nola.api.deps.DB_PATH", db_path),
+            patch("nola.main.init_db", lambda: None),  # Skip duplicate init
+            patch("nola.main.UPLOAD_DIR", upload_dir),
+            patch("nola.api.files.UPLOAD_DIR", upload_dir),
+        ):
             yield TestClient(app)
 
 
