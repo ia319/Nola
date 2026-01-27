@@ -92,6 +92,6 @@ class TestTranscriptionsAPI:
         """Test creating task from non-existent path."""
         response = client.post(
             "/api/transcriptions/from-path",
-            params={"file_path": "/nonexistent/path/audio.mp3"},
+            json={"file_path": "/nonexistent/path/audio.mp3"},
         )
         assert response.status_code == 404

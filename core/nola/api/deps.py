@@ -1,11 +1,9 @@
 """API dependency injection."""
 
 from functools import lru_cache
-from pathlib import Path
 
+from nola.core.constants import DB_PATH
 from nola.models import FileDatabase, TaskDatabase
-
-DB_PATH = Path("data/nola.db")
 
 
 @lru_cache

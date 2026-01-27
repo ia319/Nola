@@ -370,9 +370,12 @@ class TaskDatabase:
             return None
 
         task = dict(row)
-        # Parse JSON segments
+        # Parse JSON segments with defensive handling
         if task["segments"]:
-            task["segments"] = json.loads(task["segments"])
+            try:
+                task["segments"] = json.loads(task["segments"])
+            except json.JSONDecodeError:
+                task["segments"] = []
         return task
 
     # Legacy method for compatibility

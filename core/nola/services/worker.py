@@ -44,7 +44,6 @@ def run_transcription(
 
     logger.info(f"Starting transcription for task {task_id}")
 
-    # Get file path
     file_path = file_db.get_file_path(file_id)
     if not file_path:
         task_db.fail(task_id, f"File not found: {file_id}", should_retry=False)
@@ -81,7 +80,6 @@ def run_transcription(
                 "File may be silent or VAD filtered all content."
             )
 
-        # Save result
         task_db.complete(task_id, segments_list, duration)
         logger.info(
             f"Task {task_id} completed: {len(segments_list)} segments, "
@@ -109,7 +107,6 @@ def worker_loop(db_path: str | Path = "data/nola.db") -> None:
 
     while _running:
         try:
-            # Get next task
             task = task_db.dequeue(worker_id)
 
             if task:

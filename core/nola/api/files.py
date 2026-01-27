@@ -1,6 +1,5 @@
 """File management API endpoints."""
 
-import shutil
 import uuid
 from pathlib import Path
 from typing import Any
@@ -8,11 +7,14 @@ from typing import Any
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from nola.api.deps import get_file_db
+from nola.core.constants import (
+    ALLOWED_AUDIO_TYPES,
+    ALLOWED_EXTENSIONS,
+    MAX_FILE_SIZE,
+    UPLOAD_DIR,
+)
 
 router = APIRouter(prefix="/api/files", tags=["files"])
-
-# Upload directory
-UPLOAD_DIR = Path("data/uploads")
 
 
 @router.post("/", summary="Upload audio file")
@@ -24,25 +26,47 @@ async def upload_file(
     The file is saved to the server and a file_id is returned.
     Use this file_id to create transcription tasks.
 
-    Supported formats: mp3, wav, flac, m4a, ogg, etc.
+    Supported formats: mp3, wav, flac, m4a, ogg, webm, aac
+    Max file size: 500 MB
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
 
-    # Generate file ID
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file format: {file_ext}. "
+            f"Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
+
+    if file.content_type and file.content_type not in ALLOWED_AUDIO_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported content type: {file.content_type}",
+        )
+
     file_id = str(uuid.uuid4())
 
-    # Save file
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    file_ext = Path(file.filename).suffix.lower()
     file_path = UPLOAD_DIR / f"{file_id}{file_ext}"
 
+    file_size = 0
     with open(file_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+        while chunk := file.file.read(1024 * 1024):  # 1 MB chunks
+            file_size += len(chunk)
+            if file_size > MAX_FILE_SIZE:
+                f.close()
+                file_path.unlink()  # Clean up partial file
+                raise HTTPException(
+                    status_code=413,
+                    detail=(
+                        "File too large. Maximum size: "
+                        f"{MAX_FILE_SIZE // (1024 * 1024)} MB"
+                    ),
+                )
+            f.write(chunk)
 
-    file_size = file_path.stat().st_size
-
-    # Create database record
     file_db = get_file_db()
     file_db.create_file(
         file_id=file_id,
@@ -98,12 +122,10 @@ async def delete_file(file_id: str) -> dict[str, str]:
     """
     file_db = get_file_db()
 
-    # Get file info first
     file = file_db.get_file(file_id)
     if file is None:
         raise HTTPException(status_code=404, detail="File not found")
 
-    # Delete physical file if exists
     file_path = Path(file["path"])
     if file_path.exists():
         file_path.unlink()

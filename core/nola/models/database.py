@@ -1,9 +1,9 @@
 import sqlite3
 from pathlib import Path
 
-from .utils import ensure_sqlite_version
+from nola.core.constants import DB_PATH
 
-DB_PATH = Path("data/nola.db")
+from .utils import ensure_sqlite_version
 
 
 def init_db(db_path: str | Path = DB_PATH) -> None:

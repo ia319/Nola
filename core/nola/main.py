@@ -2,18 +2,14 @@
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 
 from nola import __version__
 from nola.api.files import router as files_router
 from nola.api.transcriptions import router as transcriptions_router
+from nola.core.constants import UPLOAD_DIR
 from nola.models import init_db
-
-# Data directories
-DATA_DIR = Path("data")
-UPLOAD_DIR = DATA_DIR / "uploads"
 
 
 @asynccontextmanager

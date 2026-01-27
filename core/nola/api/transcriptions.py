@@ -2,14 +2,16 @@
 
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Body, HTTPException, Query
 
 from nola.api.deps import get_file_db, get_task_db
-from nola.models import TaskStatus
 
 router = APIRouter(prefix="/api/transcriptions", tags=["transcriptions"])
+
+# Valid status values for filtering
+StatusFilter = Literal["pending", "processing", "completed", "failed", "cancelled"]
 
 
 @router.post("/", summary="Create transcription task")
@@ -27,12 +29,10 @@ async def create_transcription(
     file_db = get_file_db()
     task_db = get_task_db()
 
-    # Verify file exists
     file = file_db.get_file(file_id)
     if file is None:
         raise HTTPException(status_code=404, detail=f"File not found: {file_id}")
 
-    # Create task
     task_id = str(uuid.uuid4())
     task_db.enqueue(task_id=task_id, file_id=file_id)
 
@@ -46,7 +46,9 @@ async def create_transcription(
 
 @router.post("/from-path", summary="Create task from server path")
 async def create_transcription_from_path(
-    file_path: str = Query(..., description="Absolute path to audio file on server"),
+    file_path: str = Body(
+        ..., embed=True, description="Absolute path to audio file on server"
+    ),
 ) -> dict[str, Any]:
     """Create transcription task from a file path on the server.
 
@@ -61,7 +63,6 @@ async def create_transcription_from_path(
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
 
-    # Detect content type from extension
     ext_to_mime = {
         ".mp3": "audio/mpeg",
         ".wav": "audio/wav",
@@ -72,11 +73,9 @@ async def create_transcription_from_path(
     }
     content_type = ext_to_mime.get(path.suffix.lower(), "audio/mpeg")
 
-    # Generate IDs
     file_id = str(uuid.uuid4())
     task_id = str(uuid.uuid4())
 
-    # Create database records
     file_db = get_file_db()
     task_db = get_task_db()
 
@@ -100,7 +99,7 @@ async def create_transcription_from_path(
 
 @router.get("/")
 async def list_transcriptions(
-    status: str | None = Query(None, description="Filter by status"),
+    status: StatusFilter | None = Query(None, description="Filter by status"),
     limit: int = Query(50, ge=1, le=100, description="Max results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
 ) -> dict[str, Any]:
@@ -116,7 +115,6 @@ async def list_transcriptions(
     """
     task_db = get_task_db()
 
-    # Get tasks from database
     tasks = task_db.list_tasks(status=status, limit=limit, offset=offset)
     total = task_db.count_tasks(status=status)
 
@@ -179,27 +177,18 @@ async def cancel_transcription(task_id: str) -> dict[str, Any]:
     """
     task_db = get_task_db()
 
-    # Check task exists
-    task = task_db.get_task(task_id)
-    if task is None:
-        raise HTTPException(status_code=404, detail="Task not found")
+    # Attempt to cancel - returns False if not found or not cancellable
+    cancelled = task_db.cancel(task_id)
 
-    # Check if can be cancelled
-    if task["status"] in (
-        TaskStatus.COMPLETED.value,
-        TaskStatus.FAILED.value,
-        TaskStatus.CANCELLED.value,
-    ):
+    if not cancelled:
+        # Check if task exists to provide appropriate error
+        task = task_db.get_task(task_id)
+        if task is None:
+            raise HTTPException(status_code=404, detail="Task not found")
         raise HTTPException(
             status_code=400,
             detail=f"Cannot cancel task with status: {task['status']}",
         )
-
-    # Cancel task
-    cancelled = task_db.cancel(task_id)
-
-    if not cancelled:
-        raise HTTPException(status_code=500, detail="Failed to cancel task")
 
     return {
         "task_id": task_id,
