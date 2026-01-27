@@ -68,13 +68,17 @@ async def upload_file(
             f.write(chunk)
 
     file_db = get_file_db()
-    file_db.create_file(
-        file_id=file_id,
-        filename=file.filename,
-        path=str(file_path),
-        size=file_size,
-        content_type=file.content_type or "audio/mpeg",
-    )
+    try:
+        file_db.create_file(
+            file_id=file_id,
+            filename=file.filename,
+            path=str(file_path),
+            size=file_size,
+            content_type=file.content_type or "audio/mpeg",
+        )
+    except Exception:
+        file_path.unlink(missing_ok=True)
+        raise
 
     return {
         "file_id": file_id,
@@ -127,10 +131,9 @@ async def delete_file(file_id: str) -> dict[str, str]:
         raise HTTPException(status_code=404, detail="File not found")
 
     file_path = Path(file["path"])
-    if file_path.exists():
-        file_path.unlink()
 
-    # Delete from database
+    # DB first: orphan file is safer than orphan DB record
     file_db.delete_file(file_id)
+    file_path.unlink(missing_ok=True)
 
     return {"message": f"File {file_id} deleted"}

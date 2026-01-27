@@ -1,5 +1,6 @@
 """Batch transcription API endpoints."""
 
+import logging
 import uuid
 from pathlib import Path
 from typing import Any, Literal
@@ -7,6 +8,8 @@ from typing import Any, Literal
 from fastapi import APIRouter, Body, HTTPException, Query
 
 from nola.api.deps import get_file_db, get_task_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/transcriptions", tags=["transcriptions"])
 
@@ -57,9 +60,16 @@ async def create_transcription_from_path(
     - Automated pipelines (e.g., watched folder)
     - Development and testing
 
+    Warning:
+        This endpoint accepts arbitrary server paths. In production,
+        restrict access via API gateway or authentication.
+
     Note: The file must exist on the server where the API is running.
     """
     path = Path(file_path)
+
+    logger.info(f"from-path access: {file_path}")
+
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
 
