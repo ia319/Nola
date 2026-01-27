@@ -198,7 +198,7 @@ class TestTaskDatabase:
         assert task["retry_count"] == 1  # Verify retry count incremented
 
     def test_requeue_poison_pill(self, test_db):
-        """Test that poison pill tasks stop being requeued after max retries."""
+        """Test that poison pill tasks are marked FAILED after max retries."""
         file_db, task_db = test_db
 
         file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
@@ -222,12 +222,12 @@ class TestTaskDatabase:
         task_db.dequeue("worker-001")
         count = task_db.requeue_timeout_tasks(timeout_seconds=0)
 
-        # Should NOT requeue anymore
+        # Should NOT requeue anymore, but mark as FAILED
         assert count == 0
         task = task_db.get_task("task-poison")
-        # Task remains in PROCESSING state (or could be cleaned up by another process)
-        # Key is it's not reset to PENDING, avoiding infinite loop
-        assert task["status"] == TaskStatus.PROCESSING.value
+        assert task["status"] == TaskStatus.FAILED.value
+        assert "max retries exceeded" in task["error"]
+        assert task["completed_at"] is not None
 
     def test_list_tasks(self, test_db):
         """Test listing tasks with filtering."""

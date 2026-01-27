@@ -243,11 +243,14 @@ class TaskDatabase:
     def requeue_timeout_tasks(self, timeout_seconds: int = 3600) -> int:
         """Requeue tasks that exceeded timeout.
 
+        Tasks with retries available are requeued to PENDING.
+        Tasks that exhausted retries are marked as FAILED.
+
         Args:
             timeout_seconds: Timeout threshold
 
         Returns:
-            Number of tasks requeued
+            Number of tasks requeued (not including failed ones)
         """
         with sqlite3.connect(self.db_path) as conn:
             timeout_at = datetime.now() - timedelta(seconds=timeout_seconds)
@@ -268,20 +271,40 @@ class TaskDatabase:
                     timeout_at.isoformat(),
                 ),
             )
+            requeued_count = cursor.rowcount
 
-            count = cursor.rowcount
+            conn.execute(
+                """
+                UPDATE transcription_tasks
+                SET status = ?, 
+                    error = 'Task timeout - max retries exceeded',
+                    completed_at = ?
+                WHERE status = ?
+                  AND started_at < ?
+                  AND retry_count >= max_retries
+                """,
+                (
+                    TaskStatus.FAILED.value,
+                    datetime.now().isoformat(),
+                    TaskStatus.PROCESSING.value,
+                    timeout_at.isoformat(),
+                ),
+            )
+
             conn.commit()
-
-            return count
+            return requeued_count
 
     def requeue_dead_workers(self, heartbeat_timeout: int = 300) -> int:
         """Requeue tasks from workers with stale heartbeat.
+
+        Tasks with retries available are requeued to PENDING.
+        Tasks that exhausted retries are marked as FAILED.
 
         Args:
             heartbeat_timeout: Heartbeat timeout in seconds
 
         Returns:
-            Number of tasks requeued
+            Number of tasks requeued (not including failed ones)
         """
         with sqlite3.connect(self.db_path) as conn:
             timeout_at = datetime.now() - timedelta(seconds=heartbeat_timeout)
@@ -302,11 +325,28 @@ class TaskDatabase:
                     timeout_at.isoformat(),
                 ),
             )
+            requeued_count = cursor.rowcount
 
-            count = cursor.rowcount
+            conn.execute(
+                """
+                UPDATE transcription_tasks
+                SET status = ?, 
+                    error = 'Worker heartbeat timeout - max retries exceeded',
+                    completed_at = ?
+                WHERE status = ?
+                  AND last_heartbeat < ?
+                  AND retry_count >= max_retries
+                """,
+                (
+                    TaskStatus.FAILED.value,
+                    datetime.now().isoformat(),
+                    TaskStatus.PROCESSING.value,
+                    timeout_at.isoformat(),
+                ),
+            )
+
             conn.commit()
-
-            return count
+            return requeued_count
 
     # === Query Operations ===
 
