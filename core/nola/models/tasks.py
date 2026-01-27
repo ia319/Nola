@@ -32,6 +32,13 @@ class TaskDatabase:
         """
         self.db_path = Path(db_path)
 
+    def _connect(self) -> sqlite3.Connection:
+        """Create connection with foreign key enforcement."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        return conn
+
     # === Queue Operations ===
 
     def enqueue(
@@ -45,7 +52,7 @@ class TaskDatabase:
             priority: Task priority (higher = sooner)
             max_retries: Maximum retry attempts
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.execute(
                 """
                 INSERT INTO transcription_tasks 
@@ -72,10 +79,9 @@ class TaskDatabase:
         Returns:
             Task dict or None if queue is empty
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.row_factory = sqlite3.Row
 
-            # Atomic get + lock operation
             cursor = conn.execute(
                 """
                 UPDATE transcription_tasks
@@ -114,34 +120,42 @@ class TaskDatabase:
             task_id: Task identifier
             progress: Current progress (0-100)
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.execute(
                 """
                 UPDATE transcription_tasks
                 SET last_heartbeat = ?, progress = ?
-                WHERE id = ?
+                WHERE id = ? AND status = ?
                 """,
-                (datetime.now().isoformat(), progress, task_id),
+                (
+                    datetime.now().isoformat(),
+                    progress,
+                    task_id,
+                    TaskStatus.PROCESSING.value,
+                ),
             )
             conn.commit()
 
     def complete(
         self, task_id: str, segments: list[dict[str, Any]], duration: float
-    ) -> None:
+    ) -> bool:
         """Mark task as completed with results.
 
         Args:
             task_id: Task identifier
             segments: Transcription segments
             duration: Audio duration in seconds
+
+        Returns:
+            True if updated, False if task was cancelled or not found
         """
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
+        with self._connect() as conn:
+            cursor = conn.execute(
                 """
                 UPDATE transcription_tasks
                 SET status = ?, segments = ?, duration = ?, 
                     progress = 100.0, completed_at = ?
-                WHERE id = ?
+                WHERE id = ? AND status = ?
                 """,
                 (
                     TaskStatus.COMPLETED.value,
@@ -149,9 +163,11 @@ class TaskDatabase:
                     duration,
                     datetime.now().isoformat(),
                     task_id,
+                    TaskStatus.PROCESSING.value,
                 ),
             )
             conn.commit()
+            return cursor.rowcount > 0
 
     def fail(self, task_id: str, error: str, should_retry: bool = True) -> bool:
         """Mark task as failed with optional retry.
@@ -164,7 +180,7 @@ class TaskDatabase:
         Returns:
             True if task was updated, False if task not found
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             # Atomic conditional update:
             # 1. Try to requeue if retries available
             if should_retry:
@@ -173,12 +189,16 @@ class TaskDatabase:
                     UPDATE transcription_tasks
                     SET status = ?, retry_count = retry_count + 1, 
                         error = ?, worker_id = NULL, started_at = NULL
-                    WHERE id = ? AND retry_count < max_retries
+                    WHERE id = ? AND retry_count < max_retries AND status = ?
                     """,
-                    (TaskStatus.PENDING.value, error, task_id),
+                    (
+                        TaskStatus.PENDING.value,
+                        error,
+                        task_id,
+                        TaskStatus.PROCESSING.value,
+                    ),
                 )
 
-                # If updated, return successfully
                 if cursor.rowcount > 0:
                     conn.commit()
                     return True
@@ -191,13 +211,14 @@ class TaskDatabase:
                 """
                 UPDATE transcription_tasks
                 SET status = ?, error = ?, completed_at = ?
-                WHERE id = ?
+                WHERE id = ? AND status = ?
                 """,
                 (
                     TaskStatus.FAILED.value,
                     error,
                     datetime.now().isoformat(),
                     task_id,
+                    TaskStatus.PROCESSING.value,
                 ),
             )
 
@@ -217,7 +238,7 @@ class TaskDatabase:
         Returns:
             True if cancelled, False if not found or already completed
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             cursor = conn.execute(
                 """
                 UPDATE transcription_tasks
@@ -252,7 +273,7 @@ class TaskDatabase:
         Returns:
             Number of tasks requeued (not including failed ones)
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             timeout_at = datetime.now() - timedelta(seconds=timeout_seconds)
 
             cursor = conn.execute(
@@ -306,7 +327,7 @@ class TaskDatabase:
         Returns:
             Number of tasks requeued (not including failed ones)
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             timeout_at = datetime.now() - timedelta(seconds=heartbeat_timeout)
 
             cursor = conn.execute(
@@ -359,7 +380,7 @@ class TaskDatabase:
         Returns:
             Task dictionary or None if not found
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 "SELECT * FROM transcription_tasks WHERE id = ?", (task_id,)
@@ -370,7 +391,6 @@ class TaskDatabase:
             return None
 
         task = dict(row)
-        # Parse JSON segments with defensive handling
         if task["segments"]:
             try:
                 task["segments"] = json.loads(task["segments"])
@@ -386,7 +406,7 @@ class TaskDatabase:
     def get_next_pending_task(self) -> dict[str, Any] | None:
         """Legacy: Get next pending task (use dequeue instead)."""
         # Note: This doesn't lock the task, for testing only
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 """
@@ -405,7 +425,7 @@ class TaskDatabase:
         self, task_id: str, status: TaskStatus, error: str | None = None
     ) -> None:
         """Legacy: Update task status (use specific methods instead)."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             if status in (
                 TaskStatus.COMPLETED,
                 TaskStatus.FAILED,
@@ -448,7 +468,7 @@ class TaskDatabase:
         offset: int = 0,
     ) -> list[dict[str, Any]]:
         """List tasks with optional filtering."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.row_factory = sqlite3.Row
             if status:
                 cursor = conn.execute(
@@ -466,7 +486,7 @@ class TaskDatabase:
 
     def count_tasks(self, status: str | None = None) -> int:
         """Count tasks with optional filtering."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             if status:
                 cursor = conn.execute(
                     "SELECT COUNT(*) FROM transcription_tasks WHERE status = ?",

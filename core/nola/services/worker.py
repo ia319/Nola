@@ -86,11 +86,13 @@ def run_transcription(
                 "File may be silent or VAD filtered all content."
             )
 
-        task_db.complete(task_id, segments_list, duration)
-        logger.info(
-            f"Task {task_id} completed: {len(segments_list)} segments, "
-            f"duration={duration:.2f}s"
-        )
+        if task_db.complete(task_id, segments_list, duration):
+            logger.info(
+                f"Task {task_id} completed: {len(segments_list)} segments, "
+                f"duration={duration:.2f}s"
+            )
+        else:
+            logger.warning(f"Task {task_id} was cancelled before completion")
 
     except Exception as e:
         logger.error(f"Transcription failed for task {task_id}: {e}")
