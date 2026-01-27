@@ -16,11 +16,6 @@ from nola.engines.base import TranscribeOptions
 from nola.engines.faster_whisper import FasterWhisperEngine
 from nola.models import FileDatabase, TaskDatabase, init_db
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 logger = logging.getLogger("nola.worker")
 
 # Global flag for graceful shutdown
@@ -141,6 +136,12 @@ def signal_handler(signum: int, frame: Any) -> None:
 
 def main() -> None:
     """Worker entry point."""
+    # Configure logging (only when run directly)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+
     # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
