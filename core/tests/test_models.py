@@ -1,5 +1,6 @@
 """Pytest tests for database models."""
 
+import gc
 import tempfile
 from pathlib import Path
 
@@ -31,8 +32,6 @@ def test_db():
             yield file_db, task_db
         finally:
             # Ensure all connections are closed before cleanup
-            import gc
-
             gc.collect()
 
             # Restore original path
@@ -135,9 +134,10 @@ class TestTaskDatabase:
         task_db.enqueue("task-001", "file-001", max_retries=3)
         task_db.dequeue("worker-001")
 
-        task_db.fail("task-001", "Test error", should_retry=True)
+        result = task_db.fail("task-001", "Test error", should_retry=True)
         task = task_db.get_task("task-001")
 
+        assert result is True
         assert task["status"] == TaskStatus.PENDING.value  # Requeued
         assert task["retry_count"] == 1
         assert task["error"] == "Test error"
@@ -151,19 +151,21 @@ class TestTaskDatabase:
         task_db.enqueue("task-001", "file-001", max_retries=0)
         task_db.dequeue("worker-001")
 
-        task_db.fail("task-001", "Final error", should_retry=True)
+        result = task_db.fail("task-001", "Final error", should_retry=True)
         task = task_db.get_task("task-001")
 
+        assert result is True
         assert task["status"] == TaskStatus.FAILED.value
         assert task["retry_count"] == 0
         assert task["error"] == "Final error"
         assert task["completed_at"] is not None
 
     def test_fail_non_existent_task(self, test_db):
-        """Test failing a non-existent task."""
+        """Test failing a non-existent task returns False."""
         _, task_db = test_db
-        # Should not raise error
-        task_db.fail("non-existent", "Error")
+        # Should not raise error, but return False
+        result = task_db.fail("non-existent", "Error")
+        assert result is False
 
     def test_cancel_task(self, test_db):
         """Test task cancellation."""

@@ -1,11 +1,14 @@
 """Production-grade transcription task queue management."""
 
 import json
+import logging
 import sqlite3
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class TaskStatus(str, Enum):
@@ -150,13 +153,16 @@ class TaskDatabase:
             )
             conn.commit()
 
-    def fail(self, task_id: str, error: str, should_retry: bool = True) -> None:
+    def fail(self, task_id: str, error: str, should_retry: bool = True) -> bool:
         """Mark task as failed with optional retry.
 
         Args:
             task_id: Task identifier
             error: Error message
             should_retry: If True, requeue if retries available
+
+        Returns:
+            True if task was updated, False if task not found
         """
         with sqlite3.connect(self.db_path) as conn:
             # Atomic conditional update:
@@ -175,13 +181,13 @@ class TaskDatabase:
                 # If updated, return successfully
                 if cursor.rowcount > 0:
                     conn.commit()
-                    return
+                    return True
 
             # 2. If we reached here, either:
             #    - should_retry is False
             #    - OR retry_count >= max_retries (atomic check failed)
             # So mark as permanently failed
-            conn.execute(
+            cursor = conn.execute(
                 """
                 UPDATE transcription_tasks
                 SET status = ?, error = ?, completed_at = ?
@@ -196,6 +202,11 @@ class TaskDatabase:
             )
 
             conn.commit()
+
+            if cursor.rowcount == 0:
+                logger.warning(f"Attempted to fail non-existent task: {task_id}")
+                return False
+            return True
 
     def cancel(self, task_id: str) -> bool:
         """Cancel a task.
