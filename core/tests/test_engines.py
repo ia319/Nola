@@ -33,8 +33,8 @@ class TestEngineConfig:
         """Verify default configuration values."""
         config = EngineConfig()
 
-        assert config.model_size == "base"
-        assert config.device == "auto"
+        assert config.model_size == "small"
+        assert config.device == "cpu"
         assert config.compute_type == "default"
 
     def test_config_custom_values(self) -> None:
@@ -66,9 +66,9 @@ class TestFasterWhisperEngine:
         engine = FasterWhisperEngine()
 
         mock_model.assert_called_once_with(
-            "base", device="auto", compute_type="default"
+            "small", device="cpu", compute_type="default"
         )
-        assert engine._config.model_size == "base"
+        assert engine._config.model_size == "small"
 
     @patch("nola.engines.faster_whisper.WhisperModel")
     def test_engine_creation_custom_config(self, mock_model: MagicMock) -> None:
