@@ -7,12 +7,8 @@ from typing import Any
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from nola.api.deps import get_file_db
-from nola.core.constants import (
-    ALLOWED_AUDIO_TYPES,
-    ALLOWED_EXTENSIONS,
-    MAX_FILE_SIZE,
-    UPLOAD_DIR,
-)
+from nola.config import ALLOWED_AUDIO_TYPES, ALLOWED_EXTENSIONS, settings
+from nola.utils import infer_content_type
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
@@ -48,21 +44,21 @@ async def upload_file(
 
     file_id = str(uuid.uuid4())
 
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    file_path = UPLOAD_DIR / f"{file_id}{file_ext}"
+    settings.upload_dir.mkdir(parents=True, exist_ok=True)
+    file_path = settings.upload_dir / f"{file_id}{file_ext}"
 
     file_size = 0
     with open(file_path, "wb") as f:
         while chunk := file.file.read(1024 * 1024):  # 1 MB chunks
             file_size += len(chunk)
-            if file_size > MAX_FILE_SIZE:
+            if file_size > settings.max_file_size:
                 f.close()
                 file_path.unlink()  # Clean up partial file
                 raise HTTPException(
                     status_code=413,
                     detail=(
                         "File too large. Maximum size: "
-                        f"{MAX_FILE_SIZE // (1024 * 1024)} MB"
+                        f"{settings.max_file_size // (1024 * 1024)} MB"
                     ),
                 )
             f.write(chunk)
@@ -74,7 +70,7 @@ async def upload_file(
             filename=file.filename,
             path=str(file_path),
             size=file_size,
-            content_type=file.content_type or "audio/mpeg",
+            content_type=file.content_type or infer_content_type(file.filename),
         )
     except Exception:
         file_path.unlink(missing_ok=True)
@@ -84,7 +80,7 @@ async def upload_file(
         "file_id": file_id,
         "filename": file.filename,
         "size": file_size,
-        "content_type": file.content_type,
+        "content_type": file.content_type or infer_content_type(file.filename),
     }
 
 
