@@ -1,16 +1,16 @@
 import sqlite3
 from pathlib import Path
 
-from nola.core.constants import DB_PATH
+from nola.config import settings
 
 from .utils import ensure_sqlite_version
 
 
-def init_db(db_path: str | Path = DB_PATH) -> None:
+def init_db(db_path: str | Path | None = None) -> None:
     """Initialize database schema with files and tasks tables."""
     ensure_sqlite_version()
 
-    path = Path(db_path)
+    path = Path(db_path) if db_path else settings.db_path
     path.parent.mkdir(parents=True, exist_ok=True)
 
     with sqlite3.connect(path) as conn:

@@ -8,6 +8,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Body, HTTPException, Query
 
 from nola.api.deps import get_file_db, get_task_db
+from nola.utils import infer_content_type
 
 logger = logging.getLogger(__name__)
 
@@ -73,15 +74,7 @@ async def create_transcription_from_path(
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
 
-    ext_to_mime = {
-        ".mp3": "audio/mpeg",
-        ".wav": "audio/wav",
-        ".flac": "audio/flac",
-        ".m4a": "audio/mp4",
-        ".ogg": "audio/ogg",
-        ".wma": "audio/x-ms-wma",
-    }
-    content_type = ext_to_mime.get(path.suffix.lower(), "audio/mpeg")
+    content_type = infer_content_type(path.name)
 
     file_id = str(uuid.uuid4())
     task_id = str(uuid.uuid4())

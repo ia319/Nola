@@ -103,7 +103,6 @@ async def get_file(file_id: str) -> dict[str, Any]:
     return {
         "file_id": file["id"],
         "filename": file["filename"],
-        "path": file["path"],
         "size": file["size"],
         "content_type": file["content_type"],
         "created_at": file["created_at"],

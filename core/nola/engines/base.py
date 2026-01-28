@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 
+from nola.config import settings
+
 # Progress callback type: receives progress percentage (0-100)
 ProgressCallback = Callable[[float], None]
 
@@ -21,9 +23,9 @@ class Segment:
 class EngineConfig:
     """Engine initialization configuration."""
 
-    model_size: str = "base"
-    device: str = "auto"
-    compute_type: str = "default"
+    model_size: str = field(default_factory=lambda: settings.model_size)
+    device: str = field(default_factory=lambda: settings.device)
+    compute_type: str = field(default_factory=lambda: settings.compute_type)
 
 
 @dataclass

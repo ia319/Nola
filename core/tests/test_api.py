@@ -2,11 +2,13 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import PropertyMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
+from nola.api.deps import get_file_db, get_task_db
+from nola.config.settings import Settings
 from nola.main import app
 from nola.models import init_db
 
@@ -14,21 +16,33 @@ from nola.models import init_db
 @pytest.fixture
 def client():
     """Create test client with isolated database."""
-    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
-        db_path = Path(tmpdir) / "test.db"
-        upload_dir = Path(tmpdir) / "uploads"
+    get_file_db.cache_clear()
+    get_task_db.cache_clear()
 
-        # Pre-initialize before lifespan runs
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        tmp_path = Path(tmpdir)
+        db_path = tmp_path / "nola.db"
+        upload_dir = tmp_path / "uploads"
+
         init_db(db_path)
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         with (
-            patch("nola.api.deps.DB_PATH", db_path),
-            patch("nola.main.init_db", lambda: None),  # Skip duplicate init
-            patch("nola.main.UPLOAD_DIR", upload_dir),
-            patch("nola.api.files.UPLOAD_DIR", upload_dir),
+            patch.object(
+                Settings, "db_path", new_callable=PropertyMock, return_value=db_path
+            ),
+            patch.object(
+                Settings,
+                "upload_dir",
+                new_callable=PropertyMock,
+                return_value=upload_dir,
+            ),
+            patch("nola.main.init_db", lambda: None),
         ):
             yield TestClient(app)
+
+        get_file_db.cache_clear()
+        get_task_db.cache_clear()
 
 
 class TestHealthEndpoints:

@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from nola import __version__
 from nola.api.files import router as files_router
 from nola.api.transcriptions import router as transcriptions_router
-from nola.core.constants import UPLOAD_DIR
+from nola.config import settings
 from nola.models import init_db
 
 
@@ -16,7 +16,7 @@ from nola.models import init_db
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialize on startup."""
     init_db()
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    settings.upload_dir.mkdir(parents=True, exist_ok=True)
     yield
 
 

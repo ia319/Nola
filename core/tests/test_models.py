@@ -15,27 +15,15 @@ def test_db():
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
 
-        # Monkeypatch database path
-        import nola.models.database as db_module
-
-        original_path = db_module.DB_PATH
-        db_module.DB_PATH = db_path
-
-        # Initialize schema with explicit path
         init_db(db_path)
 
-        # Provide database instances
         file_db = FileDatabase(db_path)
         task_db = TaskDatabase(db_path)
 
         try:
             yield file_db, task_db
         finally:
-            # Ensure all connections are closed before cleanup
             gc.collect()
-
-            # Restore original path
-            db_module.DB_PATH = original_path
 
 
 class TestFileDatabase:
