@@ -14,6 +14,7 @@ ALLOWED_AUDIO_TYPES = {
     "audio/ogg",
     "audio/webm",
     "audio/aac",
+    "audio/x-ms-wma",
     "video/mp4",
 }
 
