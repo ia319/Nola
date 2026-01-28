@@ -36,8 +36,13 @@ Nola/
 │   │   ├── engines/           # Transcription engines
 │   │   │   ├── base.py        # Segment, EngineConfig, TranscriptionEngine
 │   │   │   └── faster_whisper.py  # FasterWhisperEngine implementation
-│   │   ├── services/          # Business logic
-│   │   └── models/            # Pydantic schemas
+│   │   ├── models/            # Data models & Database
+│   │   │   ├── database.py    # Schema & init
+│   │   │   ├── files.py       # File model
+│   │   │   ├── tasks.py       # Task Queue logic
+│   │   │   └── utils/         # Model utilities
+│   │   │       └── db.py      # SQLite version check
+│   │   └── services/          # Business logic
 │   └── tests/                 # Test directory
 ├── app/                       # Frontend GUI (TODO)
 ├── .pre-commit-config.yaml    # Pre-commit hooks (root level)
@@ -45,6 +50,17 @@ Nola/
 ├── .gitignore
 └── AI_INSTRUCTIONS.md         # This file
 ```
+
+---
+
+## Database Conventions
+
+> [!IMPORTANT]
+> **Database Operations Must Follow:**
+> 1.  **Context Managers**: Use `with sqlite3.connect(...) as conn:` to prevent leaks.
+> 2.  **Atomic Updates**: Use `UPDATE ... WHERE ... RETURNING` for queue operations to avoid race conditions.
+> 3.  **Poison Pill Protection**: Increment `retry_count` even when requeuing timeout/dead tasks.
+> 4.  **Environment Check**: Verify `sqlite3` version >= 3.35.0 on startup.
 
 ---
 
@@ -69,7 +85,22 @@ Nola/
 
 ---
 
-## Key Files
+## Detailed Module Overview
+
+### core/nola/models/
+Data persistence layer (SQLite):
+- `database.py`: Schema initialization, connection management, and foreign key enforcement.
+- `files.py`: `FileDatabase` for managing audio file metadata.
+- `tasks.py`: `TaskDatabase` implementing the production-grade job queue (priority, heartbeat, retries).
+- `utils/db.py`: Database utilities (e.g., `ensure_sqlite_version`).
+
+### core/nola/engines/
+Transcription engine layer:
+- `Segment`: Data class for transcribed segment with timing
+- `EngineConfig`: Engine initialization configuration
+- `TranscribeOptions`: Full transcription options (language, beam_size, vad_filter, etc.)
+- `TranscriptionEngine`: Abstract interface for transcription engines
+- `FasterWhisperEngine`: Faster-Whisper implementation
 
 ### core/nola/main.py
 FastAPI entry point:
@@ -81,14 +112,6 @@ Config management via `pydantic-settings`:
 - `model_size`: Whisper model size (default "base")
 - `device`: Runtime device (default "auto")
 - `host/port`: Server config
-
-### core/nola/engines/
-Transcription engine layer:
-- `Segment`: Data class for transcribed segment with timing
-- `EngineConfig`: Engine initialization configuration
-- `TranscribeOptions`: Full transcription options (language, beam_size, vad_filter, etc.)
-- `TranscriptionEngine`: Abstract interface for transcription engines
-- `FasterWhisperEngine`: Faster-Whisper implementation
 
 ---
 
