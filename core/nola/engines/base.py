@@ -1,8 +1,13 @@
 """Define base transcription engine interface."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
+
+from nola.config import settings
+
+# Progress callback type: receives progress percentage (0-100)
+ProgressCallback = Callable[[float], None]
 
 
 @dataclass
@@ -18,9 +23,9 @@ class Segment:
 class EngineConfig:
     """Engine initialization configuration."""
 
-    model_size: str = "base"
-    device: str = "auto"
-    compute_type: str = "default"
+    model_size: str = field(default_factory=lambda: settings.model_size)
+    device: str = field(default_factory=lambda: settings.device)
+    compute_type: str = field(default_factory=lambda: settings.compute_type)
 
 
 @dataclass
@@ -89,12 +94,14 @@ class TranscriptionEngine(ABC):
         self,
         file_path: str,
         options: TranscribeOptions | None = None,
+        on_progress: ProgressCallback | None = None,
     ) -> Generator[Segment, None, None]:
         """Transcribe audio file and yield segments.
 
         Args:
             file_path: Path to the audio file.
             options: Transcription options. Uses defaults if None.
+            on_progress: Optional callback for progress updates (0-100).
 
         Yields:
             Segment objects with start time, end time, and text.

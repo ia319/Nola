@@ -1,1 +1,1 @@
-"""Provide service layer implementations."""
+"""Services package."""

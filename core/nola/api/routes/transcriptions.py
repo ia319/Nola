@@ -1,0 +1,170 @@
+"""Transcription API endpoints."""
+
+import logging
+import uuid
+from dataclasses import asdict
+from typing import Any, Literal
+
+from fastapi import APIRouter, HTTPException, Query
+
+from nola.api.deps import get_file_db, get_task_db
+from nola.api.schemas import TranscriptionRequest
+from nola.engines.base import TranscribeOptions
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/transcriptions", tags=["transcriptions"])
+
+# Valid status values for filtering
+StatusFilter = Literal["pending", "processing", "completed", "failed", "cancelled"]
+
+
+@router.get("/options/defaults", summary="Get default transcription options")
+async def get_default_options() -> dict[str, Any]:
+    """Return default transcription options.
+
+    Use this endpoint to display available options and their defaults
+    in the frontend before creating a transcription task.
+    """
+    defaults = TranscribeOptions()
+    return asdict(defaults)
+
+
+@router.post("/", summary="Create transcription task")
+async def create_transcription(request: TranscriptionRequest) -> dict[str, Any]:
+    """Create a transcription task for an uploaded file.
+
+    Steps:
+    1. Upload file via POST /api/files → get file_id
+    2. Create task via this endpoint with file_id and optional parameters
+    3. Worker will automatically process the task
+    4. Query status via GET /api/transcriptions/{task_id}
+
+    All transcription parameters are optional. If not provided,
+    engine defaults will be used. See GET /options/defaults for defaults.
+    """
+    file_db = get_file_db()
+    task_db = get_task_db()
+
+    file = file_db.get_file(request.file_id)
+    if file is None:
+        raise HTTPException(
+            status_code=404, detail=f"File not found: {request.file_id}"
+        )
+
+    task_id = str(uuid.uuid4())
+    options = request.get_options_dict()
+
+    task_db.enqueue(
+        task_id=task_id,
+        file_id=request.file_id,
+        options=options if options else None,
+    )
+
+    return {
+        "task_id": task_id,
+        "file_id": request.file_id,
+        "filename": file["filename"],
+        "status": "pending",
+        "options": options if options else None,
+    }
+
+
+@router.get("/")
+async def list_transcriptions(
+    status: StatusFilter | None = Query(None, description="Filter by status"),
+    limit: int = Query(50, ge=1, le=100, description="Max results"),
+    offset: int = Query(0, ge=0, description="Offset for pagination"),
+) -> dict[str, Any]:
+    """List all transcription tasks.
+
+    Args:
+        status: Optional status filter (pending, processing, completed, failed)
+        limit: Maximum number of results
+        offset: Pagination offset
+
+    Returns:
+        List of tasks with pagination info
+    """
+    task_db = get_task_db()
+
+    tasks = task_db.list_tasks(status=status, limit=limit, offset=offset)
+    total = task_db.count_tasks(status=status)
+
+    return {
+        "tasks": [
+            {
+                "task_id": t["id"],
+                "file_id": t["file_id"],
+                "status": t["status"],
+                "progress": t["progress"],
+                "created_at": t["created_at"],
+                "completed_at": t["completed_at"],
+            }
+            for t in tasks
+        ],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@router.get("/{task_id}")
+async def get_transcription(task_id: str) -> dict[str, Any]:
+    """Get transcription task status and result.
+
+    Args:
+        task_id: Task identifier
+
+    Returns:
+        Task status and result
+    """
+    task_db = get_task_db()
+    task = task_db.get_task(task_id)
+
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return {
+        "task_id": task["id"],
+        "file_id": task["file_id"],
+        "status": task["status"],
+        "progress": task["progress"],
+        "duration": task["duration"],
+        "segments": task["segments"],
+        "error": task["error"],
+        "created_at": task["created_at"],
+        "completed_at": task["completed_at"],
+    }
+
+
+@router.delete("/{task_id}")
+async def cancel_transcription(task_id: str) -> dict[str, Any]:
+    """Cancel a transcription task.
+
+    Args:
+        task_id: Task identifier
+
+    Returns:
+        Cancellation result
+    """
+    task_db = get_task_db()
+
+    # Attempt to cancel - returns False if not found or not cancellable
+    cancelled = task_db.cancel(task_id)
+
+    if not cancelled:
+        # Check if task exists to provide appropriate error
+        task = task_db.get_task(task_id)
+        if task is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot cancel task with status: {task['status']}",
+        )
+
+    return {
+        "task_id": task_id,
+        "status": "cancelled",
+        "message": "Task cancelled successfully",
+    }
