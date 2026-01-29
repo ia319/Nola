@@ -42,7 +42,12 @@ class TaskDatabase:
     # === Queue Operations ===
 
     def enqueue(
-        self, task_id: str, file_id: str, priority: int = 0, max_retries: int = 3
+        self,
+        task_id: str,
+        file_id: str,
+        priority: int = 0,
+        max_retries: int = 3,
+        options: dict[str, Any] | None = None,
     ) -> None:
         """Add task to queue.
 
@@ -51,13 +56,14 @@ class TaskDatabase:
             file_id: Associated file ID
             priority: Task priority (higher = sooner)
             max_retries: Maximum retry attempts
+            options: Transcription options (non-None values only)
         """
         with self._connect() as conn:
             conn.execute(
                 """
                 INSERT INTO transcription_tasks 
-                (id, file_id, status, priority, max_retries, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (id, file_id, status, priority, max_retries, options, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     task_id,
@@ -65,6 +71,7 @@ class TaskDatabase:
                     TaskStatus.PENDING.value,
                     priority,
                     max_retries,
+                    json.dumps(options) if options else None,
                     datetime.now().isoformat(),
                 ),
             )
@@ -391,11 +398,17 @@ class TaskDatabase:
             return None
 
         task = dict(row)
+        # Parse JSON fields
         if task["segments"]:
             try:
                 task["segments"] = json.loads(task["segments"])
             except json.JSONDecodeError:
                 task["segments"] = []
+        if task.get("options"):
+            try:
+                task["options"] = json.loads(task["options"])
+            except json.JSONDecodeError:
+                task["options"] = {}
         return task
 
     # Legacy method for compatibility

@@ -65,9 +65,14 @@ def run_transcription(
 
         logger.info(f"Loading Whisper model for file: {file_path}")
         engine = FasterWhisperEngine()
-        options = TranscribeOptions()
 
-        logger.info("Starting transcription with default options")
+        # Build options from task, filtering out None values
+        task_options = task.get("options") or {}
+        options = TranscribeOptions(**task_options)
+
+        logger.info(
+            f"Starting transcription with options: {task_options or 'defaults'}"
+        )
         segments_list = []
         duration = 0.0
 

@@ -50,6 +50,9 @@ def init_db(db_path: str | Path | None = None) -> None:
                 last_heartbeat TEXT,
                 timeout_seconds INTEGER DEFAULT 3600,
                 
+                -- Transcription options (JSON)
+                options TEXT,
+                
                 -- Result fields
                 progress REAL DEFAULT 0.0,
                 duration REAL,

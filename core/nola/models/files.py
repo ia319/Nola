@@ -97,3 +97,71 @@ class FileDatabase:
             conn.commit()
 
             return deleted
+
+    def list_files(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+        """List all files with pagination.
+
+        Args:
+            limit: Maximum number of results
+            offset: Pagination offset
+
+        Returns:
+            List of file dictionaries
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM files ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def count_files(self) -> int:
+        """Count total files."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("SELECT COUNT(*) FROM files")
+            return int(cursor.fetchone()[0])
+
+    def check_integrity(self) -> dict[str, list[dict[str, Any]]]:
+        """Check file-database consistency.
+
+        Returns:
+            Dict with 'missing_files' (DB records with no file on disk)
+        """
+        missing_files = []
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT * FROM files")
+
+            for row in cursor.fetchall():
+                file_dict = dict(row)
+                file_path = Path(file_dict["path"])
+                if not file_path.exists():
+                    missing_files.append(
+                        {
+                            "id": file_dict["id"],
+                            "filename": file_dict["filename"],
+                            "path": file_dict["path"],
+                        }
+                    )
+
+        return {"missing_files": missing_files}
+
+    def cleanup_orphans(self) -> dict[str, Any]:
+        """Remove database records for files that no longer exist on disk.
+
+        Returns:
+            Dict with deleted_count and deleted_files list
+        """
+        integrity = self.check_integrity()
+        deleted_files: list[dict[str, Any]] = []
+
+        for orphan in integrity["missing_files"]:
+            if self.delete_file(orphan["id"]):
+                deleted_files.append(orphan)
+
+        return {
+            "deleted_count": len(deleted_files),
+            "deleted_files": deleted_files,
+        }
