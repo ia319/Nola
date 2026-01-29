@@ -111,20 +111,27 @@ async def upload_file(
     file_path = settings.upload_dir / f"{file_id}{file_ext}"
 
     file_size = 0
-    with open(file_path, "wb") as f:
-        while chunk := file.file.read(1024 * 1024):  # 1 MB chunks
-            file_size += len(chunk)
-            if file_size > settings.max_file_size:
-                f.close()
-                file_path.unlink()  # Clean up partial file
-                raise HTTPException(
-                    status_code=413,
-                    detail=(
-                        "File too large. Maximum size: "
-                        f"{settings.max_file_size // (1024 * 1024)} MB"
-                    ),
-                )
-            f.write(chunk)
+    try:
+        with open(file_path, "wb") as f:
+            while True:
+                chunk = await file.read(1024 * 1024)  # 1 MB chunks, async
+                if not chunk:
+                    break
+                file_size += len(chunk)
+                if file_size > settings.max_file_size:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=(
+                            "File too large. Maximum size: "
+                            f"{settings.max_file_size // (1024 * 1024)} MB"
+                        ),
+                    )
+                f.write(chunk)
+    except HTTPException:
+        file_path.unlink(missing_ok=True)
+        raise
+    finally:
+        await file.close()
 
     file_db = get_file_db()
     try:

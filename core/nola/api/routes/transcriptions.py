@@ -3,15 +3,13 @@
 import logging
 import uuid
 from dataclasses import asdict
-from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from nola.api.deps import get_file_db, get_task_db
 from nola.api.schemas import TranscriptionRequest
 from nola.engines.base import TranscribeOptions
-from nola.utils import infer_content_type
 
 logger = logging.getLogger(__name__)
 
@@ -69,58 +67,6 @@ async def create_transcription(request: TranscriptionRequest) -> dict[str, Any]:
         "filename": file["filename"],
         "status": "pending",
         "options": options if options else None,
-    }
-
-
-@router.post("/from-path", summary="Create task from server path")
-async def create_transcription_from_path(
-    file_path: str = Body(
-        ..., embed=True, description="Absolute path to audio file on server"
-    ),
-) -> dict[str, Any]:
-    """Create transcription task from a file path on the server.
-
-    This is useful for:
-    - Batch processing files already on the server
-    - Automated pipelines (e.g., watched folder)
-    - Development and testing
-
-    Warning:
-        This endpoint accepts arbitrary server paths. In production,
-        restrict access via API gateway or authentication.
-
-    Note: The file must exist on the server where the API is running.
-    """
-    path = Path(file_path)
-
-    logger.info(f"from-path access: {file_path}")
-
-    if not path.exists():
-        raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
-
-    content_type = infer_content_type(path.name)
-
-    file_id = str(uuid.uuid4())
-    task_id = str(uuid.uuid4())
-
-    file_db = get_file_db()
-    task_db = get_task_db()
-
-    file_db.create_file(
-        file_id=file_id,
-        filename=path.name,
-        path=str(path.absolute()),
-        size=path.stat().st_size,
-        content_type=content_type,
-    )
-
-    task_db.enqueue(task_id=task_id, file_id=file_id)
-
-    return {
-        "task_id": task_id,
-        "file_id": file_id,
-        "filename": path.name,
-        "status": "pending",
     }
 
 

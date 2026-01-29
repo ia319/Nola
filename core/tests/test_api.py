@@ -39,7 +39,8 @@ def client():
             ),
             patch("nola.main.init_db", lambda: None),
         ):
-            yield TestClient(app)
+            with TestClient(app) as test_client:
+                yield test_client
 
         get_file_db.cache_clear()
         get_task_db.cache_clear()
@@ -108,14 +109,6 @@ class TestTranscriptionsAPI:
         )
         assert response.status_code == 404
 
-    def test_create_task_from_nonexistent_path(self, client):
-        """Test creating task from non-existent path."""
-        response = client.post(
-            "/api/transcriptions/from-path",
-            json={"file_path": "/nonexistent/path/audio.mp3"},
-        )
-        assert response.status_code == 404
-
     def test_get_default_options(self, client):
         """Test getting default transcription options."""
         response = client.get("/api/transcriptions/options/defaults")
@@ -179,4 +172,3 @@ class TestFilesAPIExtended:
         assert response.status_code == 200
         data = response.json()
         assert data["deleted_count"] == 0
-

@@ -1,6 +1,6 @@
 """Transcription-related Pydantic schemas."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -16,7 +16,9 @@ class TranscriptionRequest(BaseModel):
 
     # Language settings
     language: str | None = Field(None, description="Language code (e.g., 'en', 'zh')")
-    task: str | None = Field(None, description="'transcribe' or 'translate'")
+    task: Literal["transcribe", "translate"] | None = Field(
+        None, description="'transcribe' or 'translate'"
+    )
 
     # Decoding parameters
     beam_size: int | None = Field(
@@ -94,8 +96,4 @@ class TranscriptionRequest(BaseModel):
 
     def get_options_dict(self) -> dict[str, Any]:
         """Return non-None options as dict for storage."""
-        return {
-            k: v
-            for k, v in self.model_dump(exclude={"file_id"}).items()
-            if v is not None
-        }
+        return self.model_dump(exclude={"file_id"}, exclude_none=True)
