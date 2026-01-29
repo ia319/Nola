@@ -8,7 +8,7 @@ import signal
 import socket
 import threading
 import time
-from dataclasses import asdict
+from dataclasses import fields
 from pathlib import Path
 from typing import Any
 
@@ -27,10 +27,28 @@ def get_worker_id() -> str:
     return f"worker-{socket.gethostname()}-{threading.current_thread().ident}"
 
 
+def build_transcribe_options(task_options: dict[str, Any] | None) -> TranscribeOptions:
+    """Build TranscribeOptions from task options dict, filtering invalid keys.
+
+    Args:
+        task_options: Dict of options from task record (may contain invalid keys)
+
+    Returns:
+        TranscribeOptions with only valid fields applied
+    """
+    if not task_options:
+        return TranscribeOptions()
+
+    valid_fields = {f.name for f in fields(TranscribeOptions)}
+    filtered = {k: v for k, v in task_options.items() if k in valid_fields}
+    return TranscribeOptions(**filtered)
+
+
 def run_transcription(
     task: dict[str, Any],
     file_db: FileDatabase,
     task_db: TaskDatabase,
+    engine: FasterWhisperEngine,
 ) -> None:
     """Execute transcription for a single task.
 
@@ -38,6 +56,7 @@ def run_transcription(
         task: Task dictionary from database
         file_db: File database instance
         task_db: Task database instance
+        engine: Pre-loaded transcription engine
     """
     task_id = task["id"]
     file_id = task["file_id"]
@@ -63,16 +82,14 @@ def run_transcription(
             )
             return
 
-        logger.info(f"Loading Whisper model for file: {file_path}")
-        engine = FasterWhisperEngine()
+        # Build options from task, filtering to valid fields only
+        task_options = task.get("options")
+        options = build_transcribe_options(task_options)
 
-        # Build options from task, filtering out None values
-        task_options = task.get("options") or {}
-        options = TranscribeOptions(**task_options)
-
-        logger.info(
-            f"Starting transcription with options: {task_options or 'defaults'}"
-        )
+        if task_options:
+            logger.info(f"Starting transcription with options: {task_options}")
+        else:
+            logger.info("Starting transcription with default options")
         segments_list = []
         duration = 0.0
 
@@ -82,7 +99,7 @@ def run_transcription(
                 logger.warning(f"Task {task_id} cancelled mid-transcription")
                 return
 
-            segments_list.append(asdict(segment))
+            segments_list.append(segment)
             duration = max(duration, segment.end)
 
         if not segments_list:
@@ -91,7 +108,16 @@ def run_transcription(
                 "File may be silent or VAD filtered all content."
             )
 
-        if task_db.complete(task_id, segments_list, duration):
+        segment_dicts = [
+            {
+                "start": s.start,
+                "end": s.end,
+                "text": s.text,
+            }
+            for s in segments_list
+        ]
+
+        if task_db.complete(task_id, segment_dicts, duration):
             logger.info(
                 f"Task {task_id} completed: {len(segments_list)} segments, "
                 f"duration={duration:.2f}s"
@@ -121,12 +147,17 @@ def worker_loop(db_path: str | Path | None = None) -> None:
     file_db = FileDatabase(db_path)
     task_db = TaskDatabase(db_path)
 
+    # Load engine once for all tasks
+    logger.info("Loading Whisper model...")
+    engine = FasterWhisperEngine()
+    logger.info("Model loaded successfully")
+
     while _running:
         try:
             task = task_db.dequeue(worker_id)
 
             if task:
-                run_transcription(task, file_db, task_db)
+                run_transcription(task, file_db, task_db, engine)
             else:
                 time.sleep(1)
 

@@ -433,33 +433,54 @@ class TaskDatabase:
 
     def update_status(
         self, task_id: str, status: TaskStatus, error: str | None = None
-    ) -> None:
-        """Legacy: Update task status (use specific methods instead)."""
+    ) -> bool:
+        """Legacy: Update task status (use specific methods instead).
+
+        Warning:
+            This method is deprecated. Use complete(), fail(), or cancel() instead.
+
+        Returns:
+            True if updated, False if task is in terminal state
+        """
+        terminal_states = (
+            TaskStatus.COMPLETED.value,
+            TaskStatus.FAILED.value,
+            TaskStatus.CANCELLED.value,
+        )
+
         with self._connect() as conn:
+            # Check current status to avoid overwriting terminal states
             if status in (
                 TaskStatus.COMPLETED,
                 TaskStatus.FAILED,
                 TaskStatus.CANCELLED,
             ):
-                conn.execute(
+                cursor = conn.execute(
                     """
                     UPDATE transcription_tasks
                     SET status = ?, error = ?, completed_at = ?
-                    WHERE id = ?
+                    WHERE id = ? AND status NOT IN (?, ?, ?)
                     """,
-                    (status.value, error, datetime.now().isoformat(), task_id),
+                    (
+                        status.value,
+                        error,
+                        datetime.now().isoformat(),
+                        task_id,
+                        *terminal_states,
+                    ),
                 )
             else:
-                conn.execute(
+                cursor = conn.execute(
                     """
                     UPDATE transcription_tasks
                     SET status = ?, error = ?
-                    WHERE id = ?
+                    WHERE id = ? AND status NOT IN (?, ?, ?)
                     """,
-                    (status.value, error, task_id),
+                    (status.value, error, task_id, *terminal_states),
                 )
 
             conn.commit()
+            return cursor.rowcount > 0
 
     def update_progress(self, task_id: str, progress: float) -> None:
         """Legacy: Update progress (use heartbeat instead)."""
