@@ -115,3 +115,68 @@ class TestTranscriptionsAPI:
             json={"file_path": "/nonexistent/path/audio.mp3"},
         )
         assert response.status_code == 404
+
+    def test_get_default_options(self, client):
+        """Test getting default transcription options."""
+        response = client.get("/api/transcriptions/options/defaults")
+        assert response.status_code == 200
+        data = response.json()
+        # Verify key default options exist
+        assert "language" in data
+        assert "beam_size" in data
+        assert data["beam_size"] == 5  # Default value
+        assert "vad_filter" in data
+        assert data["vad_filter"] is False
+
+    def test_create_task_with_options(self, client):
+        """Test creating task with custom transcription options."""
+        response = client.post(
+            "/api/transcriptions",
+            json={
+                "file_id": "nonexistent-file",
+                "language": "zh",
+                "vad_filter": True,
+                "beam_size": 3,
+            },
+        )
+        # Should fail because file doesn't exist, not because of options
+        assert response.status_code == 404
+
+
+class TestFilesAPIExtended:
+    """Test new file management endpoints."""
+
+    def test_list_files_empty(self, client):
+        """Test listing files when none exist."""
+        response = client.get("/api/files/")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["files"] == []
+        assert data["total"] == 0
+        assert data["limit"] == 50
+        assert data["offset"] == 0
+
+    def test_list_files_with_pagination(self, client):
+        """Test listing files with pagination parameters."""
+        response = client.get("/api/files/?limit=10&offset=5")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["limit"] == 10
+        assert data["offset"] == 5
+
+    def test_check_integrity_empty(self, client):
+        """Test integrity check when no files exist."""
+        response = client.get("/api/files/check-integrity")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert data["missing_files"] == []
+        assert data["missing_count"] == 0
+
+    def test_cleanup_empty(self, client):
+        """Test cleanup when no orphan records exist."""
+        response = client.post("/api/files/cleanup")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["deleted_count"] == 0
+

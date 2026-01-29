@@ -1,13 +1,16 @@
-"""Batch transcription API endpoints."""
+"""Transcription API endpoints."""
 
 import logging
 import uuid
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Body, HTTPException, Query
 
 from nola.api.deps import get_file_db, get_task_db
+from nola.api.schemas import TranscriptionRequest
+from nola.engines.base import TranscribeOptions
 from nola.utils import infer_content_type
 
 logger = logging.getLogger(__name__)
@@ -18,33 +21,48 @@ router = APIRouter(prefix="/api/transcriptions", tags=["transcriptions"])
 StatusFilter = Literal["pending", "processing", "completed", "failed", "cancelled"]
 
 
+@router.get("/options/defaults", summary="Get default transcription options")
+async def get_default_options() -> dict[str, Any]:
+    """Return default transcription options.
+
+    Use this endpoint to display available options and their defaults
+    in the frontend before creating a transcription task.
+    """
+    defaults = TranscribeOptions()
+    return asdict(defaults)
+
+
 @router.post("/", summary="Create transcription task")
-async def create_transcription(
-    file_id: str = Body(..., embed=True, description="File ID from upload API"),
-) -> dict[str, Any]:
+async def create_transcription(request: TranscriptionRequest) -> dict[str, Any]:
     """Create a transcription task for an uploaded file.
 
     Steps:
     1. Upload file via POST /api/files → get file_id
-    2. Create task via this endpoint with file_id
+    2. Create task via this endpoint with file_id and optional parameters
     3. Worker will automatically process the task
     4. Query status via GET /api/transcriptions/{task_id}
+
+    All transcription parameters are optional. If not provided,
+    engine defaults will be used. See GET /options/defaults for defaults.
     """
     file_db = get_file_db()
     task_db = get_task_db()
 
-    file = file_db.get_file(file_id)
+    file = file_db.get_file(request.file_id)
     if file is None:
-        raise HTTPException(status_code=404, detail=f"File not found: {file_id}")
+        raise HTTPException(status_code=404, detail=f"File not found: {request.file_id}")
 
     task_id = str(uuid.uuid4())
-    task_db.enqueue(task_id=task_id, file_id=file_id)
+    options = request.get_options_dict()
+
+    task_db.enqueue(task_id=task_id, file_id=request.file_id, options=options if options else None)
 
     return {
         "task_id": task_id,
-        "file_id": file_id,
+        "file_id": request.file_id,
         "filename": file["filename"],
         "status": "pending",
+        "options": options if options else None,
     }
 
 

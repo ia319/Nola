@@ -6,8 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from nola import __version__
-from nola.api.files import router as files_router
-from nola.api.transcriptions import router as transcriptions_router
+from nola.api.routes import files_router, transcriptions_router
 from nola.config import settings
 from nola.models import init_db
 
