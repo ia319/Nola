@@ -36,10 +36,14 @@ Nola/
 │   │   │   └── constants.py   # Validation constants (MIME types, extensions)
 │   │   ├── utils/             # Utility functions
 │   │   │   └── mime.py        # MIME type inference
-│   │   ├── api/               # API endpoints
+│   │   ├── api/               # API layer
 │   │   │   ├── deps.py        # Dependency injection
-│   │   │   ├── files.py       # File upload/management
-│   │   │   └── transcriptions.py  # Task creation/management
+│   │   │   ├── routes/        # API endpoints
+│   │   │   │   ├── files.py   # File upload/management
+│   │   │   │   └── transcriptions.py  # Task creation/management
+│   │   │   └── schemas/       # Pydantic request/response models
+│   │   │       ├── files.py
+│   │   │       └── transcriptions.py
 │   │   ├── engines/           # Transcription engines
 │   │   │   ├── base.py        # Segment, EngineConfig, TranscriptionEngine
 │   │   │   └── faster_whisper.py  # FasterWhisperEngine implementation
@@ -53,7 +57,8 @@ Nola/
 │   └── tests/                 # Test directory
 │       ├── test_api.py        # API endpoint tests
 │       ├── test_engines.py    # Engine tests
-│       └── test_models.py     # Database tests
+│       ├── test_models.py     # Database tests
+│       └── test_worker.py     # Worker tests
 ├── app/                       # Frontend GUI (TODO)
 ├── .pre-commit-config.yaml    # Pre-commit hooks
 ├── .editorconfig              # Editor config
@@ -113,27 +118,34 @@ Transcription engine layer:
 - `FasterWhisperEngine`: Faster-Whisper implementation
 
 ### core/nola/api/
-REST API endpoints:
+REST API layer:
 - `deps.py`: Dependency injection for database instances (singletons)
-- `files.py`: File upload/download/deletion with validation (500MB limit, MIME type checks)
-- `transcriptions.py`: Task creation, status query, cancellation
+- `routes/files.py`: File upload/list/delete with validation (500MB limit, MIME checks)
+- `routes/transcriptions.py`: Task creation, status query, cancellation, defaults
+- `schemas/files.py`: Pydantic models for file operations
+- `schemas/transcriptions.py`: TranscriptionRequest with Literal constraints
 
 ### core/nola/services/
 Background services:
 - `worker.py`: Independent worker process that dequeues and executes transcription tasks
+  - Loads engine once for performance
+  - `build_transcribe_options()` filters invalid option keys
 
 ### core/nola/main.py
 FastAPI entry point with lifespan management:
 - `GET /` - API info
 - `GET /health` - Health check
 - `POST /api/files/` - Upload audio file
+- `GET /api/files/` - List all files
 - `GET /api/files/{file_id}` - Get file metadata
 - `DELETE /api/files/{file_id}` - Delete file
+- `GET /api/files/check-integrity` - Check database-file consistency
+- `POST /api/files/cleanup` - Remove orphan database records
 - `POST /api/transcriptions/` - Create transcription task
-- `POST /api/transcriptions/from-path` - Create task from server path
 - `GET /api/transcriptions/` - List tasks (with filtering)
 - `GET /api/transcriptions/{task_id}` - Get task status/result
 - `DELETE /api/transcriptions/{task_id}` - Cancel task
+- `GET /api/transcriptions/options/defaults` - Get default options
 
 ### core/nola/config/
 Configuration and constants:
@@ -190,18 +202,21 @@ Client ──▶ FastAPI Server ──▶ SQLite DB ◀── Worker Process
 | Endpoint | Method | Body/Query | Response |
 |----------|--------|------------|----------|
 | `/api/files/` | POST | `file: UploadFile` | `{file_id, filename, size, content_type}` |
+| `/api/files/` | GET | `?limit=&offset=` | `{files: [], total, limit, offset}` |
 | `/api/files/{file_id}` | GET | - | `{file_id, filename, path, size, content_type, created_at}` |
 | `/api/files/{file_id}` | DELETE | - | `{message}` |
+| `/api/files/check-integrity` | GET | - | `{status, missing_files, missing_count}` |
+| `/api/files/cleanup` | POST | - | `{message, deleted_count, deleted_files}` |
 
 ### Transcriptions API
 
 | Endpoint | Method | Body/Query | Response |
 |----------|--------|------------|----------|
-| `/api/transcriptions/` | POST | `{file_id: str}` | `{task_id, file_id, filename, status}` |
-| `/api/transcriptions/from-path` | POST | `{file_path: str}` | `{task_id, file_id, filename, status}` |
+| `/api/transcriptions/` | POST | `{file_id, language?, task?, ...options}` | `{task_id, file_id, filename, status}` |
 | `/api/transcriptions/` | GET | `?status=&limit=&offset=` | `{tasks: [], total, limit, offset}` |
 | `/api/transcriptions/{task_id}` | GET | - | `{task_id, file_id, status, progress, duration, segments, error, ...}` |
 | `/api/transcriptions/{task_id}` | DELETE | - | `{task_id, status, message}` |
+| `/api/transcriptions/options/defaults` | GET | - | `{language, beam_size, vad_filter, ...all_options}` |
 
 ---
 
