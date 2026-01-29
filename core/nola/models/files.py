@@ -17,6 +17,13 @@ class FileDatabase:
         """
         self.db_path = Path(db_path)
 
+    def _connect(self) -> sqlite3.Connection:
+        """Create connection with consistent settings."""
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.row_factory = sqlite3.Row
+        return conn
+
     def create_file(
         self,
         file_id: str,
@@ -34,7 +41,7 @@ class FileDatabase:
             size: File size in bytes
             content_type: MIME type
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.execute(
                 """
                 INSERT INTO files (id, filename, path, size, content_type, created_at)
@@ -60,8 +67,7 @@ class FileDatabase:
         Returns:
             File dictionary or None if not found
         """
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
+        with self._connect() as conn:
             cursor = conn.execute("SELECT * FROM files WHERE id = ?", (file_id,))
             row = cursor.fetchone()
 
@@ -91,7 +97,7 @@ class FileDatabase:
         Returns:
             True if deleted, False if not found
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             cursor = conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
             deleted = cursor.rowcount > 0
             conn.commit()
@@ -108,17 +114,16 @@ class FileDatabase:
         Returns:
             List of file dictionaries
         """
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
+        with self._connect() as conn:
             cursor = conn.execute(
                 "SELECT * FROM files ORDER BY created_at DESC LIMIT ? OFFSET ?",
                 (limit, offset),
             )
-            return [dict(row) for row in cursor.fetchall()]
+            return [dict(row) for row in cursor]
 
     def count_files(self) -> int:
         """Count total files."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             cursor = conn.execute("SELECT COUNT(*) FROM files")
             return int(cursor.fetchone()[0])
 
@@ -130,11 +135,10 @@ class FileDatabase:
         """
         missing_files = []
 
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
+        with self._connect() as conn:
             cursor = conn.execute("SELECT * FROM files")
 
-            for row in cursor.fetchall():
+            for row in cursor:
                 file_dict = dict(row)
                 file_path = Path(file_dict["path"])
                 if not file_path.exists():
@@ -155,13 +159,17 @@ class FileDatabase:
             Dict with deleted_count and deleted_files list
         """
         integrity = self.check_integrity()
-        deleted_files: list[dict[str, Any]] = []
+        orphan_ids = [o["id"] for o in integrity["missing_files"]]
 
-        for orphan in integrity["missing_files"]:
-            if self.delete_file(orphan["id"]):
-                deleted_files.append(orphan)
+        if not orphan_ids:
+            return {"deleted_count": 0, "deleted_files": []}
+
+        with self._connect() as conn:
+            placeholders = ",".join("?" * len(orphan_ids))
+            conn.execute(f"DELETE FROM files WHERE id IN ({placeholders})", orphan_ids)
+            conn.commit()
 
         return {
-            "deleted_count": len(deleted_files),
-            "deleted_files": deleted_files,
+            "deleted_count": len(orphan_ids),
+            "deleted_files": integrity["missing_files"],
         }

@@ -87,8 +87,6 @@ class TaskDatabase:
             Task dict or None if queue is empty
         """
         with self._connect() as conn:
-            conn.row_factory = sqlite3.Row
-
             cursor = conn.execute(
                 """
                 UPDATE transcription_tasks
@@ -388,7 +386,6 @@ class TaskDatabase:
             Task dictionary or None if not found
         """
         with self._connect() as conn:
-            conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 "SELECT * FROM transcription_tasks WHERE id = ?", (task_id,)
             )

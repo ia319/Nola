@@ -104,12 +104,15 @@ def run_transcription(
         task_db.fail(task_id, str(e), should_retry=True)
 
 
-def worker_loop(db_path: str | Path = "data/nola.db") -> None:
+def worker_loop(db_path: str | Path | None = None) -> None:
     """Main worker loop.
 
     Args:
-        db_path: Path to database file
+        db_path: Path to database file (defaults to settings.db_path)
     """
+    from nola.config import settings
+
+    db_path = db_path or settings.db_path
     global _running
 
     worker_id = get_worker_id()

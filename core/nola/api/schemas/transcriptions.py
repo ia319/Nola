@@ -19,12 +19,18 @@ class TranscriptionRequest(BaseModel):
     task: str | None = Field(None, description="'transcribe' or 'translate'")
 
     # Decoding parameters
-    beam_size: int | None = Field(None, ge=1, le=10, description="Beam size for decoding")
+    beam_size: int | None = Field(
+        None, ge=1, le=10, description="Beam size for decoding"
+    )
     best_of: int | None = Field(None, ge=1, description="Number of candidates")
     patience: float | None = Field(None, ge=0, description="Beam search patience")
     length_penalty: float | None = Field(None, description="Length penalty")
-    repetition_penalty: float | None = Field(None, ge=1, description="Repetition penalty")
-    no_repeat_ngram_size: int | None = Field(None, ge=0, description="No repeat n-gram size")
+    repetition_penalty: float | None = Field(
+        None, ge=1, description="Repetition penalty"
+    )
+    no_repeat_ngram_size: int | None = Field(
+        None, ge=0, description="No repeat n-gram size"
+    )
     temperature: float | list[float] | None = Field(
         None, description="Sampling temperature(s)"
     )
@@ -33,7 +39,9 @@ class TranscriptionRequest(BaseModel):
     compression_ratio_threshold: float | None = Field(
         None, description="Compression ratio threshold"
     )
-    log_prob_threshold: float | None = Field(None, description="Log probability threshold")
+    log_prob_threshold: float | None = Field(
+        None, description="Log probability threshold"
+    )
     no_speech_threshold: float | None = Field(None, description="No speech threshold")
 
     # Context control
@@ -54,9 +62,15 @@ class TranscriptionRequest(BaseModel):
 
     # Timestamp settings
     without_timestamps: bool | None = Field(None, description="Disable timestamps")
-    max_initial_timestamp: float | None = Field(None, description="Max initial timestamp")
-    word_timestamps: bool | None = Field(None, description="Enable word-level timestamps")
-    prepend_punctuations: str | None = Field(None, description="Punctuations to prepend")
+    max_initial_timestamp: float | None = Field(
+        None, description="Max initial timestamp"
+    )
+    word_timestamps: bool | None = Field(
+        None, description="Enable word-level timestamps"
+    )
+    prepend_punctuations: str | None = Field(
+        None, description="Punctuations to prepend"
+    )
     append_punctuations: str | None = Field(None, description="Punctuations to append")
 
     # VAD settings

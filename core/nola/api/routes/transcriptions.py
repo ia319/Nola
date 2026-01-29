@@ -50,12 +50,18 @@ async def create_transcription(request: TranscriptionRequest) -> dict[str, Any]:
 
     file = file_db.get_file(request.file_id)
     if file is None:
-        raise HTTPException(status_code=404, detail=f"File not found: {request.file_id}")
+        raise HTTPException(
+            status_code=404, detail=f"File not found: {request.file_id}"
+        )
 
     task_id = str(uuid.uuid4())
     options = request.get_options_dict()
 
-    task_db.enqueue(task_id=task_id, file_id=request.file_id, options=options if options else None)
+    task_db.enqueue(
+        task_id=task_id,
+        file_id=request.file_id,
+        options=options if options else None,
+    )
 
     return {
         "task_id": task_id,
