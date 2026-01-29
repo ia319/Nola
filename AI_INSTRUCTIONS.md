@@ -31,21 +31,31 @@ Nola/
 │   ├── nola/                  # Main package
 │   │   ├── __init__.py        # Version info (v0.1.0)
 │   │   ├── main.py            # FastAPI entry point
-│   │   ├── core/              # Config and utilities
-│   │   │   └── config.py      # Settings via pydantic-settings
+│   │   ├── config/            # Configuration
+│   │   │   ├── settings.py    # Pydantic Settings (paths, limits, model)
+│   │   │   └── constants.py   # Validation constants (MIME types, extensions)
+│   │   ├── utils/             # Utility functions
+│   │   │   └── mime.py        # MIME type inference
+│   │   ├── api/               # API endpoints
+│   │   │   ├── deps.py        # Dependency injection
+│   │   │   ├── files.py       # File upload/management
+│   │   │   └── transcriptions.py  # Task creation/management
 │   │   ├── engines/           # Transcription engines
 │   │   │   ├── base.py        # Segment, EngineConfig, TranscriptionEngine
 │   │   │   └── faster_whisper.py  # FasterWhisperEngine implementation
 │   │   ├── models/            # Data models & Database
 │   │   │   ├── database.py    # Schema & init
-│   │   │   ├── files.py       # File model
-│   │   │   ├── tasks.py       # Task Queue logic
-│   │   │   └── utils/         # Model utilities
-│   │   │       └── db.py      # SQLite version check
+│   │   │   ├── files.py       # FileDatabase class
+│   │   │   ├── tasks.py       # TaskDatabase (job queue)
+│   │   │   └── utils.py       # SQLite utilities
 │   │   └── services/          # Business logic
+│   │       └── worker.py      # Background worker process
 │   └── tests/                 # Test directory
+│       ├── test_api.py        # API endpoint tests
+│       ├── test_engines.py    # Engine tests
+│       └── test_models.py     # Database tests
 ├── app/                       # Frontend GUI (TODO)
-├── .pre-commit-config.yaml    # Pre-commit hooks (root level)
+├── .pre-commit-config.yaml    # Pre-commit hooks
 ├── .editorconfig              # Editor config
 ├── .gitignore
 └── AI_INSTRUCTIONS.md         # This file
@@ -102,16 +112,37 @@ Transcription engine layer:
 - `TranscriptionEngine`: Abstract interface for transcription engines
 - `FasterWhisperEngine`: Faster-Whisper implementation
 
+### core/nola/api/
+REST API endpoints:
+- `deps.py`: Dependency injection for database instances (singletons)
+- `files.py`: File upload/download/deletion with validation (500MB limit, MIME type checks)
+- `transcriptions.py`: Task creation, status query, cancellation
+
+### core/nola/services/
+Background services:
+- `worker.py`: Independent worker process that dequeues and executes transcription tasks
+
 ### core/nola/main.py
-FastAPI entry point:
+FastAPI entry point with lifespan management:
 - `GET /` - API info
 - `GET /health` - Health check
+- `POST /api/files/` - Upload audio file
+- `GET /api/files/{file_id}` - Get file metadata
+- `DELETE /api/files/{file_id}` - Delete file
+- `POST /api/transcriptions/` - Create transcription task
+- `POST /api/transcriptions/from-path` - Create task from server path
+- `GET /api/transcriptions/` - List tasks (with filtering)
+- `GET /api/transcriptions/{task_id}` - Get task status/result
+- `DELETE /api/transcriptions/{task_id}` - Cancel task
 
-### core/nola/core/config.py
-Config management via `pydantic-settings`:
-- `model_size`: Whisper model size (default "base")
-- `device`: Runtime device (default "auto")
-- `host/port`: Server config
+### core/nola/config/
+Configuration and constants:
+- `settings.py`: Pydantic Settings (data_dir, max_file_size, model defaults, host/port)
+- `constants.py`: Validation constants (ALLOWED_AUDIO_TYPES, ALLOWED_EXTENSIONS)
+
+### core/nola/utils/
+Utility functions:
+- `mime.py`: MIME type inference from file extension
 
 ---
 
@@ -132,4 +163,70 @@ poetry run mypy nola
 
 # Run tests
 poetry run pytest
+
+# Start worker (in a separate terminal)
+poetry run python -m nola.services.worker
 ```
+
+---
+
+## Architecture
+
+```
+Client ──▶ FastAPI Server ──▶ SQLite DB ◀── Worker Process
+                                  │              │
+                                  │       FasterWhisperEngine
+                                  ▼
+                            data/nola.db
+                            data/uploads/
+```
+
+---
+
+## API Reference
+
+### Files API
+
+| Endpoint | Method | Body/Query | Response |
+|----------|--------|------------|----------|
+| `/api/files/` | POST | `file: UploadFile` | `{file_id, filename, size, content_type}` |
+| `/api/files/{file_id}` | GET | - | `{file_id, filename, path, size, content_type, created_at}` |
+| `/api/files/{file_id}` | DELETE | - | `{message}` |
+
+### Transcriptions API
+
+| Endpoint | Method | Body/Query | Response |
+|----------|--------|------------|----------|
+| `/api/transcriptions/` | POST | `{file_id: str}` | `{task_id, file_id, filename, status}` |
+| `/api/transcriptions/from-path` | POST | `{file_path: str}` | `{task_id, file_id, filename, status}` |
+| `/api/transcriptions/` | GET | `?status=&limit=&offset=` | `{tasks: [], total, limit, offset}` |
+| `/api/transcriptions/{task_id}` | GET | - | `{task_id, file_id, status, progress, duration, segments, error, ...}` |
+| `/api/transcriptions/{task_id}` | DELETE | - | `{task_id, status, message}` |
+
+---
+
+## Task Lifecycle
+
+```
+pending ──▶ processing ──▶ completed
+                │
+                ├──▶ failed (auto-retry up to 3x)
+                │
+                └──▶ cancelled (cooperative, per-segment check)
+```
+
+- **Timeout**: Tasks processing > 30 min are requeued
+- **Dead Worker**: Tasks from dead workers are requeued
+- **Cancellation**: Checked every segment (~2-5s granularity)
+
+---
+
+## Limits
+
+| Item | Limit |
+|------|-------|
+| File size | 500 MB |
+| Formats | mp3, wav, flac, m4a, ogg, webm, aac, mp4 |
+| Max retries | 3 |
+| Task timeout | 30 min |
+| Heartbeat timeout | 5 min |
