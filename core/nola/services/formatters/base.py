@@ -44,28 +44,36 @@ class OutputFormatter(ABC):
         ...
 
 
-def format_timestamp_srt(seconds: float) -> str:
-    """Convert seconds to SRT format: HH:MM:SS,mmm (comma before milliseconds)."""
+def _decompose_seconds(seconds: float) -> tuple[int, int, int, float]:
+    """Break seconds into (hours, minutes, secs, fractional).
+
+    Clamps negative values to zero for defensive programming.
+    """
+    if seconds < 0:
+        seconds = 0.0
     hours = int(seconds // 3600)
     minutes = int((seconds % 3600) // 60)
     secs = int(seconds % 60)
-    millis = int((seconds % 1) * 1000)
+    frac = seconds % 1
+    return hours, minutes, secs, frac
+
+
+def format_timestamp_srt(seconds: float) -> str:
+    """Convert seconds to SRT format: HH:MM:SS,mmm (comma before milliseconds)."""
+    hours, minutes, secs, frac = _decompose_seconds(seconds)
+    millis = int(frac * 1000)
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
 
 def format_timestamp_vtt(seconds: float) -> str:
     """Convert seconds to VTT format: HH:MM:SS.mmm (dot before milliseconds)."""
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    secs = int(seconds % 60)
-    millis = int((seconds % 1) * 1000)
+    hours, minutes, secs, frac = _decompose_seconds(seconds)
+    millis = int(frac * 1000)
     return f"{hours:02d}:{minutes:02d}:{secs:02d}.{millis:03d}"
 
 
 def format_timestamp_ass(seconds: float) -> str:
     """Convert seconds to ASS format: H:MM:SS.cc (single-digit hour, centiseconds)."""
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    secs = int(seconds % 60)
-    centis = int((seconds % 1) * 100)
+    hours, minutes, secs, frac = _decompose_seconds(seconds)
+    centis = int(frac * 100)
     return f"{hours}:{minutes:02d}:{secs:02d}.{centis:02d}"

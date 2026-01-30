@@ -25,9 +25,6 @@ def get_formatter(
     Args:
         format_name: Format identifier (srt, vtt, txt, ass).
         include_timestamps: TXT-only option for timestamp prefix.
-
-    Raises:
-        ValueError: If format is not supported.
     """
     formatter_class = FORMATTERS.get(format_name.lower())
     if formatter_class is None:
