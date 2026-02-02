@@ -5,9 +5,10 @@ import uuid
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
 from nola.api.deps import get_file_db, get_task_db
 from nola.api.schemas import TranscriptionRequest
@@ -208,9 +209,20 @@ async def export_transcription(
     if not segments:
         raise HTTPException(status_code=400, detail="No segments available")
 
-    segment_data = [
-        SegmentData(start=s["start"], end=s["end"], text=s["text"]) for s in segments
-    ]
+    # NOTE: Fail-fast strategy for data integrity.
+    # Future: Consider best-effort export with skipped segment warnings.
+    segment_data: list[SegmentData] = []
+    for i, s in enumerate(segments):
+        try:
+            segment_data.append(
+                SegmentData(start=s["start"], end=s["end"], text=s["text"])
+            )
+        except (KeyError, TypeError, ValueError) as e:
+            context = f"start={s.get('start')}, end={s.get('end')}"
+            raise HTTPException(
+                status_code=500,
+                detail=f"Invalid segment[{i}] in task {task_id}: {e}. Data: {context}",
+            )
 
     formatter = get_formatter(format, include_timestamps=include_timestamps)
     content = formatter.format(segment_data)
@@ -229,13 +241,15 @@ async def export_transcription(
         export_path = exports_dir / export_filename
         export_path.write_text(content, encoding="utf-8")
 
-        return Response(
-            content=f'{{"saved_path": "{export_path}"}}',
-            media_type="application/json",
-        )
+        return JSONResponse(content={"saved_path": str(export_path)})
 
     return Response(
         content=content,
         media_type=formatter.content_type,
-        headers={"Content-Disposition": f'attachment; filename="{export_filename}"'},
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{task_id}.{formatter.file_extension}"; '
+                f"filename*=UTF-8''{quote(export_filename)}"
+            )
+        },
     )
