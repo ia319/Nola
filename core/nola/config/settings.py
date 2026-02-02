@@ -33,5 +33,10 @@ class Settings(BaseSettings):
         """Path to SQLite database."""
         return self.data_dir / "nola.db"
 
+    @property
+    def exports_dir(self) -> Path:
+        """Directory for exported subtitle files."""
+        return self.data_dir / "exports"
+
 
 settings = Settings()
