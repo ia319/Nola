@@ -3,9 +3,11 @@
 import logging
 import uuid
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import Response
 
 from nola.api.deps import get_file_db, get_task_db
 from nola.api.schemas import TranscriptionRequest
@@ -168,3 +170,72 @@ async def cancel_transcription(task_id: str) -> dict[str, Any]:
         "status": "cancelled",
         "message": "Task cancelled successfully",
     }
+
+
+ExportFormat = Literal["srt", "vtt", "txt", "ass"]
+
+
+@router.get("/{task_id}/export", summary="Export transcription result")
+async def export_transcription(
+    task_id: str,
+    format: ExportFormat = Query("srt", description="Output format"),
+    include_timestamps: bool = Query(True, description="Include timestamps (TXT only)"),
+    save: bool = Query(False, description="Save to server instead of download"),
+) -> Response:
+    """Export completed transcription as subtitle file.
+
+    Supports SRT, VTT, TXT, and ASS formats.
+    Use save=true to store file on server, save=false to download directly.
+    """
+    from nola.config import settings
+    from nola.models.tasks import TaskStatus
+    from nola.services.formatters import SegmentData, get_formatter
+
+    task_db = get_task_db()
+    file_db = get_file_db()
+    task = task_db.get_task(task_id)
+
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task["status"] != TaskStatus.COMPLETED.value:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Task not completed, current status: {task['status']}",
+        )
+
+    segments = task.get("segments") or []
+    if not segments:
+        raise HTTPException(status_code=400, detail="No segments available")
+
+    segment_data = [
+        SegmentData(start=s["start"], end=s["end"], text=s["text"]) for s in segments
+    ]
+
+    formatter = get_formatter(format, include_timestamps=include_timestamps)
+    content = formatter.format(segment_data)
+
+    file_info = file_db.get_file(task["file_id"])
+    if file_info:
+        base_name = Path(file_info["filename"]).stem
+    else:
+        base_name = task_id
+
+    export_filename = f"{base_name}.{formatter.file_extension}"
+
+    if save:
+        exports_dir = settings.exports_dir
+        exports_dir.mkdir(parents=True, exist_ok=True)
+        export_path = exports_dir / export_filename
+        export_path.write_text(content, encoding="utf-8")
+
+        return Response(
+            content=f'{{"saved_path": "{export_path}"}}',
+            media_type="application/json",
+        )
+
+    return Response(
+        content=content,
+        media_type=formatter.content_type,
+        headers={"Content-Disposition": f'attachment; filename="{export_filename}"'},
+    )
