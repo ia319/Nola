@@ -44,6 +44,8 @@ class TXTFormatter(OutputFormatter):
     @staticmethod
     def _format_simple_timestamp(seconds: float) -> str:
         """HH:MM:SS format without milliseconds for readability."""
+        if seconds < 0:
+            seconds = 0.0
         hours = int(seconds // 3600)
         minutes = int((seconds % 3600) // 60)
         secs = int(seconds % 60)

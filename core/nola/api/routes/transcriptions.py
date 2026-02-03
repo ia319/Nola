@@ -241,7 +241,8 @@ async def export_transcription(
         export_path = exports_dir / export_filename
         export_path.write_text(content, encoding="utf-8")
 
-        return JSONResponse(content={"saved_path": str(export_path)})
+        relative_path = f"exports/{export_filename}"
+        return JSONResponse(content={"saved_path": relative_path})
 
     # RFC 6266: filename must be ASCII-safe for legacy clients
     ascii_name = export_filename.encode("ascii", "ignore").decode()
