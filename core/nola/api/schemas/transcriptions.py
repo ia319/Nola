@@ -95,7 +95,12 @@ class TranscriptionRequest(BaseModel):
     )
 
     def get_options_dict(self) -> dict[str, Any]:
-        """Return non-None options as dict for storage."""
+        """
+        Produce a dictionary of this model's fields (excluding `file_id`) containing only values that are not None.
+        
+        Returns:
+            dict[str, Any]: Mapping of option names to their values, excluding `file_id` and any fields with value `None`.
+        """
         return self.model_dump(exclude={"file_id"}, exclude_none=True)
 
 

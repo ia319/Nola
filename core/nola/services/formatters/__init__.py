@@ -20,11 +20,18 @@ def get_formatter(
     *,
     include_timestamps: bool = True,
 ) -> OutputFormatter:
-    """Create formatter instance by format name.
-
-    Args:
-        format_name: Format identifier (srt, vtt, txt, ass).
-        include_timestamps: TXT-only option for timestamp prefix.
+    """
+    Return an OutputFormatter instance for the given format name.
+    
+    Parameters:
+        format_name (str): Format identifier; supported values include "srt", "vtt", "txt", and "ass".
+        include_timestamps (bool): When `format_name` is "txt", whether each text segment should be prefixed with timestamps.
+    
+    Returns:
+        OutputFormatter: An instance of the formatter corresponding to `format_name`.
+    
+    Raises:
+        ValueError: If `format_name` is not one of the supported formats.
     """
     formatter_class = FORMATTERS.get(format_name.lower())
     if formatter_class is None:
@@ -38,7 +45,12 @@ def get_formatter(
 
 
 def list_formats() -> list[str]:
-    """Return list of supported format names."""
+    """
+    List available output formatter names.
+    
+    Returns:
+        list[str]: Supported format identifiers (for example: "srt", "vtt", "txt", "ass").
+    """
     return list(FORMATTERS.keys())
 
 

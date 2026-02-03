@@ -143,13 +143,19 @@ async def get_transcription(task_id: str) -> dict[str, Any]:
 
 @router.delete("/{task_id}")
 async def cancel_transcription(task_id: str) -> dict[str, Any]:
-    """Cancel a transcription task.
-
-    Args:
-        task_id: Task identifier
-
+    """
+    Cancel a transcription task identified by `task_id`.
+    
+    Raises an HTTP 404 if the task does not exist, or HTTP 400 if the task cannot be cancelled due to its current status.
+    
+    Parameters:
+    	task_id (str): Identifier of the transcription task to cancel.
+    
     Returns:
-        Cancellation result
+    	result (dict[str, Any]): Confirmation object containing `task_id`, `status` set to `"cancelled"`, and a human-readable `message`.
+    
+    Raises:
+    	HTTPException: 404 if task not found; 400 if task exists but is not cancellable.
     """
     task_db = get_task_db()
 
@@ -183,10 +189,24 @@ async def export_transcription(
     include_timestamps: bool = Query(True, description="Include timestamps (TXT only)"),
     save: bool = Query(False, description="Save to server instead of download"),
 ) -> Response:
-    """Export completed transcription as subtitle file.
-
-    Supports SRT, VTT, TXT, and ASS formats.
-    Use save=true to store file on server, save=false to download directly.
+    """
+    Export a completed transcription as a subtitle file in the requested format.
+    
+    Valid formats: "srt", "vtt", "txt", "ass". If save is True the export is written to the server exports directory and a JSON response with the saved path is returned; otherwise the formatted content is returned as a downloadable file with a Content-Disposition header.
+    
+    Parameters:
+        task_id (str): Identifier of the transcription task to export.
+        format (str): Output format for the export (one of "srt", "vtt", "txt", "ass").
+        include_timestamps (bool): When True, include timestamps in formats that support them (affects TXT output).
+        save (bool): When True, write the exported file to the server exports directory and return its relative path; when False, return the file as a download.
+    
+    Returns:
+        Response: If save is True, a JSON response containing {"saved_path": "<relative/path>"}; otherwise an HTTP response with the file content, appropriate media type, and Content-Disposition headers for download.
+    
+    Raises:
+        HTTPException(404): If the task does not exist.
+        HTTPException(400): If the task is not completed or has no segments to export.
+        HTTPException(500): If segment data is malformed and prevents building a valid export.
     """
     from nola.config import settings
     from nola.models.tasks import TaskStatus

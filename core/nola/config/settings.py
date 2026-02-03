@@ -30,12 +30,22 @@ class Settings(BaseSettings):
 
     @property
     def db_path(self) -> Path:
-        """Path to SQLite database."""
+        """
+        Path to the SQLite database file within the configured data directory.
+        
+        Returns:
+            Path: The path to the `nola.db` SQLite database file inside `data_dir`.
+        """
         return self.data_dir / "nola.db"
 
     @property
     def exports_dir(self) -> Path:
-        """Directory for exported subtitle files."""
+        """
+        Path to the directory for exported subtitle files.
+        
+        Returns:
+            Path: The filesystem path for exports, constructed as `data_dir / "exports"`.
+        """
         return self.data_dir / "exports"
 
 

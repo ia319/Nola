@@ -65,10 +65,24 @@ class TestSRTFormatter:
 
     @pytest.fixture
     def formatter(self):
+        """
+        Provide an SRTFormatter instance.
+        
+        Returns:
+            SRTFormatter: An instance of SRTFormatter.
+        """
         return SRTFormatter()
 
     @pytest.fixture
     def segments(self):
+        """
+        Provide a sample list of two subtitle segments used by tests.
+        
+        Returns:
+            list[SegmentData]: Two consecutive SegmentData objects:
+                - start 0.0, end 2.5, text "First line"
+                - start 2.5, end 5.0, text "Second line"
+        """
         return [
             SegmentData(start=0.0, end=2.5, text="First line"),
             SegmentData(start=2.5, end=5.0, text="Second line"),
@@ -102,10 +116,21 @@ class TestVTTFormatter:
 
     @pytest.fixture
     def formatter(self):
+        """
+        Retrieve the VTT formatter instance.
+        
+        @returns An instance of VTTFormatter.
+        """
         return VTTFormatter()
 
     @pytest.fixture
     def segments(self):
+        """
+        Provide a list containing a single SegmentData spanning 0.0 to 2.5 with the text "Hello".
+        
+        Returns:
+            list[SegmentData]: A list with one SegmentData(start=0.0, end=2.5, text="Hello").
+        """
         return [SegmentData(start=0.0, end=2.5, text="Hello")]
 
     def test_properties(self, formatter):
@@ -135,6 +160,12 @@ class TestTXTFormatter:
 
     @pytest.fixture
     def segments(self):
+        """
+        Provide a small list of sample SegmentData objects for tests.
+        
+        Returns:
+            list[SegmentData]: Two segments: first from 0.0 to 2.0 with text "First", second from 2.0 to 4.0 with text "Second".
+        """
         return [
             SegmentData(start=0.0, end=2.0, text="First"),
             SegmentData(start=2.0, end=4.0, text="Second"),
@@ -169,10 +200,22 @@ class TestASSFormatter:
 
     @pytest.fixture
     def formatter(self):
+        """
+        Create a new ASS subtitle formatter instance.
+        
+        Returns:
+            ASSFormatter: A fresh ASSFormatter object configured for producing SSA/ASS subtitles.
+        """
         return ASSFormatter()
 
     @pytest.fixture
     def segments(self):
+        """
+        Pytest fixture that provides a single subtitle segment for ASS formatter tests.
+        
+        Returns:
+            A list containing one SegmentData with start 0.0, end 2.5, and text "Hello ASS".
+        """
         return [SegmentData(start=0.0, end=2.5, text="Hello ASS")]
 
     def test_properties(self, formatter):
