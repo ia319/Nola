@@ -243,12 +243,17 @@ async def export_transcription(
 
         return JSONResponse(content={"saved_path": str(export_path)})
 
+    # RFC 6266: filename must be ASCII-safe for legacy clients
+    ascii_name = export_filename.encode("ascii", "ignore").decode()
+    if not ascii_name or ascii_name.startswith("."):
+        ascii_name = f"export.{formatter.file_extension}"
+
     return Response(
         content=content,
         media_type=formatter.content_type,
         headers={
             "Content-Disposition": (
-                f'attachment; filename="{task_id}.{formatter.file_extension}"; '
+                f'attachment; filename="{ascii_name}"; '
                 f"filename*=UTF-8''{quote(export_filename)}"
             )
         },
