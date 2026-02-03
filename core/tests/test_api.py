@@ -316,3 +316,49 @@ class TestExportAPI:
         assert response.status_code == 200
         assert "[Script Info]" in response.text
         assert "Dialogue:" in response.text
+
+    def test_export_save_to_disk(self, client):
+        """Test exporting with save=true returns JSON with file path."""
+        from unittest.mock import PropertyMock, patch
+
+        from nola.config.settings import Settings
+
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-save",
+            filename="audio.mp3",
+            path="/tmp/audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="test-save", file_id="test-file-save", options=None)
+        with task_db._connect() as conn:
+            conn.execute(
+                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                ("test-save",),
+            )
+            conn.commit()
+        task_db.complete(
+            task_id="test-save",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Save test"}],
+            duration=1.0,
+        )
+
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            exports_path = Path(tmpdir) / "exports"
+            with patch.object(
+                Settings,
+                "exports_dir",
+                new_callable=PropertyMock,
+                return_value=exports_path,
+            ):
+                response = client.get(
+                    "/api/transcriptions/test-save/export?format=srt&save=true"
+                )
+                assert response.status_code == 200
+                data = response.json()
+                assert "saved_path" in data
+                assert data["saved_path"].endswith(".srt")
