@@ -1,6 +1,7 @@
 """Transcription API endpoints."""
 
 import logging
+import re
 import uuid
 from dataclasses import asdict
 from pathlib import Path
@@ -244,8 +245,9 @@ async def export_transcription(
         relative_path = f"exports/{export_filename}"
         return JSONResponse(content={"saved_path": relative_path})
 
-    # RFC 6266: filename must be ASCII-safe for legacy clients
+    # Sanitize for ASCII-safe header (RFC 6266)
     ascii_name = export_filename.encode("ascii", "ignore").decode()
+    ascii_name = re.sub(r"[^A-Za-z0-9._-]", "_", ascii_name)
     if not ascii_name or ascii_name.startswith("."):
         ascii_name = f"export.{formatter.file_extension}"
 
