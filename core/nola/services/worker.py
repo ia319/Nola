@@ -3,6 +3,7 @@
 Run with: poetry run python -m nola.services.worker
 """
 
+import json
 import logging
 import signal
 import socket
@@ -85,9 +86,11 @@ def run_transcription(
         # Build options from task, filtering to valid fields only
         task_options = task.get("options")
         if isinstance(task_options, str):
-            import json
-
-            task_options = json.loads(task_options)
+            try:
+                task_options = json.loads(task_options)
+            except json.JSONDecodeError as e:
+                task_db.fail(task_id, f"Invalid options JSON: {e}", should_retry=False)
+                return
         options = build_transcribe_options(task_options)
 
         if task_options:

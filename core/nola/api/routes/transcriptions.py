@@ -305,7 +305,12 @@ async def batch_export(
                     continue
 
                 if task["status"] != TaskStatus.COMPLETED.value:
-                    errors.append({"task_id": task_id, "reason": "not_completed"})
+                    errors.append(
+                        {
+                            "task_id": task_id,
+                            "reason": f"status_{task['status']}",
+                        }
+                    )
                     continue
 
                 segments = task.get("segments", [])
