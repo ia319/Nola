@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse, Response
 
 from nola.api.deps import get_file_db, get_task_db
-from nola.api.schemas import TranscriptionRequest
+from nola.api.schemas import BatchExportRequest, TranscriptionRequest
 from nola.engines.base import TranscribeOptions
 
 logger = logging.getLogger(__name__)
@@ -260,4 +260,112 @@ async def export_transcription(
                 f"filename*=UTF-8''{quote(export_filename)}"
             )
         },
+    )
+
+
+@router.post("/export/batch", summary="Batch export transcriptions")
+async def batch_export(
+    request: "BatchExportRequest",
+) -> Response:
+    """Export multiple transcriptions as a ZIP archive.
+
+    Failed tasks are skipped and logged in _errors.txt within the archive.
+    """
+    import io
+    import zipfile
+    from datetime import datetime
+
+    from fastapi.responses import StreamingResponse
+
+    from nola.models.tasks import TaskStatus
+    from nola.services.formatters import get_formatter
+    from nola.services.formatters.base import SegmentData
+
+    task_db = get_task_db()
+    file_db = get_file_db()
+
+    if len(request.task_ids) > 500:
+        logger.warning("Large batch export requested: %d tasks", len(request.task_ids))
+
+    zip_buffer = io.BytesIO()
+    errors: list[dict[str, str]] = []
+    used_names: set[str] = set()
+    success_count = 0
+
+    formatter = get_formatter(
+        request.format, include_timestamps=request.include_timestamps
+    )
+
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for task_id in request.task_ids:
+            try:
+                task = task_db.get_task(task_id)
+                if not task:
+                    errors.append({"task_id": task_id, "reason": "not_found"})
+                    continue
+
+                if task["status"] != TaskStatus.COMPLETED.value:
+                    errors.append({"task_id": task_id, "reason": "not_completed"})
+                    continue
+
+                segments = task.get("segments", [])
+                segment_data = [
+                    SegmentData(start=s["start"], end=s["end"], text=s["text"])
+                    for s in segments
+                ]
+
+                content = formatter.format(segment_data)
+
+                file_info = file_db.get_file(task["file_id"])
+                if file_info:
+                    base_name = Path(file_info["filename"]).stem
+                else:
+                    base_name = task_id[:8]
+
+                filename = f"{base_name}.{formatter.file_extension}"
+
+                # Handle duplicate filenames
+                if filename in used_names:
+                    counter = 1
+                    while (
+                        f"{base_name}_{counter}.{formatter.file_extension}"
+                        in used_names
+                    ):
+                        counter += 1
+                    filename = f"{base_name}_{counter}.{formatter.file_extension}"
+
+                used_names.add(filename)
+                zf.writestr(filename, content)
+                success_count += 1
+
+            except Exception as e:
+                logger.exception("Error exporting task %s", task_id)
+                errors.append({"task_id": task_id, "reason": "error", "detail": str(e)})
+
+        if errors:
+            error_lines = [
+                f"{e['task_id']}: {e['reason']}"
+                + (f" - {e.get('detail', '')}" if e.get("detail") else "")
+                for e in errors
+            ]
+            zf.writestr("_errors.txt", "\n".join(error_lines))
+
+    if success_count == 0 and errors:
+        raise HTTPException(
+            status_code=400,
+            detail=f"All {len(errors)} exports failed",
+        )
+
+    zip_buffer.seek(0)
+
+    if request.zip_name:
+        zip_filename = f"{request.zip_name}.zip"
+    else:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        zip_filename = f"export_{timestamp}.zip"
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{zip_filename}"'},
     )

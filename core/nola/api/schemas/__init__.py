@@ -1,5 +1,5 @@
 """API schemas package."""
 
-from nola.api.schemas.transcriptions import TranscriptionRequest
+from nola.api.schemas.transcriptions import BatchExportRequest, TranscriptionRequest
 
-__all__ = ["TranscriptionRequest"]
+__all__ = ["BatchExportRequest", "TranscriptionRequest"]
