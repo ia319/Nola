@@ -362,3 +362,147 @@ class TestExportAPI:
                 data = response.json()
                 assert "saved_path" in data
                 assert data["saved_path"].endswith(".srt")
+
+
+class TestBatchExportAPI:
+    """Tests for batch export endpoint."""
+
+    def test_batch_export_success(self, client: TestClient):
+        """Test batch export with valid completed tasks."""
+        import io
+        import zipfile
+
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        # Create two completed tasks
+        for i in range(2):
+            file_db.create_file(
+                file_id=f"batch-file-{i}",
+                filename=f"audio_{i}.mp3",
+                path=f"/tmp/audio_{i}.mp3",
+                size=1000,
+            )
+            task_db.enqueue(
+                task_id=f"batch-task-{i}", file_id=f"batch-file-{i}", options=None
+            )
+            with task_db._connect() as conn:
+                conn.execute(
+                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                    (f"batch-task-{i}",),
+                )
+                conn.commit()
+            task_db.complete(
+                task_id=f"batch-task-{i}",
+                segments=[{"start": 0.0, "end": 1.0, "text": f"Test {i}"}],
+                duration=1.0,
+            )
+
+        response = client.post(
+            "/api/transcriptions/export/batch",
+            json={"task_ids": ["batch-task-0", "batch-task-1"], "format": "srt"},
+        )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/zip"
+
+        # Verify ZIP contents
+        zip_buffer = io.BytesIO(response.content)
+        with zipfile.ZipFile(zip_buffer, "r") as zf:
+            names = zf.namelist()
+            assert len(names) == 2
+            assert "audio_0.srt" in names
+            assert "audio_1.srt" in names
+
+    def test_batch_export_partial_failure(self, client: TestClient):
+        """Test batch export with mix of valid and invalid tasks."""
+        import io
+        import zipfile
+
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        # Create one completed task
+        file_db.create_file(
+            file_id="partial-file",
+            filename="partial.mp3",
+            path="/tmp/partial.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="partial-task", file_id="partial-file", options=None)
+        with task_db._connect() as conn:
+            conn.execute(
+                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                ("partial-task",),
+            )
+            conn.commit()
+        task_db.complete(
+            task_id="partial-task",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Partial test"}],
+            duration=1.0,
+        )
+
+        response = client.post(
+            "/api/transcriptions/export/batch",
+            json={
+                "task_ids": ["partial-task", "nonexistent-task"],
+                "format": "srt",
+            },
+        )
+
+        assert response.status_code == 200
+
+        zip_buffer = io.BytesIO(response.content)
+        with zipfile.ZipFile(zip_buffer, "r") as zf:
+            names = zf.namelist()
+            assert "partial.srt" in names
+            assert "_errors.txt" in names
+            errors = zf.read("_errors.txt").decode()
+            assert "nonexistent-task" in errors
+
+    def test_batch_export_all_failed(self, client: TestClient):
+        """Test batch export when all tasks fail."""
+        response = client.post(
+            "/api/transcriptions/export/batch",
+            json={"task_ids": ["fake-1", "fake-2"], "format": "srt"},
+        )
+
+        assert response.status_code == 400
+        assert "All" in response.json()["detail"]
+
+    def test_batch_export_custom_zip_name(self, client: TestClient):
+        """Test batch export with custom ZIP filename."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="zip-name-file",
+            filename="custom.mp3",
+            path="/tmp/custom.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="zip-name-task", file_id="zip-name-file", options=None)
+        with task_db._connect() as conn:
+            conn.execute(
+                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                ("zip-name-task",),
+            )
+            conn.commit()
+        task_db.complete(
+            task_id="zip-name-task",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Custom name"}],
+            duration=1.0,
+        )
+
+        response = client.post(
+            "/api/transcriptions/export/batch",
+            json={
+                "task_ids": ["zip-name-task"],
+                "format": "srt",
+                "zip_name": "my_subtitles",
+            },
+        )
+
+        assert response.status_code == 200
+        content_disp = response.headers["content-disposition"]
+        assert "my_subtitles.zip" in content_disp
