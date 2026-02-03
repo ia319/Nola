@@ -172,3 +172,147 @@ class TestFilesAPIExtended:
         assert response.status_code == 200
         data = response.json()
         assert data["deleted_count"] == 0
+
+
+class TestExportAPI:
+    """Test transcription export endpoints."""
+
+    def test_export_nonexistent_task(self, client):
+        """Test exporting a task that doesn't exist."""
+        response = client.get("/api/transcriptions/nonexistent-id/export")
+        assert response.status_code == 404
+
+    def test_export_uncompleted_task(self, client):
+        """Test exporting a task that is not completed."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file",
+            filename="test.mp3",
+            path="/tmp/test.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="test-task", file_id="test-file", options=None)
+
+        response = client.get("/api/transcriptions/test-task/export")
+        assert response.status_code == 400
+        assert "not completed" in response.json()["detail"]
+
+    def test_export_srt_format(self, client):
+        """Test exporting as SRT format."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-srt",
+            filename="audio.mp3",
+            path="/tmp/audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="test-task-srt", file_id="test-file-srt", options=None)
+        with task_db._connect() as conn:
+            conn.execute(
+                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                ("test-task-srt",),
+            )
+            conn.commit()
+        task_db.complete(
+            task_id="test-task-srt",
+            segments=[
+                {"start": 0.0, "end": 2.5, "text": "Hello world"},
+                {"start": 2.5, "end": 5.0, "text": "Test subtitle"},
+            ],
+            duration=5.0,
+        )
+
+        response = client.get("/api/transcriptions/test-task-srt/export?format=srt")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/x-subrip"
+        content = response.text
+        assert "00:00:00,000 --> 00:00:02,500" in content
+        assert "Hello world" in content
+
+    def test_export_vtt_format(self, client):
+        """Test exporting as VTT format."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-vtt",
+            filename="audio.mp3",
+            path="/tmp/audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="test-vtt", file_id="test-file-vtt", options=None)
+        with task_db._connect() as conn:
+            conn.execute(
+                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                ("test-vtt",),
+            )
+            conn.commit()
+        task_db.complete(
+            task_id="test-vtt",
+            segments=[{"start": 0.0, "end": 1.0, "text": "VTT test"}],
+            duration=1.0,
+        )
+
+        response = client.get("/api/transcriptions/test-vtt/export?format=vtt")
+        assert response.status_code == 200
+        assert "text/vtt" in response.headers["content-type"]
+        assert response.text.startswith("WEBVTT")
+
+    def test_export_txt_without_timestamps(self, client):
+        """Test exporting as TXT without timestamps."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-txt",
+            filename="audio.mp3",
+            path="/tmp/audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="test-txt", file_id="test-file-txt", options=None)
+        with task_db._connect() as conn:
+            conn.execute(
+                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                ("test-txt",),
+            )
+            conn.commit()
+        task_db.complete(
+            task_id="test-txt",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Plain text"}],
+            duration=1.0,
+        )
+
+        response = client.get(
+            "/api/transcriptions/test-txt/export?format=txt&include_timestamps=false"
+        )
+        assert response.status_code == 200
+        assert response.text == "Plain text"
+        assert "[" not in response.text
+
+    def test_export_ass_format(self, client):
+        """Test exporting as ASS format."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-ass",
+            filename="audio.mp3",
+            path="/tmp/audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="test-ass", file_id="test-file-ass", options=None)
+        with task_db._connect() as conn:
+            conn.execute(
+                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                ("test-ass",),
+            )
+            conn.commit()
+        task_db.complete(
+            task_id="test-ass",
+            segments=[{"start": 0.0, "end": 1.0, "text": "ASS test"}],
+            duration=1.0,
+        )
+
+        response = client.get("/api/transcriptions/test-ass/export?format=ass")
+        assert response.status_code == 200
+        assert "[Script Info]" in response.text
+        assert "Dialogue:" in response.text
