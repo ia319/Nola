@@ -363,10 +363,13 @@ async def batch_export(
 
     zip_buffer.seek(0)
 
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
     if request.zip_name:
-        zip_filename = f"{request.zip_name}.zip"
+        # Sanitize zip_name: remove header injection chars, path separators, quotes
+        safe_name = re.sub(r'[\r\n/\\"]', "", request.zip_name).strip()
+        zip_filename = f"{safe_name}.zip" if safe_name else f"export_{timestamp}.zip"
     else:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         zip_filename = f"export_{timestamp}.zip"
 
     return StreamingResponse(

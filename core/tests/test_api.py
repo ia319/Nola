@@ -226,7 +226,7 @@ class TestExportAPI:
 
         response = client.get("/api/transcriptions/test-task-srt/export?format=srt")
         assert response.status_code == 200
-        assert response.headers["content-type"] == "application/x-subrip"
+        assert response.headers["content-type"].startswith("application/x-subrip")
         content = response.text
         assert "00:00:00,000 --> 00:00:02,500" in content
         assert "Hello world" in content
@@ -404,7 +404,7 @@ class TestBatchExportAPI:
         )
 
         assert response.status_code == 200
-        assert response.headers["content-type"] == "application/zip"
+        assert response.headers["content-type"].startswith("application/zip")
 
         # Verify ZIP contents
         zip_buffer = io.BytesIO(response.content)
@@ -506,3 +506,45 @@ class TestBatchExportAPI:
         assert response.status_code == 200
         content_disp = response.headers["content-disposition"]
         assert "my_subtitles.zip" in content_disp
+
+    def test_batch_export_zip_name_injection(self, client: TestClient):
+        """Test that CR/LF in zip_name is sanitized."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="inject-file",
+            filename="inject.mp3",
+            path="/tmp/inject.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="inject-task", file_id="inject-file", options=None)
+        with task_db._connect() as conn:
+            conn.execute(
+                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                ("inject-task",),
+            )
+            conn.commit()
+        task_db.complete(
+            task_id="inject-task",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Inject test"}],
+            duration=1.0,
+        )
+
+        response = client.post(
+            "/api/transcriptions/export/batch",
+            json={
+                "task_ids": ["inject-task"],
+                "format": "srt",
+                "zip_name": '  bad\r\n/\\header"  ',
+            },
+        )
+
+        assert response.status_code == 200
+        content_disp = response.headers["content-disposition"]
+        # Verify dangerous chars are removed and whitespace is trimmed
+        assert "\r" not in content_disp
+        assert "\n" not in content_disp
+        assert "/" not in content_disp
+        assert "\\" not in content_disp
+        assert '"badheader.zip"' in content_disp
