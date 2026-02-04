@@ -97,3 +97,18 @@ class TranscriptionRequest(BaseModel):
     def get_options_dict(self) -> dict[str, Any]:
         """Return non-None options as dict for storage."""
         return self.model_dump(exclude={"file_id"}, exclude_none=True)
+
+
+class BatchExportRequest(BaseModel):
+    """Batch export request for multiple transcriptions."""
+
+    task_ids: list[str] = Field(..., description="List of task IDs to export")
+    format: Literal["srt", "vtt", "txt", "ass"] = Field(
+        "srt", description="Output format for all files"
+    )
+    include_timestamps: bool = Field(
+        True, description="Include timestamps in TXT format"
+    )
+    zip_name: str | None = Field(
+        None, description="Custom ZIP filename (without extension)"
+    )
