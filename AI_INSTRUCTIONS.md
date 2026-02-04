@@ -40,10 +40,10 @@ Nola/
 │   │   │   ├── deps.py        # Dependency injection
 │   │   │   ├── routes/        # API endpoints
 │   │   │   │   ├── files.py   # File upload/management
-│   │   │   │   └── transcriptions.py  # Task creation/management
+│   │   │   │   └── transcriptions.py  # Task + export endpoints
 │   │   │   └── schemas/       # Pydantic request/response models
 │   │   │       ├── files.py
-│   │   │       └── transcriptions.py
+│   │   │       └── transcriptions.py  # incl. BatchExportRequest
 │   │   ├── engines/           # Transcription engines
 │   │   │   ├── base.py        # Segment, EngineConfig, TranscriptionEngine
 │   │   │   └── faster_whisper.py  # FasterWhisperEngine implementation
@@ -53,12 +53,20 @@ Nola/
 │   │   │   ├── tasks.py       # TaskDatabase (job queue)
 │   │   │   └── utils.py       # SQLite utilities
 │   │   └── services/          # Business logic
-│   │       └── worker.py      # Background worker process
+│   │       ├── worker.py      # Background worker process
+│   │       └── formatters/    # Subtitle formatters
+│   │           ├── base.py    # BaseFormatter, SegmentData
+│   │           ├── srt.py     # SRT formatter
+│   │           ├── vtt.py     # VTT formatter
+│   │           ├── txt.py     # TXT formatter
+│   │           ├── ass.py     # ASS formatter
+│   │           └── __init__.py  # get_formatter() registry
 │   └── tests/                 # Test directory
 │       ├── test_api.py        # API endpoint tests
 │       ├── test_engines.py    # Engine tests
 │       ├── test_models.py     # Database tests
-│       └── test_worker.py     # Worker tests
+│       ├── test_worker.py     # Worker tests
+│       └── test_formatters.py # Formatter tests
 ├── app/                       # Frontend GUI (TODO)
 ├── .pre-commit-config.yaml    # Pre-commit hooks
 ├── .editorconfig              # Editor config
@@ -130,6 +138,10 @@ Background services:
 - `worker.py`: Independent worker process that dequeues and executes transcription tasks
   - Loads engine once for performance
   - `build_transcribe_options()` filters invalid option keys
+  - JSON options parsing with error handling
+- `formatters/`: Subtitle export formatters (SRT, VTT, TXT, ASS)
+  - `get_formatter(format, include_timestamps)` factory function
+  - Static registry pattern for format discovery
 
 ### core/nola/main.py
 FastAPI entry point with lifespan management:
@@ -146,10 +158,12 @@ FastAPI entry point with lifespan management:
 - `GET /api/transcriptions/{task_id}` - Get task status/result
 - `DELETE /api/transcriptions/{task_id}` - Cancel task
 - `GET /api/transcriptions/options/defaults` - Get default options
+- `GET /api/transcriptions/{task_id}/export` - Export as subtitle (SRT/VTT/TXT/ASS)
+- `POST /api/transcriptions/export/batch` - Batch export as ZIP
 
 ### core/nola/config/
 Configuration and constants:
-- `settings.py`: Pydantic Settings (data_dir, max_file_size, model defaults, host/port)
+- `settings.py`: Pydantic Settings (data_dir, exports_dir, max_file_size, model defaults, host/port)
 - `constants.py`: Validation constants (ALLOWED_AUDIO_TYPES, ALLOWED_EXTENSIONS)
 
 ### core/nola/utils/
@@ -217,6 +231,8 @@ Client ──▶ FastAPI Server ──▶ SQLite DB ◀── Worker Process
 | `/api/transcriptions/{task_id}` | GET | - | `{task_id, file_id, status, progress, duration, segments, error, ...}` |
 | `/api/transcriptions/{task_id}` | DELETE | - | `{task_id, status, message}` |
 | `/api/transcriptions/options/defaults` | GET | - | `{language, beam_size, vad_filter, ...all_options}` |
+| `/api/transcriptions/{task_id}/export` | GET | `?format=srt&save=false` | SRT/VTT/TXT/ASS file or `{saved_path}` |
+| `/api/transcriptions/export/batch` | POST | `{task_ids, format, zip_name?}` | ZIP file (application/zip) |
 
 ---
 
