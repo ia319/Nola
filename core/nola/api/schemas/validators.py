@@ -19,8 +19,7 @@ MAX_BATCH_EXPORT_TASKS = 500
 
 
 def validate_language_code(code: str | None) -> str | None:
-    """Validate against Whisper-supported ISO 639-1 language codes.
-
+    """
     Args:
         code: Language code string, or None for auto-detect.
 

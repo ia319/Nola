@@ -32,7 +32,6 @@ ALLOWED_EXTENSIONS = {
 }
 
 # Supported language codes from whisper/tokenizer.py LANGUAGES dict.
-# Not strictly ISO 639-1 (e.g., "haw", "jw", "yue" are exceptions).
 SUPPORTED_LANGUAGES: frozenset[str] = frozenset(
     {
         "af",
