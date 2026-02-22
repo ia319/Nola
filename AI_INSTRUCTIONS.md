@@ -43,7 +43,8 @@ Nola/
 │   │   │   │   └── transcriptions.py  # Task + export endpoints
 │   │   │   └── schemas/       # Pydantic request/response models
 │   │   │       ├── files.py
-│   │   │       └── transcriptions.py  # incl. BatchExportRequest
+│   │   │       ├── transcriptions.py  # incl. BatchExportRequest
+│   │   │       └── validators.py      # Reusable schema validators
 │   │   ├── engines/           # Transcription engines
 │   │   │   ├── base.py        # Segment, EngineConfig, TranscriptionEngine
 │   │   │   └── faster_whisper.py  # FasterWhisperEngine implementation
@@ -131,7 +132,8 @@ REST API layer:
 - `routes/files.py`: File upload/list/delete with validation (500MB limit, MIME checks)
 - `routes/transcriptions.py`: Task creation, status query, cancellation, defaults
 - `schemas/files.py`: Pydantic models for file operations
-- `schemas/transcriptions.py`: TranscriptionRequest with Literal constraints
+- `schemas/transcriptions.py`: TranscriptionRequest and BatchExportRequest models
+- `schemas/validators.py`: Reusable validation functions (e.g., language, temperature)
 
 ### core/nola/services/
 Background services:
@@ -164,7 +166,7 @@ FastAPI entry point with lifespan management:
 ### core/nola/config/
 Configuration and constants:
 - `settings.py`: Pydantic Settings (data_dir, exports_dir, max_file_size, model defaults, host/port)
-- `constants.py`: Validation constants (ALLOWED_AUDIO_TYPES, ALLOWED_EXTENSIONS)
+- `constants.py`: Validation constants (MIME/extension allowlists, language set, batch limits)
 
 ### core/nola/utils/
 Utility functions:
@@ -189,6 +191,12 @@ poetry run mypy nola
 
 # Run tests
 poetry run pytest
+
+# Auto-fix lint issues
+poetry run ruff check . --fix
+
+# Format code
+poetry run ruff format .
 
 # Start worker (in a separate terminal)
 poetry run python -m nola.services.worker
