@@ -27,12 +27,13 @@ def validate_language_code(code: str | None) -> str | None:
     """
     if code is None:
         return None
-    if code not in SUPPORTED_LANGUAGES:
+    normalized_code = code.lower()
+    if normalized_code not in SUPPORTED_LANGUAGES:
         raise ValueError(
             f"Unsupported language: '{code}'. "
             f"Use ISO 639-1 codes (e.g., 'en', 'zh', 'ja')."
         )
-    return code
+    return normalized_code
 
 
 def validate_temperature(

@@ -13,6 +13,8 @@ _ENGINE_DEFAULTS = TranscribeOptions()
 
 def _swagger_default(value: Any) -> dict[str, Any]:
     """Keep Swagger defaults aligned with engine defaults."""
+    if value is None:
+        return {"default": value}
     return {"default": value, "examples": [value]}
 
 
