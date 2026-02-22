@@ -31,7 +31,7 @@ ALLOWED_EXTENSIONS = {
     ".wma",
 }
 
-# Batch export task limit for warning and schema validation.
+# Maximum task IDs allowed in a single batch export request.
 MAX_BATCH_EXPORT_TASKS = 500
 
 # Supported language codes from whisper/tokenizer.py LANGUAGES dict.

@@ -13,7 +13,6 @@ from fastapi.responses import JSONResponse, Response
 
 from nola.api.deps import get_file_db, get_task_db
 from nola.api.schemas import BatchExportRequest, TranscriptionRequest
-from nola.config.constants import MAX_BATCH_EXPORT_TASKS
 from nola.engines.base import TranscribeOptions
 
 logger = logging.getLogger(__name__)
@@ -284,9 +283,6 @@ async def batch_export(
 
     task_db = get_task_db()
     file_db = get_file_db()
-
-    if len(request.task_ids) > MAX_BATCH_EXPORT_TASKS:
-        logger.warning("Large batch export requested: %d tasks", len(request.task_ids))
 
     zip_buffer = io.BytesIO()
     errors: list[dict[str, str]] = []
