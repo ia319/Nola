@@ -6,6 +6,14 @@ from pydantic import BaseModel, Field, field_validator
 
 from nola.api.schemas.validators import validate_language_code, validate_temperature
 from nola.config.constants import MAX_BATCH_EXPORT_TASKS
+from nola.engines.base import TranscribeOptions
+
+_ENGINE_DEFAULTS = TranscribeOptions()
+
+
+def _swagger_default(value: Any) -> dict[str, Any]:
+    """Keep Swagger defaults aligned with engine defaults."""
+    return {"default": value, "examples": [value]}
 
 
 class TranscriptionRequest(BaseModel):
@@ -63,41 +71,61 @@ class TranscriptionRequest(BaseModel):
     initial_prompt: str | None = Field(
         None,
         description="Initial prompt for context",
-        json_schema_extra={"examples": ["Hello, welcome to my lecture."]},
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.initial_prompt),
     )
     prefix: str | None = Field(
         None,
         description="Prefix for each segment",
-        json_schema_extra={"examples": ["[Speaker] "]},
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.prefix),
     )
     hotwords: str | None = Field(
         None,
         description="Hotwords to boost recognition",
-        json_schema_extra={"examples": ["Nola FastAPI Whisper"]},
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.hotwords),
     )
 
     # Token control
-    suppress_blank: bool | None = Field(None, description="Suppress blank outputs")
-    suppress_tokens: list[int] | None = Field(None, description="Token IDs to suppress")
-    max_new_tokens: int | None = Field(None, description="Max new tokens per segment")
+    suppress_blank: bool | None = Field(
+        None,
+        description="Suppress blank outputs",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.suppress_blank),
+    )
+    suppress_tokens: list[int] | None = Field(
+        None,
+        description="Token IDs to suppress",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.suppress_tokens),
+    )
+    max_new_tokens: int | None = Field(
+        None,
+        description="Max new tokens per segment",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.max_new_tokens),
+    )
 
     # Timestamp settings
-    without_timestamps: bool | None = Field(None, description="Disable timestamps")
+    without_timestamps: bool | None = Field(
+        None,
+        description="Disable timestamps",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.without_timestamps),
+    )
     max_initial_timestamp: float | None = Field(
-        None, description="Max initial timestamp"
+        None,
+        description="Max initial timestamp",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.max_initial_timestamp),
     )
     word_timestamps: bool | None = Field(
-        None, description="Enable word-level timestamps"
+        None,
+        description="Enable word-level timestamps",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.word_timestamps),
     )
     prepend_punctuations: str | None = Field(
         None,
         description="Punctuations to prepend",
-        json_schema_extra={"examples": ['"\'"¿([{-']},
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.prepend_punctuations),
     )
     append_punctuations: str | None = Field(
         None,
         description="Punctuations to append",
-        json_schema_extra={"examples": ['"\'.。,，!！?？:：")]}、']},
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.append_punctuations),
     )
 
     # VAD settings
