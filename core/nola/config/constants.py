@@ -31,6 +31,9 @@ ALLOWED_EXTENSIONS = {
     ".wma",
 }
 
+# Batch export task limit for warning and schema validation.
+MAX_BATCH_EXPORT_TASKS = 500
+
 # Supported language codes from whisper/tokenizer.py LANGUAGES dict.
 SUPPORTED_LANGUAGES: frozenset[str] = frozenset(
     {

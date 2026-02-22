@@ -13,10 +13,6 @@ from __future__ import annotations
 
 from nola.config.constants import SUPPORTED_LANGUAGES
 
-# Batch export ceiling, consistent with route-level warning threshold
-# in routes/transcriptions.py.
-MAX_BATCH_EXPORT_TASKS = 500
-
 
 def validate_language_code(code: str | None) -> str | None:
     """
