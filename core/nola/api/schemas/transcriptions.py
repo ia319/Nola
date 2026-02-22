@@ -2,7 +2,10 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from nola.api.schemas.validators import validate_language_code, validate_temperature
+from nola.config.constants import MAX_BATCH_EXPORT_TASKS
 
 
 class TranscriptionRequest(BaseModel):
@@ -15,7 +18,11 @@ class TranscriptionRequest(BaseModel):
     file_id: str = Field(..., description="File ID from upload API")
 
     # Language settings
-    language: str | None = Field(None, description="Language code (e.g., 'en', 'zh')")
+    language: str | None = Field(
+        None,
+        description="Language code. Auto-detect if omitted.",
+        json_schema_extra={"examples": ["en", "zh", "ja"]},
+    )
     task: Literal["transcribe", "translate"] | None = Field(
         None, description="'transcribe' or 'translate'"
     )
@@ -53,9 +60,21 @@ class TranscriptionRequest(BaseModel):
     prompt_reset_on_temperature: float | None = Field(
         None, description="Reset prompt on temperature"
     )
-    initial_prompt: str | None = Field(None, description="Initial prompt for context")
-    prefix: str | None = Field(None, description="Prefix for each segment")
-    hotwords: str | None = Field(None, description="Hotwords to boost recognition")
+    initial_prompt: str | None = Field(
+        None,
+        description="Initial prompt for context",
+        json_schema_extra={"examples": ["Hello, welcome to my lecture."]},
+    )
+    prefix: str | None = Field(
+        None,
+        description="Prefix for each segment",
+        json_schema_extra={"examples": ["[Speaker] "]},
+    )
+    hotwords: str | None = Field(
+        None,
+        description="Hotwords to boost recognition",
+        json_schema_extra={"examples": ["Nola FastAPI Whisper"]},
+    )
 
     # Token control
     suppress_blank: bool | None = Field(None, description="Suppress blank outputs")
@@ -71,9 +90,15 @@ class TranscriptionRequest(BaseModel):
         None, description="Enable word-level timestamps"
     )
     prepend_punctuations: str | None = Field(
-        None, description="Punctuations to prepend"
+        None,
+        description="Punctuations to prepend",
+        json_schema_extra={"examples": ['"\'"¿([{-']},
     )
-    append_punctuations: str | None = Field(None, description="Punctuations to append")
+    append_punctuations: str | None = Field(
+        None,
+        description="Punctuations to append",
+        json_schema_extra={"examples": ['"\'.。,，!！?？:：")]}、']},
+    )
 
     # VAD settings
     vad_filter: bool | None = Field(None, description="Enable VAD filtering")
@@ -94,6 +119,20 @@ class TranscriptionRequest(BaseModel):
         None, description="Segments for language detection"
     )
 
+    @field_validator("language")
+    @classmethod
+    def check_language(cls, v: str | None) -> str | None:
+        """Reject unsupported language codes early."""
+        return validate_language_code(v)
+
+    @field_validator("temperature")
+    @classmethod
+    def check_temperature(
+        cls, v: float | list[float] | None
+    ) -> float | list[float] | None:
+        """Reject negative temperature values."""
+        return validate_temperature(v)
+
     def get_options_dict(self) -> dict[str, Any]:
         """Return non-None options as dict for storage."""
         return self.model_dump(exclude={"file_id"}, exclude_none=True)
@@ -102,7 +141,12 @@ class TranscriptionRequest(BaseModel):
 class BatchExportRequest(BaseModel):
     """Batch export request for multiple transcriptions."""
 
-    task_ids: list[str] = Field(..., description="List of task IDs to export")
+    task_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_BATCH_EXPORT_TASKS,
+        description="List of task IDs to export",
+    )
     format: Literal["srt", "vtt", "txt", "ass"] = Field(
         "srt", description="Output format for all files"
     )
