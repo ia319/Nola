@@ -2,7 +2,20 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from nola.api.schemas.validators import validate_language_code, validate_temperature
+from nola.config.constants import MAX_BATCH_EXPORT_TASKS
+from nola.engines.base import TranscribeOptions
+
+_ENGINE_DEFAULTS = TranscribeOptions()
+
+
+def _swagger_default(value: Any) -> dict[str, Any]:
+    """Keep Swagger defaults aligned with engine defaults."""
+    if value is None:
+        return {"default": value}
+    return {"default": value, "examples": [value]}
 
 
 class TranscriptionRequest(BaseModel):
@@ -15,7 +28,11 @@ class TranscriptionRequest(BaseModel):
     file_id: str = Field(..., description="File ID from upload API")
 
     # Language settings
-    language: str | None = Field(None, description="Language code (e.g., 'en', 'zh')")
+    language: str | None = Field(
+        None,
+        description="Language code. Auto-detect if omitted.",
+        json_schema_extra={"examples": ["en", "zh", "ja"]},
+    )
     task: Literal["transcribe", "translate"] | None = Field(
         None, description="'transcribe' or 'translate'"
     )
@@ -53,27 +70,65 @@ class TranscriptionRequest(BaseModel):
     prompt_reset_on_temperature: float | None = Field(
         None, description="Reset prompt on temperature"
     )
-    initial_prompt: str | None = Field(None, description="Initial prompt for context")
-    prefix: str | None = Field(None, description="Prefix for each segment")
-    hotwords: str | None = Field(None, description="Hotwords to boost recognition")
+    initial_prompt: str | None = Field(
+        None,
+        description="Initial prompt for context",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.initial_prompt),
+    )
+    prefix: str | None = Field(
+        None,
+        description="Prefix for each segment",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.prefix),
+    )
+    hotwords: str | None = Field(
+        None,
+        description="Hotwords to boost recognition",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.hotwords),
+    )
 
     # Token control
-    suppress_blank: bool | None = Field(None, description="Suppress blank outputs")
-    suppress_tokens: list[int] | None = Field(None, description="Token IDs to suppress")
-    max_new_tokens: int | None = Field(None, description="Max new tokens per segment")
+    suppress_blank: bool | None = Field(
+        None,
+        description="Suppress blank outputs",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.suppress_blank),
+    )
+    suppress_tokens: list[int] | None = Field(
+        None,
+        description="Token IDs to suppress",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.suppress_tokens),
+    )
+    max_new_tokens: int | None = Field(
+        None,
+        description="Max new tokens per segment",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.max_new_tokens),
+    )
 
     # Timestamp settings
-    without_timestamps: bool | None = Field(None, description="Disable timestamps")
+    without_timestamps: bool | None = Field(
+        None,
+        description="Disable timestamps",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.without_timestamps),
+    )
     max_initial_timestamp: float | None = Field(
-        None, description="Max initial timestamp"
+        None,
+        description="Max initial timestamp",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.max_initial_timestamp),
     )
     word_timestamps: bool | None = Field(
-        None, description="Enable word-level timestamps"
+        None,
+        description="Enable word-level timestamps",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.word_timestamps),
     )
     prepend_punctuations: str | None = Field(
-        None, description="Punctuations to prepend"
+        None,
+        description="Punctuations to prepend",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.prepend_punctuations),
     )
-    append_punctuations: str | None = Field(None, description="Punctuations to append")
+    append_punctuations: str | None = Field(
+        None,
+        description="Punctuations to append",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.append_punctuations),
+    )
 
     # VAD settings
     vad_filter: bool | None = Field(None, description="Enable VAD filtering")
@@ -94,6 +149,20 @@ class TranscriptionRequest(BaseModel):
         None, description="Segments for language detection"
     )
 
+    @field_validator("language")
+    @classmethod
+    def check_language(cls, v: str | None) -> str | None:
+        """Reject unsupported language codes early."""
+        return validate_language_code(v)
+
+    @field_validator("temperature")
+    @classmethod
+    def check_temperature(
+        cls, v: float | list[float] | None
+    ) -> float | list[float] | None:
+        """Reject negative temperature values."""
+        return validate_temperature(v)
+
     def get_options_dict(self) -> dict[str, Any]:
         """Return non-None options as dict for storage."""
         return self.model_dump(exclude={"file_id"}, exclude_none=True)
@@ -102,7 +171,12 @@ class TranscriptionRequest(BaseModel):
 class BatchExportRequest(BaseModel):
     """Batch export request for multiple transcriptions."""
 
-    task_ids: list[str] = Field(..., description="List of task IDs to export")
+    task_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_BATCH_EXPORT_TASKS,
+        description="List of task IDs to export",
+    )
     format: Literal["srt", "vtt", "txt", "ass"] = Field(
         "srt", description="Output format for all files"
     )

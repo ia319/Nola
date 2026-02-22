@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from nola.api.deps import get_file_db, get_task_db
+from nola.config.constants import MAX_BATCH_EXPORT_TASKS
 from nola.config.settings import Settings
 from nola.main import app
 from nola.models import init_db
@@ -134,6 +135,119 @@ class TestTranscriptionsAPI:
         )
         # Should fail because file doesn't exist, not because of options
         assert response.status_code == 404
+
+
+class TestInputValidation:
+    """Test API input validation behavior."""
+
+    def test_language_uppercase_code_is_normalized(self, client: TestClient):
+        """Test uppercase language code is accepted and normalized."""
+        file_db = get_file_db()
+        file_db.create_file(
+            file_id="uppercase-lang-file",
+            filename="audio.mp3",
+            path="/tmp/audio.mp3",
+            size=1000,
+        )
+
+        response = client.post(
+            "/api/transcriptions",
+            json={"file_id": "uppercase-lang-file", "language": "EN"},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["options"]["language"] == "en"
+
+    def test_language_invalid_code_returns_422(self, client: TestClient):
+        """Test unsupported language code returns 422."""
+        response = client.post(
+            "/api/transcriptions",
+            json={"file_id": "nonexistent-file", "language": "chinese"},
+        )
+
+        assert response.status_code == 422
+        details = response.json()["detail"]
+        assert any(item["loc"][-1] == "language" for item in details)
+        assert "Unsupported language" in str(details)
+
+    def test_language_locale_style_returns_422(self, client: TestClient):
+        """Test locale-style language code returns 422."""
+        response = client.post(
+            "/api/transcriptions",
+            json={"file_id": "nonexistent-file", "language": "zh-CN"},
+        )
+
+        assert response.status_code == 422
+        details = response.json()["detail"]
+        assert any(item["loc"][-1] == "language" for item in details)
+        assert "Unsupported language" in str(details)
+
+    def test_language_valid_code_passes_schema_validation(self, client: TestClient):
+        """Test valid ISO 639-1 code reaches business logic layer."""
+        response = client.post(
+            "/api/transcriptions",
+            json={"file_id": "nonexistent-file", "language": "zh"},
+        )
+
+        assert response.status_code == 404
+        assert "File not found" in response.json()["detail"]
+
+    def test_language_none_passes_schema_validation(self, client: TestClient):
+        """Test null language reaches business logic layer."""
+        response = client.post(
+            "/api/transcriptions",
+            json={"file_id": "nonexistent-file", "language": None},
+        )
+
+        assert response.status_code == 404
+        assert "File not found" in response.json()["detail"]
+
+    def test_temperature_negative_returns_422(self, client: TestClient):
+        """Test negative temperature is rejected."""
+        response = client.post(
+            "/api/transcriptions",
+            json={"file_id": "nonexistent-file", "temperature": -0.1},
+        )
+
+        assert response.status_code == 422
+        details = response.json()["detail"]
+        assert any(item["loc"][-1] == "temperature" for item in details)
+        assert "non-negative" in str(details)
+
+    def test_temperature_list_with_negative_returns_422(self, client: TestClient):
+        """Test negative element in temperature list is rejected."""
+        response = client.post(
+            "/api/transcriptions",
+            json={"file_id": "nonexistent-file", "temperature": [0.0, -0.2]},
+        )
+
+        assert response.status_code == 422
+        details = response.json()["detail"]
+        assert any(item["loc"][-1] == "temperature" for item in details)
+        assert "non-negative" in str(details)
+
+    def test_batch_export_empty_task_ids_returns_422(self, client: TestClient):
+        """Test batch export rejects empty task_ids."""
+        response = client.post(
+            "/api/transcriptions/export/batch",
+            json={"task_ids": [], "format": "srt"},
+        )
+
+        assert response.status_code == 422
+        details = response.json()["detail"]
+        assert any(item["loc"][-1] == "task_ids" for item in details)
+
+    def test_batch_export_task_ids_exceed_max_returns_422(self, client: TestClient):
+        """Test batch export rejects task_ids longer than max length."""
+        task_ids = [f"task-{i}" for i in range(MAX_BATCH_EXPORT_TASKS + 1)]
+        response = client.post(
+            "/api/transcriptions/export/batch",
+            json={"task_ids": task_ids, "format": "srt"},
+        )
+
+        assert response.status_code == 422
+        details = response.json()["detail"]
+        assert any(item["loc"][-1] == "task_ids" for item in details)
 
 
 class TestFilesAPIExtended:

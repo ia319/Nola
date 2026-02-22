@@ -284,9 +284,6 @@ async def batch_export(
     task_db = get_task_db()
     file_db = get_file_db()
 
-    if len(request.task_ids) > 500:
-        logger.warning("Large batch export requested: %d tasks", len(request.task_ids))
-
     zip_buffer = io.BytesIO()
     errors: list[dict[str, str]] = []
     used_names: set[str] = set()
