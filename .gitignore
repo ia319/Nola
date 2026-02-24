@@ -19,7 +19,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+/core/lib/
 lib64/
 parts/
 sdist/
@@ -57,8 +57,7 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # Build output
-/frontend/dist/
-/frontend/build/
+/app/dist-ssr/
 
 # =========================
 # Tauri
