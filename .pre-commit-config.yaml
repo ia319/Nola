@@ -8,3 +8,19 @@ repos:
         files: ^core/
       - id: ruff-format
         files: ^core/
+
+  # Frontend linting and formatting (app/ only)
+  - repo: local
+    hooks:
+      - id: frontend-lint
+        name: ESLint (app)
+        entry: pnpm --dir app lint
+        language: system
+        files: ^app/src/.*\.(ts|tsx)$
+        pass_filenames: false
+      - id: frontend-format
+        name: Prettier (app)
+        entry: pnpm --dir app format:check
+        language: system
+        files: ^app/src/
+        pass_filenames: false
