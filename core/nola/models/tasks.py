@@ -444,11 +444,13 @@ class TaskDatabase:
             try:
                 task["segments"] = json.loads(task["segments"])
             except json.JSONDecodeError:
+                logger.warning("Corrupted segments JSON for task %s", task_id)
                 task["segments"] = []
         if task["options"]:
             try:
                 task["options"] = json.loads(task["options"])
             except json.JSONDecodeError:
+                logger.warning("Corrupted options JSON for task %s", task_id)
                 task["options"] = {}
         return task
 
