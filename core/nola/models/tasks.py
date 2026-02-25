@@ -6,7 +6,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +158,7 @@ class TaskDatabase:
         if row is None:
             return None
 
-        return dict(row)
+        return cast(TaskRowRaw, dict(row))
 
     # === State Management ===
 
@@ -452,7 +452,7 @@ class TaskDatabase:
             except json.JSONDecodeError:
                 logger.warning("Corrupted options JSON for task %s", task_id)
                 task["options"] = {}
-        return task
+        return cast(TaskRow, task)
 
     # Legacy method for compatibility
     def create_task(self, task_id: str, file_id: str) -> None:
@@ -475,7 +475,7 @@ class TaskDatabase:
             )
             row = cursor.fetchone()
 
-        return dict(row) if row else None
+        return cast(TaskRowRaw, dict(row)) if row else None
 
     def update_status(
         self, task_id: str, status: TaskStatus, error: str | None = None
@@ -559,7 +559,7 @@ class TaskDatabase:
                     "ORDER BY created_at DESC LIMIT ? OFFSET ?",
                     (limit, offset),
                 )
-            return [dict(row) for row in cursor.fetchall()]
+            return [cast(TaskRowRaw, dict(row)) for row in cursor.fetchall()]
 
     def count_tasks(self, status: str | None = None) -> int:
         """Count tasks with optional filtering."""

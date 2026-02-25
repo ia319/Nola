@@ -3,7 +3,7 @@
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 
 class FileRow(TypedDict):
@@ -85,7 +85,7 @@ class FileDatabase:
             if row is None:
                 return None
 
-            return dict(row)
+            return cast(FileRow, dict(row))
 
     def get_file_path(self, file_id: str) -> str | None:
         """Get file storage path for transcription.
@@ -130,7 +130,7 @@ class FileDatabase:
                 "SELECT * FROM files ORDER BY created_at DESC LIMIT ? OFFSET ?",
                 (limit, offset),
             )
-            return [dict(row) for row in cursor]
+            return [cast(FileRow, dict(row)) for row in cursor]
 
     def count_files(self) -> int:
         """Count total files."""

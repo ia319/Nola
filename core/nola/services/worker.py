@@ -16,6 +16,7 @@ from typing import Any
 from nola.engines.base import TranscribeOptions
 from nola.engines.faster_whisper import FasterWhisperEngine
 from nola.models import FileDatabase, TaskDatabase, init_db
+from nola.models.tasks import TaskRowRaw
 
 logger = logging.getLogger("nola.worker")
 
@@ -46,7 +47,7 @@ def build_transcribe_options(task_options: dict[str, Any] | None) -> TranscribeO
 
 
 def run_transcription(
-    task: dict[str, Any],
+    task: TaskRowRaw,
     file_db: FileDatabase,
     task_db: TaskDatabase,
     engine: FasterWhisperEngine,

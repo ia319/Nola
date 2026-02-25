@@ -319,7 +319,7 @@ async def batch_export(
                     )
                     continue
 
-                segments = task.get("segments", [])
+                segments = task.get("segments") or []
                 segment_data = [
                     SegmentData(start=s["start"], end=s["end"], text=s["text"])
                     for s in segments
