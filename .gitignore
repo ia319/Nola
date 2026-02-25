@@ -57,6 +57,7 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # Build output
+/app/dist/
 /app/dist-ssr/
 
 # =========================
