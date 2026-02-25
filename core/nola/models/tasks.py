@@ -6,9 +6,53 @@ import sqlite3
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict, cast
 
 logger = logging.getLogger(__name__)
+
+
+class TaskRowRaw(TypedDict):
+    """Raw row from SQLite, segments/options are JSON strings."""
+
+    id: str
+    file_id: str
+    status: str
+    priority: int
+    retry_count: int
+    max_retries: int
+    worker_id: str | None
+    started_at: str | None
+    last_heartbeat: str | None
+    timeout_seconds: int
+    options: str | None
+    progress: float
+    duration: float | None
+    segments: str | None
+    error: str | None
+    created_at: str
+    completed_at: str | None
+
+
+class TaskRow(TypedDict):
+    """Parsed task row, segments/options already deserialized."""
+
+    id: str
+    file_id: str
+    status: str
+    priority: int
+    retry_count: int
+    max_retries: int
+    worker_id: str | None
+    started_at: str | None
+    last_heartbeat: str | None
+    timeout_seconds: int
+    options: dict[str, Any] | None
+    progress: float
+    duration: float | None
+    segments: list[dict[str, Any]] | None
+    error: str | None
+    created_at: str
+    completed_at: str | None
 
 
 class TaskStatus(str, Enum):
@@ -77,7 +121,7 @@ class TaskDatabase:
             )
             conn.commit()
 
-    def dequeue(self, worker_id: str) -> dict[str, Any] | None:
+    def dequeue(self, worker_id: str) -> TaskRowRaw | None:
         """Atomically get and lock next pending task.
 
         Args:
@@ -114,7 +158,7 @@ class TaskDatabase:
         if row is None:
             return None
 
-        return dict(row)
+        return cast(TaskRowRaw, dict(row))
 
     # === State Management ===
 
@@ -376,7 +420,7 @@ class TaskDatabase:
 
     # === Query Operations ===
 
-    def get_task(self, task_id: str) -> dict[str, Any] | None:
+    def get_task(self, task_id: str) -> TaskRow | None:
         """Get task details by ID.
 
         Args:
@@ -400,20 +444,22 @@ class TaskDatabase:
             try:
                 task["segments"] = json.loads(task["segments"])
             except json.JSONDecodeError:
-                task["segments"] = []
-        if task.get("options"):
+                logger.warning("Corrupted segments JSON for task %s", task_id)
+                task["segments"] = None
+        if task["options"]:
             try:
                 task["options"] = json.loads(task["options"])
             except json.JSONDecodeError:
-                task["options"] = {}
-        return task
+                logger.warning("Corrupted options JSON for task %s", task_id)
+                task["options"] = None
+        return cast(TaskRow, task)
 
     # Legacy method for compatibility
     def create_task(self, task_id: str, file_id: str) -> None:
         """Legacy: Create task (use enqueue instead)."""
         self.enqueue(task_id, file_id)
 
-    def get_next_pending_task(self) -> dict[str, Any] | None:
+    def get_next_pending_task(self) -> TaskRowRaw | None:
         """Legacy: Get next pending task (use dequeue instead)."""
         # Note: This doesn't lock the task, for testing only
         with self._connect() as conn:
@@ -429,7 +475,7 @@ class TaskDatabase:
             )
             row = cursor.fetchone()
 
-        return dict(row) if row else None
+        return cast(TaskRowRaw, dict(row)) if row else None
 
     def update_status(
         self, task_id: str, status: TaskStatus, error: str | None = None
@@ -497,7 +543,7 @@ class TaskDatabase:
         status: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> list[dict[str, Any]]:
+    ) -> list[TaskRowRaw]:
         """List tasks with optional filtering."""
         with self._connect() as conn:
             conn.row_factory = sqlite3.Row
@@ -513,7 +559,7 @@ class TaskDatabase:
                     "ORDER BY created_at DESC LIMIT ? OFFSET ?",
                     (limit, offset),
                 )
-            return [dict(row) for row in cursor.fetchall()]
+            return [cast(TaskRowRaw, dict(row)) for row in cursor.fetchall()]
 
     def count_tasks(self, status: str | None = None) -> int:
         """Count tasks with optional filtering."""

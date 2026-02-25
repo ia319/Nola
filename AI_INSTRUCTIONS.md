@@ -42,8 +42,9 @@ Nola/
 │   │   │   │   ├── files.py   # File upload/management
 │   │   │   │   └── transcriptions.py  # Task + export endpoints
 │   │   │   └── schemas/       # Pydantic request/response models
-│   │   │       ├── files.py
-│   │   │       ├── transcriptions.py  # incl. BatchExportRequest
+│   │   │       ├── files.py   # FileResponse, FileListResponse, etc.
+│   │   │       ├── responses.py  # TaskDetailResponse, CreateTaskResponse, etc.
+│   │   │       ├── transcriptions.py  # TranscriptionRequest, BatchExportRequest
 │   │   │       └── validators.py      # Reusable schema validators
 │   │   ├── engines/           # Transcription engines
 │   │   │   ├── base.py        # Segment, EngineConfig, TranscriptionEngine
@@ -114,8 +115,8 @@ Nola/
 ### core/nola/models/
 Data persistence layer (SQLite):
 - `database.py`: Schema initialization, connection management, and foreign key enforcement.
-- `files.py`: `FileDatabase` for managing audio file metadata.
-- `tasks.py`: `TaskDatabase` implementing the production-grade job queue (priority, heartbeat, retries).
+- `files.py`: `FileDatabase` for managing audio file metadata. Uses `FileRow` TypedDict.
+- `tasks.py`: `TaskDatabase` implementing the production-grade job queue. Uses `TaskRowRaw`/`TaskRow` TypedDicts.
 - `utils/db.py`: Database utilities (e.g., `ensure_sqlite_version`).
 
 ### core/nola/engines/
@@ -129,10 +130,11 @@ Transcription engine layer:
 ### core/nola/api/
 REST API layer:
 - `deps.py`: Dependency injection for database instances (singletons)
-- `routes/files.py`: File upload/list/delete with validation (500MB limit, MIME checks)
-- `routes/transcriptions.py`: Task creation, status query, cancellation, defaults
-- `schemas/files.py`: Pydantic models for file operations
-- `schemas/transcriptions.py`: TranscriptionRequest and BatchExportRequest models
+- `routes/files.py`: File upload/list/delete with validation. All endpoints use `response_model`.
+- `routes/transcriptions.py`: Task CRUD + export endpoints. CRUD endpoints use `response_model`.
+- `schemas/files.py`: 8 Pydantic response models (`FileResponse`, `FileListResponse`, etc.)
+- `schemas/responses.py`: 7 Pydantic response models (`TaskDetailResponse`, `CreateTaskResponse`, etc.)
+- `schemas/transcriptions.py`: Request models (`TranscriptionRequest`, `BatchExportRequest`)
 - `schemas/validators.py`: Reusable validation functions (e.g., language, temperature)
 
 ### core/nola/services/
@@ -221,26 +223,26 @@ Client ──▶ FastAPI Server ──▶ SQLite DB ◀── Worker Process
 
 ### Files API
 
-| Endpoint | Method | Body/Query | Response |
-|----------|--------|------------|----------|
-| `/api/files/` | POST | `file: UploadFile` | `{file_id, filename, size, content_type}` |
-| `/api/files/` | GET | `?limit=&offset=` | `{files: [], total, limit, offset}` |
-| `/api/files/{file_id}` | GET | - | `{file_id, filename, path, size, content_type, created_at}` |
-| `/api/files/{file_id}` | DELETE | - | `{message}` |
-| `/api/files/check-integrity` | GET | - | `{status, missing_files, missing_count}` |
-| `/api/files/cleanup` | POST | - | `{message, deleted_count, deleted_files}` |
+| Endpoint | Method | Body/Query | Response Model |
+|----------|--------|------------|----------------|
+| `/api/files/` | POST | `file: UploadFile` | `FileUploadResponse` |
+| `/api/files/` | GET | `?limit=&offset=` | `FileListResponse` |
+| `/api/files/{file_id}` | GET | - | `FileResponse` |
+| `/api/files/{file_id}` | DELETE | - | `DeleteResponse` |
+| `/api/files/check-integrity` | GET | - | `IntegrityCheckResponse` |
+| `/api/files/cleanup` | POST | - | `CleanupResponse` |
 
 ### Transcriptions API
 
-| Endpoint | Method | Body/Query | Response |
-|----------|--------|------------|----------|
-| `/api/transcriptions/` | POST | `{file_id, language?, task?, ...options}` | `{task_id, file_id, filename, status}` |
-| `/api/transcriptions/` | GET | `?status=&limit=&offset=` | `{tasks: [], total, limit, offset}` |
-| `/api/transcriptions/{task_id}` | GET | - | `{task_id, file_id, status, progress, duration, segments, error, ...}` |
-| `/api/transcriptions/{task_id}` | DELETE | - | `{task_id, status, message}` |
-| `/api/transcriptions/options/defaults` | GET | - | `{language, beam_size, vad_filter, ...all_options}` |
-| `/api/transcriptions/{task_id}/export` | GET | `?format=srt&save=false` | SRT/VTT/TXT/ASS file or `{saved_path}` |
-| `/api/transcriptions/export/batch` | POST | `{task_ids, format, zip_name?}` | ZIP file (application/zip) |
+| Endpoint | Method | Body/Query | Response Model |
+|----------|--------|------------|----------------|
+| `/api/transcriptions/` | POST | `TranscriptionRequest` | `CreateTaskResponse` |
+| `/api/transcriptions/` | GET | `?status=&limit=&offset=` | `TaskListResponse` |
+| `/api/transcriptions/{task_id}` | GET | - | `TaskDetailResponse` |
+| `/api/transcriptions/{task_id}` | DELETE | - | `CancelTaskResponse` |
+| `/api/transcriptions/options/defaults` | GET | - | `dict` (dynamic) |
+| `/api/transcriptions/{task_id}/export` | GET | `?format=srt&save=false` | Binary or `{saved_path}` |
+| `/api/transcriptions/export/batch` | POST | `BatchExportRequest` | ZIP binary |
 
 ---
 

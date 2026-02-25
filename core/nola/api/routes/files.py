@@ -7,13 +7,21 @@ from typing import Any
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
 from nola.api.deps import get_file_db
+from nola.api.schemas import (
+    CleanupResponse,
+    DeleteResponse,
+    FileListResponse,
+    FileResponse,
+    FileUploadResponse,
+    IntegrityCheckResponse,
+)
 from nola.config import ALLOWED_AUDIO_TYPES, ALLOWED_EXTENSIONS, settings
 from nola.utils import infer_content_type
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
 
-@router.get("/", summary="List all uploaded files")
+@router.get("/", summary="List all uploaded files", response_model=FileListResponse)
 async def list_files(
     limit: int = Query(50, ge=1, le=100, description="Max results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
@@ -41,7 +49,11 @@ async def list_files(
     }
 
 
-@router.get("/check-integrity", summary="Check database-file consistency")
+@router.get(
+    "/check-integrity",
+    summary="Check database-file consistency",
+    response_model=IntegrityCheckResponse,
+)
 async def check_integrity() -> dict[str, Any]:
     """Check consistency between database records and files on disk.
 
@@ -59,7 +71,9 @@ async def check_integrity() -> dict[str, Any]:
     }
 
 
-@router.post("/cleanup", summary="Remove orphan database records")
+@router.post(
+    "/cleanup", summary="Remove orphan database records", response_model=CleanupResponse
+)
 async def cleanup_orphans() -> dict[str, Any]:
     """Remove database records for files that no longer exist on disk.
 
@@ -76,7 +90,7 @@ async def cleanup_orphans() -> dict[str, Any]:
     }
 
 
-@router.post("/", summary="Upload an audio file")
+@router.post("/", summary="Upload an audio file", response_model=FileUploadResponse)
 async def upload_file(
     file: UploadFile = File(..., description="Audio file to upload"),
 ) -> dict[str, Any]:
@@ -154,7 +168,7 @@ async def upload_file(
     }
 
 
-@router.get("/{file_id}", summary="Get file metadata")
+@router.get("/{file_id}", summary="Get file metadata", response_model=FileResponse)
 async def get_file(file_id: str) -> dict[str, Any]:
     """Get file metadata.
 
@@ -179,7 +193,7 @@ async def get_file(file_id: str) -> dict[str, Any]:
     }
 
 
-@router.delete("/{file_id}", summary="Delete a file")
+@router.delete("/{file_id}", summary="Delete a file", response_model=DeleteResponse)
 async def delete_file(file_id: str) -> dict[str, str]:
     """Delete file and associated data.
 
