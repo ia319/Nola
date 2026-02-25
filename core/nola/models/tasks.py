@@ -445,13 +445,13 @@ class TaskDatabase:
                 task["segments"] = json.loads(task["segments"])
             except json.JSONDecodeError:
                 logger.warning("Corrupted segments JSON for task %s", task_id)
-                task["segments"] = []
+                task["segments"] = None
         if task["options"]:
             try:
                 task["options"] = json.loads(task["options"])
             except json.JSONDecodeError:
                 logger.warning("Corrupted options JSON for task %s", task_id)
-                task["options"] = {}
+                task["options"] = None
         return cast(TaskRow, task)
 
     # Legacy method for compatibility
