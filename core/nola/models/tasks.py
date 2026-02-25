@@ -445,7 +445,7 @@ class TaskDatabase:
                 task["segments"] = json.loads(task["segments"])
             except json.JSONDecodeError:
                 task["segments"] = []
-        if task.get("options"):
+        if task["options"]:
             try:
                 task["options"] = json.loads(task["options"])
             except json.JSONDecodeError:
