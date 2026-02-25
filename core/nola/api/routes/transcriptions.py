@@ -12,7 +12,14 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse, Response
 
 from nola.api.deps import get_file_db, get_task_db
-from nola.api.schemas import BatchExportRequest, TranscriptionRequest
+from nola.api.schemas import (
+    BatchExportRequest,
+    CancelTaskResponse,
+    CreateTaskResponse,
+    TaskDetailResponse,
+    TaskListResponse,
+    TranscriptionRequest,
+)
 from nola.engines.base import TranscribeOptions
 
 logger = logging.getLogger(__name__)
@@ -34,7 +41,9 @@ async def get_default_options() -> dict[str, Any]:
     return asdict(defaults)
 
 
-@router.post("/", summary="Create transcription task")
+@router.post(
+    "/", summary="Create transcription task", response_model=CreateTaskResponse
+)
 async def create_transcription(request: TranscriptionRequest) -> dict[str, Any]:
     """Create a transcription task for an uploaded file.
 
@@ -74,7 +83,7 @@ async def create_transcription(request: TranscriptionRequest) -> dict[str, Any]:
     }
 
 
-@router.get("/")
+@router.get("/", response_model=TaskListResponse)
 async def list_transcriptions(
     status: StatusFilter | None = Query(None, description="Filter by status"),
     limit: int = Query(50, ge=1, le=100, description="Max results"),
@@ -113,7 +122,7 @@ async def list_transcriptions(
     }
 
 
-@router.get("/{task_id}")
+@router.get("/{task_id}", response_model=TaskDetailResponse)
 async def get_transcription(task_id: str) -> dict[str, Any]:
     """Get transcription task status and result.
 
@@ -142,7 +151,7 @@ async def get_transcription(task_id: str) -> dict[str, Any]:
     }
 
 
-@router.delete("/{task_id}")
+@router.delete("/{task_id}", response_model=CancelTaskResponse)
 async def cancel_transcription(task_id: str) -> dict[str, Any]:
     """Cancel a transcription task.
 
