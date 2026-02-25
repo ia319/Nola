@@ -3,7 +3,18 @@
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
+
+
+class FileRow(TypedDict):
+    """Row from the files table."""
+
+    id: str
+    filename: str
+    path: str
+    size: int
+    content_type: str | None
+    created_at: str
 
 
 class FileDatabase:
@@ -58,7 +69,7 @@ class FileDatabase:
             )
             conn.commit()
 
-    def get_file(self, file_id: str) -> dict[str, Any] | None:
+    def get_file(self, file_id: str) -> FileRow | None:
         """Get file metadata by ID.
 
         Args:
@@ -104,7 +115,7 @@ class FileDatabase:
 
             return deleted
 
-    def list_files(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+    def list_files(self, limit: int = 50, offset: int = 0) -> list[FileRow]:
         """List all files with pagination.
 
         Args:
