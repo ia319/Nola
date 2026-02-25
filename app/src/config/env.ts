@@ -6,10 +6,10 @@
  */
 const env = {
   /** Backend API base URL. Empty string = same origin (Vite proxy in dev). */
-  apiBaseUrl: import.meta.env.VITE_API_URL || '',
+  apiBaseUrl: import.meta.env.VITE_API_URL ?? '',
 
   /** WebSocket base URL for realtime transcription (future). */
-  wsBaseUrl: import.meta.env.VITE_WS_URL || '',
+  wsBaseUrl: import.meta.env.VITE_WS_URL ?? '',
 
   /** True when running `pnpm dev`. */
   isDev: import.meta.env.DEV,
