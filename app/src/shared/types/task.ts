@@ -2,7 +2,7 @@ import type { components } from './openapi'
 
 type Schemas = components['schemas']
 
-// -- Aliases extracted from openapi.d.ts --
+// Thin aliases over generated OpenAPI schemas.
 
 export type TaskSummary = Schemas['TaskSummaryResponse']
 export type TaskDetail = Schemas['TaskDetailResponse']
@@ -23,10 +23,10 @@ export type CreateTaskRequest = Schemas['TranscriptionRequest']
 /** POST /api/transcriptions/export/batch request. */
 export type BatchExportRequest = Schemas['BatchExportRequest']
 
-// -- Frontend-only types (no backend schema) --
+// Derived convenience types for frontend use.
 
-/** Export format literal. */
-export type ExportFormat = 'srt' | 'vtt' | 'txt' | 'ass'
+/** Export format derived from OpenAPI BatchExportRequest.format enum. */
+export type ExportFormat = Schemas['BatchExportRequest']['format']
 
 /** GET /api/transcriptions/options/defaults response (dynamic). */
 export type DefaultOptions = Record<string, unknown>
