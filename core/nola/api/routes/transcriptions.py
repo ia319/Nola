@@ -187,6 +187,9 @@ async def cancel_transcription(task_id: str) -> dict[str, Any]:
 ExportFormat = Literal["srt", "vtt", "txt", "ass"]
 
 
+# NOTE: OpenAPI only models the save=true JSON response.
+# Default (save=false) returns binary file content.
+# FE: downloadExport -> blob; saveExport -> JSON.
 @router.get(
     "/{task_id}/export",
     summary="Export transcription result",
