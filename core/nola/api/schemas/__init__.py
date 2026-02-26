@@ -13,6 +13,7 @@ from nola.api.schemas.files import (
 from nola.api.schemas.responses import (
     CancelTaskResponse,
     CreateTaskResponse,
+    SavedExportResponse,
     SegmentResponse,
     TaskDetailResponse,
     TaskListResponse,
@@ -32,6 +33,7 @@ __all__ = [
     "FileUploadResponse",
     "IntegrityCheckResponse",
     "MissingFileInfo",
+    "SavedExportResponse",
     "SegmentResponse",
     "TaskDetailResponse",
     "TaskListResponse",

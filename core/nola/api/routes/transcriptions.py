@@ -16,6 +16,7 @@ from nola.api.schemas import (
     BatchExportRequest,
     CancelTaskResponse,
     CreateTaskResponse,
+    SavedExportResponse,
     TaskDetailResponse,
     TaskListResponse,
     TranscriptionRequest,
@@ -186,7 +187,11 @@ async def cancel_transcription(task_id: str) -> dict[str, Any]:
 ExportFormat = Literal["srt", "vtt", "txt", "ass"]
 
 
-@router.get("/{task_id}/export", summary="Export transcription result")
+@router.get(
+    "/{task_id}/export",
+    summary="Export transcription result",
+    responses={200: {"model": SavedExportResponse, "description": "When save=true"}},
+)
 async def export_transcription(
     task_id: str,
     format: ExportFormat = Query("srt", description="Output format"),

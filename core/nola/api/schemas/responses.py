@@ -1,8 +1,11 @@
 """Transcription task response schemas."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
+
+# Derive from backend TaskStatus enum values.
+TaskStatusLiteral = Literal["pending", "processing", "completed", "failed", "cancelled"]
 
 
 class SegmentResponse(BaseModel):
@@ -18,7 +21,7 @@ class TaskSummaryResponse(BaseModel):
 
     task_id: str
     file_id: str
-    status: str
+    status: TaskStatusLiteral
     progress: float
     created_at: str
     completed_at: str | None
@@ -47,7 +50,7 @@ class CreateTaskResponse(BaseModel):
     task_id: str
     file_id: str
     filename: str
-    status: str
+    status: TaskStatusLiteral
     options: dict[str, Any] | None
 
 
@@ -55,5 +58,11 @@ class CancelTaskResponse(BaseModel):
     """Task cancellation response."""
 
     task_id: str
-    status: str
+    status: TaskStatusLiteral
     message: str
+
+
+class SavedExportResponse(BaseModel):
+    """Response when export is saved to server (save=true)."""
+
+    saved_path: str
