@@ -94,6 +94,28 @@ app/
 > 4. **Routing**: `routes/` handles URL matching. Components and logic live in `features/`.
 > 5. **API Types**: `shared/types/openapi.d.ts` is AUTO-GENERATED from the backend OpenAPI spec (`pnpm gen:types`). Do NOT manually edit it. The wrapper files (`api.ts`, `file.ts`, `task.ts`) provide friendly type aliases and are hand-maintained.
 
+### API Type Strategy
+
+Three-layer pipeline from backend schema to UI code:
+
+```
+Backend (Pydantic) ──► openapi.json ──► openapi.d.ts ──► wrapper aliases ──► feature api.ts
+   (Source)         (gen:types auto)   (thin re-export)   (typed functions)
+```
+
+| Layer | Path | Maintained by | Edit? |
+|-------|------|--------------|-------|
+| Raw types | `shared/types/openapi.d.ts` | `pnpm gen:types` (auto) | Never |
+| Wrapper aliases | `shared/types/task.ts`, `file.ts`, `api.ts` | Developer | Rarely (only if backend adds new schemas) |
+| Feature API | `features/*/api.ts` | Developer | Frequently |
+
+**Key rules:**
+- `TaskStatus` and `ExportFormat` are **derived from OpenAPI enum**, not hardcoded. This ensures Single Source of Truth — backend adds a new status/format, frontend auto-inherits after `pnpm gen:types`.
+- Wrapper aliases exist to avoid verbose `components['schemas']['TaskSummaryResponse']` paths in business code.
+- Feature `api.ts` functions return unwrapped `data` (not `AxiosResponse`), keeping callers free from Axios internals.
+
+**Update flow:** Backend changes schema → run `pnpm gen:types` → `openapi.d.ts` regenerates → wrapper aliases usually unchanged → feature API unchanged.
+
 ---
 
 ## Dependencies
