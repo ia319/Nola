@@ -12,7 +12,9 @@ export function downloadBlob(blob: Blob, filename: string): void {
   const a = document.createElement('a')
   a.href = url
   a.download = filename
+  document.body.appendChild(a)
   a.click()
+  document.body.removeChild(a)
   // Defer revocation so the browser can finish the async download.
   setTimeout(() => URL.revokeObjectURL(url), 100)
 }
