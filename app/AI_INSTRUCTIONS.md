@@ -24,7 +24,7 @@
 
 ## Directory Structure (Feature-First)
 
-```
+```text
 app/
 ├── .prettierrc               # Prettier config (no semicolons, single quotes)
 ├── components.json           # shadcn/ui component registry config
@@ -188,7 +188,7 @@ pnpm build
 
 ## Client-Server Architecture
 
-```
+```text
 Frontend (Vite/React) ───[ HTTP Proxy /api/* ]───▶ Backend (FastAPI, localhost:8000)
        │
    Axios (API Client)
