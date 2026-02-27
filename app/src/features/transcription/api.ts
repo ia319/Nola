@@ -24,9 +24,11 @@ export async function listTasks(
     limit?: number
     offset?: number
   } = {},
+  signal?: AbortSignal,
 ): Promise<TaskListResponse> {
   const { data } = await apiClient.get<TaskListResponse>(BASE + '/', {
     params,
+    signal,
   })
   return data
 }

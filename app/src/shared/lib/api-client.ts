@@ -23,7 +23,13 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiError>) => {
     const status = error.response?.status
-    const detail = error.response?.data ? formatApiError(error.response.data) : error.message
+    let detail: string
+    try {
+      detail = error.response?.data ? formatApiError(error.response.data) : error.message
+    } catch {
+      // Non-conforming response shape (e.g. HTML from proxy).
+      detail = error.message
+    }
 
     logger.error(`[API] ${status ?? 'NETWORK'} ${detail}`)
 

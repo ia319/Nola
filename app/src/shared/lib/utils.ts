@@ -13,5 +13,6 @@ export function downloadBlob(blob: Blob, filename: string): void {
   a.href = url
   a.download = filename
   a.click()
-  URL.revokeObjectURL(url)
+  // Defer revocation so the browser can finish the async download.
+  setTimeout(() => URL.revokeObjectURL(url), 100)
 }

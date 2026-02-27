@@ -27,9 +27,11 @@ export async function saveExport(
     format?: ExportFormat
     include_timestamps?: boolean
   } = {},
+  signal?: AbortSignal,
 ): Promise<SavedExportResponse> {
   const { data } = await apiClient.get<SavedExportResponse>(`${BASE}/${taskId}/export`, {
     params: { ...params, save: true },
+    signal,
   })
   return data
 }
