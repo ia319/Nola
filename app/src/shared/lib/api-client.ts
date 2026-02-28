@@ -2,7 +2,8 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
 import env from '@/config/env'
 import logger from '@/config/logger'
-import { formatApiError, type ApiError } from '@/shared/types'
+import { formatApiError } from '@/shared/lib/error-utils'
+import type { ApiError } from '@/shared/types'
 
 const apiClient = axios.create({
   baseURL: env.apiBaseUrl,
