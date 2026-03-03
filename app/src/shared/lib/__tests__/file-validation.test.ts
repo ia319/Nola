@@ -24,9 +24,11 @@ const DEFAULT_CONFIG: FileValidationConfig = {
   maxFileSize: 500 * 1024 * 1024,
 }
 
-/** Create a minimal File-like object for testing. */
+/** Create a File with a spoofed size to avoid real memory allocation. */
 function fakeFile(name: string, size: number, type = ''): File {
-  return new File([new ArrayBuffer(size)], name, { type })
+  const file = new File(['x'], name, { type })
+  Object.defineProperty(file, 'size', { value: size })
+  return file
 }
 
 describe('validateFile', () => {
@@ -88,5 +90,11 @@ describe('validateFile', () => {
     const r3 = validateFile(fakeFile('audio.wav', 2048, 'audio/wav'), strictConfig)
     expect(r3.valid).toBe(false)
     expect(r3.error?.code).toBe('VALIDATION_FILE_SIZE')
+  })
+
+  it('should prioritize no-extension over empty-file when both apply', () => {
+    // "noext" has no extension AND is 0 bytes — no-extension should win
+    const result = validateFile(fakeFile('noext', 0, 'audio/mpeg'), DEFAULT_CONFIG)
+    expect(result.error?.code).toBe('VALIDATION_NO_EXTENSION')
   })
 })

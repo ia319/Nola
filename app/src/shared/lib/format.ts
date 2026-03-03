@@ -10,6 +10,7 @@ const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const
  * @returns Formatted string, e.g. `"1.5 GB"`.
  */
 export function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return '0 B'
   if (bytes === 0) return '0 B'
 
   const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), UNITS.length - 1)
