@@ -12,6 +12,8 @@ import { initReactI18next } from 'react-i18next'
 import en from './locales/en.json'
 import zh from './locales/zh.json'
 
+// NOTE: Static bundled resources keep initialization predictable in current scope.
+// Revisit bootstrap coordination (await init or Suspense) if resources become async.
 i18n.use(initReactI18next).init({
   resources: {
     en: { translation: en },
