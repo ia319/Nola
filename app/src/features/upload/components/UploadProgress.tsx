@@ -10,7 +10,8 @@ interface UploadProgressProps {
   fileSize: number
   progress: number
   status: UploadStatus
-  errorMessage?: string
+  errorKey?: string
+  errorParams?: Record<string, unknown>
   onCancel?: () => void
   onRetry?: () => void
   onRemove?: () => void
@@ -24,7 +25,8 @@ export function UploadProgress({
   fileSize,
   progress,
   status,
-  errorMessage,
+  errorKey,
+  errorParams,
   onCancel,
   onRetry,
   onRemove,
@@ -57,8 +59,12 @@ export function UploadProgress({
           </div>
         )}
 
-        {status === 'error' && errorMessage && (
-          <p className="text-destructive mt-1 text-xs">{errorMessage}</p>
+        {status === 'error' && (
+          <p className="text-destructive mt-1 text-xs">
+            {errorKey
+              ? t(errorKey, { ...errorParams, defaultValue: t('upload.progress.error') })
+              : t('upload.progress.error')}
+          </p>
         )}
 
         {status === 'success' && (

@@ -23,7 +23,8 @@ export function UploadList({ uploads, onCancel, onRetry, onRemove }: UploadListP
           fileSize={item.file.size}
           progress={item.progress}
           status={item.status}
-          errorMessage={item.error?.i18nKey}
+          errorKey={item.error?.i18nKey}
+          errorParams={item.error?.params}
           onCancel={() => onCancel(item.id)}
           onRetry={() => onRetry(item.id)}
           onRemove={() => onRemove(item.id)}
