@@ -1,1 +1,26 @@
-{}
+{
+  "upload": {
+    "dropzone": {
+      "title": "Upload Audio Files",
+      "description": "Drag & drop files here, or click to browse",
+      "hint": "Supported: MP3, WAV, FLAC, M4A, OGG, WebM, AAC, MP4, WMA (max 500MB)"
+    },
+    "progress": {
+      "uploading": "Uploading...",
+      "success": "Upload complete",
+      "error": "Upload failed",
+      "cancelled": "Cancelled",
+      "cancel": "Cancel",
+      "retry": "Retry",
+      "remove": "Remove"
+    },
+    "error": {
+      "noExtension": "File has no extension: {{fileName}}",
+      "emptyFile": "File is empty: {{fileName}}",
+      "extensionNotAllowed": ".{{ext}} is not supported (allowed: {{allowed}})",
+      "mimeNotAllowed": "File type {{mime}} is not supported",
+      "fileTooLarge": "File exceeds maximum size",
+      "uploadFailed": "Upload failed, please retry"
+    }
+  }
+}
