@@ -26,6 +26,10 @@ describe('formatFileSize', () => {
     expect(formatFileSize(NaN)).toBe('0 B')
   })
 
+  it('should return "0 B" for Infinity', () => {
+    expect(formatFileSize(Infinity)).toBe('0 B')
+  })
+
   it('should format 500 MB correctly', () => {
     expect(formatFileSize(500 * 1024 * 1024)).toBe('500.0 MB')
   })
