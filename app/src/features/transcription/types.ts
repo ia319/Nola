@@ -1,7 +1,9 @@
 import type { CreateTaskPayload, CreateTaskRequest } from '@/shared/types'
 
-/** All transcription options excluding file_id — complete interface for type-safe access. */
-export type AdvancedTranscriptionOptions = Partial<Omit<CreateTaskRequest, 'file_id'>>
+/** All transcription options excluding top-level state fields — avoids dual-channel ambiguity. */
+export type AdvancedTranscriptionOptions = Partial<
+  Omit<CreateTaskRequest, 'file_id' | 'language' | 'task'>
+>
 
 /** Keep task mode constrained to backend-supported values across UI and payload builders. */
 export type TranscriptionTaskType = 'transcribe' | 'translate'
