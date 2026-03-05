@@ -1,17 +1,27 @@
-import type { CreateTaskRequest } from '@/shared/types'
+import type { CreateTaskPayload, CreateTaskRequest } from '@/shared/types'
 
-/** Fields the user can modify via the AdvancedOptions panel. */
-export type AdvancedTranscriptionOptions = Pick<
-  CreateTaskRequest,
-  | 'beam_size'
-  | 'temperature'
-  | 'vad_filter'
-  | 'no_speech_threshold'
-  | 'initial_prompt'
-  | 'condition_on_previous_text'
-  | 'word_timestamps'
-  | 'multilingual'
->
+/** All transcription options excluding file_id — complete interface for type-safe access. */
+export type AdvancedTranscriptionOptions = Partial<Omit<CreateTaskRequest, 'file_id'>>
+
+/** Keep task mode constrained to backend-supported values across UI and payload builders. */
+export type TranscriptionTaskType = 'transcribe' | 'translate'
+
+/** Define the stable contract consumed by option UI and task-creation orchestration. */
+export interface UseTranscriptionOptionsReturn {
+  language: string | undefined
+  task: TranscriptionTaskType
+  advancedOptions: AdvancedTranscriptionOptions
+  defaults: Record<string, unknown> | null
+
+  setLanguage: (lang: string | undefined) => void
+  setTask: (task: TranscriptionTaskType) => void
+  setAdvancedOption: <K extends keyof AdvancedTranscriptionOptions>(
+    key: K,
+    value: AdvancedTranscriptionOptions[K] | undefined,
+  ) => void
+  resetAdvancedOptions: () => void
+  buildRequest: (fileId: string) => CreateTaskPayload
+}
 
 /** Supported input control types for data-driven option rendering. */
 export type OptionFieldType = 'number' | 'number-list' | 'slider' | 'switch' | 'text'
