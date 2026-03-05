@@ -1,4 +1,5 @@
 import type { UploadItem } from '@/features/upload/types'
+import logger from '@/config/logger'
 import { UploadProgress } from './UploadProgress'
 
 interface UploadListProps {
@@ -26,8 +27,12 @@ export function UploadList({ uploads, onCancel, onRetry, onRemove }: UploadListP
           errorKey={item.error?.i18nKey}
           errorParams={item.error?.params}
           onCancel={() => onCancel(item.id)}
-          onRetry={() => onRetry(item.id)}
-          onRemove={() => onRemove(item.id)}
+          onRetry={() => {
+            onRetry(item.id).catch((e) => logger.warn('retryUpload unexpected', e))
+          }}
+          onRemove={() => {
+            onRemove(item.id).catch((e) => logger.warn('removeFile unexpected', e))
+          }}
         />
       ))}
     </div>
