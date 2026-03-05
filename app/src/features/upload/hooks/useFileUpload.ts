@@ -40,11 +40,9 @@ export function useFileUpload(): UseFileUploadReturn {
   // Mirror state into a ref to support synchronous reads during async queue processing.
   const uploadsRef = useRef<UploadItem[]>([])
   const setUploadsSync = useCallback((updater: UploadsUpdater) => {
-    setUploads((prev) => {
-      const next = typeof updater === 'function' ? updater(prev) : updater
-      uploadsRef.current = next
-      return next
-    })
+    const next = typeof updater === 'function' ? updater(uploadsRef.current) : updater
+    uploadsRef.current = next
+    setUploads(next)
   }, [])
 
   const updateItem = useCallback(
