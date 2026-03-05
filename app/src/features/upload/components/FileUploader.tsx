@@ -95,7 +95,7 @@ export function FileUploader({ onFilesSelected, disabled = false }: FileUploader
       </div>
 
       <Button type="button" variant="outline" size="sm" disabled={disabled}>
-        {t('upload.dropzone.description')}
+        {t('upload.dropzone.browse')}
       </Button>
 
       <p className="text-muted-foreground/70 text-xs">{t('upload.dropzone.hint')}</p>

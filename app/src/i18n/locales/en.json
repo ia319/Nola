@@ -3,7 +3,8 @@
     "dropzone": {
       "title": "Upload Audio Files",
       "description": "Drag & drop files here, or click to browse",
-      "hint": "Supported: MP3, WAV, FLAC, M4A, OGG, WebM, AAC, MP4, WMA (max 500MB)"
+      "hint": "Supported: MP3, WAV, FLAC, M4A, OGG, WebM, AAC, MP4, WMA (max 500MB)",
+      "browse": "Browse Files"
     },
     "progress": {
       "uploading": "Uploading...",

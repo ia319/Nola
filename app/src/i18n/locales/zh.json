@@ -3,7 +3,8 @@
         "dropzone": {
             "title": "上传音频文件",
             "description": "拖拽文件到此处，或点击浏览",
-            "hint": "支持格式: MP3, WAV, FLAC, M4A, OGG, WebM, AAC, MP4, WMA (最大 500MB)"
+            "hint": "支持格式: MP3, WAV, FLAC, M4A, OGG, WebM, AAC, MP4, WMA (最大 500MB)",
+            "browse": "浏览文件"
         },
         "progress": {
             "uploading": "上传中...",
