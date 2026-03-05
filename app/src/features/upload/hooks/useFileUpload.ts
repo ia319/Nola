@@ -145,6 +145,10 @@ export function useFileUpload(): UseFileUploadReturn {
       const target = uploadsRef.current.find((u) => u.id === id)
       if (!target) return
 
+      // NOTE: Snapshot-based status check has a theoretical race with in-flight upload
+      // completion. If the upload succeeds between this read and the abort() call below,
+      // the remote file won't be cleaned up here. Backend TTL/cleanup handles this edge case.
+
       if (target.status === 'uploading') {
         const controller = controllersRef.current.get(id)
         if (controller) {
