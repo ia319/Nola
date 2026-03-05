@@ -20,6 +20,10 @@ export type SavedExportResponse = Schemas['SavedExportResponse']
 /** POST /api/transcriptions/ request body. */
 export type CreateTaskRequest = Schemas['TranscriptionRequest']
 
+/** Frontend payload for task creation — only file_id required, options use backend defaults. */
+export type CreateTaskPayload = Pick<CreateTaskRequest, 'file_id'> &
+  Partial<Omit<CreateTaskRequest, 'file_id'>>
+
 /** POST /api/transcriptions/export/batch request. */
 export type BatchExportRequest = Schemas['BatchExportRequest']
 
