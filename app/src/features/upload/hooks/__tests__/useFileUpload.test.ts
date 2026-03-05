@@ -3,6 +3,7 @@ import axios from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useFileUpload } from '../useFileUpload'
 import { deleteFile, uploadFile } from '@/features/upload/api'
+import { UPLOAD_CONCURRENCY } from '@/config/constants'
 import type { FileUploadResponse } from '@/shared/types'
 
 vi.mock('@/features/upload/api', () => ({
@@ -229,9 +230,9 @@ describe('useFileUpload', () => {
     })
 
     await waitFor(() => {
-      expect(uploadFileMock).toHaveBeenCalledTimes(2)
+      expect(uploadFileMock).toHaveBeenCalledTimes(UPLOAD_CONCURRENCY)
     })
-    expect(maxInFlight).toBe(2)
+    expect(maxInFlight).toBe(UPLOAD_CONCURRENCY)
 
     d1.resolve(buildUploadResponse('id-1', f1))
     d2.resolve(buildUploadResponse('id-2', f2))
@@ -245,7 +246,7 @@ describe('useFileUpload', () => {
     await act(async () => {
       await startPromise
     })
-    expect(maxInFlight).toBe(2)
+    expect(maxInFlight).toBe(UPLOAD_CONCURRENCY)
   })
 
   it('removes success item and deletes remote orphan file', async () => {
