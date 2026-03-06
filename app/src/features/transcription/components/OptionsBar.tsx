@@ -153,6 +153,7 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
         </div>
 
         {/* Start button */}
+        {/* NOTE: add type="button" to all buttons when wrapping in <form> */}
         <Button id="start-transcription" onClick={handleStart} disabled={startDisabled}>
           {isCreating
             ? t('options.creating')
