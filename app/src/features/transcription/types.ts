@@ -26,7 +26,7 @@ export interface UseTranscriptionOptionsReturn {
 }
 
 /** Supported input control types for data-driven option rendering. */
-export type OptionFieldType = 'number' | 'number-list' | 'slider' | 'switch' | 'text'
+export type OptionFieldType = 'number' | 'number-list' | 'slider' | 'switch' | 'text' | 'textarea'
 
 /** Describes a single editable field within an option group. */
 export interface OptionFieldDef {
@@ -48,7 +48,7 @@ export interface OptionGroupDef {
   fields: OptionFieldDef[]
 }
 
-/** Whitelisted option groups driving the AdvancedOptions UI (AD-2). */
+/** Whitelisted option groups driving the AdvancedOptions UI. */
 export const OPTION_GROUPS: OptionGroupDef[] = [
   {
     titleKey: 'options.group.decoding',
@@ -56,7 +56,7 @@ export const OPTION_GROUPS: OptionGroupDef[] = [
       {
         key: 'beam_size',
         labelKey: 'options.field.beamSize',
-        type: 'number',
+        type: 'slider',
         min: 1,
         max: 10,
         step: 1,
@@ -81,7 +81,7 @@ export const OPTION_GROUPS: OptionGroupDef[] = [
   {
     titleKey: 'options.group.context',
     fields: [
-      { key: 'initial_prompt', labelKey: 'options.field.initialPrompt', type: 'text' },
+      { key: 'initial_prompt', labelKey: 'options.field.initialPrompt', type: 'textarea' },
       {
         key: 'condition_on_previous_text',
         labelKey: 'options.field.conditionOnPreviousText',
