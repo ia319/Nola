@@ -1,8 +1,8 @@
 import type { CreateTaskPayload, CreateTaskRequest } from '@/shared/types'
 
-/** All transcription options excluding top-level state fields — avoids dual-channel ambiguity. */
+/** All transcription options excluding top-level state fields and initial_prompt. */
 export type AdvancedTranscriptionOptions = Partial<
-  Omit<CreateTaskRequest, 'file_id' | 'language' | 'task'>
+  Omit<CreateTaskRequest, 'file_id' | 'language' | 'task' | 'initial_prompt'>
 >
 
 /** Keep task mode constrained to backend-supported values across UI and payload builders. */
@@ -23,6 +23,8 @@ export interface UseTranscriptionOptionsReturn {
   ) => void
   resetAdvancedOptions: () => void
   buildRequest: (fileId: string) => CreateTaskPayload
+  initialPrompt: string | undefined
+  setInitialPrompt: (value: string | undefined) => void
 }
 
 /** Supported input control types for data-driven option rendering. */
@@ -81,7 +83,6 @@ export const OPTION_GROUPS: OptionGroupDef[] = [
   {
     titleKey: 'options.group.context',
     fields: [
-      { key: 'initial_prompt', labelKey: 'options.field.initialPrompt', type: 'textarea' },
       {
         key: 'condition_on_previous_text',
         labelKey: 'options.field.conditionOnPreviousText',
