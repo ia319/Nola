@@ -23,5 +23,62 @@
             "fileTooLarge": "文件超过大小限制",
             "uploadFailed": "上传失败，请重试"
         }
+    },
+    "options": {
+        "language": {
+            "label": "语言",
+            "auto": "自动检测",
+            "en": "英语",
+            "zh": "中文",
+            "ja": "日语",
+            "ko": "韩语",
+            "de": "德语",
+            "fr": "法语",
+            "es": "西班牙语",
+            "ru": "俄语",
+            "ar": "阿拉伯语"
+        },
+        "task": {
+            "label": "任务类型",
+            "transcribe": "转写",
+            "translate": "翻译为英文"
+        },
+        "start": "开始转写 ({{count}})",
+        "startDisabled": "开始转写",
+        "creating": "创建中...",
+        "taskCreated": "任务已创建: {{taskId}}",
+        "advanced": {
+            "toggle": "高级选项",
+            "reset": "重置为默认值",
+            "numberListHint": "使用逗号分隔非负数字，例如 0.0, 0.2, 0.4",
+            "numberListError": {
+                "emptySegment": "逗号只能用于分隔数字",
+                "invalidCharacter": "请输入用逗号分隔的小数",
+                "invalidNumber": "每个温度值都必须是合法的小数",
+                "negativeNotAllowed": "温度值必须为非负数"
+            }
+        },
+        "group": {
+            "decoding": "解码",
+            "quality": "质量",
+            "context": "上下文",
+            "timestamps": "时间戳",
+            "advanced": "高级"
+        },
+        "field": {
+            "beamSize": "搜索宽度",
+            "temperature": "温度",
+            "vadFilter": "VAD 过滤",
+            "noSpeechThreshold": "无语音阈值",
+            "initialPrompt": "初始提示词",
+            "conditionOnPreviousText": "基于前文续写",
+            "wordTimestamps": "词级时间戳",
+            "multilingual": "多语言"
+        }
+    },
+    "error": {
+        "api": {
+            "serverError": "服务器错误，请稍后重试"
+        }
     }
 }

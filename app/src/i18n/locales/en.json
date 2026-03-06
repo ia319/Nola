@@ -23,5 +23,62 @@
       "fileTooLarge": "File exceeds maximum size",
       "uploadFailed": "Upload failed, please retry"
     }
+  },
+  "options": {
+    "language": {
+      "label": "Language",
+      "auto": "Auto Detect",
+      "en": "English",
+      "zh": "Chinese",
+      "ja": "Japanese",
+      "ko": "Korean",
+      "de": "German",
+      "fr": "French",
+      "es": "Spanish",
+      "ru": "Russian",
+      "ar": "Arabic"
+    },
+    "task": {
+      "label": "Task",
+      "transcribe": "Transcribe",
+      "translate": "Translate to English"
+    },
+    "start": "Start Transcription ({{count}})",
+    "startDisabled": "Start Transcription",
+    "creating": "Creating...",
+    "taskCreated": "Task created: {{taskId}}",
+    "advanced": {
+      "toggle": "Advanced Options",
+      "reset": "Reset to Defaults",
+      "numberListHint": "Comma-separated non-negative numbers, e.g. 0.0, 0.2, 0.4",
+      "numberListError": {
+        "emptySegment": "Use commas only between numbers",
+        "invalidCharacter": "Use decimal numbers separated by commas",
+        "invalidNumber": "Each temperature must be a valid decimal number",
+        "negativeNotAllowed": "Temperature values must be non-negative"
+      }
+    },
+    "group": {
+      "decoding": "Decoding",
+      "quality": "Quality",
+      "context": "Context",
+      "timestamps": "Timestamps",
+      "advanced": "Advanced"
+    },
+    "field": {
+      "beamSize": "Beam Size",
+      "temperature": "Temperature",
+      "vadFilter": "VAD Filter",
+      "noSpeechThreshold": "No Speech Threshold",
+      "initialPrompt": "Initial Prompt",
+      "conditionOnPreviousText": "Condition on Previous Text",
+      "wordTimestamps": "Word Timestamps",
+      "multilingual": "Multilingual"
+    }
+  },
+  "error": {
+    "api": {
+      "serverError": "Server error, please try again"
+    }
   }
 }
