@@ -41,7 +41,7 @@
         "task": {
             "label": "任务类型",
             "transcribe": "转写",
-            "translate": "翻译为英文"
+            "translate": "转写并翻译为英文"
         },
         "start": "开始转写 ({{count}})",
         "startDisabled": "开始转写",

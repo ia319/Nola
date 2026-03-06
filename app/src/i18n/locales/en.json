@@ -41,7 +41,7 @@
     "task": {
       "label": "Task",
       "transcribe": "Transcribe",
-      "translate": "Translate to English"
+      "translate": "Transcribe & Translate to English"
     },
     "start": "Start Transcription ({{count}})",
     "startDisabled": "Start Transcription",
