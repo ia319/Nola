@@ -14,6 +14,10 @@ export type TemperatureParseResult =
 const TEMPERATURE_ALLOWED_CHARS_RE = /^[\d\s,.-]*$/
 const TEMPERATURE_TOKEN_RE = /^-?(?:\d+(?:\.\d*)?|\.\d+)$/
 
+function formatTemperatureNumber(value: number): string {
+  return Number.isInteger(value) ? value.toFixed(1) : String(value)
+}
+
 /**
  * Normalize committed temperature values into the stable UI string form.
  *
@@ -21,7 +25,7 @@ const TEMPERATURE_TOKEN_RE = /^-?(?:\d+(?:\.\d*)?|\.\d+)$/
  * @returns A comma-space separated string suitable for field display.
  */
 export function formatTemperatureValues(values: number[]): string {
-  return values.map((value) => String(value)).join(', ')
+  return values.map((value) => formatTemperatureNumber(value)).join(', ')
 }
 
 /**
@@ -32,7 +36,7 @@ export function formatTemperatureValues(values: number[]): string {
  */
 export function serializeTemperatureValue(value: TemperatureInputValue): string {
   if (Array.isArray(value)) return formatTemperatureValues(value)
-  if (typeof value === 'number') return String(value)
+  if (typeof value === 'number') return formatTemperatureNumber(value)
   return ''
 }
 
