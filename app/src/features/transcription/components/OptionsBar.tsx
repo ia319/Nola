@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -58,6 +58,8 @@ export interface OptionsBarProps {
 export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProps) {
   const { t } = useTranslation()
   const [isCreating, setIsCreating] = useState(false)
+  // Synchronous lock to prevent double-click reentry before React re-renders.
+  const creatingRef = useRef(false)
 
   const {
     language,
@@ -75,7 +77,8 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
 
   /** Create tasks for all available file IDs, collecting per-file results. */
   async function handleStart() {
-    if (fileIds.length === 0 || isCreating) return
+    if (creatingRef.current || fileIds.length === 0) return
+    creatingRef.current = true
     setIsCreating(true)
 
     try {
@@ -102,6 +105,7 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
 
       onTasksCreated(results)
     } finally {
+      creatingRef.current = false
       setIsCreating(false)
     }
   }
