@@ -128,6 +128,7 @@ export function AdvancedOptions({
 }: AdvancedOptionsProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
+  const [resetNonce, setResetNonce] = useState(0)
   const numberListErrorMessages: Record<TemperatureParseErrorCode, string> = {
     emptySegment: t('options.advanced.numberListError.emptySegment'),
     invalidCharacter: t('options.advanced.numberListError.invalidCharacter'),
@@ -305,7 +306,7 @@ export function AdvancedOptions({
                     case 'number-list':
                       return (
                         <NumberListField
-                          key={`${field.key as string}:${serializeTemperatureValue(value as TemperatureInputValue)}`}
+                          key={`${field.key as string}:${serializeTemperatureValue(value as TemperatureInputValue)}:${resetNonce}`}
                           fieldKey={field.key as string}
                           label={t(field.labelKey)}
                           disabled={disabled}
@@ -341,7 +342,10 @@ export function AdvancedOptions({
               id="reset-advanced-options"
               variant="outline"
               size="sm"
-              onClick={onReset}
+              onClick={() => {
+                setResetNonce((n) => n + 1)
+                onReset()
+              }}
               disabled={disabled}
             >
               {t('options.advanced.reset')}
