@@ -32,3 +32,14 @@ export function createApiError(status: number, detail: string): AppError {
     retriable: false,
   }
 }
+
+/** Check whether an unknown value conforms to the AppError shape. */
+export function isAppError(err: unknown): err is AppError {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    typeof (err as AppError).code === 'string' &&
+    typeof (err as AppError).i18nKey === 'string' &&
+    typeof (err as AppError).retriable === 'boolean'
+  )
+}
