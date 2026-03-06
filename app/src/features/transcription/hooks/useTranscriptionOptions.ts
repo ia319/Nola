@@ -19,6 +19,7 @@ export function useTranscriptionOptions(): UseTranscriptionOptionsReturn {
   const [task, setTask] = useState<TranscriptionTaskType>('transcribe')
   const [advancedOptions, setAdvancedOptions] = useState<AdvancedTranscriptionOptions>({})
   const [defaults, setDefaults] = useState<Record<string, unknown> | null>(null)
+  const [initialPrompt, setInitialPrompt] = useState<string | undefined>(undefined)
 
   // Load backend defaults on mount for placeholder/label display.
   useEffect(() => {
@@ -67,6 +68,7 @@ export function useTranscriptionOptions(): UseTranscriptionOptionsReturn {
 
       if (language !== undefined) payload.language = language
       if (task !== 'transcribe') payload.task = task
+      if (initialPrompt !== undefined) payload.initial_prompt = initialPrompt
 
       // Merge only defined advanced options into payload.
       for (const [k, v] of Object.entries(advancedOptions)) {
@@ -77,7 +79,7 @@ export function useTranscriptionOptions(): UseTranscriptionOptionsReturn {
 
       return payload
     },
-    [language, task, advancedOptions],
+    [language, task, initialPrompt, advancedOptions],
   )
 
   return {
@@ -90,5 +92,7 @@ export function useTranscriptionOptions(): UseTranscriptionOptionsReturn {
     setAdvancedOption,
     resetAdvancedOptions,
     buildRequest,
+    initialPrompt,
+    setInitialPrompt,
   }
 }

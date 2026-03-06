@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -68,6 +69,8 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
     setAdvancedOption,
     resetAdvancedOptions,
     buildRequest,
+    initialPrompt,
+    setInitialPrompt,
   } = useTranscriptionOptions()
 
   /** Create tasks for all available file IDs, collecting per-file results. */
@@ -139,7 +142,7 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
             onValueChange={(v) => setTask(v as 'transcribe' | 'translate')}
             disabled={controlsDisabled}
           >
-            <SelectTrigger id="task-select" className="w-[180px]">
+            <SelectTrigger id="task-select" className="w-[260px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -157,6 +160,20 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
               ? t('options.start', { count: fileIds.length })
               : t('options.startDisabled')}
         </Button>
+      </div>
+
+      {/* Initial prompt */}
+      <div className="space-y-1.5">
+        <Label htmlFor="initial-prompt">{t('options.field.initialPrompt')}</Label>
+        <Textarea
+          id="initial-prompt"
+          disabled={controlsDisabled}
+          value={initialPrompt ?? ''}
+          placeholder={
+            typeof defaults?.initial_prompt === 'string' ? defaults.initial_prompt : undefined
+          }
+          onChange={(e) => setInitialPrompt(e.target.value || undefined)}
+        />
       </div>
 
       {/* Advanced options */}
