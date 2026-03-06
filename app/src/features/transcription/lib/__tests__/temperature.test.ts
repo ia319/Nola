@@ -7,8 +7,8 @@ import {
 } from '../temperature'
 
 describe('formatTemperatureValues', () => {
-  it('joins values with a stable comma-space separator', () => {
-    expect(formatTemperatureValues([0, 0.2, 1])).toBe('0, 0.2, 1')
+  it('keeps integer temperatures aligned with backend decimal defaults', () => {
+    expect(formatTemperatureValues([0, 0.25, 1])).toBe('0.0, 0.25, 1.0')
   })
 })
 
@@ -17,8 +17,12 @@ describe('serializeTemperatureValue', () => {
     expect(serializeTemperatureValue(0.2)).toBe('0.2')
   })
 
+  it('serializes integer scalars with one decimal place', () => {
+    expect(serializeTemperatureValue(0)).toBe('0.0')
+  })
+
   it('serializes arrays via the shared formatter', () => {
-    expect(serializeTemperatureValue([0, 0.2])).toBe('0, 0.2')
+    expect(serializeTemperatureValue([0, 0.2])).toBe('0.0, 0.2')
   })
 
   it('returns an empty draft for missing values', () => {
@@ -33,10 +37,10 @@ describe('parseTemperatureDraft', () => {
   })
 
   it('parses valid comma-separated decimals and normalizes spacing', () => {
-    expect(parseTemperatureDraft('0.0,0.2, .4')).toEqual({
+    expect(parseTemperatureDraft('0.0,0.25, .4')).toEqual({
       kind: 'success',
-      values: [0, 0.2, 0.4],
-      canonical: '0, 0.2, 0.4',
+      values: [0, 0.25, 0.4],
+      canonical: '0.0, 0.25, 0.4',
     })
   })
 
@@ -52,7 +56,7 @@ describe('parseTemperatureDraft', () => {
     expect(parseTemperatureDraft('0., .2')).toEqual({
       kind: 'success',
       values: [0, 0.2],
-      canonical: '0, 0.2',
+      canonical: '0.0, 0.2',
     })
   })
 
