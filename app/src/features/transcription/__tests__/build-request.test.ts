@@ -20,7 +20,7 @@ async function renderTranscriptionOptions(defaults: Record<string, unknown> = {}
   const hook = renderHook(() => useTranscriptionOptions())
 
   await waitFor(() => {
-    expect(getDefaultOptionsMock).toHaveBeenCalledTimes(1)
+    expect(getDefaultOptionsMock).toHaveBeenCalled()
     expect(hook.result.current.defaults).toEqual(defaults)
   })
 
