@@ -86,6 +86,13 @@ describe('useTranscriptionOptions', () => {
     })
     expect(result.current.advancedOptions.without_timestamps).toBe(true)
     expect(result.current.advancedOptions.word_timestamps).toBe(false)
+
+    // Reverse: setting word_timestamps clears without_timestamps.
+    act(() => {
+      result.current.setAdvancedOption('word_timestamps', true)
+    })
+    expect(result.current.advancedOptions.word_timestamps).toBe(true)
+    expect(result.current.advancedOptions.without_timestamps).toBe(false)
   })
 
   it('resets advanced options without affecting other state', async () => {
