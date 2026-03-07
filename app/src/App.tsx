@@ -1,30 +1,110 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
+import { toast, Toaster } from 'sonner'
 
+import { ErrorBoundary } from '@/shared/ui/ErrorBoundary'
+import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
+import { OptionsBar } from '@/features/transcription'
+import type { TaskCreateResult } from '@/features/transcription/components/OptionsBar'
+import { Button } from '@/components/ui/button'
+
+/**
+ * Root application shell.
+ *
+ * Wire upload and transcription features together with independent
+ * ErrorBoundary panels so a crash in one section does not take down the other.
+ */
 function App() {
-  const [count, setCount] = useState(0)
+  const { t } = useTranslation()
+
+  const {
+    uploads,
+    addFiles,
+    removeFile,
+    startUpload,
+    cancelUpload,
+    retryUpload,
+    markTaskCreated,
+    reset,
+    isUploading,
+    availableFileIds,
+    batchError,
+    clearBatchError,
+  } = useFileUpload()
+
+  const hasPending = uploads.some((u) => u.status === 'pending')
+
+  /** Display batch error toast when duplicate files are skipped. */
+  function handleFilesSelected(files: File[]) {
+    addFiles(files)
+  }
+
+  /** Mark successful task creations and notify via toast. */
+  function handleTasksCreated(results: TaskCreateResult[]) {
+    for (const result of results) {
+      if (result.ok && result.fileId) {
+        markTaskCreated(result.fileId)
+        toast.success(t('options.taskCreated', { taskId: result.taskId }))
+        continue
+      }
+
+      toast.error(
+        result.error?.i18nKey ? t(result.error.i18nKey, result.error.params ?? {}) : 'Failed',
+      )
+    }
+  }
+
+  /** Reset all upload state with orphan cleanup. */
+  async function handleReset() {
+    await reset()
+  }
+
+  // Surface batch-level errors (e.g. duplicate file skip) as toast.
+  useEffect(() => {
+    if (!batchError) return
+    toast.warning(t(batchError.i18nKey, batchError.params ?? {}))
+    clearBatchError()
+  }, [batchError, clearBatchError, t])
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>count is {count}</button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">Click on the Vite and React logos to learn more</p>
-    </>
+    <div className="mx-auto max-w-2xl space-y-6 p-6">
+      {/* Upload panel */}
+      <ErrorBoundary>
+        <FileUploader onFilesSelected={handleFilesSelected} disabled={isUploading} />
+
+        <UploadList
+          uploads={uploads}
+          onCancel={cancelUpload}
+          onRetry={retryUpload}
+          onRemove={removeFile}
+        />
+
+        {/* Upload / reset actions */}
+        {uploads.length > 0 && (
+          <div className="flex gap-2 pt-2">
+            {hasPending && (
+              <Button onClick={startUpload} disabled={isUploading}>
+                {isUploading ? t('upload.progress.uploading') : t('upload.startUpload')}
+              </Button>
+            )}
+            <Button variant="outline" onClick={handleReset} disabled={isUploading}>
+              {t('upload.reset')}
+            </Button>
+          </div>
+        )}
+      </ErrorBoundary>
+
+      {/* Transcription options panel */}
+      <ErrorBoundary>
+        <OptionsBar
+          fileIds={availableFileIds}
+          onTasksCreated={handleTasksCreated}
+          disabled={isUploading}
+        />
+      </ErrorBoundary>
+
+      <Toaster />
+    </div>
   )
 }
 
