@@ -82,7 +82,12 @@
   },
   "error": {
     "api": {
-      "serverError": "Server error, please try again"
+      "serverError": "Server error, please try again",
+      "clientError": "Request error ({{status}})"
+    },
+    "network": {
+      "timeout": "Request timed out, please try again",
+      "offline": "Network unavailable, check your connection"
     },
     "boundary": {
       "title": "Something went wrong",

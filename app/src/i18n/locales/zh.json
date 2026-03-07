@@ -81,7 +81,12 @@
     },
     "error": {
         "api": {
-            "serverError": "服务器错误，请稍后重试"
+            "serverError": "服务器错误，请稍后重试",
+            "clientError": "请求错误 ({{status}})"
+        },
+        "network": {
+            "timeout": "请求超时，请重试",
+            "offline": "网络不可用，请检查连接"
         },
         "boundary": {
             "title": "出现了问题",
