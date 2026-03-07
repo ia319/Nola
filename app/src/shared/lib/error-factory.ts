@@ -25,11 +25,14 @@ export function createApiError(status: number, detail: string): AppError {
     }
   }
 
+  // Rate-limited or request timeout responses are transient; allow retry.
+  const retriable = status === 408 || status === 429
+
   return {
     code: `API_CLIENT_${status}`,
     i18nKey: 'error.api.clientError',
     params: { status, detail },
-    retriable: false,
+    retriable,
   }
 }
 
