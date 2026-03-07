@@ -1,7 +1,7 @@
 /**
  * Lightweight logger with [Nola] prefix.
  *
- * - `debug` is suppressed in production builds.
+ * - `debug` and `info` are suppressed in production builds.
  * - To integrate Sentry later, add a call inside `error()`.
  */
 const logger = {
