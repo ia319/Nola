@@ -21,7 +21,8 @@
       "extensionNotAllowed": ".{{ext}} is not supported (allowed: {{allowed}})",
       "mimeNotAllowed": "File type {{mime}} is not supported",
       "fileTooLarge": "File exceeds maximum size",
-      "uploadFailed": "Upload failed, please retry"
+      "uploadFailed": "Upload failed, please retry",
+      "duplicateFiles": "{{count}} duplicate file(s) skipped"
     }
   },
   "options": {

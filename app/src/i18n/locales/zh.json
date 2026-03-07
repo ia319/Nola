@@ -21,7 +21,8 @@
             "extensionNotAllowed": "不支持 .{{ext}} 格式 (支持: {{allowed}})",
             "mimeNotAllowed": "不支持文件类型 {{mime}}",
             "fileTooLarge": "文件超过大小限制",
-            "uploadFailed": "上传失败，请重试"
+            "uploadFailed": "上传失败，请重试",
+            "duplicateFiles": "已跳过 {{count}} 个重复文件"
         }
     },
     "options": {
