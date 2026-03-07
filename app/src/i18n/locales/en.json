@@ -24,7 +24,9 @@
       "uploadFailed": "Upload failed, please retry",
       "duplicateFiles_one": "{{count}} duplicate file skipped",
       "duplicateFiles_other": "{{count}} duplicate files skipped"
-    }
+    },
+    "startUpload": "Start Upload",
+    "reset": "Reset All"
   },
   "options": {
     "language": {
@@ -81,6 +83,11 @@
   "error": {
     "api": {
       "serverError": "Server error, please try again"
+    },
+    "boundary": {
+      "title": "Something went wrong",
+      "description": "An unexpected error occurred in this section.",
+      "retry": "Try Again"
     }
   }
 }

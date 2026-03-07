@@ -23,7 +23,9 @@
             "fileTooLarge": "文件超过大小限制",
             "uploadFailed": "上传失败，请重试",
             "duplicateFiles": "已跳过 {{count}} 个重复文件"
-        }
+        },
+        "startUpload": "开始上传",
+        "reset": "全部重置"
     },
     "options": {
         "language": {
@@ -80,6 +82,11 @@
     "error": {
         "api": {
             "serverError": "服务器错误，请稍后重试"
+        },
+        "boundary": {
+            "title": "出现了问题",
+            "description": "此区域发生了意外错误。",
+            "retry": "重试"
         }
     }
 }
