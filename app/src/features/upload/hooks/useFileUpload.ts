@@ -75,6 +75,11 @@ export function useFileUpload(): UseFileUploadReturn {
       if (batchError) setBatchError(batchError)
       if (items.length === 0) return
 
+      logger.info('upload.filesAdded', {
+        accepted: items.filter((i) => i.status === 'pending').length,
+        rejected: items.filter((i) => i.status === 'error').length,
+      })
+
       setUploadsSync((prev) => [...prev, ...items])
     },
     [setUploadsSync],
@@ -101,6 +106,8 @@ export function useFileUpload(): UseFileUploadReturn {
       controllersRef.current.set(id, controller)
       updateItem(id, { status: 'uploading', progress: 0 })
 
+      logger.info('upload.start', { fileName: item.file.name, fileSize: item.file.size })
+
       const timeoutMs = computeUploadTimeoutMs(item.file.size)
 
       try {
@@ -111,6 +118,7 @@ export function useFileUpload(): UseFileUploadReturn {
           timeoutMs,
         )
         controllersRef.current.delete(id)
+        logger.info('upload.complete', { fileId: result.file_id, fileName: item.file.name })
         updateItem(id, {
           status: 'success',
           progress: 100,
@@ -123,6 +131,7 @@ export function useFileUpload(): UseFileUploadReturn {
         if (isUploadCanceledError(err)) return
 
         const appError = createNetworkError('UPLOAD_FAILED', 'upload.error.uploadFailed')
+        logger.error('upload.failed', { fileName: item.file.name, error: err })
         updateItem(id, { status: 'error', error: appError })
       }
     },
