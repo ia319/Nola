@@ -34,7 +34,7 @@ function App() {
 
   const hasPending = uploads.some((u) => u.status === 'pending')
 
-  /** Display batch error toast when duplicate files are skipped. */
+  /** Forward selected files to the upload queue for admission and validation. */
   function handleFilesSelected(files: File[]) {
     addFiles(files)
   }
@@ -49,7 +49,9 @@ function App() {
       }
 
       toast.error(
-        result.error?.i18nKey ? t(result.error.i18nKey, result.error.params ?? {}) : 'Failed',
+        result.error?.i18nKey
+          ? t(result.error.i18nKey, result.error.params ?? {})
+          : t('error.generic'),
       )
     }
   }

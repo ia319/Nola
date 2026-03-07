@@ -80,6 +80,7 @@
         }
     },
     "error": {
+        "generic": "发生错误",
         "api": {
             "serverError": "服务器错误，请稍后重试",
             "clientError": "请求错误 ({{status}})"

@@ -81,6 +81,7 @@
     }
   },
   "error": {
+    "generic": "An error occurred",
     "api": {
       "serverError": "Server error, please try again",
       "clientError": "Request error ({{status}})"
