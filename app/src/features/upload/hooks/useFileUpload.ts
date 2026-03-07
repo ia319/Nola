@@ -210,6 +210,9 @@ export function useFileUpload(): UseFileUploadReturn {
     controllersRef.current.forEach((c) => c.abort())
     controllersRef.current.clear()
 
+    // NOTE: An in-flight upload that wins the abort race may write its fileId
+    // after this snapshot, leaving the remote file uncleaned. Backend TTL
+    // handles this edge case (same race as removeFile).
     const orphans = uploadsRef.current.filter(
       (u) => u.status === 'success' && !u.taskCreated && u.fileId,
     )
