@@ -133,4 +133,16 @@ describe('useTranscriptionOptions', () => {
       beam_size: 3,
     })
   })
+
+  it('keeps defaults null when the defaults request fails', async () => {
+    getDefaultOptionsMock.mockRejectedValueOnce(new Error('network down'))
+
+    const { result } = renderHook(() => useTranscriptionOptions())
+
+    await waitFor(() => {
+      expect(getDefaultOptionsMock).toHaveBeenCalled()
+    })
+
+    expect(result.current.defaults).toBeNull()
+  })
 })

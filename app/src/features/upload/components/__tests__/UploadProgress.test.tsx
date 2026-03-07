@@ -1,0 +1,58 @@
+import { render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+
+import { UploadProgress } from '../UploadProgress'
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+  }),
+}))
+
+describe('UploadProgress', () => {
+  it('renders uploading state with progress and cancel action', () => {
+    render(
+      <UploadProgress
+        fileName="audio.mp3"
+        fileSize={1024}
+        progress={42}
+        status="uploading"
+        onCancel={() => {}}
+      />,
+    )
+
+    expect(screen.getByText('42%')).toBeTruthy()
+    expect(screen.getByLabelText('upload.progress.cancel')).toBeTruthy()
+    expect(screen.queryByText('upload.progress.retry')).toBeNull()
+  })
+
+  it('renders translated error text and recovery actions', () => {
+    render(
+      <UploadProgress
+        fileName="bad.mp3"
+        fileSize={1024}
+        progress={0}
+        status="error"
+        errorKey="upload.error.fileTooLarge"
+        onRetry={() => {}}
+        onRemove={() => {}}
+      />,
+    )
+
+    expect(screen.getByText('upload.error.fileTooLarge')).toBeTruthy()
+    expect(screen.getByText('upload.progress.retry')).toBeTruthy()
+    expect(screen.getByLabelText('upload.progress.remove')).toBeTruthy()
+  })
+
+  it('renders success and cancelled terminal messages', () => {
+    const { rerender } = render(
+      <UploadProgress fileName="done.mp3" fileSize={1024} progress={100} status="success" />,
+    )
+
+    expect(screen.getByText('upload.progress.success')).toBeTruthy()
+
+    rerender(<UploadProgress fileName="done.mp3" fileSize={1024} progress={0} status="cancelled" />)
+
+    expect(screen.getByText('upload.progress.cancelled')).toBeTruthy()
+  })
+})

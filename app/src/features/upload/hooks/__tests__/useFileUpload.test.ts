@@ -14,9 +14,10 @@ vi.mock('@/features/upload/api', () => ({
 const uploadFileMock = vi.mocked(uploadFile)
 const deleteFileMock = vi.mocked(deleteFile)
 
-function fakeFile(name: string, size: number, type = 'audio/mpeg'): File {
+function fakeFile(name: string, size: number, type = 'audio/mpeg', lastModified = 1): File {
   const file = new File(['x'], name, { type })
   Object.defineProperty(file, 'size', { value: size })
+  Object.defineProperty(file, 'lastModified', { value: lastModified })
   return file
 }
 
@@ -85,6 +86,68 @@ describe('useFileUpload', () => {
     expect(result.current.uploads[1].status).toBe('error')
     expect(result.current.uploads[1].error?.code).toBe('VALIDATION_EXTENSION')
     expect(result.current.hasErrors).toBe(true)
+  })
+
+  it('skips duplicate files and surfaces a batch-level duplicate error', () => {
+    const { result } = renderHook(() => useFileUpload())
+    const duplicateOne = fakeFile('same.mp3', 1024, 'audio/mpeg', 5)
+    const duplicateTwo = fakeFile('same.mp3', 1024, 'audio/mpeg', 5)
+
+    act(() => {
+      result.current.addFiles([duplicateOne, duplicateTwo])
+    })
+
+    expect(result.current.uploads).toHaveLength(1)
+    expect(result.current.uploads[0].file.name).toBe('same.mp3')
+    expect(result.current.batchError).toMatchObject({
+      code: 'VALIDATION_DUPLICATE',
+      i18nKey: 'upload.error.duplicateFiles',
+      params: { count: 1 },
+    })
+  })
+
+  it('clears stale batch errors on a clean add and on reset', async () => {
+    const { result } = renderHook(() => useFileUpload())
+    const duplicateOne = fakeFile('same.mp3', 1024, 'audio/mpeg', 7)
+    const duplicateTwo = fakeFile('same.mp3', 1024, 'audio/mpeg', 7)
+    const unique = fakeFile('fresh.mp3', 2048, 'audio/mpeg', 8)
+
+    act(() => {
+      result.current.addFiles([duplicateOne, duplicateTwo])
+    })
+    expect(result.current.batchError?.code).toBe('VALIDATION_DUPLICATE')
+
+    act(() => {
+      result.current.addFiles([unique])
+    })
+    expect(result.current.batchError).toBeNull()
+
+    act(() => {
+      result.current.addFiles([duplicateOne, duplicateTwo])
+    })
+    expect(result.current.batchError?.code).toBe('VALIDATION_DUPLICATE')
+
+    await act(async () => {
+      await result.current.reset()
+    })
+    expect(result.current.batchError).toBeNull()
+  })
+
+  it('allows the container to dismiss batch-level errors explicitly', () => {
+    const { result } = renderHook(() => useFileUpload())
+    const duplicateOne = fakeFile('same.mp3', 1024, 'audio/mpeg', 9)
+    const duplicateTwo = fakeFile('same.mp3', 1024, 'audio/mpeg', 9)
+
+    act(() => {
+      result.current.addFiles([duplicateOne, duplicateTwo])
+    })
+    expect(result.current.batchError).not.toBeNull()
+
+    act(() => {
+      result.current.clearBatchError()
+    })
+
+    expect(result.current.batchError).toBeNull()
   })
 
   it('uploads pending file and exposes available file id', async () => {
