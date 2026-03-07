@@ -24,4 +24,6 @@ export interface UseFileUploadReturn {
   isUploading: boolean
   availableFileIds: string[]
   hasErrors: boolean
+  batchError: AppError | null
+  clearBatchError: () => void
 }

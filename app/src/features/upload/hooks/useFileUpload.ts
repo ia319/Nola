@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { validateFile, type FileValidationConfig } from '@/shared/lib/file-validation'
+import type { FileValidationConfig } from '@/shared/lib/file-validation'
 import { createNetworkError } from '@/shared/lib/error-factory'
+import type { AppError } from '@/shared/types'
 import { uploadFile, deleteFile } from '@/features/upload/api'
 import type { UploadItem, UseFileUploadReturn } from '@/features/upload/types'
+import { admitFiles } from '@/features/upload/lib/admission'
 import { computeUploadTimeoutMs } from '@/features/upload/lib/timeout'
 import { isUploadCanceledError } from '@/features/upload/lib/error'
 import {
@@ -34,6 +36,7 @@ const validationConfig: FileValidationConfig = {
  */
 export function useFileUpload(): UseFileUploadReturn {
   const [uploads, setUploads] = useState<UploadItem[]>([])
+  const [batchError, setBatchError] = useState<AppError | null>(null)
   const controllersRef = useRef<Map<string, AbortController>>(new Map())
   const lockRef = useRef(false)
 
@@ -52,21 +55,27 @@ export function useFileUpload(): UseFileUploadReturn {
     [setUploadsSync],
   )
 
+  /**
+   * Treat remote cleanup as best-effort so local queue actions are not blocked
+   * by transient delete failures; backend TTL handles leftovers.
+   */
+  const deleteRemoteFileQuietly = useCallback(async (fileId: string) => {
+    try {
+      await deleteFile(fileId)
+    } catch {
+      logger.warn(`deleteFile failed for ${fileId}, local entry removed regardless`)
+    }
+  }, [])
+
   const addFiles = useCallback(
     (files: File[]) => {
-      const newItems: UploadItem[] = files.map((file) => {
-        const result = validateFile(file, validationConfig)
-        return {
-          id: crypto.randomUUID(),
-          file,
-          status: result.valid ? 'pending' : 'error',
-          progress: 0,
-          error: result.valid ? null : (result.error ?? null),
-          fileId: null,
-          taskCreated: false,
-        } satisfies UploadItem
-      })
-      setUploadsSync((prev) => [...prev, ...newItems])
+      setBatchError(null)
+
+      const { items, batchError } = admitFiles(files, uploadsRef.current, validationConfig)
+      if (batchError) setBatchError(batchError)
+      if (items.length === 0) return
+
+      setUploadsSync((prev) => [...prev, ...items])
     },
     [setUploadsSync],
   )
@@ -158,16 +167,12 @@ export function useFileUpload(): UseFileUploadReturn {
       }
 
       if (target.status === 'success' && !target.taskCreated && target.fileId) {
-        try {
-          await deleteFile(target.fileId)
-        } catch {
-          logger.warn(`deleteFile failed for ${target.fileId}, local entry removed regardless`)
-        }
+        await deleteRemoteFileQuietly(target.fileId)
       }
 
       setUploadsSync((prev) => removeUploadItem(prev, id))
     },
-    [setUploadsSync],
+    [deleteRemoteFileQuietly, setUploadsSync],
   )
 
   const retryUpload = useCallback(
@@ -202,16 +207,13 @@ export function useFileUpload(): UseFileUploadReturn {
 
     await Promise.all(
       orphans.map(async (u) => {
-        try {
-          await deleteFile(u.fileId!)
-        } catch {
-          logger.warn(`deleteFile failed for ${u.fileId}, local entry removed regardless`)
-        }
+        await deleteRemoteFileQuietly(u.fileId!)
       }),
     )
 
     setUploadsSync([])
-  }, [setUploadsSync])
+    setBatchError(null)
+  }, [deleteRemoteFileQuietly, setUploadsSync])
 
   const isUploading = useMemo(() => selectIsUploading(uploads), [uploads])
   const availableFileIds = useMemo(() => selectAvailableFileIds(uploads), [uploads])
@@ -223,6 +225,10 @@ export function useFileUpload(): UseFileUploadReturn {
       controllers.forEach((c) => c.abort())
       controllers.clear()
     }
+  }, [])
+
+  const clearBatchError = useCallback(() => {
+    setBatchError(null)
   }, [])
 
   return {
@@ -237,5 +243,7 @@ export function useFileUpload(): UseFileUploadReturn {
     isUploading,
     availableFileIds,
     hasErrors,
+    batchError,
+    clearBatchError,
   }
 }
