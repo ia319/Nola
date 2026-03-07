@@ -11,7 +11,9 @@ const logger = {
     }
   },
   info: (...args: unknown[]) => {
-    console.info('[Nola]', ...args)
+    if (import.meta.env.DEV) {
+      console.info('[Nola]', ...args)
+    }
   },
   warn: (...args: unknown[]) => {
     console.warn('[Nola]', ...args)
