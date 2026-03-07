@@ -22,7 +22,8 @@
       "mimeNotAllowed": "File type {{mime}} is not supported",
       "fileTooLarge": "File exceeds maximum size",
       "uploadFailed": "Upload failed, please retry",
-      "duplicateFiles": "{{count}} duplicate file(s) skipped"
+      "duplicateFiles_one": "{{count}} duplicate file skipped",
+      "duplicateFiles_other": "{{count}} duplicate files skipped"
     }
   },
   "options": {
