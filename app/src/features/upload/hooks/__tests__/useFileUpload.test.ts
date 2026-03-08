@@ -401,7 +401,7 @@ describe('useFileUpload', () => {
   })
 
   it('does not delete remote file after task is marked created', async () => {
-    const { result, unmount } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload())
     const file = fakeFile('used.mp3', 1024)
     uploadFileMock.mockResolvedValue(buildUploadResponse('used-1', file))
 
@@ -421,8 +421,5 @@ describe('useFileUpload', () => {
     })
 
     expect(deleteFileMock).not.toHaveBeenCalled()
-
-    // Ensure cleanup path is also safe after reset.
-    unmount()
   })
 })

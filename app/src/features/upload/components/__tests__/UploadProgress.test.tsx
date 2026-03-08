@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { UploadProgress } from '../UploadProgress'
 
-const tMock = vi.fn((key: string) => key)
+const { tMock } = vi.hoisted(() => ({
+  tMock: vi.fn((key: string) => key),
+}))
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
