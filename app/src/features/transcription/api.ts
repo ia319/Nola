@@ -1,7 +1,7 @@
 import apiClient from '@/shared/lib/api-client'
 import type {
   CancelTaskResponse,
-  CreateTaskRequest,
+  CreateTaskPayload,
   CreateTaskResponse,
   DefaultOptions,
   TaskDetail,
@@ -12,8 +12,13 @@ import type {
 const BASE = '/api/transcriptions'
 
 /** Create a transcription task for an uploaded file. */
-export async function createTask(request: CreateTaskRequest): Promise<CreateTaskResponse> {
-  const { data } = await apiClient.post<CreateTaskResponse>(BASE + '/', request)
+export async function createTask(payload: CreateTaskPayload): Promise<CreateTaskResponse> {
+  if (!payload.file_id) {
+    throw new Error('createTask requires a non-empty file_id')
+  }
+  // Strip undefined fields so the backend applies its own defaults for omitted options.
+  const body = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined))
+  const { data } = await apiClient.post<CreateTaskResponse>(BASE + '/', body)
   return data
 }
 

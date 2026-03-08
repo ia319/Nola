@@ -34,5 +34,12 @@ export default defineConfig([
       'no-console': ['warn', { allow: ['warn', 'error', 'info', 'debug'] }],
     },
   },
+  // shadcn/ui generated files co-export components and variant helpers by design
+  {
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
   prettierConfig,
 ])

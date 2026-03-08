@@ -2,7 +2,9 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
 import env from '@/config/env'
 import logger from '@/config/logger'
-import { formatApiError, type ApiError } from '@/shared/types'
+import { formatApiError } from '@/shared/lib/error-utils'
+import { createApiError, createNetworkError } from '@/shared/lib/error-factory'
+import type { ApiError } from '@/shared/types'
 
 const apiClient = axios.create({
   baseURL: env.apiBaseUrl,
@@ -18,10 +20,15 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config
 })
 
-// Response interceptor: parse ApiError and log failures.
+// Response interceptor: convert errors into structured AppError.
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiError>) => {
+    // Preserve cancellation semantics so callers can keep cancelled state.
+    if (axios.isCancel(error)) {
+      return Promise.reject(error)
+    }
+
     const status = error.response?.status
     let detail: string
     try {
@@ -33,9 +40,15 @@ apiClient.interceptors.response.use(
 
     logger.error(`[API] ${status ?? 'NETWORK'} ${detail}`)
 
-    // TODO(F8): Integrate toast notification [2026-02-26]
+    if (status) {
+      return Promise.reject(createApiError(status, detail))
+    }
 
-    return Promise.reject(error)
+    // No HTTP status means a network-level failure.
+    const code = error.code === 'ECONNABORTED' ? 'NETWORK_TIMEOUT' : 'NETWORK_OFFLINE'
+    const i18nKey =
+      error.code === 'ECONNABORTED' ? 'error.network.timeout' : 'error.network.offline'
+    return Promise.reject(createNetworkError(code, i18nKey))
   },
 )
 

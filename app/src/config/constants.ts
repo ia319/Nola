@@ -63,3 +63,6 @@ export const TASK_BOARD_RECENT_MAX_AGE_MS = 60 * 60 * 1000 // 1 hour
 
 /** Default page size for history list. */
 export const HISTORY_PAGE_SIZE = 20
+
+/** Max concurrent upload requests processed by the upload queue. */
+export const UPLOAD_CONCURRENCY = 2

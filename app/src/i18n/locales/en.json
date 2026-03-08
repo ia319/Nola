@@ -1,0 +1,99 @@
+{
+  "upload": {
+    "dropzone": {
+      "title": "Upload Audio Files",
+      "description": "Drag & drop files here, or click to browse",
+      "hint": "Supported: MP3, WAV, FLAC, M4A, OGG, WebM, AAC, MP4, WMA (max 500MB)",
+      "browse": "Browse Files"
+    },
+    "progress": {
+      "uploading": "Uploading...",
+      "success": "Upload complete",
+      "error": "Upload failed",
+      "cancelled": "Cancelled",
+      "cancel": "Cancel",
+      "retry": "Retry",
+      "remove": "Remove"
+    },
+    "error": {
+      "noExtension": "File has no extension: {{fileName}}",
+      "emptyFile": "File is empty: {{fileName}}",
+      "extensionNotAllowed": ".{{ext}} is not supported (allowed: {{allowed}})",
+      "mimeNotAllowed": "File type {{mime}} is not supported",
+      "fileTooLarge": "File exceeds maximum size",
+      "uploadFailed": "Upload failed, please retry",
+      "duplicateFiles_one": "{{count}} duplicate file skipped",
+      "duplicateFiles_other": "{{count}} duplicate files skipped"
+    },
+    "startUpload": "Start Upload",
+    "reset": "Reset All"
+  },
+  "options": {
+    "language": {
+      "label": "Language",
+      "auto": "Auto Detect",
+      "en": "English",
+      "zh": "Chinese",
+      "ja": "Japanese",
+      "ko": "Korean",
+      "de": "German",
+      "fr": "French",
+      "es": "Spanish",
+      "ru": "Russian",
+      "ar": "Arabic"
+    },
+    "task": {
+      "label": "Task",
+      "transcribe": "Transcribe",
+      "translate": "Transcribe & Translate to English"
+    },
+    "start": "Start Transcription ({{count}})",
+    "startDisabled": "Start Transcription",
+    "creating": "Creating...",
+    "taskCreated": "Task created: {{taskId}}",
+    "advanced": {
+      "toggle": "Advanced Options",
+      "reset": "Reset to Defaults",
+      "numberListHint": "Comma-separated non-negative numbers, e.g. 0.0, 0.2, 0.4",
+      "numberListError": {
+        "emptySegment": "Use commas only between numbers",
+        "invalidCharacter": "Use decimal numbers separated by commas",
+        "invalidNumber": "Each temperature must be a valid decimal number",
+        "negativeNotAllowed": "Temperature values must be non-negative"
+      }
+    },
+    "group": {
+      "decoding": "Decoding",
+      "quality": "Quality",
+      "context": "Context",
+      "timestamps": "Timestamps",
+      "advanced": "Advanced"
+    },
+    "field": {
+      "beamSize": "Beam Size",
+      "temperature": "Temperature",
+      "vadFilter": "VAD Filter",
+      "noSpeechThreshold": "No Speech Threshold",
+      "initialPrompt": "Initial Prompt",
+      "conditionOnPreviousText": "Condition on Previous Text",
+      "wordTimestamps": "Word Timestamps",
+      "multilingual": "Multilingual"
+    }
+  },
+  "error": {
+    "generic": "An error occurred",
+    "api": {
+      "serverError": "Server error, please try again",
+      "clientError": "Request error ({{status}})"
+    },
+    "network": {
+      "timeout": "Request timed out, please try again",
+      "offline": "Network unavailable, check your connection"
+    },
+    "boundary": {
+      "title": "Something went wrong",
+      "description": "An unexpected error occurred in this section.",
+      "retry": "Try Again"
+    }
+  }
+}

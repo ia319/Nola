@@ -1,7 +1,7 @@
 /**
  * Lightweight logger with [Nola] prefix.
  *
- * - `debug` is suppressed in production builds.
+ * - `debug` and `info` are suppressed in production builds.
  * - To integrate Sentry later, add a call inside `error()`.
  */
 const logger = {
@@ -11,7 +11,9 @@ const logger = {
     }
   },
   info: (...args: unknown[]) => {
-    console.info('[Nola]', ...args)
+    if (import.meta.env.DEV) {
+      console.info('[Nola]', ...args)
+    }
   },
   warn: (...args: unknown[]) => {
     console.warn('[Nola]', ...args)
