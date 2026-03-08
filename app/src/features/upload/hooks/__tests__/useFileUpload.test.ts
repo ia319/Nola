@@ -167,6 +167,12 @@ describe('useFileUpload', () => {
     expect(result.current.uploads[0].progress).toBe(100)
     expect(result.current.uploads[0].fileId).toBe('file-1')
     expect(result.current.availableFileIds).toEqual(['file-1'])
+    expect(uploadFileMock).toHaveBeenCalledWith(
+      file,
+      expect.any(Function),
+      expect.any(AbortSignal),
+      30_000,
+    )
   })
 
   it('maps upload failure to upload error state', async () => {
@@ -370,6 +376,27 @@ describe('useFileUpload', () => {
     })
 
     expect(capturedSignals[0]?.aborted).toBe(true)
+    expect(result.current.uploads).toEqual([])
+  })
+
+  it('deletes successful orphan files during reset when no task was created', async () => {
+    const { result } = renderHook(() => useFileUpload())
+    const file = fakeFile('orphan.mp3', 1024)
+    uploadFileMock.mockResolvedValue(buildUploadResponse('orphan-1', file))
+    deleteFileMock.mockResolvedValue({ message: 'ok' })
+
+    act(() => {
+      result.current.addFiles([file])
+    })
+    await act(async () => {
+      await result.current.startUpload()
+    })
+
+    await act(async () => {
+      await result.current.reset()
+    })
+
+    expect(deleteFileMock).toHaveBeenCalledWith('orphan-1')
     expect(result.current.uploads).toEqual([])
   })
 

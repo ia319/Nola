@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { FileValidationConfig } from '@/shared/lib/file-validation'
 import type { UploadItem } from '@/features/upload/types'
@@ -46,6 +46,10 @@ function buildUploadItem(file: File): UploadItem {
 }
 
 describe('admitFiles', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('creates queue items and preserves per-file validation results', () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('00000000-0000-0000-0000-000000000001')

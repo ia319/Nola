@@ -3,13 +3,36 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { UploadProgress } from '../UploadProgress'
 
+const tMock = vi.fn((key: string) => key)
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
+    t: tMock,
   }),
 }))
 
 describe('UploadProgress', () => {
+  it('passes interpolation params to the translated error message', () => {
+    render(
+      <UploadProgress
+        fileName="large.mp3"
+        fileSize={1024}
+        progress={0}
+        status="error"
+        errorKey="upload.error.fileTooLarge"
+        errorParams={{ maxSize: '100 MB' }}
+      />,
+    )
+
+    expect(tMock).toHaveBeenCalledWith(
+      'upload.error.fileTooLarge',
+      expect.objectContaining({
+        maxSize: '100 MB',
+        defaultValue: 'upload.progress.error',
+      }),
+    )
+  })
+
   it('renders uploading state with progress and cancel action', () => {
     render(
       <UploadProgress
