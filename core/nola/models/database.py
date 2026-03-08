@@ -7,7 +7,7 @@ from .utils import ensure_sqlite_version
 
 
 def init_db(db_path: str | Path | None = None) -> None:
-    """Initialize database schema with files and tasks tables."""
+    """Initialize database schema for files, tasks, and app config."""
     ensure_sqlite_version()
 
     path = Path(db_path) if db_path else settings.db_path
@@ -79,5 +79,13 @@ def init_db(db_path: str | Path | None = None) -> None:
             "CREATE INDEX IF NOT EXISTS idx_heartbeat "
             "ON transcription_tasks(last_heartbeat)"
         )
+
+        # Application configuration key-value store
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_config (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
 
         conn.commit()
