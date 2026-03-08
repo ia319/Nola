@@ -9,20 +9,6 @@
 | Name | Nola - Frontend Workspace |
 | Stack | React 19 + TypeScript + Vite + TailwindCSS v4 + shadcn/ui + i18next + Axios |
 
----
-
-## Current Status
-
-> [!IMPORTANT]
-> Treat `app/src` and the current Phase 3 docs as the source of truth.
->
-> - Phase 3 core flow is implemented: upload files, configure transcription options, create tasks, and surface container-level feedback.
-> - Stage 4 integration work is present in code: `App.tsx` wires `ErrorBoundary`, `Toaster`, `batchError` toasts, and task creation toasts.
-> - Stage 5 verification is still pending as a project task even if some local tests already exist.
-> - Phase 4 features are not implemented yet: no task board, no history page, no router wiring, and no Zustand task store.
-
----
-
 ## Code Style
 
 > [!IMPORTANT]
@@ -46,12 +32,14 @@ app/                          # Frontend workspace root
 ├── tsconfig.json             # TypeScript 5.9 project references
 ├── tsconfig.app.json         # App-level TS config (src/)
 ├── tsconfig.node.json        # Node-level TS config (vite.config.ts)
-├── vite.config.ts            # Vite 7 + proxy to backend + Vitest config
+├── vite.config.ts            # Vite 7 + proxy to backend + Vitest config + test setup
 ├── src/                      # Frontend source code
 │   ├── App.css               # App-level styles
-│   ├── App.tsx               # Root layout shell
+│   ├── App.tsx               # Root shell wiring upload + transcription features
 │   ├── index.css             # Tailwind v4 entry + shadcn variables
-│   ├── main.tsx              # React mounting + TanStack Router provider
+│   ├── main.tsx              # React mounting + temporary App shell entry
+│   ├── test/                 # Shared Vitest setup
+│   │   └── setup.ts          # jest-dom + ResizeObserver test polyfill
 │   │
 │   ├── assets/               # Static assets
 │   │   └── react.svg         # Example asset
@@ -59,7 +47,7 @@ app/                          # Frontend workspace root
 │   ├── config/               # Centralized configuration
 │   │   ├── constants.ts      # App constants (synced with backend)
 │   │   ├── env.ts            # Typed environment variables (import.meta.env)
-│   │   └── logger.ts         # Lightweight logger ([Nola] prefix, skips debug in prod)
+│   │   └── logger.ts         # Lightweight logger ([Nola] prefix, skips debug+info in prod)
 │   │
 │   ├── i18n/                 # i18next bootstrap + locale resources
 │   │   ├── index.ts          # i18n initialization (react-i18next)
@@ -80,6 +68,7 @@ app/                          # Frontend workspace root
 │   │       ├── slider.tsx    # Slider primitive
 │   │       ├── sonner.tsx    # Toast host wrapper
 │   │       ├── switch.tsx    # Switch primitive
+│   │       ├── textarea.tsx  # Textarea primitive
 │   │       └── tooltip.tsx   # Tooltip primitive
 │   │
 │   ├── features/             # Business modules (Domain logic)
@@ -90,23 +79,48 @@ app/                          # Frontend workspace root
 │   │   │   └── index.ts      # Placeholder
 │   │   ├── realtime/         # WebSocket streaming
 │   │   │   └── index.ts      # Placeholder
-│   │   ├── transcription/    # Task CRUD, polling, status tracking
-│   │   │   ├── api.ts        # createTask, listTasks, getTask, cancelTask
-│   │   │   └── index.ts      # Feature public exports
+│   │   ├── transcription/    # Task CRUD, options, polling, status tracking
+│   │   │   ├── api.ts        # createTask, listTasks, getTask, cancelTask, getDefaultOptions
+│   │   │   ├── components/   # Transcription feature UI components
+│   │   │   │   ├── AdvancedOptions.tsx # Collapsible advanced settings panel
+│   │   │   │   ├── OptionsBar.tsx     # Language/task selectors + start button
+│   │   │   │   └── __tests__/         # Component tests
+│   │   │   │       ├── AdvancedOptions.test.tsx # Advanced options UI behavior tests
+│   │   │   │       └── OptionsBar.test.tsx # Options bar task-creation tests
+│   │   │   ├── hooks/        # Transcription state hooks
+│   │   │   │   ├── useTranscriptionOptions.ts # Options state + buildRequest
+│   │   │   │   └── __tests__/
+│   │   │   │       └── useTranscriptionOptions.test.ts # Hook behavior tests
+│   │   │   ├── lib/          # Transcription-private pure helpers
+│   │   │   │   ├── temperature.ts # Temperature list parse/validate
+│   │   │   │   └── __tests__/
+│   │   │   │       └── temperature.test.ts # Temperature validation tests
+│   │   │   ├── __tests__/    # Feature-level tests
+│   │   │   │   └── build-request.test.ts # buildRequest payload tests
+│   │   │   ├── types.ts      # Transcription domain types + option field definitions
+│   │   │   └── index.ts      # Feature barrel exports
 │   │   └── upload/           # File upload with progress
 │   │       ├── api.ts        # uploadFile, listFiles, getFile, deleteFile
 │   │       ├── components/   # Upload feature UI components
 │   │       │   ├── FileUploader.tsx # Drag/drop + click file picker
 │   │       │   ├── UploadList.tsx # Upload item list wrapper
-│   │       │   └── UploadProgress.tsx # Single upload row UI
+│   │       │   ├── UploadProgress.tsx # Single upload row UI
+│   │       │   └── __tests__/      # Component tests
+│   │       │       ├── FileUploader.test.tsx # Dropzone input behavior tests
+│   │       │       └── UploadProgress.test.tsx # Upload row status UI tests
 │   │       ├── hooks/        # Upload orchestration hooks
 │   │       │   ├── useFileUpload.ts # Multi-file upload orchestration hook
 │   │       │   └── __tests__/ # Hook unit tests
 │   │       │       └── useFileUpload.test.ts # Queue/cancel/retry/reset coverage
 │   │       ├── lib/          # Upload-private pure helpers
+│   │       │   ├── admission.ts # File dedup + validation admission gate
 │   │       │   ├── error.ts  # Upload cancel/error classification
 │   │       │   ├── state.ts  # Upload list pure state helpers/selectors
-│   │       │   └── timeout.ts # Upload timeout policy
+│   │       │   ├── timeout.ts # Upload timeout policy
+│   │       │   └── __tests__/ # Pure helper tests
+│   │       │       ├── admission.test.ts # Dedup and batch admission tests
+│   │       │       ├── state.test.ts # Upload state selector/update tests
+│   │       │       └── timeout.test.ts # Timeout policy tests
 │   │       ├── types.ts      # Upload domain types (UploadItem, hook contract)
 │   │       └── index.ts      # Feature barrel exports (components, hook, types)
 │   │
@@ -114,14 +128,21 @@ app/                          # Frontend workspace root
 │   │   └── utils.ts          # Canonical `cn()` helper
 │   │
 │   ├── shared/               # Cross-feature shared code
+│   │   ├── ui/               # Shared UI components
+│   │   │   ├── ErrorBoundary.tsx # Render-error catch + i18n fallback + retry
+│   │   │   └── __tests__/        # Component tests
+│   │   │       └── ErrorBoundary.test.tsx # Fallback and retry tests
 │   │   ├── lib/              # Shared runtime helpers
-│   │   │   ├── api-client.ts       # Axios instance + interceptors
-│   │   │   ├── error-factory.ts    # AppError factory helpers
+│   │   │   ├── api-client.ts       # Axios instance + structured error interceptors
+│   │   │   ├── error-factory.ts    # AppError factory helpers (408/429 retriable)
 │   │   │   ├── error-utils.ts      # API error normalization helpers
 │   │   │   ├── file-validation.ts  # Pure file validation (ext/MIME/size)
 │   │   │   ├── format.ts           # formatFileSize() human-readable sizes
 │   │   │   ├── utils.ts            # downloadBlob helper
 │   │   │   └── __tests__/          # Unit tests (Vitest)
+│   │   │       ├── api-client.test.ts # Interceptor error mapping tests
+│   │   │       ├── error-factory.test.ts # AppError factory contract tests
+│   │   │       ├── error-utils.test.ts # API error formatting tests
 │   │   │       ├── file-validation.test.ts # validateFile unit tests
 │   │   │       └── format.test.ts # formatFileSize unit tests
 │   │   └── types/            # Shared type contracts
@@ -132,7 +153,7 @@ app/                          # Frontend workspace root
 │   │       ├── task.ts        # TaskSummary, TaskStatus, ExportFormat, etc.
 │   │       └── index.ts       # Barrel re-export
 │   │
-│   └── routes/               # TanStack Router definitions
+│   └── routes/               # Placeholder for future TanStack Router definitions
 │       └── .gitkeep          # Placeholder for feature routes
 ```
 
@@ -154,14 +175,16 @@ app/                          # Frontend workspace root
 
 > [!NOTE]
 > `@tanstack/react-router`, `zustand`, and `next-themes` are installed, but the current
-> Phase 3 implementation does not yet use router/store wiring as an active app shell.
-> `next-themes` is currently consumed by `components/ui/sonner.tsx`.
+> implementation does not yet use router/store wiring as the active app shell. `App.tsx`
+> serves as a temporary integration shell wiring upload and transcription features with
+> independent `ErrorBoundary` panels and sonner toast notifications. `next-themes` is
+> only consumed by `components/ui/sonner.tsx`; there is no active theme toggle yet.
 
 ### API Type Strategy
 
 Three-layer pipeline from backend schema to UI code:
 
-```
+```text
 Backend (Pydantic) ──► openapi.json ──► openapi.d.ts ──► domain aliases/contracts ──► feature api.ts
    (Source)         (gen:types auto)   (generated types)   (typed functions)
 ```
@@ -217,27 +240,49 @@ Business domain logic separated by feature. Each feature has an `api.ts` (API fu
   - `components/FileUploader.tsx`: Select files via drag/drop or click and pass raw `File[]` upward.
   - `components/UploadProgress.tsx`: Render per-file status/progress/actions.
   - `components/UploadList.tsx`: Map `UploadItem[]` into progress rows.
-  - `hooks/useFileUpload.ts`: Upload queue orchestration (validate/add/start/cancel/retry/remove/reset).
-  - `hooks/__tests__/useFileUpload.test.ts`: Hook behavior tests (queue, concurrency, cancel/retry, remove/reset cleanup).
+  - `components/__tests__/FileUploader.test.tsx`: Dropzone tests covering drag-and-drop, keyboard activation, and disabled blocking.
+  - `components/__tests__/UploadProgress.test.tsx`: Row rendering tests covering uploading, error, success, and cancelled states.
+  - `hooks/useFileUpload.ts`: Upload queue orchestration (validate/add/start/cancel/retry/remove/reset). Expose `batchError` and `clearBatchError` for batch-level admission errors.
+  - `hooks/__tests__/useFileUpload.test.ts`: Hook behavior tests (queue, dedup, batchError lifecycle, concurrency, cancel/retry, remove/reset cleanup).
+  - `lib/admission.ts`: Pure admission gate — deduplicate files by `name+size+lastModified` fingerprint against existing queue plus incoming batch, validate each file, and return accepted `UploadItem[]` plus optional `batchError`.
+  - `lib/__tests__/admission.test.ts`: Admission tests covering per-file validation preservation and duplicate skipping.
   - `lib/timeout.ts`: Per-file timeout strategy.
   - `lib/error.ts`: Axios cancellation classification helper.
   - `lib/state.ts`: Pure list update/select helpers to keep hook orchestration-focused.
-  - `types.ts`: Upload domain contracts (`UploadItem`, `UseFileUploadReturn`).
+  - `lib/__tests__/state.test.ts`: Pure helper tests for patch/remove/select behavior.
+  - `lib/__tests__/timeout.test.ts`: Timeout clamp and scaling tests.
+  - `types.ts`: Upload domain contracts (`UploadItem`, `UseFileUploadReturn` including `batchError`/`clearBatchError`).
   - `index.ts`: Public barrel exports (`FileUploader`, `UploadProgress`, `UploadList`, `useFileUpload`, `UploadItem`).
-- **transcription**: `createTask`, `listTasks` (status filter), `getTask`, `cancelTask`, `getDefaultOptions`.
+- **transcription**:
+  - `api.ts`: `createTask` (accept `CreateTaskPayload`, filter undefined), `listTasks` (status filter), `getTask`, `cancelTask`, `getDefaultOptions`.
+  - `components/OptionsBar.tsx`: Render language/task selectors, initial prompt textarea, and "Start Transcription" button. Use `useRef` lock to prevent double-click reentry.
+  - `components/AdvancedOptions.tsx`: Collapsible panel rendering option groups (decoding, quality, context, timestamps, advanced). Include `NumberListField` with draft-on-type/commit-on-blur strategy and inline error display.
+  - `components/__tests__/OptionsBar.test.tsx`: Component tests covering disabled state, initial prompt edits, task creation results, and fallback error mapping.
+  - `components/__tests__/AdvancedOptions.test.tsx`: Component tests covering slider default display, temperature commit, and reset behavior.
+  - `hooks/useTranscriptionOptions.ts`: Manage language, task, initialPrompt, and advancedOptions state. Expose `buildRequest(fileId)` to compose `CreateTaskPayload`. Enforce mutual exclusion between `word_timestamps` and `without_timestamps`.
+  - `hooks/__tests__/useTranscriptionOptions.test.ts`: Hook behavior tests (initial state, setters, bidirectional mutual exclusion, reset isolation, buildRequest payload).
+  - `lib/temperature.ts`: Parse and validate comma-separated temperature lists. Return structured errors with i18n keys.
+  - `lib/__tests__/temperature.test.ts`: Temperature parse/validate unit tests.
+  - `__tests__/build-request.test.ts`: Payload composition tests (defaults, single/multiple options, undefined filtering, full merge).
+  - `types.ts`: Transcription domain types (`AdvancedTranscriptionOptions`, `CreateTaskPayload`, `OptionFieldType`, `OPTION_GROUPS`).
 - **export**: `downloadExport` (blob), `saveExport` (server path), `batchExport` (ZIP blob).
 - **history**: Placeholder for paginated viewing of past tasks.
 - **realtime**: Placeholder for future WebSocket-based live transcription.
 
 ### src/shared/
-Cross-feature shared code, split into `lib/` and `types/`.
-- **lib/api-client.ts**: Axios instance (30s timeout, no global Content-Type). Request interceptor logs debug. Response interceptor parses `ApiError` with try/catch guard for non-conforming responses.
-- **lib/error-factory.ts**: Central factory functions for `AppError` (`createValidationError`, `createNetworkError`, `createApiError`) to keep retry semantics consistent.
+Cross-feature shared code, split into `ui/`, `lib/`, and `types/`.
+- **ui/ErrorBoundary.tsx**: Class-based error boundary wrapping child components. Catch render-time exceptions and display i18n-powered fallback UI with retry button. Use `withTranslation` HOC for i18n access in class components.
+- **ui/__tests__/ErrorBoundary.test.tsx**: Component tests covering fallback rendering and retry recovery.
+- **lib/api-client.ts**: Axios instance (30s timeout, no global Content-Type). Request interceptor logs debug. Response interceptor converts HTTP errors to `AppError` via `createApiError` and network failures to `createNetworkError`. Preserve `CanceledError` for upload cancellation semantics.
+- **lib/__tests__/api-client.test.ts**: Interceptor tests covering cancel passthrough plus client, server, timeout, and offline mappings.
+- **lib/error-factory.ts**: Central factory functions for `AppError` (`createValidationError`, `createNetworkError`, `createApiError`, `isAppError`). Mark 408/429 as `retriable: true`; other 4xx as `retriable: false`; 5xx as `retriable: true`.
+- **lib/__tests__/error-factory.test.ts**: Factory contract tests for retry semantics and `isAppError`.
 - **lib/error-utils.ts**: `formatApiError()` converts FastAPI error payloads into readable messages.
+- **lib/__tests__/error-utils.test.ts**: Formatting tests for string and validation-array payloads.
 - **lib/file-validation.ts**: Pure function `validateFile(file, config)` with config injection. Checks extension, MIME, size, empty file, no extension. Returns `AppError` on failure.
 - **lib/format.ts**: `formatFileSize(bytes)` — base-1024 human-readable string (B/KB/MB/GB/TB). Guards against negative/NaN/Infinity.
 - **lib/utils.ts**: `downloadBlob()` triggers browser file download from Blob (appends `<a>` to DOM, defers `URL.revokeObjectURL`).
-- **lib/\_\_tests\_\_/**: Vitest unit tests for pure functions (file-validation: 8 cases, format: 9 cases).
+- **lib/\_\_tests\_\_/**: Vitest unit tests for API-client mapping plus pure helpers (`error-factory`, `error-utils`, `file-validation`, `format`).
 - **types/openapi.d.ts**: Auto-generated by `pnpm gen:types`. Never edit manually.
 - **types/api-error.ts**: Backend error payload contracts (`ApiError`, `ValidationErrorItem`).
 - **types/app-error.ts**: Frontend error contract (`AppError`: `code`, `i18nKey`, `params`, `retriable`).
@@ -246,7 +291,7 @@ Cross-feature shared code, split into `lib/` and `types/`.
 - **types/index.ts**: Barrel re-export for `import type { ... } from '@/shared/types'`.
 
 ### src/routes/
-TanStack Router definitions mapping URLs to components. Currently a placeholder (`.gitkeep`).
+Reserve this directory for future TanStack Router route definitions. It is currently a placeholder (`.gitkeep`).
 
 ### src/lib/
 Autogenerated by shadcn.
@@ -261,7 +306,11 @@ i18next bootstrap and locale dictionaries.
 Bootstrap constants overriding magic strings.
 - **env.ts**: Safely extracts `import.meta.env.VITE_*` using Nullish Coalescing (`??`).
 - **constants.ts**: Manually synced values from backend (`POLL_INTERVAL_MS`, `ALLOWED_EXTENSIONS`, etc.).
-- **logger.ts**: Lightweight logger prefixing output with `[Nola]` and suppressing `debug` in production.
+- **logger.ts**: Lightweight logger prefixing output with `[Nola]` and suppressing `debug` and `info` in production. Only `warn` and `error` are visible to end users.
+
+### src/test/
+Shared Vitest bootstrap.
+- **setup.ts**: Register `@testing-library/jest-dom/vitest` and provide a `ResizeObserver` mock required by Radix-based component tests.
 
 ---
 
@@ -303,7 +352,7 @@ Frontend (Vite/React) ───[ HTTP Proxy /api/* ]───▶ Backend (FastAP
    ├── shared/types/   (openapi-typescript → domain aliases/contracts)
    ├── features/*/api.ts (thin typed functions)
    React Hooks State (Zustand reserved for future shared state)
-   TanStack Router
+   TanStack Router (installed, not wired yet)
    Tailwind v4 (Style)
 ```
 
@@ -316,4 +365,4 @@ Frontend (Vite/React) ───[ HTTP Proxy /api/* ]───▶ Backend (FastAP
 | Allowed Uploads | mp3, wav, flac, m4a, ogg, webm, aac, mp4, wma |
 | Max File Size | 500 MB (Client-side validation required) |
 | Polling Interval | 2000 ms (Long-term plan to switch to WS/SSE) |
-| Theme | `next-themes` (Dark/Light toggle support native) |
+| Theme | `next-themes` installed; no active theme shell or toggle yet |
