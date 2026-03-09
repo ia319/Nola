@@ -1,7 +1,6 @@
 """Pytest tests for API endpoints."""
 
 import tempfile
-from contextlib import closing
 from pathlib import Path
 from unittest.mock import PropertyMock, patch
 
@@ -15,13 +14,20 @@ from nola.main import app
 from nola.models import init_db
 
 
+def _claim_pending_task(task_db, expected_task_id: str) -> None:
+    """Claim a queued task through the public queue API."""
+    task = task_db.dequeue(worker_id="test-worker")
+    assert task is not None
+    assert task["id"] == expected_task_id
+
+
 @pytest.fixture
 def client():
     """Create test client with isolated database."""
     get_file_db.cache_clear()
     get_task_db.cache_clear()
 
-    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+    with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)
         db_path = tmp_path / "nola.db"
         upload_dir = tmp_path / "uploads"
@@ -324,12 +330,7 @@ class TestExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="test-task-srt", file_id="test-file-srt", options=None)
-        with closing(task_db._connect()) as conn:
-            with conn:
-                conn.execute(
-                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                    ("test-task-srt",),
-                )
+        _claim_pending_task(task_db, "test-task-srt")
         task_db.complete(
             task_id="test-task-srt",
             segments=[
@@ -357,12 +358,7 @@ class TestExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="test-vtt", file_id="test-file-vtt", options=None)
-        with closing(task_db._connect()) as conn:
-            with conn:
-                conn.execute(
-                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                    ("test-vtt",),
-                )
+        _claim_pending_task(task_db, "test-vtt")
         task_db.complete(
             task_id="test-vtt",
             segments=[{"start": 0.0, "end": 1.0, "text": "VTT test"}],
@@ -385,12 +381,7 @@ class TestExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="test-txt", file_id="test-file-txt", options=None)
-        with closing(task_db._connect()) as conn:
-            with conn:
-                conn.execute(
-                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                    ("test-txt",),
-                )
+        _claim_pending_task(task_db, "test-txt")
         task_db.complete(
             task_id="test-txt",
             segments=[{"start": 0.0, "end": 1.0, "text": "Plain text"}],
@@ -415,12 +406,7 @@ class TestExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="test-ass", file_id="test-file-ass", options=None)
-        with closing(task_db._connect()) as conn:
-            with conn:
-                conn.execute(
-                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                    ("test-ass",),
-                )
+        _claim_pending_task(task_db, "test-ass")
         task_db.complete(
             task_id="test-ass",
             segments=[{"start": 0.0, "end": 1.0, "text": "ASS test"}],
@@ -447,12 +433,7 @@ class TestExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="test-save", file_id="test-file-save", options=None)
-        with closing(task_db._connect()) as conn:
-            with conn:
-                conn.execute(
-                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                    ("test-save",),
-                )
+        _claim_pending_task(task_db, "test-save")
         task_db.complete(
             task_id="test-save",
             segments=[{"start": 0.0, "end": 1.0, "text": "Save test"}],
@@ -501,13 +482,7 @@ class TestBatchExportAPI:
             task_db.enqueue(
                 task_id=f"batch-task-{i}", file_id=f"batch-file-{i}", options=None
             )
-            with closing(task_db._connect()) as conn:
-                with conn:
-                    conn.execute(
-                        "UPDATE transcription_tasks "
-                        "SET status = 'processing' WHERE id = ?",
-                        (f"batch-task-{i}",),
-                    )
+            _claim_pending_task(task_db, f"batch-task-{i}")
             task_db.complete(
                 task_id=f"batch-task-{i}",
                 segments=[{"start": 0.0, "end": 1.0, "text": f"Test {i}"}],
@@ -546,12 +521,7 @@ class TestBatchExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="partial-task", file_id="partial-file", options=None)
-        with closing(task_db._connect()) as conn:
-            with conn:
-                conn.execute(
-                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                    ("partial-task",),
-                )
+        _claim_pending_task(task_db, "partial-task")
         task_db.complete(
             task_id="partial-task",
             segments=[{"start": 0.0, "end": 1.0, "text": "Partial test"}],
@@ -598,12 +568,7 @@ class TestBatchExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="zip-name-task", file_id="zip-name-file", options=None)
-        with closing(task_db._connect()) as conn:
-            with conn:
-                conn.execute(
-                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                    ("zip-name-task",),
-                )
+        _claim_pending_task(task_db, "zip-name-task")
         task_db.complete(
             task_id="zip-name-task",
             segments=[{"start": 0.0, "end": 1.0, "text": "Custom name"}],
@@ -635,12 +600,7 @@ class TestBatchExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="inject-task", file_id="inject-file", options=None)
-        with closing(task_db._connect()) as conn:
-            with conn:
-                conn.execute(
-                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                    ("inject-task",),
-                )
+        _claim_pending_task(task_db, "inject-task")
         task_db.complete(
             task_id="inject-task",
             segments=[{"start": 0.0, "end": 1.0, "text": "Inject test"}],
