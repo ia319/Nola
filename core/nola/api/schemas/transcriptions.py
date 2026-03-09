@@ -256,6 +256,10 @@ class TranscriptionRequest(TranscriptionOptionsPayload):
 class TranscriptionDefaultsUpdateRequest(TranscriptionOptionsPayload):
     """Partial update payload for application-level transcription defaults."""
 
+    def get_options_dict(self) -> dict[str, Any]:
+        """Return explicitly provided keys, preserving nulls for field resets."""
+        return self.model_dump(exclude_unset=True)
+
 
 class BatchExportRequest(BaseModel):
     """Batch export request for multiple transcriptions."""

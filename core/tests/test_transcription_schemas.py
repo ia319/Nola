@@ -71,3 +71,15 @@ class TestTranscriptionSchemas:
             "chunk_length": 15,
             "vad_filter": True,
         }
+
+    def test_transcription_defaults_update_request_preserves_explicit_nulls(self):
+        """Defaults update payload should keep explicit nulls for key resets."""
+        request = TranscriptionDefaultsUpdateRequest(
+            hotwords=None,
+            prefix="speaker:",
+        )
+
+        assert request.get_options_dict() == {
+            "hotwords": None,
+            "prefix": "speaker:",
+        }
