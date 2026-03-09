@@ -1,6 +1,5 @@
 """Pytest tests for the application configuration database."""
 
-import gc
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -20,10 +19,7 @@ def config_db():
         init_db(db_path)
         store = AppConfigDatabase(db_path)
 
-        try:
-            yield store, db_path
-        finally:
-            gc.collect()
+        yield store, db_path
 
 
 class TestAppConfigDatabase:
