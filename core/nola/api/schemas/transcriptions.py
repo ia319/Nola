@@ -13,77 +13,120 @@ _ENGINE_DEFAULTS = TranscribeOptions()
 
 def _swagger_default(value: Any) -> dict[str, Any]:
     """Keep Swagger defaults aligned with engine defaults."""
-    if value is None:
-        return {"default": value}
-    return {"default": value, "examples": [value]}
+    return {"default": value, "example": value}
 
 
-class TranscriptionRequest(BaseModel):
-    """Transcription request with optional parameters.
+class TranscriptionOptionsPayload(BaseModel):
+    """Shared optional transcription parameters for task and defaults APIs.
 
     All parameters default to None, meaning "use engine default".
     See TranscribeOptions in engines/base.py for actual defaults.
     """
 
-    file_id: str = Field(..., description="File ID from upload API")
-
     # Language settings
     language: str | None = Field(
         None,
         description="Language code. Auto-detect if omitted.",
-        json_schema_extra={"examples": ["en", "zh", "ja"]},
+        json_schema_extra={
+            **_swagger_default(_ENGINE_DEFAULTS.language),
+            "examples": ["en", "zh", "ja"],
+        },
     )
     task: Literal["transcribe", "translate"] | None = Field(
-        None, description="'transcribe' or 'translate'"
+        None,
+        description="'transcribe' or 'translate'",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.task),
     )
 
     # Decoding parameters
     beam_size: int | None = Field(
-        None, ge=1, le=10, description="Beam size for decoding"
+        None,
+        ge=1,
+        le=10,
+        description="Beam size for decoding",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.beam_size),
     )
-    best_of: int | None = Field(None, ge=1, description="Number of candidates")
-    patience: float | None = Field(None, ge=0, description="Beam search patience")
-    length_penalty: float | None = Field(None, description="Length penalty")
+    best_of: int | None = Field(
+        None,
+        ge=1,
+        description="Number of candidates",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.best_of),
+    )
+    patience: float | None = Field(
+        None,
+        ge=0,
+        description="Beam search patience",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.patience),
+    )
+    length_penalty: float | None = Field(
+        None,
+        description="Length penalty",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.length_penalty),
+    )
     repetition_penalty: float | None = Field(
-        None, ge=1, description="Repetition penalty"
+        None,
+        ge=1,
+        description="Repetition penalty",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.repetition_penalty),
     )
     no_repeat_ngram_size: int | None = Field(
-        None, ge=0, description="No repeat n-gram size"
+        None,
+        ge=0,
+        description="No repeat n-gram size",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.no_repeat_ngram_size),
     )
     temperature: float | list[float] | None = Field(
-        None, description="Sampling temperature(s)"
+        None,
+        description="Sampling temperature(s)",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.temperature),
     )
 
     # Quality thresholds
     compression_ratio_threshold: float | None = Field(
-        None, description="Compression ratio threshold"
+        None,
+        description="Compression ratio threshold",
+        json_schema_extra=_swagger_default(
+            _ENGINE_DEFAULTS.compression_ratio_threshold
+        ),
     )
     log_prob_threshold: float | None = Field(
-        None, description="Log probability threshold"
+        None,
+        description="Log probability threshold",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.log_prob_threshold),
     )
-    no_speech_threshold: float | None = Field(None, description="No speech threshold")
+    no_speech_threshold: float | None = Field(
+        None,
+        description="No speech threshold",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.no_speech_threshold),
+    )
 
     # Context control
     condition_on_previous_text: bool | None = Field(
-        None, description="Condition on previous text"
+        None,
+        description="Condition on previous text",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.condition_on_previous_text),
     )
     prompt_reset_on_temperature: float | None = Field(
-        None, description="Reset prompt on temperature"
+        None,
+        description="Reset prompt on temperature",
+        json_schema_extra=_swagger_default(
+            _ENGINE_DEFAULTS.prompt_reset_on_temperature
+        ),
     )
     initial_prompt: str | None = Field(
         None,
         description="Initial prompt for context",
-        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.initial_prompt),
+        json_schema_extra={"default": _ENGINE_DEFAULTS.initial_prompt, "example": ""},
     )
     prefix: str | None = Field(
         None,
         description="Prefix for each segment",
-        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.prefix),
+        json_schema_extra={"default": _ENGINE_DEFAULTS.prefix, "example": ""},
     )
     hotwords: str | None = Field(
         None,
         description="Hotwords to boost recognition",
-        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.hotwords),
+        json_schema_extra={"default": _ENGINE_DEFAULTS.hotwords, "example": ""},
     )
 
     # Token control
@@ -131,22 +174,54 @@ class TranscriptionRequest(BaseModel):
     )
 
     # VAD settings
-    vad_filter: bool | None = Field(None, description="Enable VAD filtering")
-    vad_parameters: dict[str, Any] | None = Field(None, description="VAD parameters")
+    vad_filter: bool | None = Field(
+        None,
+        description="Enable VAD filtering",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.vad_filter),
+    )
+    vad_parameters: dict[str, Any] | None = Field(
+        None,
+        description="VAD parameters",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.vad_parameters),
+    )
 
     # Advanced
-    multilingual: bool | None = Field(None, description="Enable multilingual mode")
+    multilingual: bool | None = Field(
+        None,
+        description="Enable multilingual mode",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.multilingual),
+    )
+    chunk_length: int | None = Field(
+        None,
+        ge=1,
+        description="Chunk length in seconds",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.chunk_length),
+    )
     clip_timestamps: str | list[float] | None = Field(
-        None, description="Clip timestamps"
+        None,
+        description="Clip timestamps",
+        json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.clip_timestamps),
     )
     hallucination_silence_threshold: float | None = Field(
-        None, description="Hallucination silence threshold"
+        None,
+        description="Hallucination silence threshold",
+        json_schema_extra=_swagger_default(
+            _ENGINE_DEFAULTS.hallucination_silence_threshold
+        ),
     )
     language_detection_threshold: float | None = Field(
-        None, description="Language detection threshold"
+        None,
+        description="Language detection threshold",
+        json_schema_extra=_swagger_default(
+            _ENGINE_DEFAULTS.language_detection_threshold
+        ),
     )
     language_detection_segments: int | None = Field(
-        None, description="Segments for language detection"
+        None,
+        description="Segments for language detection",
+        json_schema_extra=_swagger_default(
+            _ENGINE_DEFAULTS.language_detection_segments
+        ),
     )
 
     @field_validator("language")
@@ -165,7 +240,21 @@ class TranscriptionRequest(BaseModel):
 
     def get_options_dict(self) -> dict[str, Any]:
         """Return non-None options as dict for storage."""
+        return self.model_dump(exclude_none=True)
+
+
+class TranscriptionRequest(TranscriptionOptionsPayload):
+    """Transcription request payload for creating a task."""
+
+    file_id: str = Field(..., description="File ID from upload API")
+
+    def get_options_dict(self) -> dict[str, Any]:
+        """Return non-None transcription options without the file identifier."""
         return self.model_dump(exclude={"file_id"}, exclude_none=True)
+
+
+class TranscriptionDefaultsUpdateRequest(TranscriptionOptionsPayload):
+    """Partial update payload for application-level transcription defaults."""
 
 
 class BatchExportRequest(BaseModel):

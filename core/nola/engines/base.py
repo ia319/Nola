@@ -32,7 +32,7 @@ class EngineConfig:
 class TranscribeOptions:
     """Transcription options passed to transcribe method.
 
-    All default values match faster-whisper defaults.
+    All default values match faster-whisper WhisperModel.transcribe defaults.
     """
 
     # Language settings
@@ -71,8 +71,8 @@ class TranscribeOptions:
     without_timestamps: bool = False
     max_initial_timestamp: float = 1.0
     word_timestamps: bool = False
-    prepend_punctuations: str = '"\'"¿([{-'
-    append_punctuations: str = '"\'.。,，!！?？:：")]}、'
+    prepend_punctuations: str = "\"'“¿([{-"
+    append_punctuations: str = "\"'.。,，!！?？:：”)]}、"
 
     # VAD settings
     vad_filter: bool = False
@@ -80,6 +80,7 @@ class TranscribeOptions:
 
     # Advanced
     multilingual: bool = False
+    chunk_length: int | None = None
     clip_timestamps: str | list[float] = "0"
     hallucination_silence_threshold: float | None = None
     language_detection_threshold: float | None = 0.5

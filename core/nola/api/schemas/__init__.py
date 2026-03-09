@@ -19,7 +19,11 @@ from nola.api.schemas.responses import (
     TaskListResponse,
     TaskSummaryResponse,
 )
-from nola.api.schemas.transcriptions import BatchExportRequest, TranscriptionRequest
+from nola.api.schemas.transcriptions import (
+    BatchExportRequest,
+    TranscriptionDefaultsUpdateRequest,
+    TranscriptionRequest,
+)
 
 __all__ = [
     "BatchExportRequest",
@@ -38,5 +42,6 @@ __all__ = [
     "TaskDetailResponse",
     "TaskListResponse",
     "TaskSummaryResponse",
+    "TranscriptionDefaultsUpdateRequest",
     "TranscriptionRequest",
 ]
