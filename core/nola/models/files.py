@@ -1,6 +1,7 @@
 """File management database operations."""
 
 import sqlite3
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 from typing import Any, TypedDict, cast
@@ -52,22 +53,24 @@ class FileDatabase:
             size: File size in bytes
             content_type: MIME type
         """
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO files (id, filename, path, size, content_type, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    file_id,
-                    filename,
-                    path,
-                    size,
-                    content_type,
-                    datetime.now().isoformat(),
-                ),
-            )
-            conn.commit()
+        with closing(self._connect()) as conn:
+            with conn:
+                conn.execute(
+                    """
+                    INSERT INTO files (
+                        id, filename, path, size, content_type, created_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        file_id,
+                        filename,
+                        path,
+                        size,
+                        content_type,
+                        datetime.now().isoformat(),
+                    ),
+                )
 
     def get_file(self, file_id: str) -> FileRow | None:
         """Get file metadata by ID.
@@ -78,7 +81,7 @@ class FileDatabase:
         Returns:
             File dictionary or None if not found
         """
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             cursor = conn.execute("SELECT * FROM files WHERE id = ?", (file_id,))
             row = cursor.fetchone()
 
@@ -108,12 +111,12 @@ class FileDatabase:
         Returns:
             True if deleted, False if not found
         """
-        with self._connect() as conn:
-            cursor = conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
-            deleted = cursor.rowcount > 0
-            conn.commit()
+        with closing(self._connect()) as conn:
+            with conn:
+                cursor = conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
+                deleted = cursor.rowcount > 0
 
-            return deleted
+                return deleted
 
     def list_files(self, limit: int = 50, offset: int = 0) -> list[FileRow]:
         """List all files with pagination.
@@ -125,7 +128,7 @@ class FileDatabase:
         Returns:
             List of file dictionaries
         """
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             cursor = conn.execute(
                 "SELECT * FROM files ORDER BY created_at DESC LIMIT ? OFFSET ?",
                 (limit, offset),
@@ -134,7 +137,7 @@ class FileDatabase:
 
     def count_files(self) -> int:
         """Count total files."""
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             cursor = conn.execute("SELECT COUNT(*) FROM files")
             return int(cursor.fetchone()[0])
 
@@ -146,7 +149,7 @@ class FileDatabase:
         """
         missing_files = []
 
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             cursor = conn.execute("SELECT * FROM files")
 
             for row in cursor:
@@ -175,10 +178,12 @@ class FileDatabase:
         if not orphan_ids:
             return {"deleted_count": 0, "deleted_files": []}
 
-        with self._connect() as conn:
-            placeholders = ",".join("?" * len(orphan_ids))
-            conn.execute(f"DELETE FROM files WHERE id IN ({placeholders})", orphan_ids)
-            conn.commit()
+        with closing(self._connect()) as conn:
+            with conn:
+                placeholders = ",".join("?" * len(orphan_ids))
+                conn.execute(
+                    f"DELETE FROM files WHERE id IN ({placeholders})", orphan_ids
+                )
 
         return {
             "deleted_count": len(orphan_ids),

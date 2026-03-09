@@ -1,6 +1,7 @@
 """Pytest tests for API endpoints."""
 
 import tempfile
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import PropertyMock, patch
 
@@ -323,12 +324,12 @@ class TestExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="test-task-srt", file_id="test-file-srt", options=None)
-        with task_db._connect() as conn:
-            conn.execute(
-                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                ("test-task-srt",),
-            )
-            conn.commit()
+        with closing(task_db._connect()) as conn:
+            with conn:
+                conn.execute(
+                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                    ("test-task-srt",),
+                )
         task_db.complete(
             task_id="test-task-srt",
             segments=[
@@ -356,12 +357,12 @@ class TestExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="test-vtt", file_id="test-file-vtt", options=None)
-        with task_db._connect() as conn:
-            conn.execute(
-                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                ("test-vtt",),
-            )
-            conn.commit()
+        with closing(task_db._connect()) as conn:
+            with conn:
+                conn.execute(
+                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                    ("test-vtt",),
+                )
         task_db.complete(
             task_id="test-vtt",
             segments=[{"start": 0.0, "end": 1.0, "text": "VTT test"}],
@@ -384,12 +385,12 @@ class TestExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="test-txt", file_id="test-file-txt", options=None)
-        with task_db._connect() as conn:
-            conn.execute(
-                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                ("test-txt",),
-            )
-            conn.commit()
+        with closing(task_db._connect()) as conn:
+            with conn:
+                conn.execute(
+                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                    ("test-txt",),
+                )
         task_db.complete(
             task_id="test-txt",
             segments=[{"start": 0.0, "end": 1.0, "text": "Plain text"}],
@@ -414,12 +415,12 @@ class TestExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="test-ass", file_id="test-file-ass", options=None)
-        with task_db._connect() as conn:
-            conn.execute(
-                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                ("test-ass",),
-            )
-            conn.commit()
+        with closing(task_db._connect()) as conn:
+            with conn:
+                conn.execute(
+                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                    ("test-ass",),
+                )
         task_db.complete(
             task_id="test-ass",
             segments=[{"start": 0.0, "end": 1.0, "text": "ASS test"}],
@@ -446,12 +447,12 @@ class TestExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="test-save", file_id="test-file-save", options=None)
-        with task_db._connect() as conn:
-            conn.execute(
-                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                ("test-save",),
-            )
-            conn.commit()
+        with closing(task_db._connect()) as conn:
+            with conn:
+                conn.execute(
+                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                    ("test-save",),
+                )
         task_db.complete(
             task_id="test-save",
             segments=[{"start": 0.0, "end": 1.0, "text": "Save test"}],
@@ -500,12 +501,13 @@ class TestBatchExportAPI:
             task_db.enqueue(
                 task_id=f"batch-task-{i}", file_id=f"batch-file-{i}", options=None
             )
-            with task_db._connect() as conn:
-                conn.execute(
-                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                    (f"batch-task-{i}",),
-                )
-                conn.commit()
+            with closing(task_db._connect()) as conn:
+                with conn:
+                    conn.execute(
+                        "UPDATE transcription_tasks "
+                        "SET status = 'processing' WHERE id = ?",
+                        (f"batch-task-{i}",),
+                    )
             task_db.complete(
                 task_id=f"batch-task-{i}",
                 segments=[{"start": 0.0, "end": 1.0, "text": f"Test {i}"}],
@@ -544,12 +546,12 @@ class TestBatchExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="partial-task", file_id="partial-file", options=None)
-        with task_db._connect() as conn:
-            conn.execute(
-                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                ("partial-task",),
-            )
-            conn.commit()
+        with closing(task_db._connect()) as conn:
+            with conn:
+                conn.execute(
+                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                    ("partial-task",),
+                )
         task_db.complete(
             task_id="partial-task",
             segments=[{"start": 0.0, "end": 1.0, "text": "Partial test"}],
@@ -596,12 +598,12 @@ class TestBatchExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="zip-name-task", file_id="zip-name-file", options=None)
-        with task_db._connect() as conn:
-            conn.execute(
-                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                ("zip-name-task",),
-            )
-            conn.commit()
+        with closing(task_db._connect()) as conn:
+            with conn:
+                conn.execute(
+                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                    ("zip-name-task",),
+                )
         task_db.complete(
             task_id="zip-name-task",
             segments=[{"start": 0.0, "end": 1.0, "text": "Custom name"}],
@@ -633,12 +635,12 @@ class TestBatchExportAPI:
             size=1000,
         )
         task_db.enqueue(task_id="inject-task", file_id="inject-file", options=None)
-        with task_db._connect() as conn:
-            conn.execute(
-                "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
-                ("inject-task",),
-            )
-            conn.commit()
+        with closing(task_db._connect()) as conn:
+            with conn:
+                conn.execute(
+                    "UPDATE transcription_tasks SET status = 'processing' WHERE id = ?",
+                    ("inject-task",),
+                )
         task_db.complete(
             task_id="inject-task",
             segments=[{"start": 0.0, "end": 1.0, "text": "Inject test"}],
