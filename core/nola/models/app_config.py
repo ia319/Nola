@@ -3,6 +3,7 @@
 import json
 import logging
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -44,7 +45,7 @@ class AppConfigDatabase:
             For example, prefix ``"transcription."`` with key
             ``"transcription.beam_size"`` returns ``{"beam_size": 5}``.
         """
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             cursor = conn.execute(
                 "SELECT key, value FROM app_config WHERE key LIKE ?",
                 (f"{prefix}%",),
@@ -75,16 +76,16 @@ class AppConfigDatabase:
             List of full keys that were written.
         """
         written_keys: list[str] = []
-        with self._connect() as conn:
-            for key, value in values.items():
-                full_key = f"{prefix}{key}"
-                conn.execute(
-                    "INSERT INTO app_config (key, value) VALUES (?, ?) "
-                    "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-                    (full_key, json.dumps(value)),
-                )
-                written_keys.append(full_key)
-            conn.commit()
+        with closing(self._connect()) as conn:
+            with conn:
+                for key, value in values.items():
+                    full_key = f"{prefix}{key}"
+                    conn.execute(
+                        "INSERT INTO app_config (key, value) VALUES (?, ?) "
+                        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                        (full_key, json.dumps(value)),
+                    )
+                    written_keys.append(full_key)
         return written_keys
 
     def delete_all(self, prefix: str) -> int:
@@ -96,11 +97,11 @@ class AppConfigDatabase:
         Returns:
             Number of entries deleted.
         """
-        with self._connect() as conn:
-            cursor = conn.execute(
-                "DELETE FROM app_config WHERE key LIKE ?",
-                (f"{prefix}%",),
-            )
-            deleted = cursor.rowcount
-            conn.commit()
-            return deleted
+        with closing(self._connect()) as conn:
+            with conn:
+                cursor = conn.execute(
+                    "DELETE FROM app_config WHERE key LIKE ?",
+                    (f"{prefix}%",),
+                )
+                deleted = cursor.rowcount
+                return deleted

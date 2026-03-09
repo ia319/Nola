@@ -2,6 +2,7 @@
 
 import sqlite3
 import tempfile
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -35,7 +36,7 @@ class TestAppConfigDatabase:
         """init_db() should add the app_config table to the schema."""
         _, db_path = config_db
 
-        with sqlite3.connect(db_path) as conn:
+        with closing(sqlite3.connect(db_path)) as conn:
             row = conn.execute(
                 "SELECT name FROM sqlite_master "
                 "WHERE type = 'table' AND name = 'app_config'"
