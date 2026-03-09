@@ -27,6 +27,7 @@ class AppConfigDatabase:
     def _connect(self) -> sqlite3.Connection:
         """Create connection with consistent settings."""
         conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA foreign_keys = ON")
         conn.row_factory = sqlite3.Row
         return conn
 

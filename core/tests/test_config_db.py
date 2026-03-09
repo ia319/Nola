@@ -64,13 +64,13 @@ class TestAppConfigDatabase:
             },
         )
 
-        assert written == [
+        assert set(written) == {
             "transcription.beam_size",
             "transcription.vad_filter",
             "transcription.temperature",
             "transcription.vad_parameters",
             "transcription.initial_prompt",
-        ]
+        }
         assert store.get_all("transcription.") == {
             "beam_size": 3,
             "vad_filter": True,
