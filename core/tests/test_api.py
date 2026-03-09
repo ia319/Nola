@@ -420,10 +420,6 @@ class TestExportAPI:
 
     def test_export_save_to_disk(self, client):
         """Test exporting with save=true returns JSON with file path."""
-        from unittest.mock import PropertyMock, patch
-
-        from nola.config.settings import Settings
-
         file_db = get_file_db()
         task_db = get_task_db()
         file_db.create_file(
@@ -439,9 +435,6 @@ class TestExportAPI:
             segments=[{"start": 0.0, "end": 1.0, "text": "Save test"}],
             duration=1.0,
         )
-
-        import tempfile
-        from pathlib import Path
 
         with tempfile.TemporaryDirectory() as tmpdir:
             exports_path = Path(tmpdir) / "exports"
