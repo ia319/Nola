@@ -6,6 +6,8 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from nola.config import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -16,13 +18,13 @@ class AppConfigDatabase:
     bool, str, None) and nested objects (dict, list) are both supported.
     """
 
-    def __init__(self, db_path: str | Path = "data/nola.db") -> None:
+    def __init__(self, db_path: str | Path | None = None) -> None:
         """Initialize app config database.
 
         Args:
-            db_path: Path to SQLite database file
+            db_path: Path to SQLite database file. Defaults to settings.db_path.
         """
-        self.db_path = Path(db_path)
+        self.db_path = Path(db_path) if db_path else settings.db_path
 
     def _connect(self) -> sqlite3.Connection:
         """Create connection with consistent settings."""

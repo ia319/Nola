@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from nola.config import settings
 from nola.models import AppConfigDatabase, init_db
 
 
@@ -27,6 +28,12 @@ def config_db():
 
 class TestAppConfigDatabase:
     """Test app configuration persistence operations."""
+
+    def test_default_db_path_matches_settings(self):
+        """Default construction should follow the application database path."""
+        store = AppConfigDatabase()
+
+        assert store.db_path == settings.db_path
 
     def test_init_db_creates_app_config_table(self, config_db):
         """init_db() should add the app_config table to the schema."""
