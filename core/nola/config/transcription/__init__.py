@@ -10,7 +10,6 @@ from nola.config.transcription.languages import (
     is_multilingual,
 )
 from nola.config.transcription.metadata import (
-    TRANSCRIPTION_PARAM_SCHEMA,
     AppConfigResponse,
     EngineConfigResponse,
     EngineDefaultsResponse,
@@ -20,6 +19,7 @@ from nola.config.transcription.metadata import (
     TranscriptionConfigResponse,
     TranscriptionDefaultsPatchResponse,
     build_file_config,
+    get_transcription_param_schema,
 )
 
 __all__ = [
@@ -35,7 +35,7 @@ __all__ = [
     "LanguageOptionSchema",
     "OptionFieldSchema",
     "OptionGroupSchema",
-    "TRANSCRIPTION_PARAM_SCHEMA",
+    "get_transcription_param_schema",
     "TranscriptionConfigResponse",
     "TranscriptionDefaultsPatchResponse",
 ]

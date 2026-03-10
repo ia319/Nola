@@ -131,7 +131,7 @@ class TranscriptionDefaultsPatchResponse(BaseModel):
     defaults: dict[str, Any]
 
 
-TRANSCRIPTION_PARAM_SCHEMA: list[OptionGroupSchema] = [
+_TRANSCRIPTION_PARAM_SCHEMA: list[OptionGroupSchema] = [
     OptionGroupSchema(
         group="decoding",
         group_label_key="options.group.decoding",
@@ -433,6 +433,11 @@ TRANSCRIPTION_PARAM_SCHEMA: list[OptionGroupSchema] = [
         ],
     ),
 ]
+
+
+def get_transcription_param_schema() -> list[OptionGroupSchema]:
+    """Return a defensive copy of the transcription field metadata."""
+    return [group.model_copy(deep=True) for group in _TRANSCRIPTION_PARAM_SCHEMA]
 
 
 def build_file_config() -> FileConfigResponse:
