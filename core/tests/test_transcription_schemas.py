@@ -43,10 +43,20 @@ class TestTranscriptionSchemas:
             assert schema[key].get("default") is None
             assert schema[key].get("example") == ""
 
-    def test_request_models_do_not_override_generated_body_examples(self):
-        """Schema should rely on field-level examples for Swagger request rendering."""
-        assert "example" not in TranscriptionRequest.model_json_schema()
-        assert "example" not in TranscriptionDefaultsUpdateRequest.model_json_schema()
+    def test_request_models_expose_full_body_examples_with_string_clip_timestamps(
+        self,
+    ):
+        """Body examples should preserve string-valued clip timestamps."""
+        request_example = TranscriptionRequest.model_json_schema()["example"]
+        defaults_example = TranscriptionDefaultsUpdateRequest.model_json_schema()[
+            "example"
+        ]
+
+        assert request_example["file_id"] == "uploaded-file-id"
+        assert request_example["clip_timestamps"] == "0"
+        assert defaults_example["clip_timestamps"] == "0"
+        assert "beam_size" in request_example
+        assert "beam_size" in defaults_example
 
     def test_transcription_request_includes_chunk_length_in_options(self):
         """Task creation payload should retain chunk_length when provided."""

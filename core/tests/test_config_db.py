@@ -123,3 +123,29 @@ class TestAppConfigDatabase:
         assert deleted == 2
         assert store.get_all("transcription.") == {}
         assert store.get_all("ui.") == {"language": "en"}
+
+    def test_replace_many_rewrites_only_target_prefix(self, config_db):
+        """replace_many() should rewrite one prefix without touching others."""
+        store, _ = config_db
+
+        store.set_many(
+            "transcription.",
+            {
+                "beam_size": 5,
+                "vad_parameters": {"threshold": 0.6},
+            },
+        )
+        store.set_many("ui.", {"language": "en"})
+
+        written = store.replace_many(
+            "transcription.",
+            {
+                "vad_parameters": {"speech_pad_ms": 500},
+            },
+        )
+
+        assert written == ["transcription.vad_parameters"]
+        assert store.get_all("transcription.") == {
+            "vad_parameters": {"speech_pad_ms": 500}
+        }
+        assert store.get_all("ui.") == {"language": "en"}

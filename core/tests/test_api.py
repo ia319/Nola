@@ -7,7 +7,7 @@ from unittest.mock import PropertyMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from nola.api.deps import get_file_db, get_task_db
+from nola.api.deps import get_app_config_db, get_file_db, get_task_db
 from nola.config.constants import MAX_BATCH_EXPORT_TASKS
 from nola.config.settings import Settings
 from nola.main import app
@@ -24,6 +24,7 @@ def _claim_pending_task(task_db, expected_task_id: str) -> None:
 @pytest.fixture
 def client():
     """Create test client with isolated database."""
+    get_app_config_db.cache_clear()
     get_file_db.cache_clear()
     get_task_db.cache_clear()
 
@@ -50,6 +51,7 @@ def client():
             with TestClient(app) as test_client:
                 yield test_client
 
+        get_app_config_db.cache_clear()
         get_file_db.cache_clear()
         get_task_db.cache_clear()
 

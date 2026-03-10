@@ -88,6 +88,32 @@ class AppConfigDatabase:
                     written_keys.append(full_key)
         return written_keys
 
+    def replace_many(self, prefix: str, values: dict[str, Any]) -> list[str]:
+        """Replace all entries under a prefix in one transaction.
+
+        Args:
+            prefix: Key prefix to replace (e.g. ``"transcription."``)
+            values: Full replacement mapping of unprefixed keys to values
+
+        Returns:
+            List of full keys that were written after the replacement.
+        """
+        written_keys: list[str] = []
+        with closing(self._connect()) as conn:
+            with conn:
+                conn.execute(
+                    "DELETE FROM app_config WHERE key LIKE ?",
+                    (f"{prefix}%",),
+                )
+                for key, value in values.items():
+                    full_key = f"{prefix}{key}"
+                    conn.execute(
+                        "INSERT INTO app_config (key, value) VALUES (?, ?)",
+                        (full_key, json.dumps(value)),
+                    )
+                    written_keys.append(full_key)
+        return written_keys
+
     def delete_all(self, prefix: str) -> int:
         """Delete all configuration entries matching a key prefix.
 

@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from nola import __version__
-from nola.api.routes import files_router, transcriptions_router
+from nola.api.routes import config_router, files_router, transcriptions_router
 from nola.config import settings
 from nola.models import init_db
 
@@ -27,6 +27,7 @@ app = FastAPI(
 )
 
 # Register routers
+app.include_router(config_router)
 app.include_router(transcriptions_router)
 app.include_router(files_router)
 
