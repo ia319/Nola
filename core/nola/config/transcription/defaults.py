@@ -43,15 +43,21 @@ def _deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, An
     return result
 
 
-def get_engine_defaults() -> dict[str, Any]:
-    """Return non-batched WhisperModel defaults with expanded VAD options."""
+def _build_engine_defaults() -> dict[str, Any]:
+    """Build raw non-batched WhisperModel defaults with expanded VAD options."""
     defaults = asdict(TranscribeOptions())
     defaults["vad_parameters"] = asdict(VadOptions())
-    return _serialize_special_values(defaults)
+    return defaults
+
+
+def get_engine_defaults() -> dict[str, Any]:
+    """Return non-batched WhisperModel defaults with expanded VAD options."""
+    return _serialize_special_values(_build_engine_defaults())
 
 
 def get_effective_defaults(config_db: SupportsConfigRead) -> dict[str, Any]:
     """Return engine defaults merged with persisted application overrides."""
-    engine_defaults = get_engine_defaults()
+    engine_defaults = _build_engine_defaults()
     app_defaults = config_db.get_all("transcription.")
-    return _deep_merge(engine_defaults, app_defaults)
+    merged = _deep_merge(engine_defaults, app_defaults)
+    return _serialize_special_values(merged)

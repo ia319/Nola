@@ -5,6 +5,7 @@ from dataclasses import asdict
 from faster_whisper.vad import VadOptions
 from pydantic import TypeAdapter
 
+from nola.config.transcription import get_transcription_param_schema
 from nola.config.transcription.defaults import (
     get_effective_defaults,
     get_engine_defaults,
@@ -13,10 +14,7 @@ from nola.config.transcription.languages import (
     get_effective_languages,
     is_multilingual,
 )
-from nola.config.transcription.metadata import (
-    TRANSCRIPTION_PARAM_SCHEMA,
-    OptionFieldSchema,
-)
+from nola.config.transcription.metadata import OptionFieldSchema
 from nola.engines.base import TranscribeOptions
 
 
@@ -65,6 +63,20 @@ class TestEngineDefaults:
         assert merged["vad_parameters"]["speech_pad_ms"] == 400
         assert merged["vad_parameters"]["max_speech_duration_s"] == "inf"
 
+    def test_get_effective_defaults_serializes_special_override_values(self):
+        """Merged defaults should keep API-safe sentinel values."""
+        merged = get_effective_defaults(
+            StubConfigStore(
+                {
+                    "vad_parameters": {
+                        "max_speech_duration_s": float("inf"),
+                    }
+                }
+            )
+        )
+
+        assert merged["vad_parameters"]["max_speech_duration_s"] == "inf"
+
 
 class TestLanguageCapabilities:
     """Verify language capability helpers match the current model contract."""
@@ -100,9 +112,10 @@ class TestTranscriptionParamSchema:
 
     def test_param_schema_includes_all_vad_subfields(self):
         """VAD metadata should expose all eight Silero parameters."""
+        schema = get_transcription_param_schema()
         vad_keys = {
             field.key
-            for group in TRANSCRIPTION_PARAM_SCHEMA
+            for group in schema
             if group.group in {"vad", "vad_advanced"}
             for field in group.fields
         }
@@ -121,11 +134,8 @@ class TestTranscriptionParamSchema:
 
     def test_max_speech_duration_schema_advertises_inf_special_value(self):
         """The schema should document the API-level infinity sentinel."""
-        vad_advanced = next(
-            group
-            for group in TRANSCRIPTION_PARAM_SCHEMA
-            if group.group == "vad_advanced"
-        )
+        schema = get_transcription_param_schema()
+        vad_advanced = next(group for group in schema if group.group == "vad_advanced")
         max_speech_field = next(
             field
             for field in vad_advanced.fields
@@ -133,3 +143,12 @@ class TestTranscriptionParamSchema:
         )
 
         assert max_speech_field.special_values == ["inf"]
+
+    def test_param_schema_returns_a_defensive_copy(self):
+        """The public schema accessor should not expose shared mutable state."""
+        first = get_transcription_param_schema()
+        second = get_transcription_param_schema()
+
+        first[0].fields.append(first[0].fields[0].model_copy())
+
+        assert len(second[0].fields) + 1 == len(first[0].fields)

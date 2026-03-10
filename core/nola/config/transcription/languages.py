@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from faster_whisper.tokenizer import _LANGUAGE_CODES
 from pydantic import BaseModel
+
+from nola.config.constants import SUPPORTED_LANGUAGES
 
 
 class LanguageOptionSchema(BaseModel):
@@ -25,5 +26,5 @@ def is_multilingual(model_size: str) -> bool:
 
 def get_effective_languages(model_size: str) -> list[LanguageOptionSchema]:
     """Return selectable languages for the configured model."""
-    codes = list(_LANGUAGE_CODES) if is_multilingual(model_size) else ["en"]
+    codes = sorted(SUPPORTED_LANGUAGES) if is_multilingual(model_size) else ["en"]
     return [_language_option(code) for code in codes]
