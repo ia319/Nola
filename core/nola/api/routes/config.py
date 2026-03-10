@@ -151,6 +151,10 @@ async def patch_transcription_defaults(
         _validate_vad_parameter_keys(vad_parameters)
 
     if patch_values:
+        # This PATCH flow is a read-modify-write sequence.
+        # Concurrent PATCH requests can overwrite each other's updates because
+        # the merge happens in application code, not inside one locked SQL step.
+        # That tradeoff is acceptable for the current low-traffic config surface.
         current_overrides = config_db.get_all("transcription.")
         next_overrides = _apply_override_patch(current_overrides, patch_values)
         config_db.replace_many("transcription.", next_overrides)
