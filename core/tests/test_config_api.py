@@ -160,7 +160,9 @@ class TestConfigAPI:
         )
 
         assert response.status_code == 422
-        assert "Unsupported vad_parameters key" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "vad_parameters" in detail
+        assert "unknown_key" in detail
 
     def test_delete_transcription_defaults_resets_override_layer(
         self, client: TestClient
