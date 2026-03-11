@@ -12,10 +12,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import logger from '@/config/logger'
+import { useAppConfig } from '@/config/use-app-config'
 import { createTask } from '@/features/transcription/api'
 import { useTranscriptionOptions } from '@/features/transcription/hooks/useTranscriptionOptions'
 import { isAppError } from '@/shared/lib/error-factory'
-import type { AppError } from '@/shared/types'
+import type { AppError, LanguageOption } from '@/shared/types'
 
 import { AdvancedOptions } from './AdvancedOptions'
 
@@ -27,19 +28,8 @@ export interface TaskCreateResult {
   error?: AppError
 }
 
-/** Temporary common language subset for the current static options bar. */
-const LANGUAGES = [
-  { value: '__auto__', labelKey: 'options.language.auto' },
-  { value: 'en', labelKey: 'options.language.en' },
-  { value: 'zh', labelKey: 'options.language.zh' },
-  { value: 'ja', labelKey: 'options.language.ja' },
-  { value: 'ko', labelKey: 'options.language.ko' },
-  { value: 'de', labelKey: 'options.language.de' },
-  { value: 'fr', labelKey: 'options.language.fr' },
-  { value: 'es', labelKey: 'options.language.es' },
-  { value: 'ru', labelKey: 'options.language.ru' },
-  { value: 'ar', labelKey: 'options.language.ar' },
-] as const
+/** Synthetic auto-detect entry prepended to the language list. */
+const AUTO_DETECT: LanguageOption = { code: '__auto__', label_key: 'options.language.auto' }
 
 export interface OptionsBarProps {
   /** File IDs available for task creation (success && !taskCreated). */
@@ -61,6 +51,8 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
   // Synchronous lock to prevent double-click reentry before React re-renders.
   const creatingRef = useRef(false)
 
+  const { config } = useAppConfig()
+
   const {
     language,
     task,
@@ -74,6 +66,11 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
     initialPrompt,
     setInitialPrompt,
   } = useTranscriptionOptions()
+
+  // Build language list: auto-detect + backend effective_languages.
+  const languages: LanguageOption[] = config
+    ? [AUTO_DETECT, ...config.effective_languages]
+    : [AUTO_DETECT]
 
   /** Create tasks for all available file IDs, collecting per-file results. */
   async function handleStart() {
@@ -129,9 +126,9 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {LANGUAGES.map((lang) => (
-                <SelectItem key={lang.value} value={lang.value}>
-                  {t(lang.labelKey)}
+              {languages.map((lang) => (
+                <SelectItem key={lang.code} value={lang.code}>
+                  {t(lang.label_key)}
                 </SelectItem>
               ))}
             </SelectContent>
