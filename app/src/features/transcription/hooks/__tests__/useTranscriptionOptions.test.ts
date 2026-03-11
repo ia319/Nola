@@ -1,26 +1,47 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getTranscriptionDefaults } from '@/features/transcription/api'
 import { useTranscriptionOptions } from '../useTranscriptionOptions'
+import type { UseAppConfigReturn } from '@/config/use-app-config'
 
-vi.mock('@/features/transcription/api', () => ({
-  getTranscriptionDefaults: vi.fn().mockResolvedValue({}),
+const useAppConfigMock = vi.fn<() => UseAppConfigReturn>()
+
+vi.mock('@/config/use-app-config', () => ({
+  useAppConfig: (...args: unknown[]) => useAppConfigMock(...(args as [])),
 }))
 
-vi.mock('@/config/logger', () => ({
-  default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-}))
+function buildAppConfigReturn(defaults: Record<string, unknown> = {}): UseAppConfigReturn {
+  return {
+    config: {
+      engine: {
+        model_size: 'small',
+        device: 'cpu',
+        compute_type: 'default',
+        is_multilingual: true,
+      },
+      transcription: { defaults, schema: [] },
+      file: { allowed_extensions: [], allowed_mime_types: [], max_file_size: 0 },
+      effective_languages: [],
+    },
+    fileValidationConfig: { allowedExtensions: [], allowedMimeTypes: [], maxFileSize: 0 },
+    isLoading: false,
+  }
+}
 
-const getTranscriptionDefaultsMock = vi.mocked(getTranscriptionDefaults)
+function buildLoadingReturn(): UseAppConfigReturn {
+  return {
+    config: null,
+    fileValidationConfig: { allowedExtensions: [], allowedMimeTypes: [], maxFileSize: 0 },
+    isLoading: true,
+  }
+}
 
 async function renderTranscriptionOptions(defaults: Record<string, unknown> = {}) {
-  getTranscriptionDefaultsMock.mockResolvedValue(defaults)
+  useAppConfigMock.mockReturnValue(buildAppConfigReturn(defaults))
 
   const hook = renderHook(() => useTranscriptionOptions())
 
   await waitFor(() => {
-    expect(getTranscriptionDefaultsMock).toHaveBeenCalled()
     expect(hook.result.current.defaults).toEqual(defaults)
   })
 
@@ -134,14 +155,10 @@ describe('useTranscriptionOptions', () => {
     })
   })
 
-  it('keeps defaults null when the defaults request fails', async () => {
-    getTranscriptionDefaultsMock.mockRejectedValueOnce(new Error('network down'))
+  it('keeps defaults null when config has not loaded', () => {
+    useAppConfigMock.mockReturnValue(buildLoadingReturn())
 
     const { result } = renderHook(() => useTranscriptionOptions())
-
-    await waitFor(() => {
-      expect(getTranscriptionDefaultsMock).toHaveBeenCalled()
-    })
 
     expect(result.current.defaults).toBeNull()
   })

@@ -1,40 +1,28 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { CreateTaskPayload, TranscriptionDefaults } from '@/shared/types'
 import type {
   AdvancedTranscriptionOptions,
   TranscriptionTaskType,
   UseTranscriptionOptionsReturn,
 } from '@/features/transcription/types'
-import { getTranscriptionDefaults } from '@/features/transcription/api'
-import logger from '@/config/logger'
+import { useAppConfig } from '@/config/use-app-config'
 
 /**
  * Manage transcription option state and build the createTask payload.
  *
- * Loads backend defaults on mount for placeholder display.
+ * Consume backend defaults from the shared `useAppConfig` hook (no
+ * separate fetch — the config singleton handles caching).
  * Enforces mutual-exclusion between word_timestamps and without_timestamps.
  */
 export function useTranscriptionOptions(): UseTranscriptionOptionsReturn {
   const [language, setLanguage] = useState<string | undefined>(undefined)
   const [task, setTask] = useState<TranscriptionTaskType>('transcribe')
   const [advancedOptions, setAdvancedOptions] = useState<AdvancedTranscriptionOptions>({})
-  const [defaults, setDefaults] = useState<TranscriptionDefaults | null>(null)
   const [initialPrompt, setInitialPrompt] = useState<string | undefined>(undefined)
 
-  // Load backend defaults on mount for placeholder/label display.
-  useEffect(() => {
-    let cancelled = false
-    getTranscriptionDefaults()
-      .then((data) => {
-        if (!cancelled) setDefaults(data)
-      })
-      .catch((err) => {
-        logger.warn('Failed to load transcription defaults', err)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  // Consume defaults from the shared app config singleton.
+  const { config } = useAppConfig()
+  const defaults: TranscriptionDefaults | null = config?.transcription.defaults ?? null
 
   const setAdvancedOption = useCallback(
     <K extends keyof AdvancedTranscriptionOptions>(

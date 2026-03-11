@@ -1,26 +1,39 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getTranscriptionDefaults } from '@/features/transcription/api'
 import { useTranscriptionOptions } from '@/features/transcription/hooks/useTranscriptionOptions'
+import type { UseAppConfigReturn } from '@/config/use-app-config'
 
-vi.mock('@/features/transcription/api', () => ({
-  getTranscriptionDefaults: vi.fn().mockResolvedValue({}),
+const useAppConfigMock = vi.fn<() => UseAppConfigReturn>()
+
+vi.mock('@/config/use-app-config', () => ({
+  useAppConfig: (...args: unknown[]) => useAppConfigMock(...(args as [])),
 }))
 
-vi.mock('@/config/logger', () => ({
-  default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-}))
-
-const getTranscriptionDefaultsMock = vi.mocked(getTranscriptionDefaults)
+function buildAppConfigReturn(defaults: Record<string, unknown> = {}): UseAppConfigReturn {
+  return {
+    config: {
+      engine: {
+        model_size: 'small',
+        device: 'cpu',
+        compute_type: 'default',
+        is_multilingual: true,
+      },
+      transcription: { defaults, schema: [] },
+      file: { allowed_extensions: [], allowed_mime_types: [], max_file_size: 0 },
+      effective_languages: [],
+    },
+    fileValidationConfig: { allowedExtensions: [], allowedMimeTypes: [], maxFileSize: 0 },
+    isLoading: false,
+  }
+}
 
 async function renderTranscriptionOptions(defaults: Record<string, unknown> = {}) {
-  getTranscriptionDefaultsMock.mockResolvedValue(defaults)
+  useAppConfigMock.mockReturnValue(buildAppConfigReturn(defaults))
 
   const hook = renderHook(() => useTranscriptionOptions())
 
   await waitFor(() => {
-    expect(getTranscriptionDefaultsMock).toHaveBeenCalled()
     expect(hook.result.current.defaults).toEqual(defaults)
   })
 
