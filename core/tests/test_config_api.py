@@ -168,10 +168,14 @@ class TestConfigAPI:
         self, client: TestClient
     ):
         """Delete should remove persisted overrides and restore engine defaults."""
-        client.patch(
+        patch_response = client.patch(
             "/api/config/transcription/defaults",
             json={"beam_size": 3, "vad_filter": True},
         )
+
+        patched = patch_response.json()["defaults"]
+        assert patched["beam_size"] == 3
+        assert patched["vad_filter"] is True
 
         delete_response = client.delete("/api/config/transcription/defaults")
         config_response = client.get("/api/config")
