@@ -5,6 +5,7 @@ import { useFileUpload } from '../useFileUpload'
 import { deleteFile, uploadFile } from '@/features/upload/api'
 import { UPLOAD_CONCURRENCY } from '@/config/constants'
 import type { FileUploadResponse } from '@/shared/types'
+import type { FileValidationConfig } from '@/shared/lib/file-validation'
 
 vi.mock('@/features/upload/api', () => ({
   uploadFile: vi.fn(),
@@ -44,13 +45,36 @@ function deferred<T>() {
   }
 }
 
+/** Shared test config mirroring the fallback constants values. */
+const TEST_CONFIG: FileValidationConfig = {
+  allowedExtensions: ['mp3', 'wav', 'flac', 'm4a', 'ogg', 'webm', 'aac', 'mp4', 'wma'],
+  allowedMimeTypes: [
+    'audio/mpeg',
+    'audio/mp3',
+    'audio/wav',
+    'audio/x-wav',
+    'audio/flac',
+    'audio/x-flac',
+    'audio/mp4',
+    'audio/m4a',
+    'audio/x-m4a',
+    'audio/ogg',
+    'audio/webm',
+    'audio/aac',
+    'audio/x-ms-wma',
+    'video/mp4',
+    'video/webm',
+  ],
+  maxFileSize: 500 * 1024 * 1024,
+}
+
 describe('useFileUpload', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   it('returns initial empty state', () => {
-    const { result } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
 
     expect(result.current.uploads).toEqual([])
     expect(result.current.isUploading).toBe(false)
@@ -59,7 +83,7 @@ describe('useFileUpload', () => {
   })
 
   it('adds one valid file as pending', () => {
-    const { result } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
     const file = fakeFile('one.mp3', 1024, 'audio/mpeg')
 
     act(() => {
@@ -73,7 +97,7 @@ describe('useFileUpload', () => {
   })
 
   it('adds mixed valid and invalid files with per-item status', () => {
-    const { result } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
     const valid = fakeFile('ok.mp3', 1024, 'audio/mpeg')
     const invalid = fakeFile('bad.txt', 1024, 'text/plain')
 
@@ -89,7 +113,7 @@ describe('useFileUpload', () => {
   })
 
   it('skips duplicate files and surfaces a batch-level duplicate error', () => {
-    const { result } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
     const duplicateOne = fakeFile('same.mp3', 1024, 'audio/mpeg', 5)
     const duplicateTwo = fakeFile('same.mp3', 1024, 'audio/mpeg', 5)
 
@@ -107,7 +131,7 @@ describe('useFileUpload', () => {
   })
 
   it('clears stale batch errors on a clean add and on reset', async () => {
-    const { result } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
     const duplicateOne = fakeFile('same.mp3', 1024, 'audio/mpeg', 7)
     const duplicateTwo = fakeFile('same.mp3', 1024, 'audio/mpeg', 7)
     const unique = fakeFile('fresh.mp3', 2048, 'audio/mpeg', 8)
@@ -134,7 +158,7 @@ describe('useFileUpload', () => {
   })
 
   it('allows the container to dismiss batch-level errors explicitly', () => {
-    const { result } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
     const duplicateOne = fakeFile('same.mp3', 1024, 'audio/mpeg', 9)
     const duplicateTwo = fakeFile('same.mp3', 1024, 'audio/mpeg', 9)
 
@@ -151,7 +175,7 @@ describe('useFileUpload', () => {
   })
 
   it('uploads pending file and exposes available file id', async () => {
-    const { result } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
     const file = fakeFile('done.mp3', 2048, 'audio/mpeg')
     uploadFileMock.mockResolvedValue(buildUploadResponse('file-1', file))
 
@@ -176,7 +200,7 @@ describe('useFileUpload', () => {
   })
 
   it('maps upload failure to upload error state', async () => {
-    const { result } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
     const file = fakeFile('fail.mp3', 1024, 'audio/mpeg')
     uploadFileMock.mockRejectedValue(new Error('network down'))
 
@@ -194,7 +218,7 @@ describe('useFileUpload', () => {
   })
 
   it('keeps cancelled status after axios canceled error', async () => {
-    const { result } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
     const file = fakeFile('cancel.mp3', 1024, 'audio/mpeg')
 
     uploadFileMock.mockImplementation(
@@ -233,7 +257,7 @@ describe('useFileUpload', () => {
   })
 
   it('retries failed upload and transitions to success', async () => {
-    const { result } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
     const file = fakeFile('retry.mp3', 1024, 'audio/mpeg')
     let calls = 0
 
@@ -264,7 +288,7 @@ describe('useFileUpload', () => {
   })
 
   it('limits concurrent uploads to configured batch size', async () => {
-    const { result } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
     const f1 = fakeFile('a.mp3', 1024)
     const f2 = fakeFile('b.mp3', 1024)
     const f3 = fakeFile('c.mp3', 1024)
@@ -319,7 +343,7 @@ describe('useFileUpload', () => {
   })
 
   it('removes success item and deletes remote orphan file', async () => {
-    const { result } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
     const file = fakeFile('remote.mp3', 1024)
     uploadFileMock.mockResolvedValue(buildUploadResponse('remote-1', file))
     deleteFileMock.mockResolvedValue({ message: 'ok' })
@@ -341,7 +365,7 @@ describe('useFileUpload', () => {
   })
 
   it('aborts in-flight upload and clears state on reset', async () => {
-    const { result } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
     const file = fakeFile('running.mp3', 1024)
     const capturedSignals: AbortSignal[] = []
 
@@ -380,7 +404,7 @@ describe('useFileUpload', () => {
   })
 
   it('deletes successful orphan files during reset when no task was created', async () => {
-    const { result } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
     const file = fakeFile('orphan.mp3', 1024)
     uploadFileMock.mockResolvedValue(buildUploadResponse('orphan-1', file))
     deleteFileMock.mockResolvedValue({ message: 'ok' })
@@ -401,7 +425,7 @@ describe('useFileUpload', () => {
   })
 
   it('does not delete remote file after task is marked created', async () => {
-    const { result } = renderHook(() => useFileUpload())
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
     const file = fakeFile('used.mp3', 1024)
     uploadFileMock.mockResolvedValue(buildUploadResponse('used-1', file))
 
