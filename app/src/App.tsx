@@ -7,6 +7,7 @@ import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
 import { OptionsBar } from '@/features/transcription'
 import type { TaskCreateResult } from '@/features/transcription/components/OptionsBar'
 import { Button } from '@/components/ui/button'
+import { useAppConfig } from '@/config/use-app-config'
 
 /**
  * Root application shell.
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/button'
  */
 function App() {
   const { t } = useTranslation()
+  const { fileValidationConfig } = useAppConfig()
 
   const {
     uploads,
@@ -30,7 +32,7 @@ function App() {
     availableFileIds,
     batchError,
     clearBatchError,
-  } = useFileUpload()
+  } = useFileUpload(fileValidationConfig)
 
   const hasPending = uploads.some((u) => u.status === 'pending')
 
