@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Response, status
@@ -26,12 +27,16 @@ from nola.models import AppConfigDatabase
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
-_ALLOWED_VAD_PARAMETER_KEYS = frozenset(get_engine_defaults()["vad_parameters"].keys())
+
+@lru_cache(maxsize=1)
+def _allowed_vad_parameter_keys() -> frozenset[str]:
+    """Return valid VAD parameter keys, computed once on first use."""
+    return frozenset(get_engine_defaults()["vad_parameters"].keys())
 
 
 def _validate_vad_parameter_keys(vad_parameters: dict[str, Any]) -> None:
     """Reject nested VAD keys that are not supported by the engine contract."""
-    invalid_keys = sorted(set(vad_parameters) - _ALLOWED_VAD_PARAMETER_KEYS)
+    invalid_keys = sorted(set(vad_parameters) - _allowed_vad_parameter_keys())
     if invalid_keys:
         invalid_list = ", ".join(invalid_keys)
         raise HTTPException(
