@@ -5,8 +5,7 @@ import { createValidationError } from './error-factory'
  * Configuration for file validation rules.
  *
  * Injected by callers so this module stays pure and testable.
- * Values typically come from `config/constants.ts` today and
- * `GET /api/config` in the future.
+ * Callers can supply either static fallback constants or runtime config values.
  */
 export interface FileValidationConfig {
   allowedExtensions: readonly string[]

@@ -1,26 +1,26 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getDefaultOptions } from '@/features/transcription/api'
+import { getTranscriptionDefaults } from '@/features/transcription/api'
 import { useTranscriptionOptions } from '../useTranscriptionOptions'
 
 vi.mock('@/features/transcription/api', () => ({
-  getDefaultOptions: vi.fn().mockResolvedValue({}),
+  getTranscriptionDefaults: vi.fn().mockResolvedValue({}),
 }))
 
 vi.mock('@/config/logger', () => ({
   default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
-const getDefaultOptionsMock = vi.mocked(getDefaultOptions)
+const getTranscriptionDefaultsMock = vi.mocked(getTranscriptionDefaults)
 
 async function renderTranscriptionOptions(defaults: Record<string, unknown> = {}) {
-  getDefaultOptionsMock.mockResolvedValue(defaults)
+  getTranscriptionDefaultsMock.mockResolvedValue(defaults)
 
   const hook = renderHook(() => useTranscriptionOptions())
 
   await waitFor(() => {
-    expect(getDefaultOptionsMock).toHaveBeenCalled()
+    expect(getTranscriptionDefaultsMock).toHaveBeenCalled()
     expect(hook.result.current.defaults).toEqual(defaults)
   })
 
@@ -135,12 +135,12 @@ describe('useTranscriptionOptions', () => {
   })
 
   it('keeps defaults null when the defaults request fails', async () => {
-    getDefaultOptionsMock.mockRejectedValueOnce(new Error('network down'))
+    getTranscriptionDefaultsMock.mockRejectedValueOnce(new Error('network down'))
 
     const { result } = renderHook(() => useTranscriptionOptions())
 
     await waitFor(() => {
-      expect(getDefaultOptionsMock).toHaveBeenCalled()
+      expect(getTranscriptionDefaultsMock).toHaveBeenCalled()
     })
 
     expect(result.current.defaults).toBeNull()

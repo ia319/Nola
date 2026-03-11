@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { CreateTaskPayload } from '@/shared/types'
+import type { CreateTaskPayload, TranscriptionDefaults } from '@/shared/types'
 import type {
   AdvancedTranscriptionOptions,
   TranscriptionTaskType,
   UseTranscriptionOptionsReturn,
 } from '@/features/transcription/types'
-import { getDefaultOptions } from '@/features/transcription/api'
+import { getTranscriptionDefaults } from '@/features/transcription/api'
 import logger from '@/config/logger'
 
 /**
@@ -18,18 +18,18 @@ export function useTranscriptionOptions(): UseTranscriptionOptionsReturn {
   const [language, setLanguage] = useState<string | undefined>(undefined)
   const [task, setTask] = useState<TranscriptionTaskType>('transcribe')
   const [advancedOptions, setAdvancedOptions] = useState<AdvancedTranscriptionOptions>({})
-  const [defaults, setDefaults] = useState<Record<string, unknown> | null>(null)
+  const [defaults, setDefaults] = useState<TranscriptionDefaults | null>(null)
   const [initialPrompt, setInitialPrompt] = useState<string | undefined>(undefined)
 
   // Load backend defaults on mount for placeholder/label display.
   useEffect(() => {
     let cancelled = false
-    getDefaultOptions()
+    getTranscriptionDefaults()
       .then((data) => {
         if (!cancelled) setDefaults(data)
       })
       .catch((err) => {
-        logger.warn('Failed to load default transcription options', err)
+        logger.warn('Failed to load transcription defaults', err)
       })
     return () => {
       cancelled = true

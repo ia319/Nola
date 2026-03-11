@@ -27,7 +27,7 @@ export interface TaskCreateResult {
   error?: AppError
 }
 
-/** Hardcoded common language subset; replaced by GET /api/config in a future phase. */
+/** Temporary common language subset for the current static options bar. */
 const LANGUAGES = [
   { value: '__auto__', labelKey: 'options.language.auto' },
   { value: 'en', labelKey: 'options.language.en' },

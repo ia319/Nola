@@ -1,4 +1,4 @@
-import type { CreateTaskPayload, CreateTaskRequest } from '@/shared/types'
+import type { CreateTaskPayload, CreateTaskRequest, TranscriptionDefaults } from '@/shared/types'
 
 /** All transcription options excluding top-level state fields and initial_prompt. */
 export type AdvancedTranscriptionOptions = Partial<
@@ -13,7 +13,7 @@ export interface UseTranscriptionOptionsReturn {
   language: string | undefined
   task: TranscriptionTaskType
   advancedOptions: AdvancedTranscriptionOptions
-  defaults: Record<string, unknown> | null
+  defaults: TranscriptionDefaults | null
 
   setLanguage: (lang: string | undefined) => void
   setTask: (task: TranscriptionTaskType) => void

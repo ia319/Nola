@@ -1,12 +1,13 @@
 import apiClient from '@/shared/lib/api-client'
 import type {
+  AppConfig,
   CancelTaskResponse,
   CreateTaskPayload,
   CreateTaskResponse,
-  DefaultOptions,
   TaskDetail,
   TaskListResponse,
   TaskStatus,
+  TranscriptionDefaults,
 } from '@/shared/types'
 
 const BASE = '/api/transcriptions'
@@ -52,8 +53,10 @@ export async function cancelTask(taskId: string): Promise<CancelTaskResponse> {
   return data
 }
 
-/** Fetch default transcription options from backend. */
-export async function getDefaultOptions(): Promise<DefaultOptions> {
-  const { data } = await apiClient.get<DefaultOptions>(BASE + '/options/defaults')
-  return data
+/** Fetch effective transcription defaults from the aggregated config API. */
+export async function getTranscriptionDefaults(
+  signal?: AbortSignal,
+): Promise<TranscriptionDefaults> {
+  const { data } = await apiClient.get<AppConfig>('/api/config', { signal })
+  return data.transcription.defaults
 }
