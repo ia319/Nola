@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 from faster_whisper.vad import VadOptions
 
+from nola.common.merge import deep_merge
 from nola.engines.base import TranscribeOptions
 
 
@@ -31,18 +32,6 @@ def _serialize_special_values(value: Any) -> Any:
     return value
 
 
-def _deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
-    """Merge nested config overrides without discarding untouched subkeys."""
-    result = dict(base)
-    for key, value in overrides.items():
-        current = result.get(key)
-        if isinstance(current, dict) and isinstance(value, dict):
-            result[key] = _deep_merge(current, value)
-        else:
-            result[key] = value
-    return result
-
-
 def _build_engine_defaults() -> dict[str, Any]:
     """Build raw non-batched WhisperModel defaults with expanded VAD options."""
     defaults = asdict(TranscribeOptions())
@@ -59,5 +48,5 @@ def get_effective_defaults(config_db: SupportsConfigRead) -> dict[str, Any]:
     """Return engine defaults merged with persisted application overrides."""
     engine_defaults = _build_engine_defaults()
     app_defaults = config_db.get_all("transcription.")
-    merged = _deep_merge(engine_defaults, app_defaults)
+    merged = deep_merge(engine_defaults, app_defaults)
     return _serialize_special_values(merged)

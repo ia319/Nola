@@ -13,6 +13,7 @@ from dataclasses import asdict, fields
 from pathlib import Path
 from typing import Any
 
+from nola.common.merge import deep_merge
 from nola.engines.base import TranscribeOptions
 from nola.engines.faster_whisper import FasterWhisperEngine
 from nola.models import AppConfigDatabase, FileDatabase, TaskDatabase, init_db
@@ -27,18 +28,6 @@ _running = True
 def get_worker_id() -> str:
     """Generate unique worker ID."""
     return f"worker-{socket.gethostname()}-{threading.current_thread().ident}"
-
-
-def _deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
-    """Merge nested option dictionaries without discarding untouched subkeys."""
-    merged = dict(base)
-    for key, value in overrides.items():
-        current = merged.get(key)
-        if isinstance(current, dict) and isinstance(value, dict):
-            merged[key] = _deep_merge(current, value)
-        else:
-            merged[key] = value
-    return merged
 
 
 def _filter_valid_options(raw_options: dict[str, Any] | None) -> dict[str, Any]:
@@ -63,15 +52,19 @@ def build_transcribe_options(
     Returns:
         TranscribeOptions with the three-layer merge applied
     """
+    # Plain deep_merge is intentional here: None values in engine defaults
+    # (e.g. initial_prompt=None) are real defaults, not "remove override"
+    # instructions. The null-removes-key semantics only apply to the PATCH
+    # endpoint in config routes.
     merged_options = asdict(TranscribeOptions())
 
     if config_db is not None:
         app_defaults = _filter_valid_options(config_db.get_all("transcription."))
-        merged_options = _deep_merge(merged_options, app_defaults)
+        merged_options = deep_merge(merged_options, app_defaults)
 
     task_overrides = _filter_valid_options(task_options)
     if task_overrides:
-        merged_options = _deep_merge(merged_options, task_overrides)
+        merged_options = deep_merge(merged_options, task_overrides)
 
     return TranscribeOptions(**merged_options)
 
@@ -123,6 +116,16 @@ def run_transcription(
             except json.JSONDecodeError as e:
                 task_db.fail(task_id, f"Invalid options JSON: {e}", should_retry=False)
                 return
+
+        if task_options is not None and not isinstance(task_options, dict):
+            actual_type = type(task_options).__name__
+            task_db.fail(
+                task_id,
+                f"Options must be a JSON object, got {actual_type}",
+                should_retry=False,
+            )
+            return
+
         options = build_transcribe_options(task_options, app_config_db)
 
         if task_options:
