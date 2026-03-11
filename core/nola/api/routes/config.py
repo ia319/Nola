@@ -35,7 +35,7 @@ def _validate_vad_parameter_keys(vad_parameters: dict[str, Any]) -> None:
     if invalid_keys:
         invalid_list = ", ".join(invalid_keys)
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Unsupported vad_parameters key(s): {invalid_list}",
         )
 
