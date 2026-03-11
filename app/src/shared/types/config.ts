@@ -13,3 +13,6 @@ export type TranscriptionDefaultsPatchResponse = Schemas['TranscriptionDefaultsP
 
 /** Effective transcription defaults exposed inside GET /api/config. */
 export type TranscriptionDefaults = Schemas['TranscriptionConfigResponse']['defaults']
+
+/** Single selectable language entry from effective_languages. */
+export type LanguageOption = Schemas['LanguageOptionSchema']
