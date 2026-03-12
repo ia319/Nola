@@ -39,6 +39,23 @@ def _filter_valid_options(raw_options: dict[str, Any] | None) -> dict[str, Any]:
     return {key: value for key, value in raw_options.items() if key in valid_fields}
 
 
+def _deserialize_special_values(obj: dict[str, Any]) -> dict[str, Any]:
+    """Convert API sentinel strings back to runtime types.
+
+    Symmetric counterpart to ``_serialize_special_values`` in defaults.py.
+    Currently handles ``"inf"`` → ``float("inf")``.
+    """
+    result: dict[str, Any] = {}
+    for key, value in obj.items():
+        if value == "inf":
+            result[key] = float("inf")
+        elif isinstance(value, dict):
+            result[key] = _deserialize_special_values(value)
+        else:
+            result[key] = value
+    return result
+
+
 def build_transcribe_options(
     task_options: dict[str, Any] | None,
     config_db: AppConfigDatabase | None = None,
@@ -65,6 +82,10 @@ def build_transcribe_options(
     task_overrides = _filter_valid_options(task_options)
     if task_overrides:
         merged_options = deep_merge(merged_options, task_overrides)
+
+    # Convert API sentinel values (e.g. "inf") back to runtime types
+    # before constructing the dataclass.
+    merged_options = _deserialize_special_values(merged_options)
 
     return TranscribeOptions(**merged_options)
 
