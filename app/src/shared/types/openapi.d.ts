@@ -870,63 +870,48 @@ export interface components {
       /**
        * Task
        * @description 'transcribe' or 'translate'
-       * @default transcribe
        * @example transcribe
        */
-      task: ('transcribe' | 'translate') | null
+      task?: ('transcribe' | 'translate') | null
       /**
        * Beam Size
        * @description Beam size for decoding
-       * @default 5
        * @example 5
        */
-      beam_size: number | null
+      beam_size?: number | null
       /**
        * Best Of
        * @description Number of candidates
-       * @default 5
        * @example 5
        */
-      best_of: number | null
+      best_of?: number | null
       /**
        * Patience
        * @description Beam search patience
-       * @default 1
        * @example 1
        */
-      patience: number | null
+      patience?: number | null
       /**
        * Length Penalty
        * @description Length penalty
-       * @default 1
        * @example 1
        */
-      length_penalty: number | null
+      length_penalty?: number | null
       /**
        * Repetition Penalty
        * @description Repetition penalty
-       * @default 1
        * @example 1
        */
-      repetition_penalty: number | null
+      repetition_penalty?: number | null
       /**
        * No Repeat Ngram Size
        * @description No repeat n-gram size
-       * @default 0
        * @example 0
        */
-      no_repeat_ngram_size: number | null
+      no_repeat_ngram_size?: number | null
       /**
        * Temperature
        * @description Sampling temperature(s)
-       * @default [
-       *       0,
-       *       0.2,
-       *       0.4,
-       *       0.6,
-       *       0.8,
-       *       1
-       *     ]
        * @example [
        *       0,
        *       0.2,
@@ -936,42 +921,37 @@ export interface components {
        *       1
        *     ]
        */
-      temperature: number | number[] | null
+      temperature?: number | number[] | null
       /**
        * Compression Ratio Threshold
        * @description Compression ratio threshold
-       * @default 2.4
        * @example 2.4
        */
-      compression_ratio_threshold: number | null
+      compression_ratio_threshold?: number | null
       /**
        * Log Prob Threshold
        * @description Log probability threshold
-       * @default -1
        * @example -1
        */
-      log_prob_threshold: number | null
+      log_prob_threshold?: number | null
       /**
        * No Speech Threshold
        * @description No speech threshold
-       * @default 0.6
        * @example 0.6
        */
-      no_speech_threshold: number | null
+      no_speech_threshold?: number | null
       /**
        * Condition On Previous Text
        * @description Condition on previous text
-       * @default true
        * @example true
        */
-      condition_on_previous_text: boolean | null
+      condition_on_previous_text?: boolean | null
       /**
        * Prompt Reset On Temperature
        * @description Reset prompt on temperature
-       * @default 0.5
        * @example 0.5
        */
-      prompt_reset_on_temperature: number | null
+      prompt_reset_on_temperature?: number | null
       /**
        * Initial Prompt
        * @description Initial prompt for context
@@ -993,21 +973,17 @@ export interface components {
       /**
        * Suppress Blank
        * @description Suppress blank outputs
-       * @default true
        * @example true
        */
-      suppress_blank: boolean | null
+      suppress_blank?: boolean | null
       /**
        * Suppress Tokens
        * @description Token IDs to suppress
-       * @default [
-       *       -1
-       *     ]
        * @example [
        *       -1
        *     ]
        */
-      suppress_tokens: number[] | null
+      suppress_tokens?: number[] | null
       /**
        * Max New Tokens
        * @description Max new tokens per segment
@@ -1016,45 +992,39 @@ export interface components {
       /**
        * Without Timestamps
        * @description Disable timestamps
-       * @default false
        * @example false
        */
-      without_timestamps: boolean | null
+      without_timestamps?: boolean | null
       /**
        * Max Initial Timestamp
        * @description Max initial timestamp
-       * @default 1
        * @example 1
        */
-      max_initial_timestamp: number | null
+      max_initial_timestamp?: number | null
       /**
        * Word Timestamps
        * @description Enable word-level timestamps
-       * @default false
        * @example false
        */
-      word_timestamps: boolean | null
+      word_timestamps?: boolean | null
       /**
        * Prepend Punctuations
        * @description Punctuations to prepend
-       * @default "'“¿([{-
        * @example "'“¿([{-
        */
-      prepend_punctuations: string | null
+      prepend_punctuations?: string | null
       /**
        * Append Punctuations
        * @description Punctuations to append
-       * @default "'.。,，!！?？:：”)]}、
        * @example "'.。,，!！?？:：”)]}、
        */
-      append_punctuations: string | null
+      append_punctuations?: string | null
       /**
        * Vad Filter
        * @description Enable VAD filtering
-       * @default false
        * @example false
        */
-      vad_filter: boolean | null
+      vad_filter?: boolean | null
       /**
        * Vad Parameters
        * @description VAD parameters
@@ -1065,10 +1035,9 @@ export interface components {
       /**
        * Multilingual
        * @description Enable multilingual mode
-       * @default false
        * @example false
        */
-      multilingual: boolean | null
+      multilingual?: boolean | null
       /**
        * Chunk Length
        * @description Chunk length in seconds
@@ -1077,10 +1046,9 @@ export interface components {
       /**
        * Clip Timestamps
        * @description Clip timestamps
-       * @default 0
        * @example 0
        */
-      clip_timestamps: string | number[] | null
+      clip_timestamps?: string | number[] | null
       /**
        * Hallucination Silence Threshold
        * @description Hallucination silence threshold
@@ -1089,17 +1057,15 @@ export interface components {
       /**
        * Language Detection Threshold
        * @description Language detection threshold
-       * @default 0.5
        * @example 0.5
        */
-      language_detection_threshold: number | null
+      language_detection_threshold?: number | null
       /**
        * Language Detection Segments
        * @description Segments for language detection
-       * @default 1
        * @example 1
        */
-      language_detection_segments: number | null
+      language_detection_segments?: number | null
     }
     /**
      * TranscriptionRequest
@@ -1154,63 +1120,48 @@ export interface components {
       /**
        * Task
        * @description 'transcribe' or 'translate'
-       * @default transcribe
        * @example transcribe
        */
-      task: ('transcribe' | 'translate') | null
+      task?: ('transcribe' | 'translate') | null
       /**
        * Beam Size
        * @description Beam size for decoding
-       * @default 5
        * @example 5
        */
-      beam_size: number | null
+      beam_size?: number | null
       /**
        * Best Of
        * @description Number of candidates
-       * @default 5
        * @example 5
        */
-      best_of: number | null
+      best_of?: number | null
       /**
        * Patience
        * @description Beam search patience
-       * @default 1
        * @example 1
        */
-      patience: number | null
+      patience?: number | null
       /**
        * Length Penalty
        * @description Length penalty
-       * @default 1
        * @example 1
        */
-      length_penalty: number | null
+      length_penalty?: number | null
       /**
        * Repetition Penalty
        * @description Repetition penalty
-       * @default 1
        * @example 1
        */
-      repetition_penalty: number | null
+      repetition_penalty?: number | null
       /**
        * No Repeat Ngram Size
        * @description No repeat n-gram size
-       * @default 0
        * @example 0
        */
-      no_repeat_ngram_size: number | null
+      no_repeat_ngram_size?: number | null
       /**
        * Temperature
        * @description Sampling temperature(s)
-       * @default [
-       *       0,
-       *       0.2,
-       *       0.4,
-       *       0.6,
-       *       0.8,
-       *       1
-       *     ]
        * @example [
        *       0,
        *       0.2,
@@ -1220,42 +1171,37 @@ export interface components {
        *       1
        *     ]
        */
-      temperature: number | number[] | null
+      temperature?: number | number[] | null
       /**
        * Compression Ratio Threshold
        * @description Compression ratio threshold
-       * @default 2.4
        * @example 2.4
        */
-      compression_ratio_threshold: number | null
+      compression_ratio_threshold?: number | null
       /**
        * Log Prob Threshold
        * @description Log probability threshold
-       * @default -1
        * @example -1
        */
-      log_prob_threshold: number | null
+      log_prob_threshold?: number | null
       /**
        * No Speech Threshold
        * @description No speech threshold
-       * @default 0.6
        * @example 0.6
        */
-      no_speech_threshold: number | null
+      no_speech_threshold?: number | null
       /**
        * Condition On Previous Text
        * @description Condition on previous text
-       * @default true
        * @example true
        */
-      condition_on_previous_text: boolean | null
+      condition_on_previous_text?: boolean | null
       /**
        * Prompt Reset On Temperature
        * @description Reset prompt on temperature
-       * @default 0.5
        * @example 0.5
        */
-      prompt_reset_on_temperature: number | null
+      prompt_reset_on_temperature?: number | null
       /**
        * Initial Prompt
        * @description Initial prompt for context
@@ -1277,21 +1223,17 @@ export interface components {
       /**
        * Suppress Blank
        * @description Suppress blank outputs
-       * @default true
        * @example true
        */
-      suppress_blank: boolean | null
+      suppress_blank?: boolean | null
       /**
        * Suppress Tokens
        * @description Token IDs to suppress
-       * @default [
-       *       -1
-       *     ]
        * @example [
        *       -1
        *     ]
        */
-      suppress_tokens: number[] | null
+      suppress_tokens?: number[] | null
       /**
        * Max New Tokens
        * @description Max new tokens per segment
@@ -1300,45 +1242,39 @@ export interface components {
       /**
        * Without Timestamps
        * @description Disable timestamps
-       * @default false
        * @example false
        */
-      without_timestamps: boolean | null
+      without_timestamps?: boolean | null
       /**
        * Max Initial Timestamp
        * @description Max initial timestamp
-       * @default 1
        * @example 1
        */
-      max_initial_timestamp: number | null
+      max_initial_timestamp?: number | null
       /**
        * Word Timestamps
        * @description Enable word-level timestamps
-       * @default false
        * @example false
        */
-      word_timestamps: boolean | null
+      word_timestamps?: boolean | null
       /**
        * Prepend Punctuations
        * @description Punctuations to prepend
-       * @default "'“¿([{-
        * @example "'“¿([{-
        */
-      prepend_punctuations: string | null
+      prepend_punctuations?: string | null
       /**
        * Append Punctuations
        * @description Punctuations to append
-       * @default "'.。,，!！?？:：”)]}、
        * @example "'.。,，!！?？:：”)]}、
        */
-      append_punctuations: string | null
+      append_punctuations?: string | null
       /**
        * Vad Filter
        * @description Enable VAD filtering
-       * @default false
        * @example false
        */
-      vad_filter: boolean | null
+      vad_filter?: boolean | null
       /**
        * Vad Parameters
        * @description VAD parameters
@@ -1349,10 +1285,9 @@ export interface components {
       /**
        * Multilingual
        * @description Enable multilingual mode
-       * @default false
        * @example false
        */
-      multilingual: boolean | null
+      multilingual?: boolean | null
       /**
        * Chunk Length
        * @description Chunk length in seconds
@@ -1361,10 +1296,9 @@ export interface components {
       /**
        * Clip Timestamps
        * @description Clip timestamps
-       * @default 0
        * @example 0
        */
-      clip_timestamps: string | number[] | null
+      clip_timestamps?: string | number[] | null
       /**
        * Hallucination Silence Threshold
        * @description Hallucination silence threshold
@@ -1373,17 +1307,15 @@ export interface components {
       /**
        * Language Detection Threshold
        * @description Language detection threshold
-       * @default 0.5
        * @example 0.5
        */
-      language_detection_threshold: number | null
+      language_detection_threshold?: number | null
       /**
        * Language Detection Segments
        * @description Segments for language detection
-       * @default 1
        * @example 1
        */
-      language_detection_segments: number | null
+      language_detection_segments?: number | null
       /**
        * File Id
        * @description File ID from upload API

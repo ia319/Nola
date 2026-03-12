@@ -27,20 +27,21 @@ class TestTranscriptionSchemas:
     """Verify task and defaults payloads share the same option contract."""
 
     def test_transcription_request_schema_defaults_match_engine_defaults(self):
-        """OpenAPI defaults should stay aligned with TranscribeOptions."""
+        """OpenAPI examples should stay aligned with TranscribeOptions."""
         schema = TranscriptionRequest.model_json_schema()["properties"]
         engine_defaults = asdict(TranscribeOptions())
+        overridden = {"initial_prompt", "prefix", "hotwords"}
 
         for key, expected in engine_defaults.items():
             assert key in schema
-            assert schema[key].get("default") == expected
+            if key not in overridden:
+                assert schema[key].get("example") == expected
 
     def test_optional_text_fields_use_null_examples_in_schema(self):
-        """Swagger should keep optional text fields visible without placeholders."""
+        """Swagger should keep optional text fields visible via empty examples."""
         schema = TranscriptionRequest.model_json_schema()["properties"]
 
         for key in ("initial_prompt", "prefix", "hotwords"):
-            assert schema[key].get("default") is None
             assert schema[key].get("example") == ""
 
     def test_request_models_expose_full_body_examples_with_string_clip_timestamps(

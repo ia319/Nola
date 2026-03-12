@@ -13,8 +13,8 @@ _ENGINE_DEFAULTS = TranscribeOptions()
 
 
 def _swagger_default(value: Any) -> dict[str, Any]:
-    """Keep Swagger defaults aligned with engine defaults."""
-    return {"default": value, "example": value}
+    """Keep Swagger examples aligned with engine defaults."""
+    return {"example": value}
 
 
 def _request_body_example(include_file_id: bool) -> dict[str, Any]:
@@ -125,17 +125,17 @@ class TranscriptionOptionsPayload(BaseModel):
     initial_prompt: str | None = Field(
         None,
         description="Initial prompt for context",
-        json_schema_extra={"default": _ENGINE_DEFAULTS.initial_prompt, "example": ""},
+        json_schema_extra={"example": ""},
     )
     prefix: str | None = Field(
         None,
         description="Prefix for each segment",
-        json_schema_extra={"default": _ENGINE_DEFAULTS.prefix, "example": ""},
+        json_schema_extra={"example": ""},
     )
     hotwords: str | None = Field(
         None,
         description="Hotwords to boost recognition",
-        json_schema_extra={"default": _ENGINE_DEFAULTS.hotwords, "example": ""},
+        json_schema_extra={"example": ""},
     )
 
     # Token control
