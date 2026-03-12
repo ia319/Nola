@@ -144,7 +144,7 @@ async def get_transcription_engine_defaults() -> EngineDefaultsResponse:
     response_model=TranscriptionDefaultsPatchResponse,
     status_code=status.HTTP_200_OK,
 )
-async def patch_transcription_defaults(
+def patch_transcription_defaults(
     request: TranscriptionDefaultsUpdateRequest,
 ) -> TranscriptionDefaultsPatchResponse:
     """Persist a partial transcription-defaults update."""
@@ -178,7 +178,7 @@ async def patch_transcription_defaults(
     ),
     status_code=status.HTTP_204_NO_CONTENT,
 )
-async def delete_transcription_defaults() -> Response:
+def delete_transcription_defaults() -> Response:
     """Remove all persisted transcription overrides."""
     get_app_config_db().delete_all("transcription.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
