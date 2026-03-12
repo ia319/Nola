@@ -17,12 +17,19 @@ def _swagger_default(value: Any) -> dict[str, Any]:
     return {"example": value}
 
 
-def _request_body_example(include_file_id: bool) -> dict[str, Any]:
-    """Build a complete request example with correct runtime value types."""
-    example = asdict(_ENGINE_DEFAULTS)
-    if include_file_id:
-        return {"file_id": "uploaded-file-id", **example}
-    return example
+def _create_task_example() -> dict[str, Any]:
+    """Build a complete create-task example with runtime value types."""
+    return {"file_id": "uploaded-file-id", **asdict(_ENGINE_DEFAULTS)}
+
+
+def _defaults_patch_example() -> dict[str, Any]:
+    """Build a sparse PATCH example that demonstrates partial-update semantics."""
+    return {
+        "beam_size": 3,
+        "language": "zh",
+        "vad_parameters": {"threshold": 0.6},
+        "hotwords": None,
+    }
 
 
 class TranscriptionOptionsPayload(BaseModel):
@@ -255,9 +262,7 @@ class TranscriptionOptionsPayload(BaseModel):
 class TranscriptionRequest(TranscriptionOptionsPayload):
     """Transcription request payload for creating a task."""
 
-    model_config = {
-        "json_schema_extra": {"example": _request_body_example(include_file_id=True)}
-    }
+    model_config = {"json_schema_extra": {"example": _create_task_example()}}
 
     file_id: str = Field(..., description="File ID from upload API")
 
@@ -269,9 +274,7 @@ class TranscriptionRequest(TranscriptionOptionsPayload):
 class TranscriptionDefaultsUpdateRequest(TranscriptionOptionsPayload):
     """Partial update payload for application-level transcription defaults."""
 
-    model_config = {
-        "json_schema_extra": {"example": _request_body_example(include_file_id=False)}
-    }
+    model_config = {"json_schema_extra": {"example": _defaults_patch_example()}}
 
     def get_options_dict(self) -> dict[str, Any]:
         """Return explicitly provided keys, preserving nulls for field resets."""

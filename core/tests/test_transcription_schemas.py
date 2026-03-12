@@ -44,20 +44,26 @@ class TestTranscriptionSchemas:
         for key in ("initial_prompt", "prefix", "hotwords"):
             assert schema[key].get("example") == ""
 
-    def test_request_models_expose_full_body_examples_with_string_clip_timestamps(
-        self,
-    ):
-        """Body examples should preserve string-valued clip timestamps."""
+    def test_request_model_uses_full_example_with_string_clip_timestamps(self):
+        """Create-task example should preserve string-valued clip timestamps."""
         request_example = TranscriptionRequest.model_json_schema()["example"]
+
+        assert request_example["file_id"] == "uploaded-file-id"
+        assert request_example["clip_timestamps"] == "0"
+        assert "beam_size" in request_example
+
+    def test_defaults_patch_model_uses_sparse_example(self):
+        """PATCH example should show partial updates instead of full defaults."""
         defaults_example = TranscriptionDefaultsUpdateRequest.model_json_schema()[
             "example"
         ]
 
-        assert request_example["file_id"] == "uploaded-file-id"
-        assert request_example["clip_timestamps"] == "0"
-        assert defaults_example["clip_timestamps"] == "0"
-        assert "beam_size" in request_example
-        assert "beam_size" in defaults_example
+        assert defaults_example == {
+            "beam_size": 3,
+            "language": "zh",
+            "vad_parameters": {"threshold": 0.6},
+            "hotwords": None,
+        }
 
     def test_transcription_request_includes_chunk_length_in_options(self):
         """Task creation payload should retain chunk_length when provided."""

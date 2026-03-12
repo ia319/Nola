@@ -60,8 +60,10 @@ async def create_transcription(request: TranscriptionRequest) -> dict[str, Any]:
     3. Worker will automatically process the task
     4. Query status via GET /api/transcriptions/{task_id}
 
-    All transcription parameters are optional. If not provided,
-    engine defaults will be used. See GET /api/config for defaults.
+    All transcription parameters are optional. If omitted, the effective defaults
+    (engine defaults plus persisted application overrides) will be used.
+    See GET /api/config for effective defaults and
+    GET /api/config/transcription/engine-defaults for raw engine defaults.
     """
     file_db = get_file_db()
     task_db = get_task_db()
