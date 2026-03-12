@@ -94,9 +94,9 @@ export function useAppConfig(): UseAppConfigReturn {
   const fileValidationConfig: FileValidationConfig = config
     ? {
         allowedExtensions: config.file.allowed_extensions.map((ext) =>
-          ext.startsWith('.') ? ext.slice(1) : ext,
+          (ext.startsWith('.') ? ext.slice(1) : ext).toLowerCase(),
         ),
-        allowedMimeTypes: config.file.allowed_mime_types,
+        allowedMimeTypes: config.file.allowed_mime_types.map((m) => m.toLowerCase()),
         maxFileSize: config.file.max_file_size,
       }
     : FALLBACK_VALIDATION_CONFIG
