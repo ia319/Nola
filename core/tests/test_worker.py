@@ -122,3 +122,35 @@ class TestBuildTranscribeOptions:
         assert not hasattr(options, "device")
         assert not hasattr(options, "compute_type")
         assert not hasattr(options, "model_size")
+
+    def test_inf_sentinel_deserializes_for_vad_max_speech_duration(self):
+        """Known numeric sentinel values should be restored before engine call."""
+        options = build_transcribe_options(
+            {
+                "vad_parameters": {
+                    "max_speech_duration_s": "inf",
+                }
+            }
+        )
+
+        assert options.vad_parameters == {"max_speech_duration_s": float("inf")}
+
+    def test_inf_sentinel_deserializes_inside_nested_lists(self):
+        """Deserializer should recurse into lists to keep serializer symmetry."""
+        options = build_transcribe_options(
+            {
+                "vad_parameters": {
+                    "history": [{"max_speech_duration_s": "inf"}],
+                }
+            }
+        )
+
+        assert options.vad_parameters == {
+            "history": [{"max_speech_duration_s": float("inf")}]
+        }
+
+    def test_plain_inf_string_is_preserved_for_text_fields(self):
+        """Text payloads equal to 'inf' should remain text values."""
+        options = build_transcribe_options({"hotwords": "inf"})
+
+        assert options.hotwords == "inf"

@@ -39,21 +39,25 @@ def _filter_valid_options(raw_options: dict[str, Any] | None) -> dict[str, Any]:
     return {key: value for key, value in raw_options.items() if key in valid_fields}
 
 
-def _deserialize_special_values(obj: dict[str, Any]) -> dict[str, Any]:
-    """Convert API sentinel strings back to runtime types.
+def _deserialize_special_values(value: Any, *, key: str | None = None) -> Any:
+    """Convert API sentinel values back to runtime types.
 
-    Symmetric counterpart to ``_serialize_special_values`` in defaults.py.
-    Currently handles ``"inf"`` → ``float("inf")``.
+    Symmetric counterpart to ``_serialize_special_values`` in defaults.py,
+    including recursive list/tuple handling. The ``"inf"`` sentinel is only
+    converted for known numeric fields to avoid mutating user text values.
     """
-    result: dict[str, Any] = {}
-    for key, value in obj.items():
-        if value == "inf":
-            result[key] = float("inf")
-        elif isinstance(value, dict):
-            result[key] = _deserialize_special_values(value)
-        else:
-            result[key] = value
-    return result
+    if isinstance(value, dict):
+        return {
+            child_key: _deserialize_special_values(child_value, key=child_key)
+            for child_key, child_value in value.items()
+        }
+    if isinstance(value, list):
+        return [_deserialize_special_values(item, key=key) for item in value]
+    if isinstance(value, tuple):
+        return [_deserialize_special_values(item, key=key) for item in value]
+    if key == "max_speech_duration_s" and value == "inf":
+        return float("inf")
+    return value
 
 
 def build_transcribe_options(
