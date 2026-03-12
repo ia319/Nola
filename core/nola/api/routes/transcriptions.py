@@ -61,7 +61,7 @@ async def create_transcription(request: TranscriptionRequest) -> dict[str, Any]:
     4. Query status via GET /api/transcriptions/{task_id}
 
     All transcription parameters are optional. If not provided,
-    engine defaults will be used. See GET /options/defaults for defaults.
+    engine defaults will be used. See GET /api/config for defaults.
     """
     file_db = get_file_db()
     task_db = get_task_db()
