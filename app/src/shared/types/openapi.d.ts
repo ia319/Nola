@@ -125,8 +125,10 @@ export interface paths {
      *     3. Worker will automatically process the task
      *     4. Query status via GET /api/transcriptions/{task_id}
      *
-     *     All transcription parameters are optional. If not provided,
-     *     engine defaults will be used. See GET /options/defaults for defaults.
+     *     All transcription parameters are optional. If omitted, the effective defaults
+     *     (engine defaults plus persisted application overrides) will be used.
+     *     See GET /api/config for effective defaults and
+     *     GET /api/config/transcription/engine-defaults for raw engine defaults.
      */
     post: operations['create_transcription_api_transcriptions__post']
     delete?: never
@@ -497,10 +499,7 @@ export interface components {
      * @description Return the raw engine defaults without application overrides.
      */
     EngineDefaultsResponse: {
-      /** Defaults */
-      defaults: {
-        [key: string]: unknown
-      }
+      defaults: components['schemas']['TranscriptionResolvedDefaultsResponse']
     }
     /**
      * FileConfigResponse
@@ -801,10 +800,7 @@ export interface components {
      * @description Expose effective transcription defaults and field metadata.
      */
     TranscriptionConfigResponse: {
-      /** Defaults */
-      defaults: {
-        [key: string]: unknown
-      }
+      defaults: components['schemas']['TranscriptionResolvedDefaultsResponse']
       /** Schema */
       schema: components['schemas']['OptionGroupSchema'][]
     }
@@ -813,49 +809,17 @@ export interface components {
      * @description Return the effective defaults after a PATCH update.
      */
     TranscriptionDefaultsPatchResponse: {
-      /** Defaults */
-      defaults: {
-        [key: string]: unknown
-      }
+      defaults: components['schemas']['TranscriptionResolvedDefaultsResponse']
     }
     /**
      * TranscriptionDefaultsUpdateRequest
      * @description Partial update payload for application-level transcription defaults.
      * @example {
-     *       "append_punctuations": "\"'.。,，!！?？:：”)]}、",
-     *       "beam_size": 5,
-     *       "best_of": 5,
-     *       "clip_timestamps": "0",
-     *       "compression_ratio_threshold": 2.4,
-     *       "condition_on_previous_text": true,
-     *       "language_detection_segments": 1,
-     *       "language_detection_threshold": 0.5,
-     *       "length_penalty": 1,
-     *       "log_prob_threshold": -1,
-     *       "max_initial_timestamp": 1,
-     *       "multilingual": false,
-     *       "no_repeat_ngram_size": 0,
-     *       "no_speech_threshold": 0.6,
-     *       "patience": 1,
-     *       "prepend_punctuations": "\"'“¿([{-",
-     *       "prompt_reset_on_temperature": 0.5,
-     *       "repetition_penalty": 1,
-     *       "suppress_blank": true,
-     *       "suppress_tokens": [
-     *         -1
-     *       ],
-     *       "task": "transcribe",
-     *       "temperature": [
-     *         0,
-     *         0.2,
-     *         0.4,
-     *         0.6,
-     *         0.8,
-     *         1
-     *       ],
-     *       "vad_filter": false,
-     *       "without_timestamps": false,
-     *       "word_timestamps": false
+     *       "beam_size": 3,
+     *       "language": "zh",
+     *       "vad_parameters": {
+     *         "threshold": 0.6
+     *       }
      *     }
      */
     TranscriptionDefaultsUpdateRequest: {
@@ -1321,6 +1285,102 @@ export interface components {
        * @description File ID from upload API
        */
       file_id: string
+    }
+    /**
+     * TranscriptionResolvedDefaultsResponse
+     * @description Expose fully resolved transcription defaults used at runtime.
+     */
+    TranscriptionResolvedDefaultsResponse: {
+      /** Language */
+      language: string | null
+      /**
+       * Task
+       * @enum {string}
+       */
+      task: 'transcribe' | 'translate'
+      /** Beam Size */
+      beam_size: number
+      /** Best Of */
+      best_of: number
+      /** Patience */
+      patience: number
+      /** Length Penalty */
+      length_penalty: number
+      /** Repetition Penalty */
+      repetition_penalty: number
+      /** No Repeat Ngram Size */
+      no_repeat_ngram_size: number
+      /** Temperature */
+      temperature: number | number[]
+      /** Compression Ratio Threshold */
+      compression_ratio_threshold: number | null
+      /** Log Prob Threshold */
+      log_prob_threshold: number | null
+      /** No Speech Threshold */
+      no_speech_threshold: number | null
+      /** Condition On Previous Text */
+      condition_on_previous_text: boolean
+      /** Prompt Reset On Temperature */
+      prompt_reset_on_temperature: number
+      /** Initial Prompt */
+      initial_prompt: string | null
+      /** Prefix */
+      prefix: string | null
+      /** Hotwords */
+      hotwords: string | null
+      /** Suppress Blank */
+      suppress_blank: boolean
+      /** Suppress Tokens */
+      suppress_tokens: number[] | null
+      /** Max New Tokens */
+      max_new_tokens: number | null
+      /** Without Timestamps */
+      without_timestamps: boolean
+      /** Max Initial Timestamp */
+      max_initial_timestamp: number
+      /** Word Timestamps */
+      word_timestamps: boolean
+      /** Prepend Punctuations */
+      prepend_punctuations: string
+      /** Append Punctuations */
+      append_punctuations: string
+      /** Vad Filter */
+      vad_filter: boolean
+      vad_parameters: components['schemas']['VadParametersDefaultsResponse']
+      /** Multilingual */
+      multilingual: boolean
+      /** Chunk Length */
+      chunk_length: number | null
+      /** Clip Timestamps */
+      clip_timestamps: string | number[]
+      /** Hallucination Silence Threshold */
+      hallucination_silence_threshold: number | null
+      /** Language Detection Threshold */
+      language_detection_threshold: number | null
+      /** Language Detection Segments */
+      language_detection_segments: number
+    }
+    /**
+     * VadParametersDefaultsResponse
+     * @description Expose expanded VAD defaults in API-safe form.
+     */
+    VadParametersDefaultsResponse: {
+      /** Threshold */
+      threshold: number
+      /** Neg Threshold */
+      neg_threshold: number | null
+      /** Min Speech Duration Ms */
+      min_speech_duration_ms: number
+      /** Max Speech Duration S */
+      max_speech_duration_s: number | 'inf'
+      /** Min Silence Duration Ms */
+      min_silence_duration_ms: number
+      /** Speech Pad Ms */
+      speech_pad_ms: number
+      /** Min Silence At Max Speech */
+      min_silence_at_max_speech: number
+      /** Use Max Poss Sil At Max Speech */
+      use_max_poss_sil_at_max_speech: boolean
     }
     /** ValidationError */
     ValidationError: {
