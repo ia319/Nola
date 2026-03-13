@@ -11,6 +11,9 @@ export type EngineDefaults = Schemas['EngineDefaultsResponse']
 /** PATCH /api/config/transcription/defaults response. */
 export type TranscriptionDefaultsPatchResponse = Schemas['TranscriptionDefaultsPatchResponse']
 
+/** PATCH /api/config/transcription/defaults request body. */
+export type TranscriptionDefaultsUpdateRequest = Schemas['TranscriptionDefaultsUpdateRequest']
+
 /** Effective transcription defaults exposed inside GET /api/config. */
 export type TranscriptionDefaults = Schemas['TranscriptionConfigResponse']['defaults']
 
