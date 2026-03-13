@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useTranscriptionOptions } from '../useTranscriptionOptions'
 import type { UseAppConfigReturn } from '@/config/use-app-config'
+import type { TranscriptionDefaults } from '@/shared/types'
 
 const useAppConfigMock = vi.fn<() => UseAppConfigReturn>()
 
@@ -19,7 +20,7 @@ function buildAppConfigReturn(defaults: Record<string, unknown> = {}): UseAppCon
         compute_type: 'default',
         is_multilingual: true,
       },
-      transcription: { defaults, schema: [] },
+      transcription: { defaults: defaults as TranscriptionDefaults, schema: [] },
       file: { allowed_extensions: [], allowed_mime_types: [], max_file_size: 0 },
       effective_languages: [],
     },
@@ -62,6 +63,14 @@ describe('useTranscriptionOptions', () => {
     expect(result.current.advancedOptions).toEqual({})
     expect(result.current.initialPrompt).toBeUndefined()
     expect(result.current.defaults).toEqual(defaults)
+  })
+
+  it('hydrates language and task from persisted defaults', async () => {
+    const defaults = { language: 'ja', task: 'translate' }
+    const { result } = await renderTranscriptionOptions(defaults)
+
+    expect(result.current.language).toBe('ja')
+    expect(result.current.task).toBe('translate')
   })
 
   it('updates language via setLanguage', async () => {
@@ -132,6 +141,27 @@ describe('useTranscriptionOptions', () => {
     expect(result.current.advancedOptions).toEqual({})
     expect(result.current.language).toBe('en')
     expect(result.current.initialPrompt).toBe('keep me')
+  })
+
+  it('resets local option overrides to backend defaults', async () => {
+    const defaults = { language: 'ja', task: 'translate' }
+    const { result } = await renderTranscriptionOptions(defaults)
+
+    act(() => {
+      result.current.setLanguage('en')
+      result.current.setTask('transcribe')
+      result.current.setAdvancedOption('beam_size', 5)
+      result.current.setInitialPrompt('keep me')
+    })
+
+    act(() => {
+      result.current.resetOptionOverrides()
+    })
+
+    expect(result.current.language).toBe('ja')
+    expect(result.current.task).toBe('translate')
+    expect(result.current.advancedOptions).toEqual({})
+    expect(result.current.initialPrompt).toBeUndefined()
   })
 
   it('builds a correctly typed CreateTaskPayload', async () => {

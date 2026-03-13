@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useTranscriptionOptions } from '@/features/transcription/hooks/useTranscriptionOptions'
 import type { UseAppConfigReturn } from '@/config/use-app-config'
+import type { TranscriptionDefaults } from '@/shared/types'
 
 const useAppConfigMock = vi.fn<() => UseAppConfigReturn>()
 
@@ -19,7 +20,7 @@ function buildAppConfigReturn(defaults: Record<string, unknown> = {}): UseAppCon
         compute_type: 'default',
         is_multilingual: true,
       },
-      transcription: { defaults, schema: [] },
+      transcription: { defaults: defaults as TranscriptionDefaults, schema: [] },
       file: { allowed_extensions: [], allowed_mime_types: [], max_file_size: 0 },
       effective_languages: [],
     },
@@ -141,6 +142,22 @@ describe('buildRequest', () => {
       task: 'translate',
       initial_prompt: 'hello context',
       beam_size: 5,
+    })
+  })
+
+  it('sends null language when auto-detect overrides a persisted language default', async () => {
+    const { result } = await renderTranscriptionOptions({
+      language: 'ja',
+      task: 'transcribe',
+    })
+
+    act(() => {
+      result.current.setLanguage(undefined)
+    })
+
+    expect(result.current.buildRequest('f-6')).toEqual({
+      file_id: 'f-6',
+      language: null,
     })
   })
 })
