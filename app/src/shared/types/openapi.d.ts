@@ -4,1874 +4,1912 @@
  */
 
 export interface paths {
-    "/api/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get aggregated application configuration
-         * @description Return the frontend-facing configuration view, including engine info, effective transcription defaults, transcription field metadata, upload constraints, and model-compatible language options.
-         */
-        get: operations["get_config_api_config_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/config/transcription/engine-defaults": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get raw transcription engine defaults
-         * @description Return the non-batched WhisperModel defaults expanded with the full VadOptions default set, without any persisted application overrides.
-         */
-        get: operations["get_transcription_engine_defaults_api_config_transcription_engine_defaults_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/config/transcription/defaults": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Reset persisted transcription defaults
-         * @description Delete the application-level transcription-defaults override layer and fall back to the raw engine defaults.
-         */
-        delete: operations["delete_transcription_defaults_api_config_transcription_defaults_delete"];
-        options?: never;
-        head?: never;
-        /**
-         * Update persisted transcription defaults
-         * @description Apply a partial update to the persisted application-level transcription defaults. Explicit null removes an override key, and nested objects are merged without replacing untouched subkeys.
-         */
-        patch: operations["patch_transcription_defaults_api_config_transcription_defaults_patch"];
-        trace?: never;
-    };
-    "/api/transcriptions/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Transcriptions
-         * @description List all transcription tasks.
-         *
-         *     Args:
-         *         status: Optional status filter (pending, processing, completed, failed)
-         *         limit: Maximum number of results
-         *         offset: Pagination offset
-         *
-         *     Returns:
-         *         List of tasks with pagination info
-         */
-        get: operations["list_transcriptions_api_transcriptions__get"];
-        put?: never;
-        /**
-         * Create transcription task
-         * @description Create a transcription task for an uploaded file.
-         *
-         *     Steps:
-         *     1. Upload file via POST /api/files → get file_id
-         *     2. Create task via this endpoint with file_id and optional parameters
-         *     3. Worker will automatically process the task
-         *     4. Query status via GET /api/transcriptions/{task_id}
-         *
-         *     All transcription parameters are optional. If omitted, the effective defaults
-         *     (engine defaults plus persisted application overrides) will be used.
-         *     See GET /api/config for effective defaults and
-         *     GET /api/config/transcription/engine-defaults for raw engine defaults.
-         */
-        post: operations["create_transcription_api_transcriptions__post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/transcriptions/{task_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Transcription
-         * @description Get transcription task status and result.
-         *
-         *     Args:
-         *         task_id: Task identifier
-         *
-         *     Returns:
-         *         Task status and result
-         */
-        get: operations["get_transcription_api_transcriptions__task_id__get"];
-        put?: never;
-        post?: never;
-        /**
-         * Cancel Transcription
-         * @description Cancel a transcription task.
-         *
-         *     Args:
-         *         task_id: Task identifier
-         *
-         *     Returns:
-         *         Cancellation result
-         */
-        delete: operations["cancel_transcription_api_transcriptions__task_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/transcriptions/{task_id}/export": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Export transcription result
-         * @description Export completed transcription as subtitle file.
-         *
-         *     Supports SRT, VTT, TXT, and ASS formats.
-         *     Use save=true to store file on server, save=false to download directly.
-         */
-        get: operations["export_transcription_api_transcriptions__task_id__export_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/transcriptions/export/batch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Batch export transcriptions
-         * @description Export multiple transcriptions as a ZIP archive.
-         *
-         *     Failed tasks are skipped and logged in _errors.txt within the archive.
-         */
-        post: operations["batch_export_api_transcriptions_export_batch_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/files/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List all uploaded files
-         * @description List all uploaded files with pagination.
-         */
-        get: operations["list_files_api_files__get"];
-        put?: never;
-        /**
-         * Upload an audio file
-         * @description Upload an audio file for later transcription.
-         *
-         *     The file is saved to the server and a file_id is returned.
-         *     Use this file_id to create transcription tasks.
-         *
-         *     Supported formats: mp3, wav, flac, m4a, ogg, webm, aac
-         *     Max file size: 500 MB
-         */
-        post: operations["upload_file_api_files__post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/files/check-integrity": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Check database-file consistency
-         * @description Check consistency between database records and files on disk.
-         *
-         *     Returns a list of 'missing_files' - database records that reference
-         *     files which no longer exist on disk. This can happen if files are
-         *     manually deleted from the uploads directory.
-         */
-        get: operations["check_integrity_api_files_check_integrity_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/files/cleanup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Remove orphan database records
-         * @description Remove database records for files that no longer exist on disk.
-         *
-         *     This is useful after manually deleting files from the uploads directory.
-         *     Use GET /check-integrity first to see what will be cleaned up.
-         */
-        post: operations["cleanup_orphans_api_files_cleanup_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/files/{file_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get file metadata
-         * @description Get file metadata.
-         *
-         *     Args:
-         *         file_id: File identifier
-         *
-         *     Returns:
-         *         File metadata
-         */
-        get: operations["get_file_api_files__file_id__get"];
-        put?: never;
-        post?: never;
-        /**
-         * Delete a file
-         * @description Delete file and associated data.
-         *
-         *     Args:
-         *         file_id: File identifier
-         *
-         *     Returns:
-         *         Deletion confirmation
-         */
-        delete: operations["delete_file_api_files__file_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Health Check
-         * @description Return health status.
-         */
-        get: operations["health_check_health_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Root
-         * @description Return API information.
-         */
-        get: operations["root__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
+  '/api/config': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get aggregated application configuration
+     * @description Return the frontend-facing configuration view, including engine info, effective transcription defaults, transcription field metadata, upload constraints, and model-compatible language options.
+     */
+    get: operations['get_config_api_config_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/config/transcription/engine-defaults': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get raw transcription engine defaults
+     * @description Return the non-batched WhisperModel defaults expanded with the full VadOptions default set, without any persisted application overrides.
+     */
+    get: operations['get_transcription_engine_defaults_api_config_transcription_engine_defaults_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/config/transcription/defaults': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Reset persisted transcription defaults
+     * @description Delete the application-level transcription-defaults override layer and fall back to the raw engine defaults.
+     */
+    delete: operations['delete_transcription_defaults_api_config_transcription_defaults_delete']
+    options?: never
+    head?: never
+    /**
+     * Update persisted transcription defaults
+     * @description Apply a partial update to the persisted application-level transcription defaults. Explicit null removes an override key, and nested objects are merged without replacing untouched subkeys.
+     */
+    patch: operations['patch_transcription_defaults_api_config_transcription_defaults_patch']
+    trace?: never
+  }
+  '/api/transcriptions/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List Transcriptions
+     * @description List all transcription tasks.
+     *
+     *     Args:
+     *         status: Optional status filter (pending, processing, completed, failed)
+     *         limit: Maximum number of results
+     *         offset: Pagination offset
+     *
+     *     Returns:
+     *         List of tasks with pagination info
+     */
+    get: operations['list_transcriptions_api_transcriptions__get']
+    put?: never
+    /**
+     * Create transcription task
+     * @description Create a transcription task for an uploaded file.
+     *
+     *     Steps:
+     *     1. Upload file via POST /api/files → get file_id
+     *     2. Create task via this endpoint with file_id and optional parameters
+     *     3. Worker will automatically process the task
+     *     4. Query status via GET /api/transcriptions/{task_id}
+     *
+     *     All transcription parameters are optional. If omitted, the effective defaults
+     *     (engine defaults plus persisted application overrides) will be used.
+     *     See GET /api/config for effective defaults and
+     *     GET /api/config/transcription/engine-defaults for raw engine defaults.
+     */
+    post: operations['create_transcription_api_transcriptions__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/transcriptions/{task_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get Transcription
+     * @description Get transcription task status and result.
+     *
+     *     Args:
+     *         task_id: Task identifier
+     *
+     *     Returns:
+     *         Task status and result
+     */
+    get: operations['get_transcription_api_transcriptions__task_id__get']
+    put?: never
+    post?: never
+    /**
+     * Cancel Transcription
+     * @description Cancel a transcription task.
+     *
+     *     Args:
+     *         task_id: Task identifier
+     *
+     *     Returns:
+     *         Cancellation result
+     */
+    delete: operations['cancel_transcription_api_transcriptions__task_id__delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/transcriptions/{task_id}/export': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Export transcription result
+     * @description Export completed transcription as subtitle file.
+     *
+     *     Supports SRT, VTT, TXT, and ASS formats.
+     *     Use save=true to store file on server, save=false to download directly.
+     */
+    get: operations['export_transcription_api_transcriptions__task_id__export_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/transcriptions/export/batch': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch export transcriptions
+     * @description Export multiple transcriptions as a ZIP archive.
+     *
+     *     Failed tasks are skipped and logged in _errors.txt within the archive.
+     */
+    post: operations['batch_export_api_transcriptions_export_batch_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/files/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List all uploaded files
+     * @description List all uploaded files with pagination.
+     */
+    get: operations['list_files_api_files__get']
+    put?: never
+    /**
+     * Upload an audio file
+     * @description Upload an audio file for later transcription.
+     *
+     *     The file is saved to the server and a file_id is returned.
+     *     Use this file_id to create transcription tasks.
+     *
+     *     Supported formats: mp3, wav, flac, m4a, ogg, webm, aac
+     *     Max file size: 500 MB
+     */
+    post: operations['upload_file_api_files__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/files/check-integrity': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Check database-file consistency
+     * @description Check consistency between database records and files on disk.
+     *
+     *     Returns a list of 'missing_files' - database records that reference
+     *     files which no longer exist on disk. This can happen if files are
+     *     manually deleted from the uploads directory.
+     */
+    get: operations['check_integrity_api_files_check_integrity_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/files/cleanup': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Remove orphan database records
+     * @description Remove database records for files that no longer exist on disk.
+     *
+     *     This is useful after manually deleting files from the uploads directory.
+     *     Use GET /check-integrity first to see what will be cleaned up.
+     */
+    post: operations['cleanup_orphans_api_files_cleanup_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/files/{file_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get file metadata
+     * @description Get file metadata.
+     *
+     *     Args:
+     *         file_id: File identifier
+     *
+     *     Returns:
+     *         File metadata
+     */
+    get: operations['get_file_api_files__file_id__get']
+    put?: never
+    post?: never
+    /**
+     * Delete a file
+     * @description Delete file and associated data.
+     *
+     *     Args:
+     *         file_id: File identifier
+     *
+     *     Returns:
+     *         Deletion confirmation
+     */
+    delete: operations['delete_file_api_files__file_id__delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/health': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Health Check
+     * @description Return health status.
+     */
+    get: operations['health_check_health_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Root
+     * @description Return API information.
+     */
+    get: operations['root__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
-export type webhooks = Record<string, never>;
+export type webhooks = Record<string, never>
 export interface components {
-    schemas: {
-        /**
-         * AppConfigResponse
-         * @description Aggregate application configuration required by the frontend.
-         */
-        AppConfigResponse: {
-            engine: components["schemas"]["EngineConfigResponse"];
-            transcription: components["schemas"]["TranscriptionConfigResponse"];
-            file: components["schemas"]["FileConfigResponse"];
-            /** Effective Languages */
-            effective_languages: components["schemas"]["LanguageOptionSchema"][];
-        };
-        /**
-         * BatchExportRequest
-         * @description Batch export request for multiple transcriptions.
-         */
-        BatchExportRequest: {
-            /**
-             * Task Ids
-             * @description List of task IDs to export
-             */
-            task_ids: string[];
-            /**
-             * Format
-             * @description Output format for all files
-             * @default srt
-             * @enum {string}
-             */
-            format: "srt" | "vtt" | "txt" | "ass";
-            /**
-             * Include Timestamps
-             * @description Include timestamps in TXT format
-             * @default true
-             */
-            include_timestamps: boolean;
-            /**
-             * Zip Name
-             * @description Custom ZIP filename (without extension)
-             */
-            zip_name?: string | null;
-        };
-        /** Body_upload_file_api_files__post */
-        Body_upload_file_api_files__post: {
-            /**
-             * File
-             * Format: binary
-             * @description Audio file to upload
-             */
-            file: string;
-        };
-        /**
-         * CancelTaskResponse
-         * @description Task cancellation response.
-         */
-        CancelTaskResponse: {
-            /** Task Id */
-            task_id: string;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "pending" | "processing" | "completed" | "failed" | "cancelled";
-            /** Message */
-            message: string;
-        };
-        /**
-         * CleanupResponse
-         * @description Orphan cleanup result.
-         */
-        CleanupResponse: {
-            /** Message */
-            message: string;
-            /** Deleted Count */
-            deleted_count: number;
-            /** Deleted Files */
-            deleted_files: components["schemas"]["MissingFileInfo"][];
-        };
-        /**
-         * CreateTaskResponse
-         * @description Task creation response.
-         */
-        CreateTaskResponse: {
-            /** Task Id */
-            task_id: string;
-            /** File Id */
-            file_id: string;
-            /** Filename */
-            filename: string;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "pending" | "processing" | "completed" | "failed" | "cancelled";
-            /** Options */
-            options: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /**
-         * DeleteResponse
-         * @description Generic deletion confirmation.
-         */
-        DeleteResponse: {
-            /** Message */
-            message: string;
-        };
-        /**
-         * EngineConfigResponse
-         * @description Expose the active engine configuration.
-         */
-        EngineConfigResponse: {
-            /** Model Size */
-            model_size: string;
-            /** Device */
-            device: string;
-            /** Compute Type */
-            compute_type: string;
-            /** Is Multilingual */
-            is_multilingual: boolean;
-        };
-        /**
-         * EngineDefaultsResponse
-         * @description Return the raw engine defaults without application overrides.
-         */
-        EngineDefaultsResponse: {
-            defaults: components["schemas"]["TranscriptionResolvedDefaultsResponse"];
-        };
-        /**
-         * FileConfigResponse
-         * @description Expose upload-related configuration needed by the frontend.
-         */
-        FileConfigResponse: {
-            /** Allowed Extensions */
-            allowed_extensions: string[];
-            /** Allowed Mime Types */
-            allowed_mime_types: string[];
-            /** Max File Size */
-            max_file_size: number;
-        };
-        /**
-         * FileListResponse
-         * @description Paginated file list response.
-         */
-        FileListResponse: {
-            /** Files */
-            files: components["schemas"]["FileResponse"][];
-            /** Total */
-            total: number;
-            /** Limit */
-            limit: number;
-            /** Offset */
-            offset: number;
-        };
-        /**
-         * FileResponse
-         * @description Single file metadata response.
-         */
-        FileResponse: {
-            /** File Id */
-            file_id: string;
-            /** Filename */
-            filename: string;
-            /** Size */
-            size: number;
-            /** Content Type */
-            content_type: string | null;
-            /** Created At */
-            created_at: string;
-        };
-        /**
-         * FileUploadResponse
-         * @description File upload success response.
-         */
-        FileUploadResponse: {
-            /** File Id */
-            file_id: string;
-            /** Filename */
-            filename: string;
-            /** Size */
-            size: number;
-            /** Content Type */
-            content_type: string | null;
-        };
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
-        };
-        /**
-         * IntegrityCheckResponse
-         * @description File integrity check result.
-         */
-        IntegrityCheckResponse: {
-            /** Status */
-            status: string;
-            /** Missing Files */
-            missing_files: components["schemas"]["MissingFileInfo"][];
-            /** Missing Count */
-            missing_count: number;
-        };
-        /**
-         * LanguageOptionSchema
-         * @description Describe one selectable language option.
-         */
-        LanguageOptionSchema: {
-            /** Code */
-            code: string;
-            /** Label Key */
-            label_key: string;
-        };
-        /**
-         * MissingFileInfo
-         * @description Info about a file record missing from disk.
-         */
-        MissingFileInfo: {
-            /** Id */
-            id: string;
-            /** Filename */
-            filename: string;
-            /** Path */
-            path: string;
-        };
-        /**
-         * NumberFieldSchema
-         * @description Describe a numeric text input field.
-         */
-        NumberFieldSchema: {
-            /** Key */
-            key: string;
-            /** Label Key */
-            label_key: string;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "number";
-            /** Min */
-            min?: number | null;
-            /** Max */
-            max?: number | null;
-            /** Step */
-            step?: number | null;
-            /** Depends On */
-            depends_on?: string | null;
-            /** Special Values */
-            special_values?: string[] | null;
-        };
-        /**
-         * NumberListFieldSchema
-         * @description Describe a comma-separated numeric list field.
-         */
-        NumberListFieldSchema: {
-            /** Key */
-            key: string;
-            /** Label Key */
-            label_key: string;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "number_list";
-            /** Depends On */
-            depends_on?: string | null;
-        };
-        /**
-         * OptionGroupSchema
-         * @description Group related option fields under one UI section.
-         */
-        OptionGroupSchema: {
-            /** Group */
-            group: string;
-            /** Group Label Key */
-            group_label_key: string;
-            /** Fields */
-            fields: (components["schemas"]["SliderFieldSchema"] | components["schemas"]["SwitchFieldSchema"] | components["schemas"]["NumberFieldSchema"] | components["schemas"]["NumberListFieldSchema"] | components["schemas"]["TextFieldSchema"])[];
-        };
-        /**
-         * SavedExportResponse
-         * @description Response when export is saved to server (save=true).
-         */
-        SavedExportResponse: {
-            /** Saved Path */
-            saved_path: string;
-        };
-        /**
-         * SegmentResponse
-         * @description Single transcription segment.
-         */
-        SegmentResponse: {
-            /** Start */
-            start: number;
-            /** End */
-            end: number;
-            /** Text */
-            text: string;
-        };
-        /**
-         * SliderFieldSchema
-         * @description Describe a slider-backed numeric field.
-         */
-        SliderFieldSchema: {
-            /** Key */
-            key: string;
-            /** Label Key */
-            label_key: string;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "slider";
-            /** Min */
-            min: number;
-            /** Max */
-            max: number;
-            /** Step */
-            step: number;
-            /** Depends On */
-            depends_on?: string | null;
-        };
-        /**
-         * SwitchFieldSchema
-         * @description Describe a boolean toggle field.
-         */
-        SwitchFieldSchema: {
-            /** Key */
-            key: string;
-            /** Label Key */
-            label_key: string;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "switch";
-            /** Depends On */
-            depends_on?: string | null;
-        };
-        /**
-         * TaskDetailResponse
-         * @description Full task detail with transcription result.
-         */
-        TaskDetailResponse: {
-            /** Task Id */
-            task_id: string;
-            /** File Id */
-            file_id: string;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "pending" | "processing" | "completed" | "failed" | "cancelled";
-            /** Progress */
-            progress: number;
-            /** Created At */
-            created_at: string;
-            /** Completed At */
-            completed_at: string | null;
-            /** Duration */
-            duration: number | null;
-            /** Segments */
-            segments: components["schemas"]["SegmentResponse"][] | null;
-            /** Error */
-            error: string | null;
-        };
-        /**
-         * TaskListResponse
-         * @description Paginated task list response.
-         */
-        TaskListResponse: {
-            /** Tasks */
-            tasks: components["schemas"]["TaskSummaryResponse"][];
-            /** Total */
-            total: number;
-            /** Limit */
-            limit: number;
-            /** Offset */
-            offset: number;
-        };
-        /**
-         * TaskSummaryResponse
-         * @description Task in list view (no segments).
-         */
-        TaskSummaryResponse: {
-            /** Task Id */
-            task_id: string;
-            /** File Id */
-            file_id: string;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "pending" | "processing" | "completed" | "failed" | "cancelled";
-            /** Progress */
-            progress: number;
-            /** Created At */
-            created_at: string;
-            /** Completed At */
-            completed_at: string | null;
-        };
-        /**
-         * TextFieldSchema
-         * @description Describe a free-form text field.
-         */
-        TextFieldSchema: {
-            /** Key */
-            key: string;
-            /** Label Key */
-            label_key: string;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "text";
-            /** Depends On */
-            depends_on?: string | null;
-        };
-        /**
-         * TranscriptionConfigResponse
-         * @description Expose effective transcription defaults and field metadata.
-         */
-        TranscriptionConfigResponse: {
-            defaults: components["schemas"]["TranscriptionResolvedDefaultsResponse"];
-            /** Schema */
-            schema: components["schemas"]["OptionGroupSchema"][];
-        };
-        /**
-         * TranscriptionDefaultsPatchResponse
-         * @description Return the effective defaults after a PATCH update.
-         */
-        TranscriptionDefaultsPatchResponse: {
-            defaults: components["schemas"]["TranscriptionResolvedDefaultsResponse"];
-        };
-        /**
-         * TranscriptionDefaultsUpdateRequest
-         * @description Partial update payload for application-level transcription defaults.
-         * @example {
-         *       "beam_size": 3,
-         *       "language": "zh",
-         *       "vad_parameters": {
-         *         "threshold": 0.6
-         *       }
-         *     }
-         */
-        TranscriptionDefaultsUpdateRequest: {
-            /**
-             * Language
-             * @description Language code. Auto-detect if omitted.
-             * @example en
-             * @example zh
-             * @example ja
-             */
-            language?: string | null;
-            /**
-             * Task
-             * @description 'transcribe' or 'translate'
-             * @example transcribe
-             */
-            task?: ("transcribe" | "translate") | null;
-            /**
-             * Beam Size
-             * @description Beam size for decoding
-             * @example 5
-             */
-            beam_size?: number | null;
-            /**
-             * Best Of
-             * @description Number of candidates
-             * @example 5
-             */
-            best_of?: number | null;
-            /**
-             * Patience
-             * @description Beam search patience
-             * @example 1
-             */
-            patience?: number | null;
-            /**
-             * Length Penalty
-             * @description Length penalty
-             * @example 1
-             */
-            length_penalty?: number | null;
-            /**
-             * Repetition Penalty
-             * @description Repetition penalty
-             * @example 1
-             */
-            repetition_penalty?: number | null;
-            /**
-             * No Repeat Ngram Size
-             * @description No repeat n-gram size
-             * @example 0
-             */
-            no_repeat_ngram_size?: number | null;
-            /**
-             * Temperature
-             * @description Sampling temperature(s)
-             * @example [
-             *       0,
-             *       0.2,
-             *       0.4,
-             *       0.6,
-             *       0.8,
-             *       1
-             *     ]
-             */
-            temperature?: number | number[] | null;
-            /**
-             * Compression Ratio Threshold
-             * @description Compression ratio threshold
-             * @example 2.4
-             */
-            compression_ratio_threshold?: number | null;
-            /**
-             * Log Prob Threshold
-             * @description Log probability threshold
-             * @example -1
-             */
-            log_prob_threshold?: number | null;
-            /**
-             * No Speech Threshold
-             * @description No speech threshold
-             * @example 0.6
-             */
-            no_speech_threshold?: number | null;
-            /**
-             * Condition On Previous Text
-             * @description Condition on previous text
-             * @example true
-             */
-            condition_on_previous_text?: boolean | null;
-            /**
-             * Prompt Reset On Temperature
-             * @description Reset prompt on temperature
-             * @example 0.5
-             */
-            prompt_reset_on_temperature?: number | null;
-            /**
-             * Initial Prompt
-             * @description Initial prompt for context
-             * @example
-             */
-            initial_prompt?: string | null;
-            /**
-             * Prefix
-             * @description Prefix for each segment
-             * @example
-             */
-            prefix?: string | null;
-            /**
-             * Hotwords
-             * @description Hotwords to boost recognition
-             * @example
-             */
-            hotwords?: string | null;
-            /**
-             * Suppress Blank
-             * @description Suppress blank outputs
-             * @example true
-             */
-            suppress_blank?: boolean | null;
-            /**
-             * Suppress Tokens
-             * @description Token IDs to suppress
-             * @example [
-             *       -1
-             *     ]
-             */
-            suppress_tokens?: number[] | null;
-            /**
-             * Max New Tokens
-             * @description Max new tokens per segment
-             */
-            max_new_tokens?: number | null;
-            /**
-             * Without Timestamps
-             * @description Disable timestamps
-             * @example false
-             */
-            without_timestamps?: boolean | null;
-            /**
-             * Max Initial Timestamp
-             * @description Max initial timestamp
-             * @example 1
-             */
-            max_initial_timestamp?: number | null;
-            /**
-             * Word Timestamps
-             * @description Enable word-level timestamps
-             * @example false
-             */
-            word_timestamps?: boolean | null;
-            /**
-             * Prepend Punctuations
-             * @description Punctuations to prepend
-             * @example "'“¿([{-
-             */
-            prepend_punctuations?: string | null;
-            /**
-             * Append Punctuations
-             * @description Punctuations to append
-             * @example "'.。,，!！?？:：”)]}、
-             */
-            append_punctuations?: string | null;
-            /**
-             * Vad Filter
-             * @description Enable VAD filtering
-             * @example false
-             */
-            vad_filter?: boolean | null;
-            /**
-             * Vad Parameters
-             * @description VAD parameters
-             */
-            vad_parameters?: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Multilingual
-             * @description Enable multilingual mode
-             * @example false
-             */
-            multilingual?: boolean | null;
-            /**
-             * Chunk Length
-             * @description Chunk length in seconds
-             */
-            chunk_length?: number | null;
-            /**
-             * Clip Timestamps
-             * @description Clip timestamps
-             * @example 0
-             */
-            clip_timestamps?: string | number[] | null;
-            /**
-             * Hallucination Silence Threshold
-             * @description Hallucination silence threshold
-             */
-            hallucination_silence_threshold?: number | null;
-            /**
-             * Language Detection Threshold
-             * @description Language detection threshold
-             * @example 0.5
-             */
-            language_detection_threshold?: number | null;
-            /**
-             * Language Detection Segments
-             * @description Segments for language detection
-             * @example 1
-             */
-            language_detection_segments?: number | null;
-        };
-        /**
-         * TranscriptionRequest
-         * @description Transcription request payload for creating a task.
-         * @example {
-         *       "append_punctuations": "\"'.。,，!！?？:：”)]}、",
-         *       "beam_size": 5,
-         *       "best_of": 5,
-         *       "clip_timestamps": "0",
-         *       "compression_ratio_threshold": 2.4,
-         *       "condition_on_previous_text": true,
-         *       "file_id": "uploaded-file-id",
-         *       "language_detection_segments": 1,
-         *       "language_detection_threshold": 0.5,
-         *       "length_penalty": 1,
-         *       "log_prob_threshold": -1,
-         *       "max_initial_timestamp": 1,
-         *       "multilingual": false,
-         *       "no_repeat_ngram_size": 0,
-         *       "no_speech_threshold": 0.6,
-         *       "patience": 1,
-         *       "prepend_punctuations": "\"'“¿([{-",
-         *       "prompt_reset_on_temperature": 0.5,
-         *       "repetition_penalty": 1,
-         *       "suppress_blank": true,
-         *       "suppress_tokens": [
-         *         -1
-         *       ],
-         *       "task": "transcribe",
-         *       "temperature": [
-         *         0,
-         *         0.2,
-         *         0.4,
-         *         0.6,
-         *         0.8,
-         *         1
-         *       ],
-         *       "vad_filter": false,
-         *       "without_timestamps": false,
-         *       "word_timestamps": false
-         *     }
-         */
-        TranscriptionRequest: {
-            /**
-             * Language
-             * @description Language code. Auto-detect if omitted.
-             * @example en
-             * @example zh
-             * @example ja
-             */
-            language?: string | null;
-            /**
-             * Task
-             * @description 'transcribe' or 'translate'
-             * @example transcribe
-             */
-            task?: ("transcribe" | "translate") | null;
-            /**
-             * Beam Size
-             * @description Beam size for decoding
-             * @example 5
-             */
-            beam_size?: number | null;
-            /**
-             * Best Of
-             * @description Number of candidates
-             * @example 5
-             */
-            best_of?: number | null;
-            /**
-             * Patience
-             * @description Beam search patience
-             * @example 1
-             */
-            patience?: number | null;
-            /**
-             * Length Penalty
-             * @description Length penalty
-             * @example 1
-             */
-            length_penalty?: number | null;
-            /**
-             * Repetition Penalty
-             * @description Repetition penalty
-             * @example 1
-             */
-            repetition_penalty?: number | null;
-            /**
-             * No Repeat Ngram Size
-             * @description No repeat n-gram size
-             * @example 0
-             */
-            no_repeat_ngram_size?: number | null;
-            /**
-             * Temperature
-             * @description Sampling temperature(s)
-             * @example [
-             *       0,
-             *       0.2,
-             *       0.4,
-             *       0.6,
-             *       0.8,
-             *       1
-             *     ]
-             */
-            temperature?: number | number[] | null;
-            /**
-             * Compression Ratio Threshold
-             * @description Compression ratio threshold
-             * @example 2.4
-             */
-            compression_ratio_threshold?: number | null;
-            /**
-             * Log Prob Threshold
-             * @description Log probability threshold
-             * @example -1
-             */
-            log_prob_threshold?: number | null;
-            /**
-             * No Speech Threshold
-             * @description No speech threshold
-             * @example 0.6
-             */
-            no_speech_threshold?: number | null;
-            /**
-             * Condition On Previous Text
-             * @description Condition on previous text
-             * @example true
-             */
-            condition_on_previous_text?: boolean | null;
-            /**
-             * Prompt Reset On Temperature
-             * @description Reset prompt on temperature
-             * @example 0.5
-             */
-            prompt_reset_on_temperature?: number | null;
-            /**
-             * Initial Prompt
-             * @description Initial prompt for context
-             * @example
-             */
-            initial_prompt?: string | null;
-            /**
-             * Prefix
-             * @description Prefix for each segment
-             * @example
-             */
-            prefix?: string | null;
-            /**
-             * Hotwords
-             * @description Hotwords to boost recognition
-             * @example
-             */
-            hotwords?: string | null;
-            /**
-             * Suppress Blank
-             * @description Suppress blank outputs
-             * @example true
-             */
-            suppress_blank?: boolean | null;
-            /**
-             * Suppress Tokens
-             * @description Token IDs to suppress
-             * @example [
-             *       -1
-             *     ]
-             */
-            suppress_tokens?: number[] | null;
-            /**
-             * Max New Tokens
-             * @description Max new tokens per segment
-             */
-            max_new_tokens?: number | null;
-            /**
-             * Without Timestamps
-             * @description Disable timestamps
-             * @example false
-             */
-            without_timestamps?: boolean | null;
-            /**
-             * Max Initial Timestamp
-             * @description Max initial timestamp
-             * @example 1
-             */
-            max_initial_timestamp?: number | null;
-            /**
-             * Word Timestamps
-             * @description Enable word-level timestamps
-             * @example false
-             */
-            word_timestamps?: boolean | null;
-            /**
-             * Prepend Punctuations
-             * @description Punctuations to prepend
-             * @example "'“¿([{-
-             */
-            prepend_punctuations?: string | null;
-            /**
-             * Append Punctuations
-             * @description Punctuations to append
-             * @example "'.。,，!！?？:：”)]}、
-             */
-            append_punctuations?: string | null;
-            /**
-             * Vad Filter
-             * @description Enable VAD filtering
-             * @example false
-             */
-            vad_filter?: boolean | null;
-            /**
-             * Vad Parameters
-             * @description VAD parameters
-             */
-            vad_parameters?: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Multilingual
-             * @description Enable multilingual mode
-             * @example false
-             */
-            multilingual?: boolean | null;
-            /**
-             * Chunk Length
-             * @description Chunk length in seconds
-             */
-            chunk_length?: number | null;
-            /**
-             * Clip Timestamps
-             * @description Clip timestamps
-             * @example 0
-             */
-            clip_timestamps?: string | number[] | null;
-            /**
-             * Hallucination Silence Threshold
-             * @description Hallucination silence threshold
-             */
-            hallucination_silence_threshold?: number | null;
-            /**
-             * Language Detection Threshold
-             * @description Language detection threshold
-             * @example 0.5
-             */
-            language_detection_threshold?: number | null;
-            /**
-             * Language Detection Segments
-             * @description Segments for language detection
-             * @example 1
-             */
-            language_detection_segments?: number | null;
-            /**
-             * File Id
-             * @description File ID from upload API
-             */
-            file_id: string;
-        };
-        /**
-         * TranscriptionResolvedDefaultsResponse
-         * @description Expose fully resolved transcription defaults used at runtime.
-         */
-        TranscriptionResolvedDefaultsResponse: {
-            /** Language */
-            language: string | null;
-            /**
-             * Task
-             * @enum {string}
-             */
-            task: "transcribe" | "translate";
-            /** Beam Size */
-            beam_size: number;
-            /** Best Of */
-            best_of: number;
-            /** Patience */
-            patience: number;
-            /** Length Penalty */
-            length_penalty: number;
-            /** Repetition Penalty */
-            repetition_penalty: number;
-            /** No Repeat Ngram Size */
-            no_repeat_ngram_size: number;
-            /** Temperature */
-            temperature: number | number[];
-            /** Compression Ratio Threshold */
-            compression_ratio_threshold: number | null;
-            /** Log Prob Threshold */
-            log_prob_threshold: number | null;
-            /** No Speech Threshold */
-            no_speech_threshold: number | null;
-            /** Condition On Previous Text */
-            condition_on_previous_text: boolean;
-            /** Prompt Reset On Temperature */
-            prompt_reset_on_temperature: number;
-            /** Initial Prompt */
-            initial_prompt: string | null;
-            /** Prefix */
-            prefix: string | null;
-            /** Hotwords */
-            hotwords: string | null;
-            /** Suppress Blank */
-            suppress_blank: boolean;
-            /** Suppress Tokens */
-            suppress_tokens: number[] | null;
-            /** Max New Tokens */
-            max_new_tokens: number | null;
-            /** Without Timestamps */
-            without_timestamps: boolean;
-            /** Max Initial Timestamp */
-            max_initial_timestamp: number;
-            /** Word Timestamps */
-            word_timestamps: boolean;
-            /** Prepend Punctuations */
-            prepend_punctuations: string;
-            /** Append Punctuations */
-            append_punctuations: string;
-            /** Vad Filter */
-            vad_filter: boolean;
-            vad_parameters: components["schemas"]["VadParametersDefaultsResponse"];
-            /** Multilingual */
-            multilingual: boolean;
-            /** Chunk Length */
-            chunk_length: number | null;
-            /** Clip Timestamps */
-            clip_timestamps: string | number[];
-            /** Hallucination Silence Threshold */
-            hallucination_silence_threshold: number | null;
-            /** Language Detection Threshold */
-            language_detection_threshold: number | null;
-            /** Language Detection Segments */
-            language_detection_segments: number;
-        };
-        /**
-         * VadParametersDefaultsResponse
-         * @description Expose expanded VAD defaults in API-safe form.
-         */
-        VadParametersDefaultsResponse: {
-            /** Threshold */
-            threshold: number;
-            /** Neg Threshold */
-            neg_threshold: number | null;
-            /** Min Speech Duration Ms */
-            min_speech_duration_ms: number;
-            /** Max Speech Duration S */
-            max_speech_duration_s: number | "inf";
-            /** Min Silence Duration Ms */
-            min_silence_duration_ms: number;
-            /** Speech Pad Ms */
-            speech_pad_ms: number;
-            /** Min Silence At Max Speech */
-            min_silence_at_max_speech?: number | null;
-            /** Use Max Poss Sil At Max Speech */
-            use_max_poss_sil_at_max_speech?: boolean | null;
-        };
-        /** ValidationError */
-        ValidationError: {
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
-        };
-    };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+  schemas: {
+    /**
+     * AppConfigResponse
+     * @description Aggregate application configuration required by the frontend.
+     */
+    AppConfigResponse: {
+      engine: components['schemas']['EngineConfigResponse']
+      transcription: components['schemas']['TranscriptionConfigResponse']
+      file: components['schemas']['FileConfigResponse']
+      /** Effective Languages */
+      effective_languages: components['schemas']['LanguageOptionSchema'][]
+    }
+    /**
+     * BatchExportRequest
+     * @description Batch export request for multiple transcriptions.
+     */
+    BatchExportRequest: {
+      /**
+       * Task Ids
+       * @description List of task IDs to export
+       */
+      task_ids: string[]
+      /**
+       * Format
+       * @description Output format for all files
+       * @default srt
+       * @enum {string}
+       */
+      format: 'srt' | 'vtt' | 'txt' | 'ass'
+      /**
+       * Include Timestamps
+       * @description Include timestamps in TXT format
+       * @default true
+       */
+      include_timestamps: boolean
+      /**
+       * Zip Name
+       * @description Custom ZIP filename (without extension)
+       */
+      zip_name?: string | null
+    }
+    /** Body_upload_file_api_files__post */
+    Body_upload_file_api_files__post: {
+      /**
+       * File
+       * Format: binary
+       * @description Audio file to upload
+       */
+      file: string
+    }
+    /**
+     * CancelTaskResponse
+     * @description Task cancellation response.
+     */
+    CancelTaskResponse: {
+      /** Task Id */
+      task_id: string
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
+      /** Message */
+      message: string
+    }
+    /**
+     * CleanupResponse
+     * @description Orphan cleanup result.
+     */
+    CleanupResponse: {
+      /** Message */
+      message: string
+      /** Deleted Count */
+      deleted_count: number
+      /** Deleted Files */
+      deleted_files: components['schemas']['MissingFileInfo'][]
+    }
+    /**
+     * CreateTaskResponse
+     * @description Task creation response.
+     */
+    CreateTaskResponse: {
+      /** Task Id */
+      task_id: string
+      /** File Id */
+      file_id: string
+      /** Filename */
+      filename: string
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
+      /** Options */
+      options: {
+        [key: string]: unknown
+      } | null
+    }
+    /**
+     * DeleteResponse
+     * @description Generic deletion confirmation.
+     */
+    DeleteResponse: {
+      /** Message */
+      message: string
+    }
+    /**
+     * EngineConfigResponse
+     * @description Expose the active engine configuration.
+     */
+    EngineConfigResponse: {
+      /** Model Size */
+      model_size: string
+      /** Device */
+      device: string
+      /** Compute Type */
+      compute_type: string
+      /** Is Multilingual */
+      is_multilingual: boolean
+    }
+    /**
+     * EngineDefaultsResponse
+     * @description Return the raw engine defaults without application overrides.
+     */
+    EngineDefaultsResponse: {
+      defaults: components['schemas']['TranscriptionResolvedDefaultsResponse']
+    }
+    /**
+     * FileConfigResponse
+     * @description Expose upload-related configuration needed by the frontend.
+     */
+    FileConfigResponse: {
+      /** Allowed Extensions */
+      allowed_extensions: string[]
+      /** Allowed Mime Types */
+      allowed_mime_types: string[]
+      /** Max File Size */
+      max_file_size: number
+    }
+    /**
+     * FileListResponse
+     * @description Paginated file list response.
+     */
+    FileListResponse: {
+      /** Files */
+      files: components['schemas']['FileResponse'][]
+      /** Total */
+      total: number
+      /** Limit */
+      limit: number
+      /** Offset */
+      offset: number
+    }
+    /**
+     * FileResponse
+     * @description Single file metadata response.
+     */
+    FileResponse: {
+      /** File Id */
+      file_id: string
+      /** Filename */
+      filename: string
+      /** Size */
+      size: number
+      /** Content Type */
+      content_type: string | null
+      /** Created At */
+      created_at: string
+    }
+    /**
+     * FileUploadResponse
+     * @description File upload success response.
+     */
+    FileUploadResponse: {
+      /** File Id */
+      file_id: string
+      /** Filename */
+      filename: string
+      /** Size */
+      size: number
+      /** Content Type */
+      content_type: string | null
+    }
+    /** HTTPValidationError */
+    HTTPValidationError: {
+      /** Detail */
+      detail?: components['schemas']['ValidationError'][]
+    }
+    /**
+     * IntegrityCheckResponse
+     * @description File integrity check result.
+     */
+    IntegrityCheckResponse: {
+      /** Status */
+      status: string
+      /** Missing Files */
+      missing_files: components['schemas']['MissingFileInfo'][]
+      /** Missing Count */
+      missing_count: number
+    }
+    /**
+     * LanguageOptionSchema
+     * @description Describe one selectable language option.
+     */
+    LanguageOptionSchema: {
+      /** Code */
+      code: string
+      /** Label Key */
+      label_key: string
+    }
+    /**
+     * MissingFileInfo
+     * @description Info about a file record missing from disk.
+     */
+    MissingFileInfo: {
+      /** Id */
+      id: string
+      /** Filename */
+      filename: string
+      /** Path */
+      path: string
+    }
+    /**
+     * NumberFieldSchema
+     * @description Describe a numeric text input field.
+     */
+    NumberFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'number'
+      /** Min */
+      min?: number | null
+      /** Max */
+      max?: number | null
+      /** Step */
+      step?: number | null
+      /** Depends On */
+      depends_on?: string | null
+      /** Special Values */
+      special_values?: string[] | null
+    }
+    /**
+     * NumberListFieldSchema
+     * @description Describe a comma-separated numeric list field.
+     */
+    NumberListFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'number_list'
+      /** Depends On */
+      depends_on?: string | null
+    }
+    /**
+     * OptionGroupSchema
+     * @description Group related option fields under one UI section.
+     */
+    OptionGroupSchema: {
+      /** Group */
+      group: string
+      /** Group Label Key */
+      group_label_key: string
+      /** Fields */
+      fields: (
+        | components['schemas']['SliderFieldSchema']
+        | components['schemas']['SwitchFieldSchema']
+        | components['schemas']['NumberFieldSchema']
+        | components['schemas']['NumberListFieldSchema']
+        | components['schemas']['TextFieldSchema']
+        | components['schemas']['SelectFieldSchema']
+      )[]
+    }
+    /**
+     * SavedExportResponse
+     * @description Response when export is saved to server (save=true).
+     */
+    SavedExportResponse: {
+      /** Saved Path */
+      saved_path: string
+    }
+    /**
+     * SegmentResponse
+     * @description Single transcription segment.
+     */
+    SegmentResponse: {
+      /** Start */
+      start: number
+      /** End */
+      end: number
+      /** Text */
+      text: string
+    }
+    /**
+     * SelectFieldSchema
+     * @description Describe a single-select field.
+     */
+    SelectFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'select'
+      /** Options */
+      options?: components['schemas']['SelectOptionSchema'][] | null
+      /** Options Source */
+      options_source?: 'effective_languages' | null
+      /** Depends On */
+      depends_on?: string | null
+    }
+    /**
+     * SelectOptionSchema
+     * @description Describe one selectable option entry.
+     */
+    SelectOptionSchema: {
+      /** Value */
+      value: string
+      /** Label Key */
+      label_key: string
+    }
+    /**
+     * SliderFieldSchema
+     * @description Describe a slider-backed numeric field.
+     */
+    SliderFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'slider'
+      /** Min */
+      min: number
+      /** Max */
+      max: number
+      /** Step */
+      step: number
+      /** Depends On */
+      depends_on?: string | null
+    }
+    /**
+     * SwitchFieldSchema
+     * @description Describe a boolean toggle field.
+     */
+    SwitchFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'switch'
+      /** Depends On */
+      depends_on?: string | null
+    }
+    /**
+     * TaskDetailResponse
+     * @description Full task detail with transcription result.
+     */
+    TaskDetailResponse: {
+      /** Task Id */
+      task_id: string
+      /** File Id */
+      file_id: string
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
+      /** Progress */
+      progress: number
+      /** Created At */
+      created_at: string
+      /** Completed At */
+      completed_at: string | null
+      /** Duration */
+      duration: number | null
+      /** Segments */
+      segments: components['schemas']['SegmentResponse'][] | null
+      /** Error */
+      error: string | null
+    }
+    /**
+     * TaskListResponse
+     * @description Paginated task list response.
+     */
+    TaskListResponse: {
+      /** Tasks */
+      tasks: components['schemas']['TaskSummaryResponse'][]
+      /** Total */
+      total: number
+      /** Limit */
+      limit: number
+      /** Offset */
+      offset: number
+    }
+    /**
+     * TaskSummaryResponse
+     * @description Task in list view (no segments).
+     */
+    TaskSummaryResponse: {
+      /** Task Id */
+      task_id: string
+      /** File Id */
+      file_id: string
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
+      /** Progress */
+      progress: number
+      /** Created At */
+      created_at: string
+      /** Completed At */
+      completed_at: string | null
+    }
+    /**
+     * TextFieldSchema
+     * @description Describe a free-form text field.
+     */
+    TextFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'text'
+      /** Depends On */
+      depends_on?: string | null
+    }
+    /**
+     * TranscriptionConfigResponse
+     * @description Expose effective transcription defaults and field metadata.
+     */
+    TranscriptionConfigResponse: {
+      defaults: components['schemas']['TranscriptionResolvedDefaultsResponse']
+      /** Schema */
+      schema: components['schemas']['OptionGroupSchema'][]
+    }
+    /**
+     * TranscriptionDefaultsPatchResponse
+     * @description Return the effective defaults after a PATCH update.
+     */
+    TranscriptionDefaultsPatchResponse: {
+      defaults: components['schemas']['TranscriptionResolvedDefaultsResponse']
+    }
+    /**
+     * TranscriptionDefaultsUpdateRequest
+     * @description Partial update payload for application-level transcription defaults.
+     * @example {
+     *       "beam_size": 3,
+     *       "language": "zh",
+     *       "vad_parameters": {
+     *         "threshold": 0.6
+     *       }
+     *     }
+     */
+    TranscriptionDefaultsUpdateRequest: {
+      /**
+       * Language
+       * @description Language code. Auto-detect if omitted.
+       * @example en
+       * @example zh
+       * @example ja
+       */
+      language?: string | null
+      /**
+       * Task
+       * @description 'transcribe' or 'translate'
+       * @example transcribe
+       */
+      task?: ('transcribe' | 'translate') | null
+      /**
+       * Beam Size
+       * @description Beam size for decoding
+       * @example 5
+       */
+      beam_size?: number | null
+      /**
+       * Best Of
+       * @description Number of candidates
+       * @example 5
+       */
+      best_of?: number | null
+      /**
+       * Patience
+       * @description Beam search patience
+       * @example 1
+       */
+      patience?: number | null
+      /**
+       * Length Penalty
+       * @description Length penalty
+       * @example 1
+       */
+      length_penalty?: number | null
+      /**
+       * Repetition Penalty
+       * @description Repetition penalty
+       * @example 1
+       */
+      repetition_penalty?: number | null
+      /**
+       * No Repeat Ngram Size
+       * @description No repeat n-gram size
+       * @example 0
+       */
+      no_repeat_ngram_size?: number | null
+      /**
+       * Temperature
+       * @description Sampling temperature(s)
+       * @example [
+       *       0,
+       *       0.2,
+       *       0.4,
+       *       0.6,
+       *       0.8,
+       *       1
+       *     ]
+       */
+      temperature?: number | number[] | null
+      /**
+       * Compression Ratio Threshold
+       * @description Compression ratio threshold
+       * @example 2.4
+       */
+      compression_ratio_threshold?: number | null
+      /**
+       * Log Prob Threshold
+       * @description Log probability threshold
+       * @example -1
+       */
+      log_prob_threshold?: number | null
+      /**
+       * No Speech Threshold
+       * @description No speech threshold
+       * @example 0.6
+       */
+      no_speech_threshold?: number | null
+      /**
+       * Condition On Previous Text
+       * @description Condition on previous text
+       * @example true
+       */
+      condition_on_previous_text?: boolean | null
+      /**
+       * Prompt Reset On Temperature
+       * @description Reset prompt on temperature
+       * @example 0.5
+       */
+      prompt_reset_on_temperature?: number | null
+      /**
+       * Initial Prompt
+       * @description Initial prompt for context
+       * @example
+       */
+      initial_prompt?: string | null
+      /**
+       * Prefix
+       * @description Prefix for each segment
+       * @example
+       */
+      prefix?: string | null
+      /**
+       * Hotwords
+       * @description Hotwords to boost recognition
+       * @example
+       */
+      hotwords?: string | null
+      /**
+       * Suppress Blank
+       * @description Suppress blank outputs
+       * @example true
+       */
+      suppress_blank?: boolean | null
+      /**
+       * Suppress Tokens
+       * @description Token IDs to suppress
+       * @example [
+       *       -1
+       *     ]
+       */
+      suppress_tokens?: number[] | null
+      /**
+       * Max New Tokens
+       * @description Max new tokens per segment
+       */
+      max_new_tokens?: number | null
+      /**
+       * Without Timestamps
+       * @description Disable timestamps
+       * @example false
+       */
+      without_timestamps?: boolean | null
+      /**
+       * Max Initial Timestamp
+       * @description Max initial timestamp
+       * @example 1
+       */
+      max_initial_timestamp?: number | null
+      /**
+       * Word Timestamps
+       * @description Enable word-level timestamps
+       * @example false
+       */
+      word_timestamps?: boolean | null
+      /**
+       * Prepend Punctuations
+       * @description Punctuations to prepend
+       * @example "'“¿([{-
+       */
+      prepend_punctuations?: string | null
+      /**
+       * Append Punctuations
+       * @description Punctuations to append
+       * @example "'.。,，!！?？:：”)]}、
+       */
+      append_punctuations?: string | null
+      /**
+       * Vad Filter
+       * @description Enable VAD filtering
+       * @example false
+       */
+      vad_filter?: boolean | null
+      /**
+       * Vad Parameters
+       * @description VAD parameters
+       */
+      vad_parameters?: {
+        [key: string]: unknown
+      } | null
+      /**
+       * Multilingual
+       * @description Enable multilingual mode
+       * @example false
+       */
+      multilingual?: boolean | null
+      /**
+       * Chunk Length
+       * @description Chunk length in seconds
+       */
+      chunk_length?: number | null
+      /**
+       * Clip Timestamps
+       * @description Clip timestamps
+       * @example 0
+       */
+      clip_timestamps?: string | number[] | null
+      /**
+       * Hallucination Silence Threshold
+       * @description Hallucination silence threshold
+       */
+      hallucination_silence_threshold?: number | null
+      /**
+       * Language Detection Threshold
+       * @description Language detection threshold
+       * @example 0.5
+       */
+      language_detection_threshold?: number | null
+      /**
+       * Language Detection Segments
+       * @description Segments for language detection
+       * @example 1
+       */
+      language_detection_segments?: number | null
+    }
+    /**
+     * TranscriptionRequest
+     * @description Transcription request payload for creating a task.
+     * @example {
+     *       "append_punctuations": "\"'.。,，!！?？:：”)]}、",
+     *       "beam_size": 5,
+     *       "best_of": 5,
+     *       "clip_timestamps": "0",
+     *       "compression_ratio_threshold": 2.4,
+     *       "condition_on_previous_text": true,
+     *       "file_id": "uploaded-file-id",
+     *       "language_detection_segments": 1,
+     *       "language_detection_threshold": 0.5,
+     *       "length_penalty": 1,
+     *       "log_prob_threshold": -1,
+     *       "max_initial_timestamp": 1,
+     *       "multilingual": false,
+     *       "no_repeat_ngram_size": 0,
+     *       "no_speech_threshold": 0.6,
+     *       "patience": 1,
+     *       "prepend_punctuations": "\"'“¿([{-",
+     *       "prompt_reset_on_temperature": 0.5,
+     *       "repetition_penalty": 1,
+     *       "suppress_blank": true,
+     *       "suppress_tokens": [
+     *         -1
+     *       ],
+     *       "task": "transcribe",
+     *       "temperature": [
+     *         0,
+     *         0.2,
+     *         0.4,
+     *         0.6,
+     *         0.8,
+     *         1
+     *       ],
+     *       "vad_filter": false,
+     *       "without_timestamps": false,
+     *       "word_timestamps": false
+     *     }
+     */
+    TranscriptionRequest: {
+      /**
+       * Language
+       * @description Language code. Auto-detect if omitted.
+       * @example en
+       * @example zh
+       * @example ja
+       */
+      language?: string | null
+      /**
+       * Task
+       * @description 'transcribe' or 'translate'
+       * @example transcribe
+       */
+      task?: ('transcribe' | 'translate') | null
+      /**
+       * Beam Size
+       * @description Beam size for decoding
+       * @example 5
+       */
+      beam_size?: number | null
+      /**
+       * Best Of
+       * @description Number of candidates
+       * @example 5
+       */
+      best_of?: number | null
+      /**
+       * Patience
+       * @description Beam search patience
+       * @example 1
+       */
+      patience?: number | null
+      /**
+       * Length Penalty
+       * @description Length penalty
+       * @example 1
+       */
+      length_penalty?: number | null
+      /**
+       * Repetition Penalty
+       * @description Repetition penalty
+       * @example 1
+       */
+      repetition_penalty?: number | null
+      /**
+       * No Repeat Ngram Size
+       * @description No repeat n-gram size
+       * @example 0
+       */
+      no_repeat_ngram_size?: number | null
+      /**
+       * Temperature
+       * @description Sampling temperature(s)
+       * @example [
+       *       0,
+       *       0.2,
+       *       0.4,
+       *       0.6,
+       *       0.8,
+       *       1
+       *     ]
+       */
+      temperature?: number | number[] | null
+      /**
+       * Compression Ratio Threshold
+       * @description Compression ratio threshold
+       * @example 2.4
+       */
+      compression_ratio_threshold?: number | null
+      /**
+       * Log Prob Threshold
+       * @description Log probability threshold
+       * @example -1
+       */
+      log_prob_threshold?: number | null
+      /**
+       * No Speech Threshold
+       * @description No speech threshold
+       * @example 0.6
+       */
+      no_speech_threshold?: number | null
+      /**
+       * Condition On Previous Text
+       * @description Condition on previous text
+       * @example true
+       */
+      condition_on_previous_text?: boolean | null
+      /**
+       * Prompt Reset On Temperature
+       * @description Reset prompt on temperature
+       * @example 0.5
+       */
+      prompt_reset_on_temperature?: number | null
+      /**
+       * Initial Prompt
+       * @description Initial prompt for context
+       * @example
+       */
+      initial_prompt?: string | null
+      /**
+       * Prefix
+       * @description Prefix for each segment
+       * @example
+       */
+      prefix?: string | null
+      /**
+       * Hotwords
+       * @description Hotwords to boost recognition
+       * @example
+       */
+      hotwords?: string | null
+      /**
+       * Suppress Blank
+       * @description Suppress blank outputs
+       * @example true
+       */
+      suppress_blank?: boolean | null
+      /**
+       * Suppress Tokens
+       * @description Token IDs to suppress
+       * @example [
+       *       -1
+       *     ]
+       */
+      suppress_tokens?: number[] | null
+      /**
+       * Max New Tokens
+       * @description Max new tokens per segment
+       */
+      max_new_tokens?: number | null
+      /**
+       * Without Timestamps
+       * @description Disable timestamps
+       * @example false
+       */
+      without_timestamps?: boolean | null
+      /**
+       * Max Initial Timestamp
+       * @description Max initial timestamp
+       * @example 1
+       */
+      max_initial_timestamp?: number | null
+      /**
+       * Word Timestamps
+       * @description Enable word-level timestamps
+       * @example false
+       */
+      word_timestamps?: boolean | null
+      /**
+       * Prepend Punctuations
+       * @description Punctuations to prepend
+       * @example "'“¿([{-
+       */
+      prepend_punctuations?: string | null
+      /**
+       * Append Punctuations
+       * @description Punctuations to append
+       * @example "'.。,，!！?？:：”)]}、
+       */
+      append_punctuations?: string | null
+      /**
+       * Vad Filter
+       * @description Enable VAD filtering
+       * @example false
+       */
+      vad_filter?: boolean | null
+      /**
+       * Vad Parameters
+       * @description VAD parameters
+       */
+      vad_parameters?: {
+        [key: string]: unknown
+      } | null
+      /**
+       * Multilingual
+       * @description Enable multilingual mode
+       * @example false
+       */
+      multilingual?: boolean | null
+      /**
+       * Chunk Length
+       * @description Chunk length in seconds
+       */
+      chunk_length?: number | null
+      /**
+       * Clip Timestamps
+       * @description Clip timestamps
+       * @example 0
+       */
+      clip_timestamps?: string | number[] | null
+      /**
+       * Hallucination Silence Threshold
+       * @description Hallucination silence threshold
+       */
+      hallucination_silence_threshold?: number | null
+      /**
+       * Language Detection Threshold
+       * @description Language detection threshold
+       * @example 0.5
+       */
+      language_detection_threshold?: number | null
+      /**
+       * Language Detection Segments
+       * @description Segments for language detection
+       * @example 1
+       */
+      language_detection_segments?: number | null
+      /**
+       * File Id
+       * @description File ID from upload API
+       */
+      file_id: string
+    }
+    /**
+     * TranscriptionResolvedDefaultsResponse
+     * @description Expose fully resolved transcription defaults used at runtime.
+     */
+    TranscriptionResolvedDefaultsResponse: {
+      /** Language */
+      language: string | null
+      /**
+       * Task
+       * @enum {string}
+       */
+      task: 'transcribe' | 'translate'
+      /** Beam Size */
+      beam_size: number
+      /** Best Of */
+      best_of: number
+      /** Patience */
+      patience: number
+      /** Length Penalty */
+      length_penalty: number
+      /** Repetition Penalty */
+      repetition_penalty: number
+      /** No Repeat Ngram Size */
+      no_repeat_ngram_size: number
+      /** Temperature */
+      temperature: number | number[]
+      /** Compression Ratio Threshold */
+      compression_ratio_threshold: number | null
+      /** Log Prob Threshold */
+      log_prob_threshold: number | null
+      /** No Speech Threshold */
+      no_speech_threshold: number | null
+      /** Condition On Previous Text */
+      condition_on_previous_text: boolean
+      /** Prompt Reset On Temperature */
+      prompt_reset_on_temperature: number
+      /** Initial Prompt */
+      initial_prompt: string | null
+      /** Prefix */
+      prefix: string | null
+      /** Hotwords */
+      hotwords: string | null
+      /** Suppress Blank */
+      suppress_blank: boolean
+      /** Suppress Tokens */
+      suppress_tokens: number[] | null
+      /** Max New Tokens */
+      max_new_tokens: number | null
+      /** Without Timestamps */
+      without_timestamps: boolean
+      /** Max Initial Timestamp */
+      max_initial_timestamp: number
+      /** Word Timestamps */
+      word_timestamps: boolean
+      /** Prepend Punctuations */
+      prepend_punctuations: string
+      /** Append Punctuations */
+      append_punctuations: string
+      /** Vad Filter */
+      vad_filter: boolean
+      vad_parameters: components['schemas']['VadParametersDefaultsResponse']
+      /** Multilingual */
+      multilingual: boolean
+      /** Chunk Length */
+      chunk_length: number | null
+      /** Clip Timestamps */
+      clip_timestamps: string | number[]
+      /** Hallucination Silence Threshold */
+      hallucination_silence_threshold: number | null
+      /** Language Detection Threshold */
+      language_detection_threshold: number | null
+      /** Language Detection Segments */
+      language_detection_segments: number
+    }
+    /**
+     * VadParametersDefaultsResponse
+     * @description Expose expanded VAD defaults in API-safe form.
+     */
+    VadParametersDefaultsResponse: {
+      /** Threshold */
+      threshold: number
+      /** Neg Threshold */
+      neg_threshold: number | null
+      /** Min Speech Duration Ms */
+      min_speech_duration_ms: number
+      /** Max Speech Duration S */
+      max_speech_duration_s: number | 'inf'
+      /** Min Silence Duration Ms */
+      min_silence_duration_ms: number
+      /** Speech Pad Ms */
+      speech_pad_ms: number
+      /** Min Silence At Max Speech */
+      min_silence_at_max_speech?: number | null
+      /** Use Max Poss Sil At Max Speech */
+      use_max_poss_sil_at_max_speech?: boolean | null
+    }
+    /** ValidationError */
+    ValidationError: {
+      /** Location */
+      loc: (string | number)[]
+      /** Message */
+      msg: string
+      /** Error Type */
+      type: string
+    }
+  }
+  responses: never
+  parameters: never
+  requestBodies: never
+  headers: never
+  pathItems: never
 }
-export type $defs = Record<string, never>;
+export type $defs = Record<string, never>
 export interface operations {
-    get_config_api_config_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AppConfigResponse"];
-                };
-            };
-        };
-    };
-    get_transcription_engine_defaults_api_config_transcription_engine_defaults_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EngineDefaultsResponse"];
-                };
-            };
-        };
-    };
-    delete_transcription_defaults_api_config_transcription_defaults_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    patch_transcription_defaults_api_config_transcription_defaults_patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TranscriptionDefaultsUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TranscriptionDefaultsPatchResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_transcriptions_api_transcriptions__get: {
-        parameters: {
-            query?: {
-                /** @description Filter by status */
-                status?: ("pending" | "processing" | "completed" | "failed" | "cancelled") | null;
-                /** @description Max results */
-                limit?: number;
-                /** @description Offset for pagination */
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskListResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_transcription_api_transcriptions__post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TranscriptionRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CreateTaskResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_transcription_api_transcriptions__task_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskDetailResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    cancel_transcription_api_transcriptions__task_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CancelTaskResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    export_transcription_api_transcriptions__task_id__export_get: {
-        parameters: {
-            query?: {
-                /** @description Output format */
-                format?: "srt" | "vtt" | "txt" | "ass";
-                /** @description Include timestamps (TXT only) */
-                include_timestamps?: boolean;
-                /** @description Save to server instead of download */
-                save?: boolean;
-            };
-            header?: never;
-            path: {
-                task_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description When save=true */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SavedExportResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    batch_export_api_transcriptions_export_batch_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BatchExportRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_files_api_files__get: {
-        parameters: {
-            query?: {
-                /** @description Max results */
-                limit?: number;
-                /** @description Offset for pagination */
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FileListResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    upload_file_api_files__post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_upload_file_api_files__post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FileUploadResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    check_integrity_api_files_check_integrity_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntegrityCheckResponse"];
-                };
-            };
-        };
-    };
-    cleanup_orphans_api_files_cleanup_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CleanupResponse"];
-                };
-            };
-        };
-    };
-    get_file_api_files__file_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                file_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FileResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_file_api_files__file_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                file_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeleteResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    health_check_health_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
-                };
-            };
-        };
-    };
-    root__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
-                };
-            };
-        };
-    };
+  get_config_api_config_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AppConfigResponse']
+        }
+      }
+    }
+  }
+  get_transcription_engine_defaults_api_config_transcription_engine_defaults_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['EngineDefaultsResponse']
+        }
+      }
+    }
+  }
+  delete_transcription_defaults_api_config_transcription_defaults_delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  patch_transcription_defaults_api_config_transcription_defaults_patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TranscriptionDefaultsUpdateRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TranscriptionDefaultsPatchResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_transcriptions_api_transcriptions__get: {
+    parameters: {
+      query?: {
+        /** @description Filter by status */
+        status?: ('pending' | 'processing' | 'completed' | 'failed' | 'cancelled') | null
+        /** @description Max results */
+        limit?: number
+        /** @description Offset for pagination */
+        offset?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TaskListResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_transcription_api_transcriptions__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TranscriptionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CreateTaskResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_transcription_api_transcriptions__task_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        task_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TaskDetailResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  cancel_transcription_api_transcriptions__task_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        task_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CancelTaskResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  export_transcription_api_transcriptions__task_id__export_get: {
+    parameters: {
+      query?: {
+        /** @description Output format */
+        format?: 'srt' | 'vtt' | 'txt' | 'ass'
+        /** @description Include timestamps (TXT only) */
+        include_timestamps?: boolean
+        /** @description Save to server instead of download */
+        save?: boolean
+      }
+      header?: never
+      path: {
+        task_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description When save=true */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SavedExportResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  batch_export_api_transcriptions_export_batch_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BatchExportRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_files_api_files__get: {
+    parameters: {
+      query?: {
+        /** @description Max results */
+        limit?: number
+        /** @description Offset for pagination */
+        offset?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['FileListResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  upload_file_api_files__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Body_upload_file_api_files__post']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['FileUploadResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  check_integrity_api_files_check_integrity_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['IntegrityCheckResponse']
+        }
+      }
+    }
+  }
+  cleanup_orphans_api_files_cleanup_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CleanupResponse']
+        }
+      }
+    }
+  }
+  get_file_api_files__file_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        file_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['FileResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  delete_file_api_files__file_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        file_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeleteResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  health_check_health_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: string
+          }
+        }
+      }
+    }
+  }
+  root__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: string
+          }
+        }
+      }
+    }
+  }
 }

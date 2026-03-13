@@ -26,5 +26,8 @@ export type TranscriptionOptionField = TranscriptionOptionGroup['fields'][number
 /** Discriminated number input field metadata from backend schema. */
 export type NumberOptionField = Schemas['NumberFieldSchema']
 
+/** Discriminated select input field metadata from backend schema. */
+export type SelectOptionField = Schemas['SelectFieldSchema']
+
 /** Single selectable language entry from effective_languages. */
 export type LanguageOption = Schemas['LanguageOptionSchema']
