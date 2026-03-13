@@ -1,6 +1,7 @@
 """Tests for transcription configuration schema and default helpers."""
 
 from dataclasses import asdict
+from dataclasses import fields as dataclass_fields
 
 from faster_whisper.vad import VadOptions
 from pydantic import TypeAdapter
@@ -110,8 +111,8 @@ class TestTranscriptionParamSchema:
         assert schema["discriminator"]["propertyName"] == "type"
         assert "oneOf" in schema
 
-    def test_param_schema_includes_all_vad_subfields(self):
-        """VAD metadata should expose all eight Silero parameters."""
+    def test_param_schema_includes_runtime_supported_vad_subfields(self):
+        """VAD metadata should match the installed faster-whisper contract."""
         schema = get_transcription_param_schema()
         vad_keys = {
             field.key
@@ -119,18 +120,11 @@ class TestTranscriptionParamSchema:
             if group.group in {"vad", "vad_advanced"}
             for field in group.fields
         }
-
-        assert vad_keys == {
-            "vad_filter",
-            "vad_parameters.threshold",
-            "vad_parameters.min_silence_duration_ms",
-            "vad_parameters.speech_pad_ms",
-            "vad_parameters.neg_threshold",
-            "vad_parameters.min_speech_duration_ms",
-            "vad_parameters.max_speech_duration_s",
-            "vad_parameters.min_silence_at_max_speech",
-            "vad_parameters.use_max_poss_sil_at_max_speech",
+        supported_nested = {
+            f"vad_parameters.{field.name}" for field in dataclass_fields(VadOptions)
         }
+
+        assert vad_keys == {"vad_filter", *supported_nested}
 
     def test_max_speech_duration_schema_advertises_inf_special_value(self):
         """The schema should document the API-level infinity sentinel."""

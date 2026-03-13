@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import fields as dataclass_fields
 from typing import Annotated, Literal
 
+from faster_whisper.vad import VadOptions
 from pydantic import BaseModel, ConfigDict, Field
 
 from nola.config.constants import ALLOWED_AUDIO_TYPES, ALLOWED_EXTENSIONS
@@ -107,8 +109,8 @@ class VadParametersDefaultsResponse(BaseModel):
     max_speech_duration_s: float | Literal["inf"]
     min_silence_duration_ms: int
     speech_pad_ms: int
-    min_silence_at_max_speech: int
-    use_max_poss_sil_at_max_speech: bool
+    min_silence_at_max_speech: int | None = None
+    use_max_poss_sil_at_max_speech: bool | None = None
 
 
 class TranscriptionResolvedDefaultsResponse(BaseModel):
@@ -486,9 +488,28 @@ _TRANSCRIPTION_PARAM_SCHEMA: list[OptionGroupSchema] = [
 ]
 
 
+_SUPPORTED_VAD_PARAMETER_KEYS = frozenset(
+    field.name for field in dataclass_fields(VadOptions)
+)
+
+
+def _field_is_supported(field: OptionFieldSchema) -> bool:
+    """Keep schema fields aligned with the installed faster-whisper contract."""
+    if not field.key.startswith("vad_parameters."):
+        return True
+    nested_key = field.key.split(".", maxsplit=1)[1]
+    return nested_key in _SUPPORTED_VAD_PARAMETER_KEYS
+
+
 def get_transcription_param_schema() -> list[OptionGroupSchema]:
     """Return a defensive copy of the transcription field metadata."""
-    return [group.model_copy(deep=True) for group in _TRANSCRIPTION_PARAM_SCHEMA]
+    copied = [group.model_copy(deep=True) for group in _TRANSCRIPTION_PARAM_SCHEMA]
+    filtered: list[OptionGroupSchema] = []
+    for group in copied:
+        group.fields = [field for field in group.fields if _field_is_supported(field)]
+        if group.fields:
+            filtered.append(group)
+    return filtered
 
 
 def build_file_config() -> FileConfigResponse:
