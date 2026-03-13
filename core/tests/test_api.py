@@ -119,18 +119,6 @@ class TestTranscriptionsAPI:
         )
         assert response.status_code == 404
 
-    def test_get_default_options(self, client):
-        """Test getting default transcription options."""
-        response = client.get("/api/transcriptions/options/defaults")
-        assert response.status_code == 200
-        data = response.json()
-        # Verify key default options exist
-        assert "language" in data
-        assert "beam_size" in data
-        assert data["beam_size"] == 5  # Default value
-        assert "vad_filter" in data
-        assert data["vad_filter"] is False
-
     def test_create_task_with_options(self, client):
         """Test creating task with custom transcription options."""
         response = client.post(

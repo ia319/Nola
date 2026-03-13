@@ -184,10 +184,3 @@ class TestConfigAPI:
         defaults = config_response.json()["transcription"]["defaults"]
         assert defaults["beam_size"] == 5
         assert defaults["vad_filter"] is False
-
-    def test_legacy_defaults_endpoint_is_marked_deprecated(self, client: TestClient):
-        """The old defaults endpoint should remain available but deprecated."""
-        openapi = client.app.openapi()
-        operation = openapi["paths"]["/api/transcriptions/options/defaults"]["get"]
-
-        assert operation["deprecated"] is True

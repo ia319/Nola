@@ -3,7 +3,6 @@
 import logging
 import re
 import uuid
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import quote
@@ -21,7 +20,6 @@ from nola.api.schemas import (
     TaskListResponse,
     TranscriptionRequest,
 )
-from nola.engines.base import TranscribeOptions
 
 logger = logging.getLogger(__name__)
 
@@ -29,23 +27,6 @@ router = APIRouter(prefix="/api/transcriptions", tags=["transcriptions"])
 
 # Valid status values for filtering
 StatusFilter = Literal["pending", "processing", "completed", "failed", "cancelled"]
-
-
-@router.get(
-    "/options/defaults",
-    summary="Get default transcription options",
-    deprecated=True,
-)
-async def get_default_options() -> dict[str, Any]:
-    """Return default transcription options.
-
-    Use this endpoint to display available options and their defaults
-    in the frontend before creating a transcription task.
-
-    Deprecated: use GET /api/config/transcription/engine-defaults instead.
-    """
-    defaults = TranscribeOptions()
-    return asdict(defaults)
 
 
 @router.post(
