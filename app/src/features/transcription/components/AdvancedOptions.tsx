@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDownIcon } from 'lucide-react'
 
@@ -209,7 +209,7 @@ function hasSpecialValue(field: NumberOptionField, token: string): boolean {
  * Drive groups, field types, and dependency states from `/api/config`.
  * Skip `initial_prompt`; render it in `OptionsBar`.
  */
-export function AdvancedOptions({
+function AdvancedOptionsInner({
   schema,
   advancedOptions,
   defaults,
@@ -464,3 +464,7 @@ export function AdvancedOptions({
     </Collapsible>
   )
 }
+
+// NOTE: Keep this panel memoized because prompt typing updates parent state.
+// Consider splitting prompt and advanced panels into separate containers to isolate updates by ownership.
+export const AdvancedOptions = memo(AdvancedOptionsInner)
