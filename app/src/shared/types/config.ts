@@ -14,5 +14,14 @@ export type TranscriptionDefaultsPatchResponse = Schemas['TranscriptionDefaultsP
 /** Effective transcription defaults exposed inside GET /api/config. */
 export type TranscriptionDefaults = Schemas['TranscriptionConfigResponse']['defaults']
 
+/** Schema group describing frontend-renderable transcription options. */
+export type TranscriptionOptionGroup = Schemas['OptionGroupSchema']
+
+/** Union of all field schema variants under a transcription option group. */
+export type TranscriptionOptionField = TranscriptionOptionGroup['fields'][number]
+
+/** Discriminated number input field metadata from backend schema. */
+export type NumberOptionField = Schemas['NumberFieldSchema']
+
 /** Single selectable language entry from effective_languages. */
 export type LanguageOption = Schemas['LanguageOptionSchema']

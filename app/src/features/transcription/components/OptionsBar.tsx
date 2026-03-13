@@ -71,6 +71,7 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
   const languages: LanguageOption[] = config
     ? [AUTO_DETECT, ...config.effective_languages]
     : [AUTO_DETECT]
+  const transcriptionSchema = config?.transcription.schema ?? []
 
   /** Create tasks for all available file IDs, collecting per-file results. */
   async function handleStart() {
@@ -180,6 +181,7 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
 
       {/* Advanced options */}
       <AdvancedOptions
+        schema={transcriptionSchema}
         advancedOptions={advancedOptions}
         defaults={defaults}
         onOptionChange={setAdvancedOption}
