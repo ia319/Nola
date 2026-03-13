@@ -162,6 +162,7 @@
       }
     },
     "group": {
+      "general": "General",
       "decoding": "Decoding",
       "quality": "Quality",
       "context": "Context",

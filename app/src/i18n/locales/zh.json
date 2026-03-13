@@ -161,6 +161,7 @@
       }
     },
     "group": {
+      "general": "通用",
       "decoding": "解码",
       "quality": "质量",
       "context": "上下文",
