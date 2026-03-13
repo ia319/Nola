@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Response, status
 
 from nola.api.deps import get_app_config_db
 from nola.api.schemas import TranscriptionDefaultsUpdateRequest
@@ -26,23 +25,6 @@ from nola.config.transcription import (
 from nola.models import AppConfigDatabase
 
 router = APIRouter(prefix="/api/config", tags=["config"])
-
-
-@lru_cache(maxsize=1)
-def _allowed_vad_parameter_keys() -> frozenset[str]:
-    """Return valid VAD parameter keys, computed once on first use."""
-    return frozenset(get_engine_defaults()["vad_parameters"].keys())
-
-
-def _validate_vad_parameter_keys(vad_parameters: dict[str, Any]) -> None:
-    """Reject nested VAD keys that are not supported by the engine contract."""
-    invalid_keys = sorted(set(vad_parameters) - _allowed_vad_parameter_keys())
-    if invalid_keys:
-        invalid_list = ", ".join(invalid_keys)
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=f"Unsupported vad_parameters key(s): {invalid_list}",
-        )
 
 
 def _apply_override_patch(
@@ -150,10 +132,6 @@ def patch_transcription_defaults(
     """Persist a partial transcription-defaults update."""
     config_db = get_app_config_db()
     patch_values = request.get_options_dict()
-
-    vad_parameters = patch_values.get("vad_parameters")
-    if isinstance(vad_parameters, dict):
-        _validate_vad_parameter_keys(vad_parameters)
 
     if patch_values:
         # This PATCH flow is a read-modify-write sequence.

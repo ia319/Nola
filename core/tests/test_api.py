@@ -223,6 +223,33 @@ class TestInputValidation:
         assert any(item["loc"][-1] == "temperature" for item in details)
         assert "non-negative" in str(details)
 
+    def test_vad_parameters_unknown_key_returns_422(self, client: TestClient):
+        """Test unknown nested VAD key is rejected at request validation."""
+        response = client.post(
+            "/api/transcriptions",
+            json={
+                "file_id": "nonexistent-file",
+                "vad_filter": True,
+                "vad_parameters": {"threshld": 0.6},
+            },
+        )
+
+        assert response.status_code == 422
+        details = response.json()["detail"]
+        assert any(item["loc"][-1] == "vad_parameters" for item in details)
+        assert "Unsupported vad_parameters key(s): threshld" in str(details)
+
+    def test_unknown_top_level_option_key_returns_422(self, client: TestClient):
+        """Test unknown top-level options are rejected instead of ignored."""
+        response = client.post(
+            "/api/transcriptions",
+            json={"file_id": "nonexistent-file", "beam_sizee": 3},
+        )
+
+        assert response.status_code == 422
+        details = response.json()["detail"]
+        assert any(item["loc"][-1] == "beam_sizee" for item in details)
+
     def test_batch_export_empty_task_ids_returns_422(self, client: TestClient):
         """Test batch export rejects empty task_ids."""
         response = client.post(

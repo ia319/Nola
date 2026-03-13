@@ -3,9 +3,13 @@
 from dataclasses import asdict
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from nola.api.schemas.validators import validate_language_code, validate_temperature
+from nola.api.schemas.validators import (
+    validate_language_code,
+    validate_temperature,
+    validate_vad_parameter_keys,
+)
 from nola.config.constants import MAX_BATCH_EXPORT_TASKS
 from nola.engines.base import TranscribeOptions
 
@@ -38,6 +42,8 @@ class TranscriptionOptionsPayload(BaseModel):
     All parameters default to None, meaning "use engine default".
     See TranscribeOptions in engines/base.py for actual defaults.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     # Language settings
     language: str | None = Field(
@@ -254,6 +260,12 @@ class TranscriptionOptionsPayload(BaseModel):
         """Reject negative temperature values."""
         return validate_temperature(v)
 
+    @field_validator("vad_parameters")
+    @classmethod
+    def check_vad_parameters(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        """Reject unsupported VAD parameter keys early."""
+        return validate_vad_parameter_keys(v)
+
     def get_options_dict(self) -> dict[str, Any]:
         """Return non-None options as dict for storage."""
         return self.model_dump(exclude_none=True)
@@ -262,7 +274,7 @@ class TranscriptionOptionsPayload(BaseModel):
 class TranscriptionRequest(TranscriptionOptionsPayload):
     """Transcription request payload for creating a task."""
 
-    model_config = {"json_schema_extra": {"example": _create_task_example()}}
+    model_config = ConfigDict(json_schema_extra={"example": _create_task_example()})
 
     file_id: str = Field(..., description="File ID from upload API")
 
@@ -274,7 +286,7 @@ class TranscriptionRequest(TranscriptionOptionsPayload):
 class TranscriptionDefaultsUpdateRequest(TranscriptionOptionsPayload):
     """Partial update payload for application-level transcription defaults."""
 
-    model_config = {"json_schema_extra": {"example": _defaults_patch_example()}}
+    model_config = ConfigDict(json_schema_extra={"example": _defaults_patch_example()})
 
     def get_options_dict(self) -> dict[str, Any]:
         """Return explicitly provided keys, preserving nulls for field resets."""
