@@ -4,7 +4,6 @@ import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -12,12 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import logger from '@/config/logger'
+import { Textarea } from '@/components/ui/textarea'
 import {
   deleteTranscriptionDefaults,
   fetchEngineDefaults,
   patchTranscriptionDefaults,
 } from '@/config/api'
+import logger from '@/config/logger'
 import { refreshAppConfig, useAppConfig } from '@/config/use-app-config'
 import { createTask } from '@/features/transcription/api'
 import { useTranscriptionOptions } from '@/features/transcription/hooks/useTranscriptionOptions'
@@ -25,8 +25,9 @@ import {
   buildDefaultsPatchPayload,
   buildEffectiveDefaults,
 } from '@/features/transcription/lib/defaults-patch'
+import { buildTranscriptionSchemaUiModel } from '@/features/transcription/lib/schema-adapter'
 import { isAppError } from '@/shared/lib/error-factory'
-import type { AppError, LanguageOption } from '@/shared/types'
+import type { AppError } from '@/shared/types'
 
 import { AdvancedOptions } from './AdvancedOptions'
 
@@ -37,9 +38,6 @@ export interface TaskCreateResult {
   ok: boolean
   error?: AppError
 }
-
-/** Synthetic auto-detect entry prepended to the language list. */
-const AUTO_DETECT: LanguageOption = { code: '__auto__', label_key: 'options.language.auto' }
 
 export interface OptionsBarProps {
   /** File IDs available for task creation (success && !taskCreated). */
@@ -60,7 +58,7 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
   const [isCreating, setIsCreating] = useState(false)
   const [isSavingDefaults, setIsSavingDefaults] = useState(false)
   const [isResettingDefaults, setIsResettingDefaults] = useState(false)
-  // Synchronous lock to prevent double-click reentry before React re-renders.
+  // Prevent double-click reentry before React re-renders.
   const creatingRef = useRef(false)
 
   const { config } = useAppConfig()
@@ -80,11 +78,10 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
     setInitialPrompt,
   } = useTranscriptionOptions()
 
-  // Build language list: auto-detect + backend effective_languages.
-  const languages: LanguageOption[] = config
-    ? [AUTO_DETECT, ...config.effective_languages]
-    : [AUTO_DETECT]
-  const transcriptionSchema = config?.transcription.schema ?? []
+  const schemaUiModel = buildTranscriptionSchemaUiModel({
+    schema: config?.transcription.schema ?? [],
+    effectiveLanguages: config?.effective_languages ?? [],
+  })
 
   function toAppError(err: unknown): AppError {
     if (isAppError(err)) return err
@@ -181,49 +178,47 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
 
   return (
     <div className="space-y-4">
-      {/* Basic options row */}
       <div className="flex flex-wrap items-end gap-4">
-        {/* Language selector */}
         <div className="space-y-1.5">
-          <Label htmlFor="language-select">{t('options.language.label')}</Label>
+          <Label htmlFor="language-select">{t(schemaUiModel.languageControl.labelKey)}</Label>
           <Select
             value={language ?? '__auto__'}
-            onValueChange={(v) => setLanguage(v === '__auto__' ? undefined : v)}
+            onValueChange={(value) => setLanguage(value === '__auto__' ? undefined : value)}
             disabled={controlsDisabled}
           >
             <SelectTrigger id="language-select" className="w-[160px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {languages.map((lang) => (
-                <SelectItem key={lang.code} value={lang.code}>
-                  {t(lang.label_key)}
+              {schemaUiModel.languageControl.options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {t(option.labelKey)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Task type selector */}
         <div className="space-y-1.5">
-          <Label htmlFor="task-select">{t('options.task.label')}</Label>
+          <Label htmlFor="task-select">{t(schemaUiModel.taskControl.labelKey)}</Label>
           <Select
             value={task}
-            onValueChange={(v) => setTask(v as 'transcribe' | 'translate')}
+            onValueChange={(value) => setTask(value === 'translate' ? 'translate' : 'transcribe')}
             disabled={controlsDisabled}
           >
             <SelectTrigger id="task-select" className="w-[260px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="transcribe">{t('options.task.transcribe')}</SelectItem>
-              <SelectItem value="translate">{t('options.task.translate')}</SelectItem>
+              {schemaUiModel.taskControl.options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {t(option.labelKey)}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Start button */}
-        {/* NOTE: add type="button" to all buttons when wrapping in <form> */}
         <Button
           id="start-transcription"
           type="button"
@@ -261,9 +256,8 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
         </Button>
       </div>
 
-      {/* Initial prompt */}
       <div className="space-y-1.5">
-        <Label htmlFor="initial-prompt">{t('options.field.initialPrompt')}</Label>
+        <Label htmlFor="initial-prompt">{t(schemaUiModel.initialPromptControl.labelKey)}</Label>
         <Textarea
           id="initial-prompt"
           disabled={controlsDisabled}
@@ -275,9 +269,8 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
         />
       </div>
 
-      {/* Advanced options */}
       <AdvancedOptions
-        schema={transcriptionSchema}
+        schema={schemaUiModel.advancedSchema}
         advancedOptions={advancedOptions}
         defaults={defaults}
         onOptionChange={setAdvancedOption}
