@@ -78,6 +78,38 @@ describe('buildRequest', () => {
     })
   })
 
+  it('expands dot-path options into nested payload objects', async () => {
+    const { result } = await renderTranscriptionOptions()
+
+    act(() => {
+      result.current.setAdvancedOption('vad_parameters.threshold', 0.7)
+      result.current.setAdvancedOption('vad_parameters.speech_pad_ms', 500)
+    })
+
+    expect(result.current.buildRequest('f-3b')).toEqual({
+      file_id: 'f-3b',
+      vad_parameters: {
+        threshold: 0.7,
+        speech_pad_ms: 500,
+      },
+    })
+  })
+
+  it('keeps special string values like inf when building nested payload', async () => {
+    const { result } = await renderTranscriptionOptions()
+
+    act(() => {
+      result.current.setAdvancedOption('vad_parameters.max_speech_duration_s', 'inf')
+    })
+
+    expect(result.current.buildRequest('f-3c')).toEqual({
+      file_id: 'f-3c',
+      vad_parameters: {
+        max_speech_duration_s: 'inf',
+      },
+    })
+  })
+
   it('filters out undefined advanced option values', async () => {
     const { result } = await renderTranscriptionOptions()
 

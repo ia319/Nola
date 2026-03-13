@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { AdvancedOptions } from '../AdvancedOptions'
+import type { TranscriptionOptionGroup } from '@/shared/types'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -9,12 +10,46 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
+function renderAdvancedOptions(
+  schema: TranscriptionOptionGroup[],
+  overrides?: Partial<Parameters<typeof AdvancedOptions>[0]>,
+) {
+  return render(
+    <AdvancedOptions
+      schema={schema}
+      advancedOptions={{}}
+      defaults={null}
+      onOptionChange={vi.fn()}
+      onReset={vi.fn()}
+      {...overrides}
+    />,
+  )
+}
+
 describe('AdvancedOptions', () => {
   it('shows slider placeholders until backend defaults arrive', () => {
     const onOptionChange = vi.fn()
     const onReset = vi.fn()
+    const schema: TranscriptionOptionGroup[] = [
+      {
+        group: 'decoding',
+        group_label_key: 'options.group.decoding',
+        fields: [
+          {
+            key: 'beam_size',
+            label_key: 'options.field.beamSize',
+            type: 'slider',
+            min: 1,
+            max: 10,
+            step: 1,
+          },
+        ],
+      },
+    ]
+
     const { rerender } = render(
       <AdvancedOptions
+        schema={schema}
         advancedOptions={{}}
         defaults={null}
         onOptionChange={onOptionChange}
@@ -28,6 +63,7 @@ describe('AdvancedOptions', () => {
 
     rerender(
       <AdvancedOptions
+        schema={schema}
         advancedOptions={{}}
         defaults={{ beam_size: 5 }}
         onOptionChange={onOptionChange}
@@ -40,16 +76,21 @@ describe('AdvancedOptions', () => {
 
   it('commits canonical temperature values on blur', () => {
     const onOptionChange = vi.fn()
+    const schema: TranscriptionOptionGroup[] = [
+      {
+        group: 'decoding',
+        group_label_key: 'options.group.decoding',
+        fields: [
+          {
+            key: 'temperature',
+            label_key: 'options.field.temperature',
+            type: 'number_list',
+          },
+        ],
+      },
+    ]
 
-    render(
-      <AdvancedOptions
-        advancedOptions={{}}
-        defaults={null}
-        onOptionChange={onOptionChange}
-        onReset={() => {}}
-      />,
-    )
-
+    renderAdvancedOptions(schema, { onOptionChange })
     fireEvent.click(screen.getByRole('button', { name: 'options.advanced.toggle' }))
 
     const input = screen.getByLabelText('options.field.temperature') as HTMLInputElement
@@ -63,16 +104,21 @@ describe('AdvancedOptions', () => {
   it('keeps invalid temperature drafts visible until reset', () => {
     const onOptionChange = vi.fn()
     const onReset = vi.fn()
+    const schema: TranscriptionOptionGroup[] = [
+      {
+        group: 'decoding',
+        group_label_key: 'options.group.decoding',
+        fields: [
+          {
+            key: 'temperature',
+            label_key: 'options.field.temperature',
+            type: 'number_list',
+          },
+        ],
+      },
+    ]
 
-    render(
-      <AdvancedOptions
-        advancedOptions={{}}
-        defaults={null}
-        onOptionChange={onOptionChange}
-        onReset={onReset}
-      />,
-    )
-
+    renderAdvancedOptions(schema, { onOptionChange, onReset })
     fireEvent.click(screen.getByRole('button', { name: 'options.advanced.toggle' }))
 
     const input = screen.getByLabelText('options.field.temperature') as HTMLInputElement
@@ -87,5 +133,90 @@ describe('AdvancedOptions', () => {
     expect(onReset).toHaveBeenCalledTimes(1)
     expect((screen.getByLabelText('options.field.temperature') as HTMLInputElement).value).toBe('')
     expect(screen.queryByText('options.advanced.numberListError.emptySegment')).toBeNull()
+  })
+
+  it('disables depends_on fields until the dependency becomes true', () => {
+    const schema: TranscriptionOptionGroup[] = [
+      {
+        group: 'vad',
+        group_label_key: 'options.group.vad',
+        fields: [
+          {
+            key: 'vad_filter',
+            label_key: 'options.field.vadFilter',
+            type: 'switch',
+          },
+          {
+            key: 'vad_parameters.min_speech_duration_ms',
+            label_key: 'options.field.vadMinSpeechDurationMs',
+            type: 'number',
+            min: 0,
+            max: 10000,
+            step: 1,
+            depends_on: 'vad_filter',
+          },
+        ],
+      },
+    ]
+
+    const { rerender } = renderAdvancedOptions(schema, {
+      defaults: {
+        vad_filter: false,
+        vad_parameters: { min_speech_duration_ms: 0 },
+      },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'options.advanced.toggle' }))
+
+    const input = screen.getByLabelText('options.field.vadMinSpeechDurationMs') as HTMLInputElement
+    expect(input.disabled).toBe(true)
+
+    rerender(
+      <AdvancedOptions
+        schema={schema}
+        advancedOptions={{ vad_filter: true }}
+        defaults={{
+          vad_filter: false,
+          vad_parameters: { min_speech_duration_ms: 0 },
+        }}
+        onOptionChange={vi.fn()}
+        onReset={vi.fn()}
+      />,
+    )
+
+    expect(
+      screen.getByLabelText('options.field.vadMinSpeechDurationMs') as HTMLInputElement,
+    ).toBeEnabled()
+  })
+
+  it('supports selecting special inf value for number fields', () => {
+    const onOptionChange = vi.fn()
+    const schema: TranscriptionOptionGroup[] = [
+      {
+        group: 'vad_advanced',
+        group_label_key: 'options.group.vadAdvanced',
+        fields: [
+          {
+            key: 'vad_parameters.max_speech_duration_s',
+            label_key: 'options.field.vadMaxSpeechDurationS',
+            type: 'number',
+            min: 0,
+            step: 1,
+            special_values: ['inf'],
+            depends_on: 'vad_filter',
+          },
+        ],
+      },
+    ]
+
+    renderAdvancedOptions(schema, {
+      defaults: { vad_filter: true },
+      onOptionChange,
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'options.advanced.toggle' }))
+    fireEvent.click(screen.getByRole('button', { name: 'inf' }))
+
+    expect(onOptionChange).toHaveBeenCalledWith('vad_parameters.max_speech_duration_s', 'inf')
   })
 })
