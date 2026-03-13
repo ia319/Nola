@@ -51,6 +51,14 @@
     "startDisabled": "Start Transcription",
     "creating": "Creating...",
     "taskCreated": "Task created: {{taskId}}",
+    "defaults": {
+      "save": "Save as Defaults",
+      "saving": "Saving...",
+      "resetEngine": "Reset to Engine Defaults",
+      "resetting": "Resetting...",
+      "saved": "Defaults saved",
+      "resetDone": "Defaults reset to engine values"
+    },
     "advanced": {
       "toggle": "Advanced Options",
       "reset": "Reset to Defaults",

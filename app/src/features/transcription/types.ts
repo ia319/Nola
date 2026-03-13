@@ -23,6 +23,7 @@ export interface UseTranscriptionOptionsReturn {
   setTask: (task: TranscriptionTaskType) => void
   setAdvancedOption: (key: string, value: AdvancedOptionValue | undefined) => void
   resetAdvancedOptions: () => void
+  resetOptionOverrides: () => void
   buildRequest: (fileId: string) => CreateTaskPayload
   initialPrompt: string | undefined
   setInitialPrompt: (value: string | undefined) => void

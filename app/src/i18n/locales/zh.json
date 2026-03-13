@@ -50,6 +50,14 @@
         "startDisabled": "开始转写",
         "creating": "创建中...",
         "taskCreated": "任务已创建: {{taskId}}",
+        "defaults": {
+            "save": "\u4fdd\u5b58\u4e3a\u9ed8\u8ba4\u503c",
+            "saving": "\u4fdd\u5b58\u4e2d...",
+            "resetEngine": "\u91cd\u7f6e\u4e3a\u5f15\u64ce\u9ed8\u8ba4",
+            "resetting": "\u91cd\u7f6e\u4e2d...",
+            "saved": "\u5df2\u4fdd\u5b58\u9ed8\u8ba4\u503c",
+            "resetDone": "\u5df2\u91cd\u7f6e\u4e3a\u5f15\u64ce\u9ed8\u8ba4"
+        },
         "advanced": {
             "toggle": "高级选项",
             "reset": "重置为默认值",

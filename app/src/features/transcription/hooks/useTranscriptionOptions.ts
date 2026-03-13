@@ -9,27 +9,34 @@ import type {
 import { useAppConfig } from '@/config/use-app-config'
 import { setValueByPath } from '@/features/transcription/lib/object-path'
 
-/**
- * Manage transcription option state and build create-task payloads.
- * Read defaults from shared app config.
- * Enforce `word_timestamps` and `without_timestamps` mutual exclusion.
- * Convert dot-path advanced keys to nested request fields.
- */
+/** Keep option state and build task payloads. */
 export function useTranscriptionOptions(): UseTranscriptionOptionsReturn {
-  const [language, setLanguage] = useState<string | undefined>(undefined)
-  const [task, setTask] = useState<TranscriptionTaskType>('transcribe')
+  const [languageOverride, setLanguageOverride] = useState<string | null | undefined>(undefined)
+  const [taskOverride, setTaskOverride] = useState<TranscriptionTaskType | undefined>(undefined)
   const [advancedOptions, setAdvancedOptions] = useState<AdvancedTranscriptionOptions>({})
   const [initialPrompt, setInitialPrompt] = useState<string | undefined>(undefined)
 
-  // Read defaults from the shared app config singleton.
   const { config } = useAppConfig()
   const defaults: TranscriptionDefaults | null = config?.transcription.defaults ?? null
+
+  const language =
+    languageOverride === undefined
+      ? (defaults?.language ?? undefined)
+      : (languageOverride ?? undefined)
+  const task = taskOverride ?? defaults?.task ?? 'transcribe'
+
+  const setLanguage = useCallback((next: string | undefined) => {
+    setLanguageOverride(next ?? null)
+  }, [])
+
+  const setTask = useCallback((next: TranscriptionTaskType) => {
+    setTaskOverride(next)
+  }, [])
 
   const setAdvancedOption = useCallback((key: string, value: AdvancedOptionValue | undefined) => {
     setAdvancedOptions((prev) => {
       const next: AdvancedTranscriptionOptions = { ...prev, [key]: value }
 
-      // Keep `word_timestamps` and `without_timestamps` mutually exclusive.
       if (key === 'word_timestamps' && value === true) {
         next.without_timestamps = false
       }
@@ -45,20 +52,26 @@ export function useTranscriptionOptions(): UseTranscriptionOptionsReturn {
     setAdvancedOptions({})
   }, [])
 
+  const resetOptionOverrides = useCallback(() => {
+    setLanguageOverride(undefined)
+    setTaskOverride(undefined)
+    setInitialPrompt(undefined)
+    setAdvancedOptions({})
+  }, [])
+
   const buildRequest = useCallback(
     (fileId: string) => {
       const payload: CreateTaskPayload = { file_id: fileId }
 
-      if (language !== undefined) payload.language = language
-      if (task !== 'transcribe') payload.task = task
+      if (languageOverride !== undefined) payload.language = languageOverride
+      if (taskOverride !== undefined) payload.task = taskOverride
       if (initialPrompt !== undefined) payload.initial_prompt = initialPrompt
 
-      // Convert dot-path keys back into nested request objects.
       const advancedPayload: Record<string, unknown> = {}
 
-      for (const [k, v] of Object.entries(advancedOptions)) {
-        if (v !== undefined) {
-          setValueByPath(advancedPayload, k, v)
+      for (const [key, value] of Object.entries(advancedOptions)) {
+        if (value !== undefined) {
+          setValueByPath(advancedPayload, key, value)
         }
       }
 
@@ -66,7 +79,7 @@ export function useTranscriptionOptions(): UseTranscriptionOptionsReturn {
 
       return payload
     },
-    [language, task, initialPrompt, advancedOptions],
+    [advancedOptions, initialPrompt, languageOverride, taskOverride],
   )
 
   return {
@@ -78,6 +91,7 @@ export function useTranscriptionOptions(): UseTranscriptionOptionsReturn {
     setTask,
     setAdvancedOption,
     resetAdvancedOptions,
+    resetOptionOverrides,
     buildRequest,
     initialPrompt,
     setInitialPrompt,
