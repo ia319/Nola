@@ -70,7 +70,16 @@ class TestConfigAPI:
             data["transcription"]["defaults"]["vad_parameters"]["max_speech_duration_s"]
             == "inf"
         )
-        assert data["transcription"]["schema"][0]["group"] == "decoding"
+        schema_groups = {group["group"] for group in data["transcription"]["schema"]}
+        assert {"general", "decoding", "vad", "vad_advanced"} <= schema_groups
+
+        general_group = next(
+            group
+            for group in data["transcription"]["schema"]
+            if group["group"] == "general"
+        )
+        general_keys = {field["key"] for field in general_group["fields"]}
+        assert {"language", "task", "initial_prompt"} <= general_keys
         assert data["file"]["max_file_size"] == 500 * 1024 * 1024
         assert any(option["code"] == "en" for option in data["effective_languages"])
 
@@ -161,8 +170,8 @@ class TestConfigAPI:
 
         assert response.status_code == 422
         detail = response.json()["detail"]
-        assert "vad_parameters" in detail
-        assert "unknown_key" in detail
+        assert any(item.get("loc") == ["body", "vad_parameters"] for item in detail)
+        assert any("unknown_key" in item.get("msg", "") for item in detail)
 
     def test_delete_transcription_defaults_resets_override_layer(
         self, client: TestClient

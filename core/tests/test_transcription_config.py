@@ -105,11 +105,25 @@ class TestTranscriptionParamSchema:
     """Verify schema metadata covers the planned option surface."""
 
     def test_option_field_union_keeps_discriminator_for_openapi(self):
-        """The option-field schema should remain a typed discriminator union."""
+        """Keep option-field schema as a typed discriminator union."""
         schema = TypeAdapter(OptionFieldSchema).json_schema()
 
         assert schema["discriminator"]["propertyName"] == "type"
         assert "oneOf" in schema
+        assert "select" in schema["discriminator"]["mapping"]
+
+    def test_param_schema_covers_transcribe_options_surface(self):
+        """Cover all editable TranscribeOptions fields in schema keys."""
+        schema = get_transcription_param_schema()
+        schema_keys = {field.key for group in schema for field in group.fields}
+
+        expected = {field.name for field in dataclass_fields(TranscribeOptions)}
+        expected.remove("vad_parameters")
+        expected |= {
+            f"vad_parameters.{field.name}" for field in dataclass_fields(VadOptions)
+        }
+
+        assert expected <= schema_keys
 
     def test_param_schema_includes_runtime_supported_vad_subfields(self):
         """VAD metadata should match the installed faster-whisper contract."""

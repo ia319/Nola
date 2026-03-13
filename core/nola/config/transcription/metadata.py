@@ -65,12 +65,31 @@ class TextFieldSchema(BaseModel):
     depends_on: str | None = None
 
 
+class SelectOptionSchema(BaseModel):
+    """Describe one selectable option entry."""
+
+    value: str
+    label_key: str
+
+
+class SelectFieldSchema(BaseModel):
+    """Describe a single-select field."""
+
+    key: str
+    label_key: str
+    type: Literal["select"]
+    options: list[SelectOptionSchema] | None = None
+    options_source: Literal["effective_languages"] | None = None
+    depends_on: str | None = None
+
+
 OptionFieldSchema = Annotated[
     SliderFieldSchema
     | SwitchFieldSchema
     | NumberFieldSchema
     | NumberListFieldSchema
-    | TextFieldSchema,
+    | TextFieldSchema
+    | SelectFieldSchema,
     Field(discriminator="type"),
 ]
 
@@ -186,6 +205,38 @@ class TranscriptionDefaultsPatchResponse(BaseModel):
 
 _TRANSCRIPTION_PARAM_SCHEMA: list[OptionGroupSchema] = [
     OptionGroupSchema(
+        group="general",
+        group_label_key="options.group.general",
+        fields=[
+            SelectFieldSchema(
+                key="language",
+                label_key="options.language.label",
+                type="select",
+                options_source="effective_languages",
+            ),
+            SelectFieldSchema(
+                key="task",
+                label_key="options.task.label",
+                type="select",
+                options=[
+                    SelectOptionSchema(
+                        value="transcribe",
+                        label_key="options.task.transcribe",
+                    ),
+                    SelectOptionSchema(
+                        value="translate",
+                        label_key="options.task.translate",
+                    ),
+                ],
+            ),
+            TextFieldSchema(
+                key="initial_prompt",
+                label_key="options.field.initialPrompt",
+                type="text",
+            ),
+        ],
+    ),
+    OptionGroupSchema(
         group="decoding",
         group_label_key="options.group.decoding",
         fields=[
@@ -280,11 +331,6 @@ _TRANSCRIPTION_PARAM_SCHEMA: list[OptionGroupSchema] = [
                 min=0,
                 max=1,
                 step=0.05,
-            ),
-            TextFieldSchema(
-                key="initial_prompt",
-                label_key="options.field.initialPrompt",
-                type="text",
             ),
             TextFieldSchema(
                 key="prefix",
