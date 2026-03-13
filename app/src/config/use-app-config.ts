@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 
 import type { AppConfig } from '@/shared/types'
 import type { FileValidationConfig } from '@/shared/lib/file-validation'
@@ -6,110 +6,133 @@ import { ALLOWED_EXTENSIONS, ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from './constan
 import { fetchAppConfig } from './api'
 import logger from './logger'
 
-/** Fallback validation config derived from hardcoded constants. */
 const FALLBACK_VALIDATION_CONFIG: FileValidationConfig = {
   allowedExtensions: [...ALLOWED_EXTENSIONS],
   allowedMimeTypes: [...ALLOWED_MIME_TYPES],
   maxFileSize: MAX_FILE_SIZE,
 }
 
-// ---------------------------------------------------------------------------
-// Module-level singleton: the fetch runs once and is shared across all callers.
-// No AbortSignal — config is an app-level resource whose lifecycle is not
-// tied to any React component.
-// ---------------------------------------------------------------------------
-
 let cachedConfig: AppConfig | null = null
 let fetchPromise: Promise<AppConfig> | null = null
+let isFetching = false
+let hasSettledInitialFetch = false
+const subscribers = new Set<() => void>()
+let storeSnapshot: AppConfigSnapshot = {
+  config: null,
+  isLoading: true,
+}
 
-function getOrFetchConfig(): Promise<AppConfig> {
-  if (cachedConfig) return Promise.resolve(cachedConfig)
+interface AppConfigSnapshot {
+  config: AppConfig | null
+  isLoading: boolean
+}
+
+function emitStoreChange(): void {
+  subscribers.forEach((subscriber) => subscriber())
+}
+
+function subscribeStore(subscriber: () => void): () => void {
+  subscribers.add(subscriber)
+  return () => {
+    subscribers.delete(subscriber)
+  }
+}
+
+function getStoreSnapshot(): AppConfigSnapshot {
+  return storeSnapshot
+}
+
+function updateStoreSnapshot(): void {
+  const nextIsLoading = isFetching || (!hasSettledInitialFetch && cachedConfig === null)
+  const nextConfig = cachedConfig
+
+  if (storeSnapshot.config === nextConfig && storeSnapshot.isLoading === nextIsLoading) {
+    return
+  }
+
+  storeSnapshot = {
+    config: nextConfig,
+    isLoading: nextIsLoading,
+  }
+  emitStoreChange()
+}
+
+function getOrFetchConfig(forceRefresh = false): Promise<AppConfig> {
   if (fetchPromise) return fetchPromise
+  if (!forceRefresh && cachedConfig) return Promise.resolve(cachedConfig)
+
+  isFetching = true
+  updateStoreSnapshot()
 
   fetchPromise = fetchAppConfig()
     .then((config) => {
       cachedConfig = config
+      updateStoreSnapshot()
       return config
     })
     .catch((err) => {
-      // Allow retry on next hook mount if this attempt fails.
-      fetchPromise = null
+      if (cachedConfig) {
+        logger.warn('Failed to refresh app config, keeping cached values', err)
+      } else {
+        logger.warn('Failed to fetch app config, using fallback constants', err)
+      }
       throw err
+    })
+    .finally(() => {
+      fetchPromise = null
+      isFetching = false
+      hasSettledInitialFetch = true
+      updateStoreSnapshot()
     })
 
   return fetchPromise
 }
 
-// ---------------------------------------------------------------------------
-// Public hook
-// ---------------------------------------------------------------------------
-
 export interface UseAppConfigReturn {
-  /** Fetched config, or null while loading / on failure. */
   config: AppConfig | null
-  /** Validation config derived from fetched config, or fallback constants. */
   fileValidationConfig: FileValidationConfig
-  /** True while the initial fetch is in-flight. */
   isLoading: boolean
 }
 
-/**
- * Fetch and cache the application config from `GET /api/config`.
- *
- * Multiple callers share one fetch; the result is cached at module level
- * so remounts do not trigger additional requests. When the fetch fails,
- * `fileValidationConfig` falls back to the hardcoded constants.
- *
- * The fetch intentionally has no AbortSignal — config is an app-level
- * singleton resource that should never be cancelled by component unmount.
- * The `active` flag only guards against setState on unmounted components.
- */
+/** Fetch and cache app config from `GET /api/config`. */
 export function useAppConfig(): UseAppConfigReturn {
-  const [config, setConfig] = useState<AppConfig | null>(() => cachedConfig)
-  const [isLoading, setIsLoading] = useState(() => cachedConfig === null)
+  const snapshot = useSyncExternalStore(subscribeStore, getStoreSnapshot, getStoreSnapshot)
 
   useEffect(() => {
-    let active = true
-
-    getOrFetchConfig()
-      .then((data) => {
-        if (active) {
-          setConfig(data)
-          setIsLoading(false)
-        }
-      })
-      .catch((err) => {
-        if (active) {
-          logger.warn('Failed to fetch app config, using fallback constants', err)
-          setIsLoading(false)
-        }
-      })
-
-    return () => {
-      active = false
-    }
+    void getOrFetchConfig().catch(() => undefined)
   }, [])
 
-  // Derive FileValidationConfig from the fetched config or fall back.
-  const fileValidationConfig: FileValidationConfig = config
+  const fileValidationConfig: FileValidationConfig = snapshot.config
     ? {
-        allowedExtensions: config.file.allowed_extensions.map((ext) =>
+        allowedExtensions: snapshot.config.file.allowed_extensions.map((ext) =>
           (ext.startsWith('.') ? ext.slice(1) : ext).toLowerCase(),
         ),
-        allowedMimeTypes: config.file.allowed_mime_types.map((m) => m.toLowerCase()),
-        maxFileSize: config.file.max_file_size,
+        allowedMimeTypes: snapshot.config.file.allowed_mime_types.map((m) => m.toLowerCase()),
+        maxFileSize: snapshot.config.file.max_file_size,
       }
     : FALLBACK_VALIDATION_CONFIG
 
-  return { config, fileValidationConfig, isLoading }
+  return {
+    config: snapshot.config,
+    fileValidationConfig,
+    isLoading: snapshot.isLoading,
+  }
 }
 
-// ---------------------------------------------------------------------------
-// Test helpers (only available via explicit import in test files)
-// ---------------------------------------------------------------------------
+/** Force a network refetch and replace the shared config snapshot. */
+export async function refreshAppConfig(): Promise<AppConfig> {
+  return getOrFetchConfig(true)
+}
 
-/** Reset the module-level cache. Call in `beforeEach` / `afterEach`. */
+/** Reset module-level cache in tests. */
 export function _resetConfigCache(): void {
   cachedConfig = null
   fetchPromise = null
+  isFetching = false
+  hasSettledInitialFetch = false
+  storeSnapshot = {
+    config: null,
+    isLoading: true,
+  }
+  emitStoreChange()
 }
