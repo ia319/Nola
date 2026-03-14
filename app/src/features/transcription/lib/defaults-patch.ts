@@ -13,6 +13,8 @@ function isPlainObject(value: unknown): value is JsonObject {
 }
 
 function cloneValue<T>(value: T): T {
+  // NOTE: Keep JSON clone for now because defaults come from JSON-safe API payloads.
+  // Switch to structuredClone when defaults include non-JSON runtime values.
   return JSON.parse(JSON.stringify(value)) as T
 }
 
