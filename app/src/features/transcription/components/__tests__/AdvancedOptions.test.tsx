@@ -283,4 +283,58 @@ describe('AdvancedOptions', () => {
 
     expect(onOptionChange).toHaveBeenCalledWith('vad_parameters.max_speech_duration_s', 'inf')
   })
+
+  it('commits plain number fields on blur instead of on each keystroke', () => {
+    const onOptionChange = vi.fn()
+    const schema: TranscriptionOptionGroup[] = [
+      {
+        group: 'quality',
+        group_label_key: 'options.group.quality',
+        fields: [
+          {
+            key: 'log_prob_threshold',
+            label_key: 'options.field.logProbThreshold',
+            type: 'number',
+            step: 0.1,
+          },
+        ],
+      },
+    ]
+
+    renderAdvancedOptions(schema, { onOptionChange })
+    fireEvent.click(screen.getByRole('button', { name: 'options.advanced.toggle' }))
+
+    const input = screen.getByLabelText('options.field.logProbThreshold') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '0.5' } })
+
+    expect(onOptionChange).not.toHaveBeenCalled()
+
+    fireEvent.blur(input)
+
+    expect(onOptionChange).toHaveBeenCalledWith('log_prob_threshold', 0.5)
+  })
+
+  it('renders array placeholders for text fields', () => {
+    const schema: TranscriptionOptionGroup[] = [
+      {
+        group: 'timestamps',
+        group_label_key: 'options.group.timestamps',
+        fields: [
+          {
+            key: 'clip_timestamps',
+            label_key: 'options.field.clipTimestamps',
+            type: 'text',
+          },
+        ],
+      },
+    ]
+
+    renderAdvancedOptions(schema, {
+      defaults: { clip_timestamps: [0, 5, 10] },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'options.advanced.toggle' }))
+
+    const input = screen.getByLabelText('options.field.clipTimestamps') as HTMLInputElement
+    expect(input.placeholder).toBe('0, 5, 10')
+  })
 })

@@ -193,6 +193,73 @@ function NumberListField({
   )
 }
 
+interface NumberFieldProps {
+  field: NumberOptionField
+  label: string
+  disabled?: boolean
+  value: unknown
+  placeholder?: string
+  onChange: (parsed: number | string | null | undefined) => void
+}
+
+function NumberField({ field, label, disabled, value, placeholder, onChange }: NumberFieldProps) {
+  const [draft, setDraft] = useState(() => (typeof value === 'number' ? String(value) : ''))
+  const hasSpecials = Array.isArray(field.special_values) && field.special_values.length > 0
+  const activeSpecial =
+    typeof value === 'string' && hasSpecialValue(field, value) ? value.toLowerCase() : null
+
+  function commitDraft() {
+    const raw = draft.trim()
+    if (raw === '') {
+      onChange(null)
+      return
+    }
+
+    const parsed = Number(raw)
+    if (!Number.isFinite(parsed)) {
+      return
+    }
+
+    onChange(parsed)
+    setDraft(String(parsed))
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={`opt-${field.key}`} className="text-sm">
+        {label}
+      </Label>
+      <div className="flex items-center gap-2">
+        <Input
+          id={`opt-${field.key}`}
+          type="number"
+          disabled={disabled}
+          min={field.min ?? undefined}
+          max={field.max ?? undefined}
+          step={field.step ?? undefined}
+          value={draft}
+          placeholder={placeholder}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commitDraft}
+        />
+        {hasSpecials &&
+          field.special_values?.map((token) => (
+            <Button
+              key={token}
+              type="button"
+              size="sm"
+              variant={activeSpecial === token.toLowerCase() ? 'default' : 'outline'}
+              disabled={disabled}
+              onClick={() => onChange(activeSpecial === token.toLowerCase() ? undefined : token)}
+            >
+              {token}
+            </Button>
+          ))}
+      </div>
+    </div>
+  )
+}
+
 export interface AdvancedOptionsProps {
   schema: TranscriptionOptionGroup[]
   advancedOptions: AdvancedTranscriptionOptions
@@ -336,57 +403,23 @@ function AdvancedOptionsInner({
                       }
 
                       case 'number': {
-                        const hasSpecials =
-                          Array.isArray(field.special_values) && field.special_values.length > 0
-                        const activeSpecial =
-                          typeof value === 'string' &&
-                          hasSpecialValue(field, value) &&
-                          value.toLowerCase()
+                        const numberKeyValue =
+                          typeof value === 'number' || typeof value === 'string'
+                            ? String(value)
+                            : ''
 
                         return (
-                          <div key={field.key} className="space-y-1.5">
-                            <Label htmlFor={`opt-${field.key}`} className="text-sm">
-                              {t(field.label_key)}
-                            </Label>
-                            <div className="flex items-center gap-2">
-                              <Input
-                                id={`opt-${field.key}`}
-                                type="number"
-                                disabled={fieldDisabled}
-                                min={field.min ?? undefined}
-                                max={field.max ?? undefined}
-                                step={field.step ?? undefined}
-                                value={typeof value === 'number' ? value : ''}
-                                placeholder={
-                                  placeholder !== undefined ? String(placeholder) : undefined
-                                }
-                                onChange={(e) => {
-                                  const raw = e.target.value
-                                  onOptionChange(field.key, raw === '' ? null : Number(raw))
-                                }}
-                              />
-                              {hasSpecials &&
-                                field.special_values?.map((token) => (
-                                  <Button
-                                    key={token}
-                                    type="button"
-                                    size="sm"
-                                    variant={
-                                      activeSpecial === token.toLowerCase() ? 'default' : 'outline'
-                                    }
-                                    disabled={fieldDisabled}
-                                    onClick={() =>
-                                      onOptionChange(
-                                        field.key,
-                                        activeSpecial === token.toLowerCase() ? undefined : token,
-                                      )
-                                    }
-                                  >
-                                    {token}
-                                  </Button>
-                                ))}
-                            </div>
-                          </div>
+                          <NumberField
+                            key={`${field.key}:${numberKeyValue}:${resetNonce}`}
+                            field={field}
+                            label={t(field.label_key)}
+                            disabled={fieldDisabled}
+                            value={value}
+                            placeholder={
+                              placeholder !== undefined ? String(placeholder) : undefined
+                            }
+                            onChange={(parsed) => onOptionChange(field.key, parsed)}
+                          />
                         )
                       }
 
@@ -401,7 +434,11 @@ function AdvancedOptionsInner({
                               disabled={fieldDisabled}
                               value={typeof value === 'string' ? value : ''}
                               placeholder={
-                                typeof placeholder === 'string' ? placeholder : undefined
+                                Array.isArray(placeholder)
+                                  ? placeholder.map(String).join(', ')
+                                  : typeof placeholder === 'string'
+                                    ? placeholder
+                                    : undefined
                               }
                               onChange={(e) => {
                                 const next = e.target.value
