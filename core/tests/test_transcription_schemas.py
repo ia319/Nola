@@ -153,3 +153,51 @@ class TestTranscriptionSchemas:
         """Unknown task values should fail request validation early."""
         with pytest.raises(ValidationError, match="Unsupported task"):
             TranscriptionRequest(file_id="file-001", task="summarize")
+
+    def test_transcription_request_rejects_out_of_range_probability_fields(self):
+        """Probability-like fields should stay in the [0, 1] range."""
+        with pytest.raises(ValidationError):
+            TranscriptionRequest(
+                file_id="file-001",
+                no_speech_threshold=1.2,
+            )
+
+        with pytest.raises(ValidationError):
+            TranscriptionRequest(
+                file_id="file-001",
+                language_detection_threshold=-0.1,
+            )
+
+        with pytest.raises(ValidationError):
+            TranscriptionRequest(
+                file_id="file-001",
+                vad_parameters={"threshold": 1.1},
+            )
+
+    def test_transcription_request_rejects_negative_duration_fields(self):
+        """Duration and threshold fields should reject negative values."""
+        with pytest.raises(ValidationError):
+            TranscriptionRequest(
+                file_id="file-001",
+                max_initial_timestamp=-0.1,
+            )
+
+        with pytest.raises(ValidationError):
+            TranscriptionRequest(
+                file_id="file-001",
+                hallucination_silence_threshold=-0.1,
+            )
+
+        with pytest.raises(ValidationError):
+            TranscriptionRequest(
+                file_id="file-001",
+                vad_parameters={"speech_pad_ms": -10},
+            )
+
+    def test_defaults_patch_rejects_non_positive_count_fields(self):
+        """Count-like fields should reject zero/negative values."""
+        with pytest.raises(ValidationError):
+            TranscriptionDefaultsUpdateRequest(max_new_tokens=0)
+
+        with pytest.raises(ValidationError):
+            TranscriptionDefaultsUpdateRequest(language_detection_segments=0)

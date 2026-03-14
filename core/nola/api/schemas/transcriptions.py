@@ -42,13 +42,13 @@ class VadParametersRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    threshold: float | None = None
-    neg_threshold: float | None = None
-    min_speech_duration_ms: int | None = None
+    threshold: float | None = Field(None, ge=0, le=1)
+    neg_threshold: float | None = Field(None, ge=0, le=1)
+    min_speech_duration_ms: int | None = Field(None, ge=0)
     max_speech_duration_s: float | Literal["inf"] | None = None
-    min_silence_duration_ms: int | None = None
-    speech_pad_ms: int | None = None
-    min_silence_at_max_speech: int | None = None
+    min_silence_duration_ms: int | None = Field(None, ge=0)
+    speech_pad_ms: int | None = Field(None, ge=0)
+    min_silence_at_max_speech: int | None = Field(None, ge=0)
     use_max_poss_sil_at_max_speech: bool | None = None
 
     @model_validator(mode="before")
@@ -57,6 +57,18 @@ class VadParametersRequest(BaseModel):
         """Reject runtime-unsupported keys before field parsing."""
         if isinstance(value, dict):
             validate_vad_parameter_keys(value)
+        return value
+
+    @field_validator("max_speech_duration_s")
+    @classmethod
+    def check_max_speech_duration_s(
+        cls, value: float | Literal["inf"] | None
+    ) -> float | Literal["inf"] | None:
+        """Keep VAD max speech duration non-negative while allowing the inf sentinel."""
+        if value is None or value == "inf":
+            return value
+        if value < 0:
+            raise ValueError("max_speech_duration_s must be non-negative.")
         return value
 
 
@@ -142,6 +154,8 @@ class TranscriptionOptionsPayload(BaseModel):
     )
     no_speech_threshold: float | None = Field(
         None,
+        ge=0,
+        le=1,
         description="No speech threshold",
         json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.no_speech_threshold),
     )
@@ -154,6 +168,7 @@ class TranscriptionOptionsPayload(BaseModel):
     )
     prompt_reset_on_temperature: float | None = Field(
         None,
+        ge=0,
         description="Reset prompt on temperature",
         json_schema_extra=_swagger_default(
             _ENGINE_DEFAULTS.prompt_reset_on_temperature
@@ -188,6 +203,7 @@ class TranscriptionOptionsPayload(BaseModel):
     )
     max_new_tokens: int | None = Field(
         None,
+        ge=1,
         description="Max new tokens per segment",
         json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.max_new_tokens),
     )
@@ -200,6 +216,7 @@ class TranscriptionOptionsPayload(BaseModel):
     )
     max_initial_timestamp: float | None = Field(
         None,
+        ge=0,
         description="Max initial timestamp",
         json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.max_initial_timestamp),
     )
@@ -250,6 +267,7 @@ class TranscriptionOptionsPayload(BaseModel):
     )
     hallucination_silence_threshold: float | None = Field(
         None,
+        ge=0,
         description="Hallucination silence threshold",
         json_schema_extra=_swagger_default(
             _ENGINE_DEFAULTS.hallucination_silence_threshold
@@ -257,6 +275,8 @@ class TranscriptionOptionsPayload(BaseModel):
     )
     language_detection_threshold: float | None = Field(
         None,
+        ge=0,
+        le=1,
         description="Language detection threshold",
         json_schema_extra=_swagger_default(
             _ENGINE_DEFAULTS.language_detection_threshold
@@ -264,6 +284,7 @@ class TranscriptionOptionsPayload(BaseModel):
     )
     language_detection_segments: int | None = Field(
         None,
+        ge=1,
         description="Segments for language detection",
         json_schema_extra=_swagger_default(
             _ENGINE_DEFAULTS.language_detection_segments

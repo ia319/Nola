@@ -173,6 +173,25 @@ class TestConfigAPI:
         assert any(item.get("loc") == ["body", "vad_parameters"] for item in detail)
         assert any("unknown_key" in item.get("msg", "") for item in detail)
 
+    def test_patch_transcription_defaults_rejects_out_of_range_values(
+        self, client: TestClient
+    ):
+        """Out-of-range values should fail before persisting defaults."""
+        response = client.patch(
+            "/api/config/transcription/defaults",
+            json={
+                "no_speech_threshold": 1.2,
+                "vad_parameters": {"speech_pad_ms": -1},
+            },
+        )
+
+        assert response.status_code == 422
+        detail = response.json()["detail"]
+        assert any(
+            item.get("loc", [None])[-1] == "no_speech_threshold" for item in detail
+        )
+        assert any(item.get("loc", [None])[-1] == "speech_pad_ms" for item in detail)
+
     def test_delete_transcription_defaults_resets_override_layer(
         self, client: TestClient
     ):
