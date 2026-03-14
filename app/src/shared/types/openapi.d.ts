@@ -854,10 +854,10 @@ export interface components {
       language?: string | null
       /**
        * Task
-       * @description 'transcribe' or 'translate'
+       * @description Task value defined by backend transcription schema
        * @example transcribe
        */
-      task?: ('transcribe' | 'translate') | null
+      task?: string | null
       /**
        * Beam Size
        * @description Beam size for decoding
@@ -1099,10 +1099,10 @@ export interface components {
       language?: string | null
       /**
        * Task
-       * @description 'transcribe' or 'translate'
+       * @description Task value defined by backend transcription schema
        * @example transcribe
        */
-      task?: ('transcribe' | 'translate') | null
+      task?: string | null
       /**
        * Beam Size
        * @description Beam size for decoding
@@ -1304,11 +1304,8 @@ export interface components {
     TranscriptionResolvedDefaultsResponse: {
       /** Language */
       language: string | null
-      /**
-       * Task
-       * @enum {string}
-       */
-      task: 'transcribe' | 'translate'
+      /** Task */
+      task: string
       /** Beam Size */
       beam_size: number
       /** Best Of */

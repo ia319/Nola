@@ -26,7 +26,6 @@ import {
   buildEffectiveDefaults,
 } from '@/features/transcription/lib/defaults-patch'
 import { buildTranscriptionSchemaUiModel } from '@/features/transcription/lib/schema-adapter'
-import type { TranscriptionTaskType } from '@/features/transcription/types'
 import { isAppError } from '@/shared/lib/error-factory'
 import type { AppError } from '@/shared/types'
 
@@ -46,10 +45,6 @@ export interface OptionsBarProps {
   /** Callback after batch task creation attempt. */
   onTasksCreated: (results: TaskCreateResult[]) => void
   disabled?: boolean
-}
-
-function isTranscriptionTaskType(value: string): value is TranscriptionTaskType {
-  return value === 'transcribe' || value === 'translate'
 }
 
 /**
@@ -96,12 +91,7 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
   )
 
   const supportedTaskValues = useMemo(
-    () =>
-      new Set(
-        schemaUiModel.taskControl.options
-          .map((option) => option.value)
-          .filter(isTranscriptionTaskType),
-      ),
+    () => new Set(schemaUiModel.taskControl.options.map((option) => option.value)),
     [schemaUiModel.taskControl.options],
   )
 
@@ -236,7 +226,7 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
           <Select
             value={task}
             onValueChange={(value) => {
-              if (!isTranscriptionTaskType(value) || !supportedTaskValues.has(value)) {
+              if (!supportedTaskValues.has(value)) {
                 logger.warn('task.unsupportedTaskOption', { value })
                 return
               }

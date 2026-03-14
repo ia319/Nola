@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from nola.api.schemas import TranscriptionDefaultsUpdateRequest, TranscriptionRequest
+from nola.config.transcription import get_transcription_param_schema
 from nola.engines.base import TranscribeOptions
 
 
@@ -131,3 +132,24 @@ class TestTranscriptionSchemas:
         assert request.get_options_dict() == {
             "vad_parameters": {"max_speech_duration_s": "inf"},
         }
+
+    def test_task_validation_uses_runtime_task_options(self):
+        """Task values should follow the backend metadata option list."""
+        schema = get_transcription_param_schema()
+        task_field = next(
+            field
+            for group in schema
+            for field in group.fields
+            if field.type == "select" and field.key == "task"
+        )
+        assert task_field.options is not None
+
+        selected = task_field.options[0].value
+        request = TranscriptionRequest(file_id="file-001", task=selected.upper())
+
+        assert request.get_options_dict() == {"task": selected}
+
+    def test_task_validation_rejects_unknown_values(self):
+        """Unknown task values should fail request validation early."""
+        with pytest.raises(ValidationError, match="Unsupported task"):
+            TranscriptionRequest(file_id="file-001", task="summarize")

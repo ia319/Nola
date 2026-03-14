@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from nola.api.schemas.validators import (
     validate_language_code,
+    validate_task_value,
     validate_temperature,
     validate_vad_parameter_keys,
 )
@@ -77,9 +78,9 @@ class TranscriptionOptionsPayload(BaseModel):
             "examples": ["en", "zh", "ja"],
         },
     )
-    task: Literal["transcribe", "translate"] | None = Field(
+    task: str | None = Field(
         None,
-        description="'transcribe' or 'translate'",
+        description="Task value defined by backend transcription schema",
         json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.task),
     )
 
@@ -274,6 +275,12 @@ class TranscriptionOptionsPayload(BaseModel):
     def check_language(cls, v: str | None) -> str | None:
         """Reject unsupported language codes early."""
         return validate_language_code(v)
+
+    @field_validator("task")
+    @classmethod
+    def check_task(cls, v: str | None) -> str | None:
+        """Reject task values not exposed by runtime transcription metadata."""
+        return validate_task_value(v)
 
     @field_validator("temperature")
     @classmethod

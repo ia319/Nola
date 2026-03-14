@@ -71,6 +71,34 @@ def validate_temperature(
 
 
 @lru_cache(maxsize=1)
+def _allowed_task_values() -> frozenset[str]:
+    """Read supported task values from shared transcription metadata."""
+    values: set[str] = set()
+    for group in get_transcription_param_schema():
+        for field in group.fields:
+            if field.type == "select" and field.key == "task":
+                if field.options:
+                    values |= {option.value.lower() for option in field.options}
+    if values:
+        return frozenset(values)
+    return frozenset({"transcribe", "translate"})
+
+
+def validate_task_value(value: str | None) -> str | None:
+    """Validate task values against the runtime task option list."""
+    if value is None:
+        return None
+
+    normalized_value = value.lower()
+    if normalized_value not in _allowed_task_values():
+        raise ValueError(
+            f"Unsupported task: '{value}'. "
+            f"Use one of: {', '.join(sorted(_allowed_task_values()))}."
+        )
+    return normalized_value
+
+
+@lru_cache(maxsize=1)
 def _allowed_vad_parameter_keys() -> frozenset[str]:
     """Read the supported nested VAD keys from shared transcription metadata."""
     keys = {

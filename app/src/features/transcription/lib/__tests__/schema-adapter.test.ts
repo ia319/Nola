@@ -23,6 +23,7 @@ describe('buildTranscriptionSchemaUiModel', () => {
             options: [
               { value: 'transcribe', label_key: 'options.task.transcribe' },
               { value: 'translate', label_key: 'options.task.translate' },
+              { value: 'summarize', label_key: 'options.task.summarize' },
             ],
           },
           {
@@ -63,6 +64,7 @@ describe('buildTranscriptionSchemaUiModel', () => {
     expect(result.taskControl.options.map((option) => option.value)).toEqual([
       'transcribe',
       'translate',
+      'summarize',
     ])
     expect(result.initialPromptControl.key).toBe('initial_prompt')
     expect(result.advancedSchema).toHaveLength(1)

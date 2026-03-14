@@ -9,8 +9,8 @@ export type AdvancedOptionValue = string | number | boolean | number[] | null
  */
 export type AdvancedTranscriptionOptions = Record<string, AdvancedOptionValue | undefined>
 
-/** Keep task mode constrained to backend-supported values across UI and payload builders. */
-export type TranscriptionTaskType = 'transcribe' | 'translate'
+/** Treat task values as backend-driven option codes. */
+export type TranscriptionTaskType = string
 
 /** Define the stable contract consumed by option UI and task-creation orchestration. */
 export interface UseTranscriptionOptionsReturn {

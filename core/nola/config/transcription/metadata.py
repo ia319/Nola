@@ -139,7 +139,7 @@ class TranscriptionResolvedDefaultsResponse(BaseModel):
     """Expose fully resolved transcription defaults used at runtime."""
 
     language: str | None
-    task: Literal["transcribe", "translate"]
+    task: str
     beam_size: int
     best_of: int
     patience: float
