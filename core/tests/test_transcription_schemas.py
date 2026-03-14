@@ -2,6 +2,9 @@
 
 from dataclasses import asdict
 
+import pytest
+from pydantic import ValidationError
+
 from nola.api.schemas import TranscriptionDefaultsUpdateRequest, TranscriptionRequest
 from nola.engines.base import TranscribeOptions
 
@@ -99,4 +102,32 @@ class TestTranscriptionSchemas:
         assert request.get_options_dict() == {
             "hotwords": None,
             "prefix": "speaker:",
+        }
+
+    def test_transcription_defaults_update_request_preserves_nested_nulls(self):
+        """Defaults update payload should keep nested nulls for VAD key resets."""
+        request = TranscriptionDefaultsUpdateRequest(
+            vad_parameters={"threshold": None},
+        )
+
+        assert request.get_options_dict() == {
+            "vad_parameters": {"threshold": None},
+        }
+
+    def test_vad_parameters_unknown_key_is_rejected(self):
+        """Unknown nested VAD keys should fail schema validation."""
+        with pytest.raises(ValidationError, match="Unsupported vad_parameters key"):
+            TranscriptionDefaultsUpdateRequest(
+                vad_parameters={"threshld": 0.6},
+            )
+
+    def test_transcription_request_accepts_inf_vad_sentinel(self):
+        """Accept API-level infinity sentinel for VAD max duration in task payload."""
+        request = TranscriptionRequest(
+            file_id="file-001",
+            vad_parameters={"max_speech_duration_s": "inf"},
+        )
+
+        assert request.get_options_dict() == {
+            "vad_parameters": {"max_speech_duration_s": "inf"},
         }

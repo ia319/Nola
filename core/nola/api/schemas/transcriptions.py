@@ -3,7 +3,7 @@
 from dataclasses import asdict
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from nola.api.schemas.validators import (
     validate_language_code,
@@ -34,6 +34,29 @@ def _defaults_patch_example() -> dict[str, Any]:
         "vad_parameters": {"threshold": 0.6},
         "hotwords": None,
     }
+
+
+class VadParametersRequest(BaseModel):
+    """Typed VAD payload for task creation and defaults updates."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    threshold: float | None = None
+    neg_threshold: float | None = None
+    min_speech_duration_ms: int | None = None
+    max_speech_duration_s: float | Literal["inf"] | None = None
+    min_silence_duration_ms: int | None = None
+    speech_pad_ms: int | None = None
+    min_silence_at_max_speech: int | None = None
+    use_max_poss_sil_at_max_speech: bool | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def check_supported_keys(cls, value: Any) -> Any:
+        """Reject runtime-unsupported keys before field parsing."""
+        if isinstance(value, dict):
+            validate_vad_parameter_keys(value)
+        return value
 
 
 class TranscriptionOptionsPayload(BaseModel):
@@ -201,7 +224,7 @@ class TranscriptionOptionsPayload(BaseModel):
         description="Enable VAD filtering",
         json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.vad_filter),
     )
-    vad_parameters: dict[str, Any] | None = Field(
+    vad_parameters: VadParametersRequest | None = Field(
         None,
         description="VAD parameters",
         json_schema_extra=_swagger_default(_ENGINE_DEFAULTS.vad_parameters),
@@ -259,12 +282,6 @@ class TranscriptionOptionsPayload(BaseModel):
     ) -> float | list[float] | None:
         """Reject negative temperature values."""
         return validate_temperature(v)
-
-    @field_validator("vad_parameters")
-    @classmethod
-    def check_vad_parameters(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
-        """Reject unsupported VAD parameter keys early."""
-        return validate_vad_parameter_keys(v)
 
     def get_options_dict(self) -> dict[str, Any]:
         """Return non-None options as dict for storage."""

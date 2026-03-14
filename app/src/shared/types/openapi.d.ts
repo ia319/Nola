@@ -1010,13 +1010,8 @@ export interface components {
        * @example false
        */
       vad_filter?: boolean | null
-      /**
-       * Vad Parameters
-       * @description VAD parameters
-       */
-      vad_parameters?: {
-        [key: string]: unknown
-      } | null
+      /** @description VAD parameters */
+      vad_parameters?: components['schemas']['VadParametersRequest'] | null
       /**
        * Multilingual
        * @description Enable multilingual mode
@@ -1260,13 +1255,8 @@ export interface components {
        * @example false
        */
       vad_filter?: boolean | null
-      /**
-       * Vad Parameters
-       * @description VAD parameters
-       */
-      vad_parameters?: {
-        [key: string]: unknown
-      } | null
+      /** @description VAD parameters */
+      vad_parameters?: components['schemas']['VadParametersRequest'] | null
       /**
        * Multilingual
        * @description Enable multilingual mode
@@ -1398,6 +1388,28 @@ export interface components {
       min_silence_duration_ms: number
       /** Speech Pad Ms */
       speech_pad_ms: number
+      /** Min Silence At Max Speech */
+      min_silence_at_max_speech?: number | null
+      /** Use Max Poss Sil At Max Speech */
+      use_max_poss_sil_at_max_speech?: boolean | null
+    }
+    /**
+     * VadParametersRequest
+     * @description Typed VAD payload for task creation and defaults updates.
+     */
+    VadParametersRequest: {
+      /** Threshold */
+      threshold?: number | null
+      /** Neg Threshold */
+      neg_threshold?: number | null
+      /** Min Speech Duration Ms */
+      min_speech_duration_ms?: number | null
+      /** Max Speech Duration S */
+      max_speech_duration_s?: number | 'inf' | null
+      /** Min Silence Duration Ms */
+      min_silence_duration_ms?: number | null
+      /** Speech Pad Ms */
+      speech_pad_ms?: number | null
       /** Min Silence At Max Speech */
       min_silence_at_max_speech?: number | null
       /** Use Max Poss Sil At Max Speech */

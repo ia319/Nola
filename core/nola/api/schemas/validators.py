@@ -11,12 +11,10 @@ Each validator:
 
 from __future__ import annotations
 
-from dataclasses import fields
 from functools import lru_cache
 
-from faster_whisper.vad import VadOptions
-
 from nola.config.constants import SUPPORTED_LANGUAGES
+from nola.config.transcription import get_transcription_param_schema
 
 
 def validate_language_code(code: str | None) -> str | None:
@@ -74,8 +72,14 @@ def validate_temperature(
 
 @lru_cache(maxsize=1)
 def _allowed_vad_parameter_keys() -> frozenset[str]:
-    """Return runtime-supported VAD parameter keys."""
-    return frozenset(field.name for field in fields(VadOptions))
+    """Read the supported nested VAD keys from shared transcription metadata."""
+    keys = {
+        field.key.split(".", maxsplit=1)[1]
+        for group in get_transcription_param_schema()
+        for field in group.fields
+        if field.key.startswith("vad_parameters.")
+    }
+    return frozenset(keys)
 
 
 def validate_vad_parameter_keys(
