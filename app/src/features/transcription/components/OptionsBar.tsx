@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -11,9 +11,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  deleteTranscriptionDefaults,
+  fetchEngineDefaults,
+  patchTranscriptionDefaults,
+} from '@/config/api'
 import logger from '@/config/logger'
+import { refreshAppConfig, useAppConfig } from '@/config/use-app-config'
 import { createTask } from '@/features/transcription/api'
 import { useTranscriptionOptions } from '@/features/transcription/hooks/useTranscriptionOptions'
+import {
+  buildDefaultsPatchPayload,
+  buildEffectiveDefaults,
+} from '@/features/transcription/lib/defaults-patch'
+import { buildTranscriptionSchemaUiModel } from '@/features/transcription/lib/schema-adapter'
 import { isAppError } from '@/shared/lib/error-factory'
 import type { AppError } from '@/shared/types'
 
@@ -26,20 +38,6 @@ export interface TaskCreateResult {
   ok: boolean
   error?: AppError
 }
-
-/** Hardcoded common language subset; replaced by GET /api/config in a future phase. */
-const LANGUAGES = [
-  { value: '__auto__', labelKey: 'options.language.auto' },
-  { value: 'en', labelKey: 'options.language.en' },
-  { value: 'zh', labelKey: 'options.language.zh' },
-  { value: 'ja', labelKey: 'options.language.ja' },
-  { value: 'ko', labelKey: 'options.language.ko' },
-  { value: 'de', labelKey: 'options.language.de' },
-  { value: 'fr', labelKey: 'options.language.fr' },
-  { value: 'es', labelKey: 'options.language.es' },
-  { value: 'ru', labelKey: 'options.language.ru' },
-  { value: 'ar', labelKey: 'options.language.ar' },
-] as const
 
 export interface OptionsBarProps {
   /** File IDs available for task creation (success && !taskCreated). */
@@ -58,8 +56,12 @@ export interface OptionsBarProps {
 export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProps) {
   const { t } = useTranslation()
   const [isCreating, setIsCreating] = useState(false)
-  // Synchronous lock to prevent double-click reentry before React re-renders.
+  const [isSavingDefaults, setIsSavingDefaults] = useState(false)
+  const [isResettingDefaults, setIsResettingDefaults] = useState(false)
+  // Prevent double-click reentry before React re-renders.
   const creatingRef = useRef(false)
+
+  const { config } = useAppConfig()
 
   const {
     language,
@@ -70,10 +72,47 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
     setTask,
     setAdvancedOption,
     resetAdvancedOptions,
+    resetOptionOverrides,
     buildRequest,
     initialPrompt,
     setInitialPrompt,
   } = useTranscriptionOptions()
+
+  const schema = config?.transcription.schema
+  const effectiveLanguages = config?.effective_languages
+
+  const schemaUiModel = useMemo(
+    () =>
+      buildTranscriptionSchemaUiModel({
+        schema: schema ?? [],
+        effectiveLanguages: effectiveLanguages ?? [],
+      }),
+    [schema, effectiveLanguages],
+  )
+
+  const supportedTaskValues = useMemo(
+    () => new Set(schemaUiModel.taskControl.options.map((option) => option.value)),
+    [schemaUiModel.taskControl.options],
+  )
+
+  function toAppError(err: unknown): AppError {
+    if (isAppError(err)) return err
+    return {
+      code: 'API_SERVER_UNKNOWN',
+      i18nKey: 'error.api.serverError',
+      retriable: true,
+    }
+  }
+
+  async function refreshDefaultsView(context: 'save' | 'reset'): Promise<boolean> {
+    try {
+      await refreshAppConfig()
+      return true
+    } catch (err: unknown) {
+      logger.error('config.defaults.refreshFailed', { context, error: err })
+      return false
+    }
+  }
 
   /** Create tasks for all available file IDs, collecting per-file results. */
   async function handleStart() {
@@ -92,13 +131,7 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
           results.push({ fileId, taskId: res.task_id, ok: true })
         } catch (err: unknown) {
           logger.error('task.createFailed', { fileId, error: err })
-          const appError: AppError = isAppError(err)
-            ? err
-            : {
-                code: 'API_SERVER_UNKNOWN',
-                i18nKey: 'error.api.serverError',
-                retriable: true,
-              }
+          const appError = toAppError(err)
           results.push({ fileId, ok: false, error: appError })
         }
       }
@@ -110,55 +143,118 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
     }
   }
 
-  const controlsDisabled = disabled || isCreating
+  async function handleSaveDefaults() {
+    // NOTE: Use state flags as the write gate; add a shared ref lock only if duplicate writes appear in real usage.
+    if (!defaults || isSavingDefaults || disabled) return
+
+    setIsSavingDefaults(true)
+    try {
+      const engineDefaults = (await fetchEngineDefaults()).defaults
+      const nextEffectiveDefaults = buildEffectiveDefaults({
+        defaults,
+        language,
+        task,
+        initialPrompt,
+        advancedOptions,
+      })
+      const payload = buildDefaultsPatchPayload({
+        engineDefaults,
+        previousEffectiveDefaults: defaults,
+        nextEffectiveDefaults,
+      })
+
+      await patchTranscriptionDefaults(payload)
+      await refreshDefaultsView('save')
+      toast.success(t('options.defaults.saved'))
+    } catch (err: unknown) {
+      logger.error('config.defaults.saveFailed', { error: err })
+      const appError = toAppError(err)
+      toast.error(t(appError.i18nKey, appError.params ?? {}))
+    } finally {
+      setIsSavingDefaults(false)
+    }
+  }
+
+  async function handleResetDefaults() {
+    // NOTE: Use state flags as the write gate; add a shared ref lock only if save/reset overlap appears in real usage.
+    if (isResettingDefaults || disabled) return
+
+    setIsResettingDefaults(true)
+    try {
+      await deleteTranscriptionDefaults()
+      const refreshed = await refreshDefaultsView('reset')
+      if (refreshed) {
+        resetOptionOverrides()
+      }
+      toast.success(t('options.defaults.resetDone'))
+    } catch (err: unknown) {
+      logger.error('config.defaults.resetFailed', { error: err })
+      const appError = toAppError(err)
+      toast.error(t(appError.i18nKey, appError.params ?? {}))
+    } finally {
+      setIsResettingDefaults(false)
+    }
+  }
+
+  const controlsDisabled = disabled || isCreating || isSavingDefaults || isResettingDefaults
   const startDisabled = controlsDisabled || fileIds.length === 0
+  const defaultsActionDisabled = controlsDisabled || defaults === null
 
   return (
     <div className="space-y-4">
-      {/* Basic options row */}
       <div className="flex flex-wrap items-end gap-4">
-        {/* Language selector */}
         <div className="space-y-1.5">
-          <Label htmlFor="language-select">{t('options.language.label')}</Label>
+          <Label htmlFor="language-select">{t(schemaUiModel.languageControl.labelKey)}</Label>
           <Select
             value={language ?? '__auto__'}
-            onValueChange={(v) => setLanguage(v === '__auto__' ? undefined : v)}
+            onValueChange={(value) => setLanguage(value === '__auto__' ? undefined : value)}
             disabled={controlsDisabled}
           >
             <SelectTrigger id="language-select" className="w-[160px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {LANGUAGES.map((lang) => (
-                <SelectItem key={lang.value} value={lang.value}>
-                  {t(lang.labelKey)}
+              {schemaUiModel.languageControl.options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {t(option.labelKey)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Task type selector */}
         <div className="space-y-1.5">
-          <Label htmlFor="task-select">{t('options.task.label')}</Label>
+          <Label htmlFor="task-select">{t(schemaUiModel.taskControl.labelKey)}</Label>
           <Select
             value={task}
-            onValueChange={(v) => setTask(v as 'transcribe' | 'translate')}
+            onValueChange={(value) => {
+              if (!supportedTaskValues.has(value)) {
+                logger.warn('task.unsupportedTaskOption', { value })
+                return
+              }
+              setTask(value)
+            }}
             disabled={controlsDisabled}
           >
             <SelectTrigger id="task-select" className="w-[260px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="transcribe">{t('options.task.transcribe')}</SelectItem>
-              <SelectItem value="translate">{t('options.task.translate')}</SelectItem>
+              {schemaUiModel.taskControl.options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {t(option.labelKey)}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Start button */}
-        {/* NOTE: add type="button" to all buttons when wrapping in <form> */}
-        <Button id="start-transcription" onClick={handleStart} disabled={startDisabled}>
+        <Button
+          id="start-transcription"
+          type="button"
+          onClick={handleStart}
+          disabled={startDisabled}
+        >
           {isCreating
             ? t('options.creating')
             : fileIds.length > 0
@@ -167,9 +263,31 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
         </Button>
       </div>
 
-      {/* Initial prompt */}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          id="save-defaults"
+          type="button"
+          variant="outline"
+          disabled={defaultsActionDisabled}
+          onClick={handleSaveDefaults}
+        >
+          {isSavingDefaults ? t('options.defaults.saving') : t('options.defaults.save')}
+        </Button>
+        <Button
+          id="reset-engine-defaults"
+          type="button"
+          variant="outline"
+          disabled={defaultsActionDisabled}
+          onClick={handleResetDefaults}
+        >
+          {isResettingDefaults
+            ? t('options.defaults.resetting')
+            : t('options.defaults.resetEngine')}
+        </Button>
+      </div>
+
       <div className="space-y-1.5">
-        <Label htmlFor="initial-prompt">{t('options.field.initialPrompt')}</Label>
+        <Label htmlFor="initial-prompt">{t(schemaUiModel.initialPromptControl.labelKey)}</Label>
         <Textarea
           id="initial-prompt"
           disabled={controlsDisabled}
@@ -177,12 +295,15 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
           placeholder={
             typeof defaults?.initial_prompt === 'string' ? defaults.initial_prompt : undefined
           }
-          onChange={(e) => setInitialPrompt(e.target.value || undefined)}
+          onChange={(e) => {
+            const next = e.target.value
+            setInitialPrompt(next === '' ? null : next)
+          }}
         />
       </div>
 
-      {/* Advanced options */}
       <AdvancedOptions
+        schema={schemaUiModel.advancedSchema}
         advancedOptions={advancedOptions}
         defaults={defaults}
         onOptionChange={setAdvancedOption}

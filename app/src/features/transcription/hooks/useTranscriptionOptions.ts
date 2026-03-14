@@ -1,64 +1,61 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { CreateTaskPayload } from '@/shared/types'
+import { useCallback, useState } from 'react'
+import type { CreateTaskPayload, TranscriptionDefaults } from '@/shared/types'
 import type {
+  AdvancedOptionValue,
   AdvancedTranscriptionOptions,
   TranscriptionTaskType,
   UseTranscriptionOptionsReturn,
 } from '@/features/transcription/types'
-import { getDefaultOptions } from '@/features/transcription/api'
-import logger from '@/config/logger'
+import { useAppConfig } from '@/config/use-app-config'
+import { setValueByPath } from '@/features/transcription/lib/object-path'
 
-/**
- * Manage transcription option state and build the createTask payload.
- *
- * Loads backend defaults on mount for placeholder display.
- * Enforces mutual-exclusion between word_timestamps and without_timestamps.
- */
+/** Keep option state and build task payloads. */
 export function useTranscriptionOptions(): UseTranscriptionOptionsReturn {
-  const [language, setLanguage] = useState<string | undefined>(undefined)
-  const [task, setTask] = useState<TranscriptionTaskType>('transcribe')
+  const [languageOverride, setLanguageOverride] = useState<string | null | undefined>(undefined)
+  const [taskOverride, setTaskOverride] = useState<TranscriptionTaskType | undefined>(undefined)
   const [advancedOptions, setAdvancedOptions] = useState<AdvancedTranscriptionOptions>({})
-  const [defaults, setDefaults] = useState<Record<string, unknown> | null>(null)
-  const [initialPrompt, setInitialPrompt] = useState<string | undefined>(undefined)
+  const [initialPrompt, setInitialPrompt] = useState<string | null | undefined>(undefined)
 
-  // Load backend defaults on mount for placeholder/label display.
-  useEffect(() => {
-    let cancelled = false
-    getDefaultOptions()
-      .then((data) => {
-        if (!cancelled) setDefaults(data)
-      })
-      .catch((err) => {
-        logger.warn('Failed to load default transcription options', err)
-      })
-    return () => {
-      cancelled = true
-    }
+  const { config } = useAppConfig()
+  const defaults: TranscriptionDefaults | null = config?.transcription.defaults ?? null
+
+  const language =
+    languageOverride === undefined
+      ? (defaults?.language ?? undefined)
+      : (languageOverride ?? undefined)
+  const task = taskOverride ?? defaults?.task ?? 'transcribe'
+
+  const setLanguage = useCallback((next: string | undefined) => {
+    setLanguageOverride(next ?? null)
   }, [])
 
-  const setAdvancedOption = useCallback(
-    <K extends keyof AdvancedTranscriptionOptions>(
-      key: K,
-      value: AdvancedTranscriptionOptions[K] | undefined,
-    ) => {
-      setAdvancedOptions((prev) => {
-        const next: AdvancedTranscriptionOptions = { ...prev, [key]: value }
+  const setTask = useCallback((next: TranscriptionTaskType) => {
+    setTaskOverride(next)
+  }, [])
 
-        // Mutual exclusion: word_timestamps and without_timestamps cannot both be true.
-        if (key === 'word_timestamps' && value === true) {
-          next.without_timestamps = false
-        }
-        if (key === 'without_timestamps' && value === true) {
-          next.word_timestamps = false
-        }
+  const setAdvancedOption = useCallback((key: string, value: AdvancedOptionValue | undefined) => {
+    setAdvancedOptions((prev) => {
+      const next: AdvancedTranscriptionOptions = { ...prev, [key]: value }
 
-        return next
-      })
-    },
-    [],
-  )
+      if (key === 'word_timestamps' && value === true) {
+        next.without_timestamps = false
+      }
+      if (key === 'without_timestamps' && value === true) {
+        next.word_timestamps = false
+      }
+
+      return next
+    })
+  }, [])
 
   const resetAdvancedOptions = useCallback(() => {
+    setAdvancedOptions({})
+  }, [])
+
+  const resetOptionOverrides = useCallback(() => {
+    setLanguageOverride(undefined)
+    setTaskOverride(undefined)
+    setInitialPrompt(undefined)
     setAdvancedOptions({})
   }, [])
 
@@ -66,20 +63,23 @@ export function useTranscriptionOptions(): UseTranscriptionOptionsReturn {
     (fileId: string) => {
       const payload: CreateTaskPayload = { file_id: fileId }
 
-      if (language !== undefined) payload.language = language
-      if (task !== 'transcribe') payload.task = task
+      if (languageOverride !== undefined) payload.language = languageOverride
+      if (taskOverride !== undefined) payload.task = taskOverride
       if (initialPrompt !== undefined) payload.initial_prompt = initialPrompt
 
-      // Merge only defined advanced options into payload.
-      for (const [k, v] of Object.entries(advancedOptions)) {
-        if (v !== undefined) {
-          Object.assign(payload, { [k]: v })
+      const advancedPayload: Record<string, unknown> = {}
+
+      for (const [key, value] of Object.entries(advancedOptions)) {
+        if (value !== undefined) {
+          setValueByPath(advancedPayload, key, value)
         }
       }
 
+      Object.assign(payload, advancedPayload as Partial<CreateTaskPayload>)
+
       return payload
     },
-    [language, task, initialPrompt, advancedOptions],
+    [advancedOptions, initialPrompt, languageOverride, taskOverride],
   )
 
   return {
@@ -91,6 +91,7 @@ export function useTranscriptionOptions(): UseTranscriptionOptionsReturn {
     setTask,
     setAdvancedOption,
     resetAdvancedOptions,
+    resetOptionOverrides,
     buildRequest,
     initialPrompt,
     setInitialPrompt,

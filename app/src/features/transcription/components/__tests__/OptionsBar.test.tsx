@@ -2,13 +2,32 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { OptionsBar } from '../OptionsBar'
+import type { UseAppConfigReturn } from '@/config/use-app-config'
 import type { UseTranscriptionOptionsReturn } from '@/features/transcription/types'
-import type { AppError } from '@/shared/types'
+import type { AppError, TranscriptionDefaults } from '@/shared/types'
 
-const { createTaskMock, useTranscriptionOptionsMock, buildRequestMock } = vi.hoisted(() => ({
+const {
+  createTaskMock,
+  useTranscriptionOptionsMock,
+  buildRequestMock,
+  fetchEngineDefaultsMock,
+  patchTranscriptionDefaultsMock,
+  deleteTranscriptionDefaultsMock,
+  refreshAppConfigMock,
+  useAppConfigMock,
+  toastSuccessMock,
+  toastErrorMock,
+} = vi.hoisted(() => ({
   createTaskMock: vi.fn(),
   useTranscriptionOptionsMock: vi.fn(),
   buildRequestMock: vi.fn(),
+  fetchEngineDefaultsMock: vi.fn(),
+  patchTranscriptionDefaultsMock: vi.fn(),
+  deleteTranscriptionDefaultsMock: vi.fn(),
+  refreshAppConfigMock: vi.fn(),
+  useAppConfigMock: vi.fn<() => UseAppConfigReturn>(),
+  toastSuccessMock: vi.fn(),
+  toastErrorMock: vi.fn(),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -21,8 +40,26 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
+vi.mock('sonner', () => ({
+  toast: {
+    success: toastSuccessMock,
+    error: toastErrorMock,
+  },
+}))
+
 vi.mock('@/config/logger', () => ({
   default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}))
+
+vi.mock('@/config/api', () => ({
+  fetchEngineDefaults: fetchEngineDefaultsMock,
+  patchTranscriptionDefaults: patchTranscriptionDefaultsMock,
+  deleteTranscriptionDefaults: deleteTranscriptionDefaultsMock,
+}))
+
+vi.mock('@/config/use-app-config', () => ({
+  useAppConfig: (...args: unknown[]) => useAppConfigMock(...(args as [])),
+  refreshAppConfig: (...args: unknown[]) => refreshAppConfigMock(...(args as [])),
 }))
 
 vi.mock('@/features/transcription/api', () => ({
@@ -39,6 +76,28 @@ vi.mock('../AdvancedOptions', () => ({
   ),
 }))
 
+function buildAppConfigReturn(): UseAppConfigReturn {
+  return {
+    config: {
+      engine: {
+        model_size: 'small',
+        device: 'cpu',
+        compute_type: 'default',
+        is_multilingual: true,
+      },
+      transcription: { defaults: {} as TranscriptionDefaults, schema: [] },
+      file: { allowed_extensions: [], allowed_mime_types: [], max_file_size: 0 },
+      effective_languages: [],
+    },
+    fileValidationConfig: { allowedExtensions: [], allowedMimeTypes: [], maxFileSize: 0 },
+    isLoading: false,
+  }
+}
+
+function buildDefaults(values: Record<string, unknown>): TranscriptionDefaults {
+  return values as unknown as TranscriptionDefaults
+}
+
 function buildHookReturn(
   overrides: Partial<UseTranscriptionOptionsReturn> = {},
 ): UseTranscriptionOptionsReturn {
@@ -51,6 +110,7 @@ function buildHookReturn(
     setTask: vi.fn(),
     setAdvancedOption: vi.fn(),
     resetAdvancedOptions: vi.fn(),
+    resetOptionOverrides: vi.fn(),
     buildRequest: buildRequestMock,
     initialPrompt: undefined,
     setInitialPrompt: vi.fn(),
@@ -62,6 +122,7 @@ describe('OptionsBar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     buildRequestMock.mockImplementation((fileId: string) => ({ file_id: fileId }))
+    useAppConfigMock.mockReturnValue(buildAppConfigReturn())
     useTranscriptionOptionsMock.mockReturnValue(buildHookReturn())
   })
 
@@ -138,5 +199,207 @@ describe('OptionsBar', () => {
         },
       ])
     })
+  })
+
+  it('saves defaults via patch and refreshes shared app config', async () => {
+    const defaults = buildDefaults({
+      language: null,
+      task: 'transcribe',
+      beam_size: 3,
+    })
+
+    useTranscriptionOptionsMock.mockReturnValue(
+      buildHookReturn({
+        defaults,
+        language: 'en',
+        task: 'translate',
+        advancedOptions: { beam_size: 4 },
+      }),
+    )
+
+    fetchEngineDefaultsMock.mockResolvedValue({
+      defaults: buildDefaults({
+        language: null,
+        task: 'transcribe',
+        beam_size: 5,
+      }),
+    })
+    patchTranscriptionDefaultsMock.mockResolvedValue({ defaults })
+    refreshAppConfigMock.mockResolvedValue(buildAppConfigReturn().config)
+
+    render(<OptionsBar fileIds={[]} onTasksCreated={() => {}} />)
+
+    fireEvent.click(document.querySelector('#save-defaults') as HTMLButtonElement)
+
+    await waitFor(() => {
+      expect(fetchEngineDefaultsMock).toHaveBeenCalledTimes(1)
+      expect(patchTranscriptionDefaultsMock).toHaveBeenCalledWith({
+        language: 'en',
+        task: 'translate',
+        beam_size: 4,
+      })
+      expect(refreshAppConfigMock).toHaveBeenCalledTimes(1)
+      expect(toastSuccessMock).toHaveBeenCalledWith('options.defaults.saved')
+    })
+  })
+
+  it('shows an error toast when saving defaults fails', async () => {
+    const defaults = buildDefaults({
+      language: null,
+      task: 'transcribe',
+      beam_size: 3,
+    })
+    const appError: AppError = {
+      code: 'API_CLIENT_400',
+      i18nKey: 'error.api.clientError',
+      retriable: false,
+      params: { status: 400 },
+    }
+
+    useTranscriptionOptionsMock.mockReturnValue(
+      buildHookReturn({
+        defaults,
+        language: 'en',
+        task: 'translate',
+        advancedOptions: { beam_size: 4 },
+      }),
+    )
+    fetchEngineDefaultsMock.mockResolvedValue({
+      defaults: buildDefaults({
+        language: null,
+        task: 'transcribe',
+        beam_size: 5,
+      }),
+    })
+    patchTranscriptionDefaultsMock.mockRejectedValue(appError)
+
+    render(<OptionsBar fileIds={[]} onTasksCreated={() => {}} />)
+
+    fireEvent.click(document.querySelector('#save-defaults') as HTMLButtonElement)
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith('error.api.clientError')
+    })
+    expect(refreshAppConfigMock).not.toHaveBeenCalled()
+    expect(toastSuccessMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps save success when refresh fails after defaults write', async () => {
+    const defaults = buildDefaults({
+      language: null,
+      task: 'transcribe',
+      beam_size: 3,
+    })
+
+    useTranscriptionOptionsMock.mockReturnValue(
+      buildHookReturn({
+        defaults,
+        language: 'en',
+        task: 'translate',
+        advancedOptions: { beam_size: 4 },
+      }),
+    )
+    fetchEngineDefaultsMock.mockResolvedValue({
+      defaults: buildDefaults({
+        language: null,
+        task: 'transcribe',
+        beam_size: 5,
+      }),
+    })
+    patchTranscriptionDefaultsMock.mockResolvedValue({ defaults })
+    refreshAppConfigMock.mockRejectedValue(new Error('refresh failed'))
+
+    render(<OptionsBar fileIds={[]} onTasksCreated={() => {}} />)
+
+    fireEvent.click(document.querySelector('#save-defaults') as HTMLButtonElement)
+
+    await waitFor(() => {
+      expect(patchTranscriptionDefaultsMock).toHaveBeenCalledTimes(1)
+      expect(refreshAppConfigMock).toHaveBeenCalledTimes(1)
+      expect(toastSuccessMock).toHaveBeenCalledWith('options.defaults.saved')
+    })
+    expect(toastErrorMock).not.toHaveBeenCalled()
+  })
+
+  it('resets persisted defaults and clears local option overrides', async () => {
+    const resetOptionOverrides = vi.fn()
+    useTranscriptionOptionsMock.mockReturnValue(
+      buildHookReturn({
+        defaults: buildDefaults({
+          language: 'ja',
+          task: 'translate',
+          beam_size: 3,
+        }),
+        resetOptionOverrides,
+      }),
+    )
+
+    deleteTranscriptionDefaultsMock.mockResolvedValue(undefined)
+    refreshAppConfigMock.mockResolvedValue(buildAppConfigReturn().config)
+
+    render(<OptionsBar fileIds={[]} onTasksCreated={() => {}} />)
+
+    fireEvent.click(document.querySelector('#reset-engine-defaults') as HTMLButtonElement)
+
+    await waitFor(() => {
+      expect(deleteTranscriptionDefaultsMock).toHaveBeenCalledTimes(1)
+      expect(resetOptionOverrides).toHaveBeenCalledTimes(1)
+      expect(refreshAppConfigMock).toHaveBeenCalledTimes(1)
+      expect(toastSuccessMock).toHaveBeenCalledWith('options.defaults.resetDone')
+    })
+  })
+
+  it('shows an error toast when resetting defaults fails', async () => {
+    const resetOptionOverrides = vi.fn()
+    useTranscriptionOptionsMock.mockReturnValue(
+      buildHookReturn({
+        defaults: buildDefaults({
+          language: 'ja',
+          task: 'translate',
+          beam_size: 3,
+        }),
+        resetOptionOverrides,
+      }),
+    )
+    deleteTranscriptionDefaultsMock.mockRejectedValue(new Error('boom'))
+
+    render(<OptionsBar fileIds={[]} onTasksCreated={() => {}} />)
+
+    fireEvent.click(document.querySelector('#reset-engine-defaults') as HTMLButtonElement)
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith('error.api.serverError')
+    })
+    expect(refreshAppConfigMock).not.toHaveBeenCalled()
+    expect(resetOptionOverrides).not.toHaveBeenCalled()
+    expect(toastSuccessMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps reset success but preserves local overrides when refresh fails', async () => {
+    const resetOptionOverrides = vi.fn()
+    useTranscriptionOptionsMock.mockReturnValue(
+      buildHookReturn({
+        defaults: buildDefaults({
+          language: 'ja',
+          task: 'translate',
+          beam_size: 3,
+        }),
+        resetOptionOverrides,
+      }),
+    )
+    deleteTranscriptionDefaultsMock.mockResolvedValue(undefined)
+    refreshAppConfigMock.mockRejectedValue(new Error('refresh failed'))
+
+    render(<OptionsBar fileIds={[]} onTasksCreated={() => {}} />)
+
+    fireEvent.click(document.querySelector('#reset-engine-defaults') as HTMLButtonElement)
+
+    await waitFor(() => {
+      expect(deleteTranscriptionDefaultsMock).toHaveBeenCalledTimes(1)
+      expect(refreshAppConfigMock).toHaveBeenCalledTimes(1)
+      expect(toastSuccessMock).toHaveBeenCalledWith('options.defaults.resetDone')
+    })
+    expect(resetOptionOverrides).not.toHaveBeenCalled()
+    expect(toastErrorMock).not.toHaveBeenCalled()
   })
 })

@@ -8,7 +8,7 @@ from .utils import ensure_sqlite_version
 
 
 def init_db(db_path: str | Path | None = None) -> None:
-    """Initialize database schema with files and tasks tables."""
+    """Initialize database schema for files, tasks, and app config."""
     ensure_sqlite_version()
 
     path = Path(db_path) if db_path else settings.db_path
@@ -40,31 +40,31 @@ def init_db(db_path: str | Path | None = None) -> None:
                     id TEXT PRIMARY KEY,
                     file_id TEXT NOT NULL,
                     status TEXT NOT NULL,
-                    
+
                     -- Scheduling fields
                     priority INTEGER DEFAULT 0,
                     retry_count INTEGER DEFAULT 0,
                     max_retries INTEGER DEFAULT 3,
-                    
+
                     -- Worker management
                     worker_id TEXT,
                     started_at TEXT,
                     last_heartbeat TEXT,
                     timeout_seconds INTEGER DEFAULT 3600,
-                    
+
                     -- Transcription options (JSON)
                     options TEXT,
-                    
+
                     -- Result fields
                     progress REAL DEFAULT 0.0,
                     duration REAL,
                     segments TEXT,
                     error TEXT,
-                    
+
                     -- Timestamps
                     created_at TEXT NOT NULL,
                     completed_at TEXT,
-                    
+
                     FOREIGN KEY (file_id) REFERENCES files(id)
                 )
             """)
@@ -82,3 +82,11 @@ def init_db(db_path: str | Path | None = None) -> None:
                 "CREATE INDEX IF NOT EXISTS idx_heartbeat "
                 "ON transcription_tasks(last_heartbeat)"
             )
+
+            # Application configuration key-value store
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS app_config (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)

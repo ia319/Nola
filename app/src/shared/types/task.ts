@@ -31,6 +31,3 @@ export type BatchExportRequest = Schemas['BatchExportRequest']
 
 /** Export format derived from OpenAPI BatchExportRequest.format enum. */
 export type ExportFormat = Schemas['BatchExportRequest']['format']
-
-/** GET /api/transcriptions/options/defaults response (dynamic). */
-export type DefaultOptions = Record<string, unknown>

@@ -4,10 +4,8 @@ export { AdvancedOptions } from './components/AdvancedOptions'
 export type { AdvancedOptionsProps } from './components/AdvancedOptions'
 export { useTranscriptionOptions } from './hooks/useTranscriptionOptions'
 export type {
+  AdvancedOptionValue,
   AdvancedTranscriptionOptions,
   TranscriptionTaskType,
   UseTranscriptionOptionsReturn,
-  OptionFieldDef,
-  OptionGroupDef,
 } from './types'
-export { OPTION_GROUPS } from './types'

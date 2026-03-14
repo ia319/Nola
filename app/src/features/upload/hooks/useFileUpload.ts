@@ -15,32 +15,22 @@ import {
   selectIsUploading,
   type UploadsUpdater,
 } from '@/features/upload/lib/state'
-import {
-  ALLOWED_EXTENSIONS,
-  ALLOWED_MIME_TYPES,
-  MAX_FILE_SIZE,
-  UPLOAD_CONCURRENCY,
-} from '@/config/constants'
+import { UPLOAD_CONCURRENCY } from '@/config/constants'
 import logger from '@/config/logger'
-
-const validationConfig: FileValidationConfig = {
-  allowedExtensions: [...ALLOWED_EXTENSIONS],
-  allowedMimeTypes: [...ALLOWED_MIME_TYPES],
-  maxFileSize: MAX_FILE_SIZE,
-}
 
 /**
  * Manage multi-file upload lifecycle.
  *
+ * @param validationConfig - File validation rules injected by the caller
+ *   (derived from runtime app config or fallback constants).
  * @returns Upload state and actions conforming to AD-4 multi-file architecture.
  */
-export function useFileUpload(): UseFileUploadReturn {
+export function useFileUpload(validationConfig: FileValidationConfig): UseFileUploadReturn {
   const [uploads, setUploads] = useState<UploadItem[]>([])
   const [batchError, setBatchError] = useState<AppError | null>(null)
   const controllersRef = useRef<Map<string, AbortController>>(new Map())
   const lockRef = useRef(false)
 
-  // Mirror state into a ref to support synchronous reads during async queue processing.
   const uploadsRef = useRef<UploadItem[]>([])
   const setUploadsSync = useCallback((updater: UploadsUpdater) => {
     const next = typeof updater === 'function' ? updater(uploadsRef.current) : updater
@@ -82,7 +72,7 @@ export function useFileUpload(): UseFileUploadReturn {
 
       setUploadsSync((prev) => [...prev, ...items])
     },
-    [setUploadsSync],
+    [setUploadsSync, validationConfig],
   )
 
   const cancelUpload = useCallback(

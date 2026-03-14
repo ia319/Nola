@@ -3,7 +3,7 @@
 from functools import lru_cache
 
 from nola.config import settings
-from nola.models import FileDatabase, TaskDatabase
+from nola.models import AppConfigDatabase, FileDatabase, TaskDatabase
 
 
 @lru_cache
@@ -16,3 +16,9 @@ def get_file_db() -> FileDatabase:
 def get_task_db() -> TaskDatabase:
     """Get task database instance (singleton)."""
     return TaskDatabase(settings.db_path)
+
+
+@lru_cache
+def get_app_config_db() -> AppConfigDatabase:
+    """Get app-config database instance (singleton)."""
+    return AppConfigDatabase(settings.db_path)

@@ -1,26 +1,40 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getDefaultOptions } from '@/features/transcription/api'
 import { useTranscriptionOptions } from '@/features/transcription/hooks/useTranscriptionOptions'
+import type { UseAppConfigReturn } from '@/config/use-app-config'
+import type { TranscriptionDefaults } from '@/shared/types'
 
-vi.mock('@/features/transcription/api', () => ({
-  getDefaultOptions: vi.fn().mockResolvedValue({}),
+const useAppConfigMock = vi.fn<() => UseAppConfigReturn>()
+
+vi.mock('@/config/use-app-config', () => ({
+  useAppConfig: (...args: unknown[]) => useAppConfigMock(...(args as [])),
 }))
 
-vi.mock('@/config/logger', () => ({
-  default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-}))
-
-const getDefaultOptionsMock = vi.mocked(getDefaultOptions)
+function buildAppConfigReturn(defaults: Record<string, unknown> = {}): UseAppConfigReturn {
+  return {
+    config: {
+      engine: {
+        model_size: 'small',
+        device: 'cpu',
+        compute_type: 'default',
+        is_multilingual: true,
+      },
+      transcription: { defaults: defaults as TranscriptionDefaults, schema: [] },
+      file: { allowed_extensions: [], allowed_mime_types: [], max_file_size: 0 },
+      effective_languages: [],
+    },
+    fileValidationConfig: { allowedExtensions: [], allowedMimeTypes: [], maxFileSize: 0 },
+    isLoading: false,
+  }
+}
 
 async function renderTranscriptionOptions(defaults: Record<string, unknown> = {}) {
-  getDefaultOptionsMock.mockResolvedValue(defaults)
+  useAppConfigMock.mockReturnValue(buildAppConfigReturn(defaults))
 
   const hook = renderHook(() => useTranscriptionOptions())
 
   await waitFor(() => {
-    expect(getDefaultOptionsMock).toHaveBeenCalled()
     expect(hook.result.current.defaults).toEqual(defaults)
   })
 
@@ -65,6 +79,38 @@ describe('buildRequest', () => {
     })
   })
 
+  it('expands dot-path options into nested payload objects', async () => {
+    const { result } = await renderTranscriptionOptions()
+
+    act(() => {
+      result.current.setAdvancedOption('vad_parameters.threshold', 0.7)
+      result.current.setAdvancedOption('vad_parameters.speech_pad_ms', 500)
+    })
+
+    expect(result.current.buildRequest('f-3b')).toEqual({
+      file_id: 'f-3b',
+      vad_parameters: {
+        threshold: 0.7,
+        speech_pad_ms: 500,
+      },
+    })
+  })
+
+  it('keeps special string values like inf when building nested payload', async () => {
+    const { result } = await renderTranscriptionOptions()
+
+    act(() => {
+      result.current.setAdvancedOption('vad_parameters.max_speech_duration_s', 'inf')
+    })
+
+    expect(result.current.buildRequest('f-3c')).toEqual({
+      file_id: 'f-3c',
+      vad_parameters: {
+        max_speech_duration_s: 'inf',
+      },
+    })
+  })
+
   it('filters out undefined advanced option values', async () => {
     const { result } = await renderTranscriptionOptions()
 
@@ -96,6 +142,22 @@ describe('buildRequest', () => {
       task: 'translate',
       initial_prompt: 'hello context',
       beam_size: 5,
+    })
+  })
+
+  it('sends null language when auto-detect overrides a persisted language default', async () => {
+    const { result } = await renderTranscriptionOptions({
+      language: 'ja',
+      task: 'transcribe',
+    })
+
+    act(() => {
+      result.current.setLanguage(undefined)
+    })
+
+    expect(result.current.buildRequest('f-6')).toEqual({
+      file_id: 'f-6',
+      language: null,
     })
   })
 })

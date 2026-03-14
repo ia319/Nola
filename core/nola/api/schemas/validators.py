@@ -11,7 +11,10 @@ Each validator:
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from nola.config.constants import SUPPORTED_LANGUAGES
+from nola.config.transcription import get_transcription_param_schema
 
 
 def validate_language_code(code: str | None) -> str | None:
@@ -63,5 +66,60 @@ def validate_temperature(
                 raise ValueError(f"temperature[{i}] must be non-negative, got {t}.")
     elif value < 0:
         raise ValueError(f"Temperature must be non-negative, got {value}.")
+
+    return value
+
+
+@lru_cache(maxsize=1)
+def _allowed_task_values() -> frozenset[str]:
+    """Read supported task values from shared transcription metadata."""
+    values: set[str] = set()
+    for group in get_transcription_param_schema():
+        for field in group.fields:
+            if field.type == "select" and field.key == "task":
+                if field.options:
+                    values |= {option.value.lower() for option in field.options}
+    if values:
+        return frozenset(values)
+    return frozenset({"transcribe", "translate"})
+
+
+def validate_task_value(value: str | None) -> str | None:
+    """Validate task values against the runtime task option list."""
+    if value is None:
+        return None
+
+    normalized_value = value.lower()
+    if normalized_value not in _allowed_task_values():
+        raise ValueError(
+            f"Unsupported task: '{value}'. "
+            f"Use one of: {', '.join(sorted(_allowed_task_values()))}."
+        )
+    return normalized_value
+
+
+@lru_cache(maxsize=1)
+def _allowed_vad_parameter_keys() -> frozenset[str]:
+    """Read the supported nested VAD keys from shared transcription metadata."""
+    keys = {
+        field.key.split(".", maxsplit=1)[1]
+        for group in get_transcription_param_schema()
+        for field in group.fields
+        if field.key.startswith("vad_parameters.")
+    }
+    return frozenset(keys)
+
+
+def validate_vad_parameter_keys(
+    value: dict[str, object] | None,
+) -> dict[str, object] | None:
+    """Reject unsupported nested keys in vad_parameters."""
+    if value is None:
+        return None
+
+    invalid_keys = sorted(set(value) - _allowed_vad_parameter_keys())
+    if invalid_keys:
+        invalid_list = ", ".join(invalid_keys)
+        raise ValueError(f"Unsupported vad_parameters key(s): {invalid_list}")
 
     return value

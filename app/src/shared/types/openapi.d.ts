@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-  '/api/transcriptions/options/defaults': {
+  '/api/config': {
     parameters: {
       query?: never
       header?: never
@@ -12,19 +12,60 @@ export interface paths {
       cookie?: never
     }
     /**
-     * Get default transcription options
-     * @description Return default transcription options.
-     *
-     *     Use this endpoint to display available options and their defaults
-     *     in the frontend before creating a transcription task.
+     * Get aggregated application configuration
+     * @description Return the frontend-facing configuration view, including engine info, effective transcription defaults, transcription field metadata, upload constraints, and model-compatible language options.
      */
-    get: operations['get_default_options_api_transcriptions_options_defaults_get']
+    get: operations['get_config_api_config_get']
     put?: never
     post?: never
     delete?: never
     options?: never
     head?: never
     patch?: never
+    trace?: never
+  }
+  '/api/config/transcription/engine-defaults': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get raw transcription engine defaults
+     * @description Return the non-batched WhisperModel defaults expanded with the full VadOptions default set, without any persisted application overrides.
+     */
+    get: operations['get_transcription_engine_defaults_api_config_transcription_engine_defaults_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/config/transcription/defaults': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Reset persisted transcription defaults
+     * @description Delete the application-level transcription-defaults override layer and fall back to the raw engine defaults.
+     */
+    delete: operations['delete_transcription_defaults_api_config_transcription_defaults_delete']
+    options?: never
+    head?: never
+    /**
+     * Update persisted transcription defaults
+     * @description Apply a partial update to the persisted application-level transcription defaults. Explicit null removes an override key, and nested objects are merged without replacing untouched subkeys.
+     */
+    patch: operations['patch_transcription_defaults_api_config_transcription_defaults_patch']
     trace?: never
   }
   '/api/transcriptions/': {
@@ -58,8 +99,10 @@ export interface paths {
      *     3. Worker will automatically process the task
      *     4. Query status via GET /api/transcriptions/{task_id}
      *
-     *     All transcription parameters are optional. If not provided,
-     *     engine defaults will be used. See GET /options/defaults for defaults.
+     *     All transcription parameters are optional. If omitted, the effective defaults
+     *     (engine defaults plus persisted application overrides) will be used.
+     *     See GET /api/config for effective defaults and
+     *     GET /api/config/transcription/engine-defaults for raw engine defaults.
      */
     post: operations['create_transcription_api_transcriptions__post']
     delete?: never
@@ -307,6 +350,17 @@ export type webhooks = Record<string, never>
 export interface components {
   schemas: {
     /**
+     * AppConfigResponse
+     * @description Aggregate application configuration required by the frontend.
+     */
+    AppConfigResponse: {
+      engine: components['schemas']['EngineConfigResponse']
+      transcription: components['schemas']['TranscriptionConfigResponse']
+      file: components['schemas']['FileConfigResponse']
+      /** Effective Languages */
+      effective_languages: components['schemas']['LanguageOptionSchema'][]
+    }
+    /**
      * BatchExportRequest
      * @description Batch export request for multiple transcriptions.
      */
@@ -401,6 +455,39 @@ export interface components {
       message: string
     }
     /**
+     * EngineConfigResponse
+     * @description Expose the active engine configuration.
+     */
+    EngineConfigResponse: {
+      /** Model Size */
+      model_size: string
+      /** Device */
+      device: string
+      /** Compute Type */
+      compute_type: string
+      /** Is Multilingual */
+      is_multilingual: boolean
+    }
+    /**
+     * EngineDefaultsResponse
+     * @description Return the raw engine defaults without application overrides.
+     */
+    EngineDefaultsResponse: {
+      defaults: components['schemas']['TranscriptionResolvedDefaultsResponse']
+    }
+    /**
+     * FileConfigResponse
+     * @description Expose upload-related configuration needed by the frontend.
+     */
+    FileConfigResponse: {
+      /** Allowed Extensions */
+      allowed_extensions: string[]
+      /** Allowed Mime Types */
+      allowed_mime_types: string[]
+      /** Max File Size */
+      max_file_size: number
+    }
+    /**
      * FileListResponse
      * @description Paginated file list response.
      */
@@ -462,6 +549,16 @@ export interface components {
       missing_count: number
     }
     /**
+     * LanguageOptionSchema
+     * @description Describe one selectable language option.
+     */
+    LanguageOptionSchema: {
+      /** Code */
+      code: string
+      /** Label Key */
+      label_key: string
+    }
+    /**
      * MissingFileInfo
      * @description Info about a file record missing from disk.
      */
@@ -472,6 +569,82 @@ export interface components {
       filename: string
       /** Path */
       path: string
+    }
+    /**
+     * NumberFieldSchema
+     * @description Describe a numeric text input field.
+     */
+    NumberFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'number'
+      /** Min */
+      min?: number | null
+      /** Max */
+      max?: number | null
+      /** Step */
+      step?: number | null
+      /** Depends On */
+      depends_on?: string | null
+      /** Special Values */
+      special_values?: string[] | null
+    }
+    /**
+     * NumberListFieldSchema
+     * @description Describe a comma-separated numeric list field.
+     */
+    NumberListFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'number_list'
+      /**
+       * Allow Negative
+       * @default false
+       */
+      allow_negative: boolean
+      /**
+       * Integer Only
+       * @default false
+       */
+      integer_only: boolean
+      /**
+       * Collapse Single Value
+       * @default false
+       */
+      collapse_single_value: boolean
+      /** Depends On */
+      depends_on?: string | null
+    }
+    /**
+     * OptionGroupSchema
+     * @description Group related option fields under one UI section.
+     */
+    OptionGroupSchema: {
+      /** Group */
+      group: string
+      /** Group Label Key */
+      group_label_key: string
+      /** Fields */
+      fields: (
+        | components['schemas']['SliderFieldSchema']
+        | components['schemas']['SwitchFieldSchema']
+        | components['schemas']['NumberFieldSchema']
+        | components['schemas']['NumberListFieldSchema']
+        | components['schemas']['TextFieldSchema']
+        | components['schemas']['SelectFieldSchema']
+      )[]
     }
     /**
      * SavedExportResponse
@@ -492,6 +665,77 @@ export interface components {
       end: number
       /** Text */
       text: string
+    }
+    /**
+     * SelectFieldSchema
+     * @description Describe a single-select field.
+     */
+    SelectFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'select'
+      /** Options */
+      options?: components['schemas']['SelectOptionSchema'][] | null
+      /** Options Source */
+      options_source?: 'effective_languages' | null
+      /** Depends On */
+      depends_on?: string | null
+    }
+    /**
+     * SelectOptionSchema
+     * @description Describe one selectable option entry.
+     */
+    SelectOptionSchema: {
+      /** Value */
+      value: string
+      /** Label Key */
+      label_key: string
+    }
+    /**
+     * SliderFieldSchema
+     * @description Describe a slider-backed numeric field.
+     */
+    SliderFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'slider'
+      /** Min */
+      min: number
+      /** Max */
+      max: number
+      /** Step */
+      step: number
+      /** Depends On */
+      depends_on?: string | null
+    }
+    /**
+     * SwitchFieldSchema
+     * @description Describe a boolean toggle field.
+     */
+    SwitchFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'switch'
+      /** Depends On */
+      depends_on?: string | null
     }
     /**
      * TaskDetailResponse
@@ -556,18 +800,50 @@ export interface components {
       completed_at: string | null
     }
     /**
-     * TranscriptionRequest
-     * @description Transcription request with optional parameters.
-     *
-     *     All parameters default to None, meaning "use engine default".
-     *     See TranscribeOptions in engines/base.py for actual defaults.
+     * TextFieldSchema
+     * @description Describe a free-form text field.
      */
-    TranscriptionRequest: {
+    TextFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
       /**
-       * File Id
-       * @description File ID from upload API
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
        */
-      file_id: string
+      type: 'text'
+      /** Depends On */
+      depends_on?: string | null
+    }
+    /**
+     * TranscriptionConfigResponse
+     * @description Expose effective transcription defaults and field metadata.
+     */
+    TranscriptionConfigResponse: {
+      defaults: components['schemas']['TranscriptionResolvedDefaultsResponse']
+      /** Schema */
+      schema: components['schemas']['OptionGroupSchema'][]
+    }
+    /**
+     * TranscriptionDefaultsPatchResponse
+     * @description Return the effective defaults after a PATCH update.
+     */
+    TranscriptionDefaultsPatchResponse: {
+      defaults: components['schemas']['TranscriptionResolvedDefaultsResponse']
+    }
+    /**
+     * TranscriptionDefaultsUpdateRequest
+     * @description Partial update payload for application-level transcription defaults.
+     * @example {
+     *       "beam_size": 3,
+     *       "language": "zh",
+     *       "vad_parameters": {
+     *         "threshold": 0.6
+     *       }
+     *     }
+     */
+    TranscriptionDefaultsUpdateRequest: {
       /**
        * Language
        * @description Language code. Auto-detect if omitted.
@@ -578,102 +854,121 @@ export interface components {
       language?: string | null
       /**
        * Task
-       * @description 'transcribe' or 'translate'
+       * @description Task value defined by backend transcription schema
+       * @example transcribe
        */
-      task?: ('transcribe' | 'translate') | null
+      task?: string | null
       /**
        * Beam Size
        * @description Beam size for decoding
+       * @example 5
        */
       beam_size?: number | null
       /**
        * Best Of
        * @description Number of candidates
+       * @example 5
        */
       best_of?: number | null
       /**
        * Patience
        * @description Beam search patience
+       * @example 1
        */
       patience?: number | null
       /**
        * Length Penalty
        * @description Length penalty
+       * @example 1
        */
       length_penalty?: number | null
       /**
        * Repetition Penalty
        * @description Repetition penalty
+       * @example 1
        */
       repetition_penalty?: number | null
       /**
        * No Repeat Ngram Size
        * @description No repeat n-gram size
+       * @example 0
        */
       no_repeat_ngram_size?: number | null
       /**
        * Temperature
        * @description Sampling temperature(s)
+       * @example [
+       *       0,
+       *       0.2,
+       *       0.4,
+       *       0.6,
+       *       0.8,
+       *       1
+       *     ]
        */
       temperature?: number | number[] | null
       /**
        * Compression Ratio Threshold
        * @description Compression ratio threshold
+       * @example 2.4
        */
       compression_ratio_threshold?: number | null
       /**
        * Log Prob Threshold
        * @description Log probability threshold
+       * @example -1
        */
       log_prob_threshold?: number | null
       /**
        * No Speech Threshold
        * @description No speech threshold
+       * @example 0.6
        */
       no_speech_threshold?: number | null
       /**
        * Condition On Previous Text
        * @description Condition on previous text
+       * @example true
        */
       condition_on_previous_text?: boolean | null
       /**
        * Prompt Reset On Temperature
        * @description Reset prompt on temperature
+       * @example 0.5
        */
       prompt_reset_on_temperature?: number | null
       /**
        * Initial Prompt
        * @description Initial prompt for context
+       * @example
        */
       initial_prompt?: string | null
       /**
        * Prefix
        * @description Prefix for each segment
+       * @example
        */
       prefix?: string | null
       /**
        * Hotwords
        * @description Hotwords to boost recognition
+       * @example
        */
       hotwords?: string | null
       /**
        * Suppress Blank
        * @description Suppress blank outputs
-       * @default true
        * @example true
        */
-      suppress_blank: boolean | null
+      suppress_blank?: boolean | null
       /**
        * Suppress Tokens
        * @description Token IDs to suppress
-       * @default [
-       *       -1
-       *     ]
        * @example [
        *       -1
        *     ]
        */
-      suppress_tokens: number[] | null
+      suppress_tokens?: number[] | null
       /**
        * Max New Tokens
        * @description Max new tokens per segment
@@ -682,58 +977,56 @@ export interface components {
       /**
        * Without Timestamps
        * @description Disable timestamps
-       * @default false
        * @example false
        */
-      without_timestamps: boolean | null
+      without_timestamps?: boolean | null
       /**
        * Max Initial Timestamp
        * @description Max initial timestamp
-       * @default 1
        * @example 1
        */
-      max_initial_timestamp: number | null
+      max_initial_timestamp?: number | null
       /**
        * Word Timestamps
        * @description Enable word-level timestamps
-       * @default false
        * @example false
        */
-      word_timestamps: boolean | null
+      word_timestamps?: boolean | null
       /**
        * Prepend Punctuations
        * @description Punctuations to prepend
-       * @default "'"¿([{-
-       * @example "'"¿([{-
+       * @example "'“¿([{-
        */
-      prepend_punctuations: string | null
+      prepend_punctuations?: string | null
       /**
        * Append Punctuations
        * @description Punctuations to append
-       * @default "'.。,，!！?？:：")]}、
-       * @example "'.。,，!！?？:：")]}、
+       * @example "'.。,，!！?？:：”)]}、
        */
-      append_punctuations: string | null
+      append_punctuations?: string | null
       /**
        * Vad Filter
        * @description Enable VAD filtering
+       * @example false
        */
       vad_filter?: boolean | null
-      /**
-       * Vad Parameters
-       * @description VAD parameters
-       */
-      vad_parameters?: {
-        [key: string]: unknown
-      } | null
+      /** @description VAD parameters */
+      vad_parameters?: components['schemas']['VadParametersRequest'] | null
       /**
        * Multilingual
        * @description Enable multilingual mode
+       * @example false
        */
       multilingual?: boolean | null
       /**
+       * Chunk Length
+       * @description Chunk length in seconds
+       */
+      chunk_length?: number | null
+      /**
        * Clip Timestamps
        * @description Clip timestamps
+       * @example 0
        */
       clip_timestamps?: string | number[] | null
       /**
@@ -744,13 +1037,380 @@ export interface components {
       /**
        * Language Detection Threshold
        * @description Language detection threshold
+       * @example 0.5
        */
       language_detection_threshold?: number | null
       /**
        * Language Detection Segments
        * @description Segments for language detection
+       * @example 1
        */
       language_detection_segments?: number | null
+    }
+    /**
+     * TranscriptionRequest
+     * @description Transcription request payload for creating a task.
+     * @example {
+     *       "append_punctuations": "\"'.。,，!！?？:：”)]}、",
+     *       "beam_size": 5,
+     *       "best_of": 5,
+     *       "clip_timestamps": "0",
+     *       "compression_ratio_threshold": 2.4,
+     *       "condition_on_previous_text": true,
+     *       "file_id": "uploaded-file-id",
+     *       "language_detection_segments": 1,
+     *       "language_detection_threshold": 0.5,
+     *       "length_penalty": 1,
+     *       "log_prob_threshold": -1,
+     *       "max_initial_timestamp": 1,
+     *       "multilingual": false,
+     *       "no_repeat_ngram_size": 0,
+     *       "no_speech_threshold": 0.6,
+     *       "patience": 1,
+     *       "prepend_punctuations": "\"'“¿([{-",
+     *       "prompt_reset_on_temperature": 0.5,
+     *       "repetition_penalty": 1,
+     *       "suppress_blank": true,
+     *       "suppress_tokens": [
+     *         -1
+     *       ],
+     *       "task": "transcribe",
+     *       "temperature": [
+     *         0,
+     *         0.2,
+     *         0.4,
+     *         0.6,
+     *         0.8,
+     *         1
+     *       ],
+     *       "vad_filter": false,
+     *       "without_timestamps": false,
+     *       "word_timestamps": false
+     *     }
+     */
+    TranscriptionRequest: {
+      /**
+       * Language
+       * @description Language code. Auto-detect if omitted.
+       * @example en
+       * @example zh
+       * @example ja
+       */
+      language?: string | null
+      /**
+       * Task
+       * @description Task value defined by backend transcription schema
+       * @example transcribe
+       */
+      task?: string | null
+      /**
+       * Beam Size
+       * @description Beam size for decoding
+       * @example 5
+       */
+      beam_size?: number | null
+      /**
+       * Best Of
+       * @description Number of candidates
+       * @example 5
+       */
+      best_of?: number | null
+      /**
+       * Patience
+       * @description Beam search patience
+       * @example 1
+       */
+      patience?: number | null
+      /**
+       * Length Penalty
+       * @description Length penalty
+       * @example 1
+       */
+      length_penalty?: number | null
+      /**
+       * Repetition Penalty
+       * @description Repetition penalty
+       * @example 1
+       */
+      repetition_penalty?: number | null
+      /**
+       * No Repeat Ngram Size
+       * @description No repeat n-gram size
+       * @example 0
+       */
+      no_repeat_ngram_size?: number | null
+      /**
+       * Temperature
+       * @description Sampling temperature(s)
+       * @example [
+       *       0,
+       *       0.2,
+       *       0.4,
+       *       0.6,
+       *       0.8,
+       *       1
+       *     ]
+       */
+      temperature?: number | number[] | null
+      /**
+       * Compression Ratio Threshold
+       * @description Compression ratio threshold
+       * @example 2.4
+       */
+      compression_ratio_threshold?: number | null
+      /**
+       * Log Prob Threshold
+       * @description Log probability threshold
+       * @example -1
+       */
+      log_prob_threshold?: number | null
+      /**
+       * No Speech Threshold
+       * @description No speech threshold
+       * @example 0.6
+       */
+      no_speech_threshold?: number | null
+      /**
+       * Condition On Previous Text
+       * @description Condition on previous text
+       * @example true
+       */
+      condition_on_previous_text?: boolean | null
+      /**
+       * Prompt Reset On Temperature
+       * @description Reset prompt on temperature
+       * @example 0.5
+       */
+      prompt_reset_on_temperature?: number | null
+      /**
+       * Initial Prompt
+       * @description Initial prompt for context
+       * @example
+       */
+      initial_prompt?: string | null
+      /**
+       * Prefix
+       * @description Prefix for each segment
+       * @example
+       */
+      prefix?: string | null
+      /**
+       * Hotwords
+       * @description Hotwords to boost recognition
+       * @example
+       */
+      hotwords?: string | null
+      /**
+       * Suppress Blank
+       * @description Suppress blank outputs
+       * @example true
+       */
+      suppress_blank?: boolean | null
+      /**
+       * Suppress Tokens
+       * @description Token IDs to suppress
+       * @example [
+       *       -1
+       *     ]
+       */
+      suppress_tokens?: number[] | null
+      /**
+       * Max New Tokens
+       * @description Max new tokens per segment
+       */
+      max_new_tokens?: number | null
+      /**
+       * Without Timestamps
+       * @description Disable timestamps
+       * @example false
+       */
+      without_timestamps?: boolean | null
+      /**
+       * Max Initial Timestamp
+       * @description Max initial timestamp
+       * @example 1
+       */
+      max_initial_timestamp?: number | null
+      /**
+       * Word Timestamps
+       * @description Enable word-level timestamps
+       * @example false
+       */
+      word_timestamps?: boolean | null
+      /**
+       * Prepend Punctuations
+       * @description Punctuations to prepend
+       * @example "'“¿([{-
+       */
+      prepend_punctuations?: string | null
+      /**
+       * Append Punctuations
+       * @description Punctuations to append
+       * @example "'.。,，!！?？:：”)]}、
+       */
+      append_punctuations?: string | null
+      /**
+       * Vad Filter
+       * @description Enable VAD filtering
+       * @example false
+       */
+      vad_filter?: boolean | null
+      /** @description VAD parameters */
+      vad_parameters?: components['schemas']['VadParametersRequest'] | null
+      /**
+       * Multilingual
+       * @description Enable multilingual mode
+       * @example false
+       */
+      multilingual?: boolean | null
+      /**
+       * Chunk Length
+       * @description Chunk length in seconds
+       */
+      chunk_length?: number | null
+      /**
+       * Clip Timestamps
+       * @description Clip timestamps
+       * @example 0
+       */
+      clip_timestamps?: string | number[] | null
+      /**
+       * Hallucination Silence Threshold
+       * @description Hallucination silence threshold
+       */
+      hallucination_silence_threshold?: number | null
+      /**
+       * Language Detection Threshold
+       * @description Language detection threshold
+       * @example 0.5
+       */
+      language_detection_threshold?: number | null
+      /**
+       * Language Detection Segments
+       * @description Segments for language detection
+       * @example 1
+       */
+      language_detection_segments?: number | null
+      /**
+       * File Id
+       * @description File ID from upload API
+       */
+      file_id: string
+    }
+    /**
+     * TranscriptionResolvedDefaultsResponse
+     * @description Expose fully resolved transcription defaults used at runtime.
+     */
+    TranscriptionResolvedDefaultsResponse: {
+      /** Language */
+      language: string | null
+      /** Task */
+      task: string
+      /** Beam Size */
+      beam_size: number
+      /** Best Of */
+      best_of: number
+      /** Patience */
+      patience: number
+      /** Length Penalty */
+      length_penalty: number
+      /** Repetition Penalty */
+      repetition_penalty: number
+      /** No Repeat Ngram Size */
+      no_repeat_ngram_size: number
+      /** Temperature */
+      temperature: number | number[]
+      /** Compression Ratio Threshold */
+      compression_ratio_threshold: number | null
+      /** Log Prob Threshold */
+      log_prob_threshold: number | null
+      /** No Speech Threshold */
+      no_speech_threshold: number | null
+      /** Condition On Previous Text */
+      condition_on_previous_text: boolean
+      /** Prompt Reset On Temperature */
+      prompt_reset_on_temperature: number
+      /** Initial Prompt */
+      initial_prompt: string | null
+      /** Prefix */
+      prefix: string | null
+      /** Hotwords */
+      hotwords: string | null
+      /** Suppress Blank */
+      suppress_blank: boolean
+      /** Suppress Tokens */
+      suppress_tokens: number[] | null
+      /** Max New Tokens */
+      max_new_tokens: number | null
+      /** Without Timestamps */
+      without_timestamps: boolean
+      /** Max Initial Timestamp */
+      max_initial_timestamp: number
+      /** Word Timestamps */
+      word_timestamps: boolean
+      /** Prepend Punctuations */
+      prepend_punctuations: string
+      /** Append Punctuations */
+      append_punctuations: string
+      /** Vad Filter */
+      vad_filter: boolean
+      vad_parameters: components['schemas']['VadParametersDefaultsResponse']
+      /** Multilingual */
+      multilingual: boolean
+      /** Chunk Length */
+      chunk_length: number | null
+      /** Clip Timestamps */
+      clip_timestamps: string | number[]
+      /** Hallucination Silence Threshold */
+      hallucination_silence_threshold: number | null
+      /** Language Detection Threshold */
+      language_detection_threshold: number | null
+      /** Language Detection Segments */
+      language_detection_segments: number
+    }
+    /**
+     * VadParametersDefaultsResponse
+     * @description Expose expanded VAD defaults in API-safe form.
+     */
+    VadParametersDefaultsResponse: {
+      /** Threshold */
+      threshold: number
+      /** Neg Threshold */
+      neg_threshold: number | null
+      /** Min Speech Duration Ms */
+      min_speech_duration_ms: number
+      /** Max Speech Duration S */
+      max_speech_duration_s: number | 'inf'
+      /** Min Silence Duration Ms */
+      min_silence_duration_ms: number
+      /** Speech Pad Ms */
+      speech_pad_ms: number
+      /** Min Silence At Max Speech */
+      min_silence_at_max_speech?: number | null
+      /** Use Max Poss Sil At Max Speech */
+      use_max_poss_sil_at_max_speech?: boolean | null
+    }
+    /**
+     * VadParametersRequest
+     * @description Typed VAD payload for task creation and defaults updates.
+     */
+    VadParametersRequest: {
+      /** Threshold */
+      threshold?: number | null
+      /** Neg Threshold */
+      neg_threshold?: number | null
+      /** Min Speech Duration Ms */
+      min_speech_duration_ms?: number | null
+      /** Max Speech Duration S */
+      max_speech_duration_s?: number | 'inf' | null
+      /** Min Silence Duration Ms */
+      min_silence_duration_ms?: number | null
+      /** Speech Pad Ms */
+      speech_pad_ms?: number | null
+      /** Min Silence At Max Speech */
+      min_silence_at_max_speech?: number | null
+      /** Use Max Poss Sil At Max Speech */
+      use_max_poss_sil_at_max_speech?: boolean | null
     }
     /** ValidationError */
     ValidationError: {
@@ -770,7 +1430,7 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
-  get_default_options_api_transcriptions_options_defaults_get: {
+  get_config_api_config_get: {
     parameters: {
       query?: never
       header?: never
@@ -785,9 +1445,78 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': {
-            [key: string]: unknown
-          }
+          'application/json': components['schemas']['AppConfigResponse']
+        }
+      }
+    }
+  }
+  get_transcription_engine_defaults_api_config_transcription_engine_defaults_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['EngineDefaultsResponse']
+        }
+      }
+    }
+  }
+  delete_transcription_defaults_api_config_transcription_defaults_delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  patch_transcription_defaults_api_config_transcription_defaults_patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TranscriptionDefaultsUpdateRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TranscriptionDefaultsPatchResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
         }
       }
     }

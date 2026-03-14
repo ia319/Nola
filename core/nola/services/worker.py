@@ -9,13 +9,14 @@ import signal
 import socket
 import threading
 import time
-from dataclasses import fields
+from dataclasses import asdict, fields
 from pathlib import Path
 from typing import Any
 
+from nola.common.merge import deep_merge
 from nola.engines.base import TranscribeOptions
 from nola.engines.faster_whisper import FasterWhisperEngine
-from nola.models import FileDatabase, TaskDatabase, init_db
+from nola.models import AppConfigDatabase, FileDatabase, TaskDatabase, init_db
 from nola.models.tasks import TaskRowRaw
 
 logger = logging.getLogger("nola.worker")
@@ -29,27 +30,76 @@ def get_worker_id() -> str:
     return f"worker-{socket.gethostname()}-{threading.current_thread().ident}"
 
 
-def build_transcribe_options(task_options: dict[str, Any] | None) -> TranscribeOptions:
-    """Build TranscribeOptions from task options dict, filtering invalid keys.
+def _filter_valid_options(raw_options: dict[str, Any] | None) -> dict[str, Any]:
+    """Discard top-level keys that are not part of TranscribeOptions."""
+    if not raw_options:
+        return {}
+
+    valid_fields = {field.name for field in fields(TranscribeOptions)}
+    return {key: value for key, value in raw_options.items() if key in valid_fields}
+
+
+def _deserialize_special_values(value: Any, *, key: str | None = None) -> Any:
+    """Convert API sentinel values back to runtime types.
+
+    Symmetric counterpart to ``_serialize_special_values`` in defaults.py,
+    including recursive list/tuple handling. The ``"inf"`` sentinel is only
+    converted for known numeric fields to avoid mutating user text values.
+    The current API contract only serializes positive infinity as ``"inf"``.
+    """
+    if isinstance(value, dict):
+        return {
+            child_key: _deserialize_special_values(child_value, key=child_key)
+            for child_key, child_value in value.items()
+        }
+    if isinstance(value, list):
+        return [_deserialize_special_values(item, key=key) for item in value]
+    if isinstance(value, tuple):
+        return [_deserialize_special_values(item, key=key) for item in value]
+    if key == "max_speech_duration_s" and value == "inf":
+        return float("inf")
+    return value
+
+
+def build_transcribe_options(
+    task_options: dict[str, Any] | None,
+    config_db: AppConfigDatabase | None = None,
+) -> TranscribeOptions:
+    """Build TranscribeOptions from engine defaults, app defaults, and task options.
 
     Args:
-        task_options: Dict of options from task record (may contain invalid keys)
+        task_options: Dict of per-task overrides from the task record
+        config_db: App config store used to load persisted defaults
 
     Returns:
-        TranscribeOptions with only valid fields applied
+        TranscribeOptions with the three-layer merge applied
     """
-    if not task_options:
-        return TranscribeOptions()
+    # Plain deep_merge is intentional here: None values in engine defaults
+    # (e.g. initial_prompt=None) are real defaults, not "remove override"
+    # instructions. The null-removes-key semantics only apply to the PATCH
+    # endpoint in config routes.
+    merged_options = asdict(TranscribeOptions())
 
-    valid_fields = {f.name for f in fields(TranscribeOptions)}
-    filtered = {k: v for k, v in task_options.items() if k in valid_fields}
-    return TranscribeOptions(**filtered)
+    if config_db is not None:
+        app_defaults = _filter_valid_options(config_db.get_all("transcription."))
+        merged_options = deep_merge(merged_options, app_defaults)
+
+    task_overrides = _filter_valid_options(task_options)
+    if task_overrides:
+        merged_options = deep_merge(merged_options, task_overrides)
+
+    # Convert API sentinel values (e.g. "inf") back to runtime types
+    # before constructing the dataclass.
+    merged_options = _deserialize_special_values(merged_options)
+
+    return TranscribeOptions(**merged_options)
 
 
 def run_transcription(
     task: TaskRowRaw,
     file_db: FileDatabase,
     task_db: TaskDatabase,
+    app_config_db: AppConfigDatabase,
     engine: FasterWhisperEngine,
 ) -> None:
     """Execute transcription for a single task.
@@ -92,7 +142,17 @@ def run_transcription(
             except json.JSONDecodeError as e:
                 task_db.fail(task_id, f"Invalid options JSON: {e}", should_retry=False)
                 return
-        options = build_transcribe_options(task_options)
+
+        if task_options is not None and not isinstance(task_options, dict):
+            actual_type = type(task_options).__name__
+            task_db.fail(
+                task_id,
+                f"Options must be a JSON object, got {actual_type}",
+                should_retry=False,
+            )
+            return
+
+        options = build_transcribe_options(task_options, app_config_db)
 
         if task_options:
             logger.info(f"Starting transcription with options: {task_options}")
@@ -154,6 +214,7 @@ def worker_loop(db_path: str | Path | None = None) -> None:
 
     file_db = FileDatabase(db_path)
     task_db = TaskDatabase(db_path)
+    app_config_db = AppConfigDatabase(db_path)
 
     # Load engine once for all tasks
     logger.info("Loading Whisper model...")
@@ -165,7 +226,7 @@ def worker_loop(db_path: str | Path | None = None) -> None:
             task = task_db.dequeue(worker_id)
 
             if task:
-                run_transcription(task, file_db, task_db, engine)
+                run_transcription(task, file_db, task_db, app_config_db, engine)
             else:
                 time.sleep(1)
 

@@ -2,11 +2,10 @@ import type { AppError } from '@/shared/types'
 import { createValidationError } from './error-factory'
 
 /**
- * Configuration for file validation rules.
+ * File validation rules injected by callers.
  *
- * Injected by callers so this module stays pure and testable.
- * Values typically come from `config/constants.ts` today and
- * `GET /api/config` in the future.
+ * This module performs no input normalization — callers must pre-normalize:
+ * extensions lowercase without leading dot, MIME types lowercase.
  */
 export interface FileValidationConfig {
   allowedExtensions: readonly string[]

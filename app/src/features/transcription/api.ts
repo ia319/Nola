@@ -3,7 +3,6 @@ import type {
   CancelTaskResponse,
   CreateTaskPayload,
   CreateTaskResponse,
-  DefaultOptions,
   TaskDetail,
   TaskListResponse,
   TaskStatus,
@@ -49,11 +48,5 @@ export async function getTask(taskId: string, signal?: AbortSignal): Promise<Tas
 /** Cancel a pending or processing task. */
 export async function cancelTask(taskId: string): Promise<CancelTaskResponse> {
   const { data } = await apiClient.delete<CancelTaskResponse>(`${BASE}/${taskId}`)
-  return data
-}
-
-/** Fetch default transcription options from backend. */
-export async function getDefaultOptions(): Promise<DefaultOptions> {
-  const { data } = await apiClient.get<DefaultOptions>(BASE + '/options/defaults')
   return data
 }

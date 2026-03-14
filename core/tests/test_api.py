@@ -7,7 +7,7 @@ from unittest.mock import PropertyMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from nola.api.deps import get_file_db, get_task_db
+from nola.api.deps import get_app_config_db, get_file_db, get_task_db
 from nola.config.constants import MAX_BATCH_EXPORT_TASKS
 from nola.config.settings import Settings
 from nola.main import app
@@ -24,6 +24,7 @@ def _claim_pending_task(task_db, expected_task_id: str) -> None:
 @pytest.fixture
 def client():
     """Create test client with isolated database."""
+    get_app_config_db.cache_clear()
     get_file_db.cache_clear()
     get_task_db.cache_clear()
 
@@ -50,6 +51,7 @@ def client():
             with TestClient(app) as test_client:
                 yield test_client
 
+        get_app_config_db.cache_clear()
         get_file_db.cache_clear()
         get_task_db.cache_clear()
 
@@ -116,18 +118,6 @@ class TestTranscriptionsAPI:
             json={"file_id": "nonexistent-file"},
         )
         assert response.status_code == 404
-
-    def test_get_default_options(self, client):
-        """Test getting default transcription options."""
-        response = client.get("/api/transcriptions/options/defaults")
-        assert response.status_code == 200
-        data = response.json()
-        # Verify key default options exist
-        assert "language" in data
-        assert "beam_size" in data
-        assert data["beam_size"] == 5  # Default value
-        assert "vad_filter" in data
-        assert data["vad_filter"] is False
 
     def test_create_task_with_options(self, client):
         """Test creating task with custom transcription options."""
@@ -232,6 +222,62 @@ class TestInputValidation:
         details = response.json()["detail"]
         assert any(item["loc"][-1] == "temperature" for item in details)
         assert "non-negative" in str(details)
+
+    def test_vad_parameters_unknown_key_returns_422(self, client: TestClient):
+        """Test unknown nested VAD key is rejected at request validation."""
+        response = client.post(
+            "/api/transcriptions",
+            json={
+                "file_id": "nonexistent-file",
+                "vad_filter": True,
+                "vad_parameters": {"threshld": 0.6},
+            },
+        )
+
+        assert response.status_code == 422
+        details = response.json()["detail"]
+        assert any(item["loc"][-1] == "vad_parameters" for item in details)
+        assert "Unsupported vad_parameters key(s): threshld" in str(details)
+
+    def test_vad_parameters_out_of_range_value_returns_422(self, client: TestClient):
+        """Test out-of-range nested VAD value is rejected at request validation."""
+        response = client.post(
+            "/api/transcriptions",
+            json={
+                "file_id": "nonexistent-file",
+                "vad_filter": True,
+                "vad_parameters": {"threshold": 1.1},
+            },
+        )
+
+        assert response.status_code == 422
+        details = response.json()["detail"]
+        assert any(item["loc"][-1] == "threshold" for item in details)
+
+    def test_language_detection_segments_zero_returns_422(self, client: TestClient):
+        """Test zero language_detection_segments is rejected."""
+        response = client.post(
+            "/api/transcriptions",
+            json={
+                "file_id": "nonexistent-file",
+                "language_detection_segments": 0,
+            },
+        )
+
+        assert response.status_code == 422
+        details = response.json()["detail"]
+        assert any(item["loc"][-1] == "language_detection_segments" for item in details)
+
+    def test_unknown_top_level_option_key_returns_422(self, client: TestClient):
+        """Test unknown top-level options are rejected instead of ignored."""
+        response = client.post(
+            "/api/transcriptions",
+            json={"file_id": "nonexistent-file", "beam_sizee": 3},
+        )
+
+        assert response.status_code == 422
+        details = response.json()["detail"]
+        assert any(item["loc"][-1] == "beam_sizee" for item in details)
 
     def test_batch_export_empty_task_ids_returns_422(self, client: TestClient):
         """Test batch export rejects empty task_ids."""

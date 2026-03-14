@@ -1,26 +1,48 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getDefaultOptions } from '@/features/transcription/api'
 import { useTranscriptionOptions } from '../useTranscriptionOptions'
+import type { UseAppConfigReturn } from '@/config/use-app-config'
+import type { TranscriptionDefaults } from '@/shared/types'
 
-vi.mock('@/features/transcription/api', () => ({
-  getDefaultOptions: vi.fn().mockResolvedValue({}),
+const useAppConfigMock = vi.fn<() => UseAppConfigReturn>()
+
+vi.mock('@/config/use-app-config', () => ({
+  useAppConfig: (...args: unknown[]) => useAppConfigMock(...(args as [])),
 }))
 
-vi.mock('@/config/logger', () => ({
-  default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-}))
+function buildAppConfigReturn(defaults: Record<string, unknown> = {}): UseAppConfigReturn {
+  return {
+    config: {
+      engine: {
+        model_size: 'small',
+        device: 'cpu',
+        compute_type: 'default',
+        is_multilingual: true,
+      },
+      transcription: { defaults: defaults as TranscriptionDefaults, schema: [] },
+      file: { allowed_extensions: [], allowed_mime_types: [], max_file_size: 0 },
+      effective_languages: [],
+    },
+    fileValidationConfig: { allowedExtensions: [], allowedMimeTypes: [], maxFileSize: 0 },
+    isLoading: false,
+  }
+}
 
-const getDefaultOptionsMock = vi.mocked(getDefaultOptions)
+function buildLoadingReturn(): UseAppConfigReturn {
+  return {
+    config: null,
+    fileValidationConfig: { allowedExtensions: [], allowedMimeTypes: [], maxFileSize: 0 },
+    isLoading: true,
+  }
+}
 
 async function renderTranscriptionOptions(defaults: Record<string, unknown> = {}) {
-  getDefaultOptionsMock.mockResolvedValue(defaults)
+  useAppConfigMock.mockReturnValue(buildAppConfigReturn(defaults))
 
   const hook = renderHook(() => useTranscriptionOptions())
 
   await waitFor(() => {
-    expect(getDefaultOptionsMock).toHaveBeenCalled()
     expect(hook.result.current.defaults).toEqual(defaults)
   })
 
@@ -41,6 +63,14 @@ describe('useTranscriptionOptions', () => {
     expect(result.current.advancedOptions).toEqual({})
     expect(result.current.initialPrompt).toBeUndefined()
     expect(result.current.defaults).toEqual(defaults)
+  })
+
+  it('hydrates language and task from persisted defaults', async () => {
+    const defaults = { language: 'ja', task: 'translate' }
+    const { result } = await renderTranscriptionOptions(defaults)
+
+    expect(result.current.language).toBe('ja')
+    expect(result.current.task).toBe('translate')
   })
 
   it('updates language via setLanguage', async () => {
@@ -113,6 +143,27 @@ describe('useTranscriptionOptions', () => {
     expect(result.current.initialPrompt).toBe('keep me')
   })
 
+  it('resets local option overrides to backend defaults', async () => {
+    const defaults = { language: 'ja', task: 'translate' }
+    const { result } = await renderTranscriptionOptions(defaults)
+
+    act(() => {
+      result.current.setLanguage('en')
+      result.current.setTask('transcribe')
+      result.current.setAdvancedOption('beam_size', 5)
+      result.current.setInitialPrompt('keep me')
+    })
+
+    act(() => {
+      result.current.resetOptionOverrides()
+    })
+
+    expect(result.current.language).toBe('ja')
+    expect(result.current.task).toBe('translate')
+    expect(result.current.advancedOptions).toEqual({})
+    expect(result.current.initialPrompt).toBeUndefined()
+  })
+
   it('builds a correctly typed CreateTaskPayload', async () => {
     const { result } = await renderTranscriptionOptions()
 
@@ -134,14 +185,10 @@ describe('useTranscriptionOptions', () => {
     })
   })
 
-  it('keeps defaults null when the defaults request fails', async () => {
-    getDefaultOptionsMock.mockRejectedValueOnce(new Error('network down'))
+  it('keeps defaults null when config has not loaded', () => {
+    useAppConfigMock.mockReturnValue(buildLoadingReturn())
 
     const { result } = renderHook(() => useTranscriptionOptions())
-
-    await waitFor(() => {
-      expect(getDefaultOptionsMock).toHaveBeenCalled()
-    })
 
     expect(result.current.defaults).toBeNull()
   })
