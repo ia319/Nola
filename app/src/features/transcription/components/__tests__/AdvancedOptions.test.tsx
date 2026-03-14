@@ -101,6 +101,58 @@ describe('AdvancedOptions', () => {
     expect(input.value).toBe('0.0, 0.25')
   })
 
+  it('collapses single temperature value to scalar on blur', () => {
+    const onOptionChange = vi.fn()
+    const schema: TranscriptionOptionGroup[] = [
+      {
+        group: 'decoding',
+        group_label_key: 'options.group.decoding',
+        fields: [
+          {
+            key: 'temperature',
+            label_key: 'options.field.temperature',
+            type: 'number_list',
+          },
+        ],
+      },
+    ]
+
+    renderAdvancedOptions(schema, { onOptionChange })
+    fireEvent.click(screen.getByRole('button', { name: 'options.advanced.toggle' }))
+
+    const input = screen.getByLabelText('options.field.temperature') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '0.2' } })
+    fireEvent.blur(input)
+
+    expect(onOptionChange).toHaveBeenCalledWith('temperature', 0.2)
+  })
+
+  it('keeps suppress tokens as an array on blur', () => {
+    const onOptionChange = vi.fn()
+    const schema: TranscriptionOptionGroup[] = [
+      {
+        group: 'decoding',
+        group_label_key: 'options.group.decoding',
+        fields: [
+          {
+            key: 'suppress_tokens',
+            label_key: 'options.field.suppressTokens',
+            type: 'number_list',
+          },
+        ],
+      },
+    ]
+
+    renderAdvancedOptions(schema, { onOptionChange })
+    fireEvent.click(screen.getByRole('button', { name: 'options.advanced.toggle' }))
+
+    const input = screen.getByLabelText('options.field.suppressTokens') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '5' } })
+    fireEvent.blur(input)
+
+    expect(onOptionChange).toHaveBeenCalledWith('suppress_tokens', [5])
+  })
+
   it('keeps invalid temperature drafts visible until reset', () => {
     const onOptionChange = vi.fn()
     const onReset = vi.fn()

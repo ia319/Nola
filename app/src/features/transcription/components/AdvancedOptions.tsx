@@ -111,6 +111,7 @@ interface NumberListFieldProps {
   errorMessages: Record<TemperatureParseErrorCode, string>
   parser: (raw: string) => NumberListParseResult
   serializer: (value: TemperatureInputValue) => string
+  collapseSingleValue?: boolean
   onChange: (parsed: number | number[] | undefined) => void
 }
 
@@ -124,6 +125,7 @@ function NumberListField({
   errorMessages,
   parser,
   serializer,
+  collapseSingleValue = false,
   onChange,
 }: NumberListFieldProps) {
   const [draft, setDraft] = useState(() => serializer(value))
@@ -149,7 +151,14 @@ function NumberListField({
     setError(null)
     setDraft(result.canonical ?? '')
     const values = result.values ?? []
-    onChange(values.length === 1 ? values[0] : values)
+    if (collapseSingleValue && values.length === 1) {
+      const firstValue = values[0]
+      if (firstValue !== undefined) {
+        onChange(firstValue)
+        return
+      }
+    }
+    onChange(values)
   }
 
   return (
@@ -432,6 +441,7 @@ function AdvancedOptionsInner({
                             errorMessages={numberListErrorMessages}
                             parser={parser}
                             serializer={serializer}
+                            collapseSingleValue={isTemperatureField}
                             onChange={(parsed) => onOptionChange(field.key, parsed)}
                           />
                         )
