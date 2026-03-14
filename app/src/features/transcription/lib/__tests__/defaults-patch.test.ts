@@ -109,4 +109,25 @@ describe('defaults-patch', () => {
       hotwords: null,
     })
   })
+
+  it('keeps object-to-primitive replacements in patch payload', () => {
+    const payload = buildDefaultsPatchPayload({
+      engineDefaults: defaults({
+        task: 'transcribe',
+        vad_parameters: { threshold: 0.5, speech_pad_ms: 400 },
+      }),
+      previousEffectiveDefaults: defaults({
+        task: 'transcribe',
+        vad_parameters: { threshold: 0.6, speech_pad_ms: 400 },
+      }),
+      nextEffectiveDefaults: defaults({
+        task: 'transcribe',
+        vad_parameters: 1,
+      }),
+    })
+
+    expect(payload).toEqual({
+      vad_parameters: 1,
+    })
+  })
 })

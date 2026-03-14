@@ -66,6 +66,10 @@ function diffFromBase(base: unknown, target: unknown): unknown | undefined {
 
 function buildRemovalPatch(previousDiff: unknown, nextDiff: unknown): unknown | undefined {
   if (isPlainObject(previousDiff)) {
+    if (nextDiff !== undefined && !isPlainObject(nextDiff)) {
+      return undefined
+    }
+
     const nextObject = isPlainObject(nextDiff) ? nextDiff : null
     const patch: JsonObject = {}
 
