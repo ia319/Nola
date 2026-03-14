@@ -144,6 +144,7 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
   }
 
   async function handleSaveDefaults() {
+    // NOTE: Use state flags as the write gate; add a shared ref lock only if duplicate writes appear in real usage.
     if (!defaults || isSavingDefaults || disabled) return
 
     setIsSavingDefaults(true)
@@ -175,6 +176,7 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
   }
 
   async function handleResetDefaults() {
+    // NOTE: Use state flags as the write gate; add a shared ref lock only if save/reset overlap appears in real usage.
     if (isResettingDefaults || disabled) return
 
     setIsResettingDefaults(true)
