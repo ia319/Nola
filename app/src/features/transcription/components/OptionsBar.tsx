@@ -157,8 +157,6 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
 
     setIsResettingDefaults(true)
     try {
-      // Load engine defaults to keep reset flow aligned with backend source.
-      await fetchEngineDefaults()
       await deleteTranscriptionDefaults()
       resetOptionOverrides()
       await refreshAppConfig()

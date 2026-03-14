@@ -256,7 +256,6 @@ describe('OptionsBar', () => {
       }),
     )
 
-    fetchEngineDefaultsMock.mockResolvedValue({ defaults: buildDefaults({ task: 'transcribe' }) })
     deleteTranscriptionDefaultsMock.mockResolvedValue(undefined)
     refreshAppConfigMock.mockResolvedValue(buildAppConfigReturn().config)
 
@@ -265,7 +264,6 @@ describe('OptionsBar', () => {
     fireEvent.click(document.querySelector('#reset-engine-defaults') as HTMLButtonElement)
 
     await waitFor(() => {
-      expect(fetchEngineDefaultsMock).toHaveBeenCalledTimes(1)
       expect(deleteTranscriptionDefaultsMock).toHaveBeenCalledTimes(1)
       expect(resetOptionOverrides).toHaveBeenCalledTimes(1)
       expect(refreshAppConfigMock).toHaveBeenCalledTimes(1)
