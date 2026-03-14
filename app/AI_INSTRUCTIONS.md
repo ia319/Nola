@@ -45,9 +45,13 @@ app/                          # Frontend workspace root
 │   │   └── react.svg         # Example asset
 │   │
 │   ├── config/               # Centralized configuration
+│   │   ├── api.ts            # Config API (fetch + defaults update/reset)
+│   │   ├── __tests__/        # Config store tests
+│   │   │   └── use-app-config.test.ts # Shared config cache/store tests
 │   │   ├── constants.ts      # App constants (synced with backend)
 │   │   ├── env.ts            # Typed environment variables (import.meta.env)
-│   │   └── logger.ts         # Lightweight logger ([Nola] prefix, skips debug+info in prod)
+│   │   ├── logger.ts         # Lightweight logger ([Nola] prefix, skips debug+info in prod)
+│   │   └── use-app-config.ts # Shared config store + refresh API
 │   │
 │   ├── i18n/                 # i18next bootstrap + locale resources
 │   │   ├── index.ts          # i18n initialization (react-i18next)
@@ -80,7 +84,7 @@ app/                          # Frontend workspace root
 │   │   ├── realtime/         # WebSocket streaming
 │   │   │   └── index.ts      # Placeholder
 │   │   ├── transcription/    # Task CRUD, options, polling, status tracking
-│   │   │   ├── api.ts        # createTask, listTasks, getTask, cancelTask, getDefaultOptions
+│   │   │   ├── api.ts        # createTask, listTasks, getTask, cancelTask
 │   │   │   ├── components/   # Transcription feature UI components
 │   │   │   │   ├── AdvancedOptions.tsx # Collapsible advanced settings panel
 │   │   │   │   ├── OptionsBar.tsx     # Language/task selectors + start button
@@ -92,8 +96,13 @@ app/                          # Frontend workspace root
 │   │   │   │   └── __tests__/
 │   │   │   │       └── useTranscriptionOptions.test.ts # Hook behavior tests
 │   │   │   ├── lib/          # Transcription-private pure helpers
+│   │   │   │   ├── defaults-patch.ts # Build defaults patch payloads
+│   │   │   │   ├── object-path.ts # Dot-path read/write helpers
+│   │   │   │   ├── schema-adapter.ts # Map schema to top-level UI model
 │   │   │   │   ├── temperature.ts # Temperature list parse/validate
 │   │   │   │   └── __tests__/
+│   │   │   │       ├── defaults-patch.test.ts # Defaults patch helper tests
+│   │   │   │       ├── schema-adapter.test.ts # Schema adapter behavior tests
 │   │   │   │       └── temperature.test.ts # Temperature validation tests
 │   │   │   ├── __tests__/    # Feature-level tests
 │   │   │   │   └── build-request.test.ts # buildRequest payload tests
@@ -149,6 +158,7 @@ app/                          # Frontend workspace root
 │   │       ├── openapi.d.ts   # AUTO-GENERATED (pnpm gen:types)
 │   │       ├── api-error.ts   # Backend error payload types
 │   │       ├── app-error.ts   # Frontend standardized error model
+│   │       ├── config.ts      # Config response aliases (schema/defaults)
 │   │       ├── file.ts        # FileInfo, FileUploadResponse, etc.
 │   │       ├── task.ts        # TaskSummary, TaskStatus, ExportFormat, etc.
 │   │       └── index.ts       # Barrel re-export
@@ -167,11 +177,19 @@ app/                          # Frontend workspace root
 > 2. **Barrel Exports**: Every feature must expose its public methods/components via an `index.ts`. External files should ONLY import from a feature's index.
 > 3. **Shared UI**: Any component used by >1 feature should be promoted to `src/components/` (or `src/components/ui/` for shared primitives).
 > 4. **Routing**: `routes/` handles URL matching. Components and logic live in `features/`.
-> 5. **API Types**: `shared/types/openapi.d.ts` is AUTO-GENERATED from the backend OpenAPI spec (`pnpm gen:types`). Do NOT manually edit it. Hand-maintained aliases/contracts (`file.ts`, `task.ts`, `api-error.ts`, `app-error.ts`) provide stable, readable types for business code.
+> 5. **API Types**: `shared/types/openapi.d.ts` is AUTO-GENERATED from the backend OpenAPI spec (`pnpm gen:types`). Do NOT manually edit it. Hand-maintained aliases/contracts (`config.ts`, `file.ts`, `task.ts`, `api-error.ts`, `app-error.ts`) provide stable, readable types for business code.
 > 6. **Lib Layer Boundaries**:
 >    - `src/lib/*`: app/platform-level helpers (e.g., shadcn `cn`)
 >    - `src/shared/lib/*`: cross-feature reusable runtime helpers
 >    - `src/features/*/lib/*`: feature-private helpers; promote to `shared/lib` only when reused by another feature
+> 7. **Schema-Driven Controls**: Drive language/task/initial prompt and advanced controls from backend schema via `schema-adapter`; do not reintroduce hardcoded option groups.
+> 8. **Defaults Priority**: Apply `engine defaults < persisted defaults < task overrides` when composing request payloads and defaults patches.
+> 9. **Defaults Patch Semantics**: Use `undefined` for unchanged fields, use `null` to clear persisted overrides, and send concrete values for explicit overrides.
+> 10. **Language Ordering**: Consume `effective_languages` in backend return order; do not assume alphabetical ordering.
+
+> [!IMPORTANT]
+> Use `GET /api/config` and `GET /api/config/transcription/engine-defaults` as the only defaults source.
+> Do not add new frontend calls to `/api/transcriptions/options/defaults`.
 
 > [!NOTE]
 > `@tanstack/react-router`, `zustand`, and `next-themes` are installed, but the current
@@ -192,7 +210,7 @@ Backend (Pydantic) ──► openapi.json ──► openapi.d.ts ──► domai
 | Layer | Path | Maintained by | Edit? |
 |-------|------|--------------|-------|
 | Raw types | `shared/types/openapi.d.ts` | `pnpm gen:types` (auto) | Never |
-| Domain aliases/contracts | `shared/types/task.ts`, `file.ts`, `api-error.ts`, `app-error.ts` | Developer | Rarely (only if backend adds new schemas or error contract changes) |
+| Domain aliases/contracts | `shared/types/config.ts`, `task.ts`, `file.ts`, `api-error.ts`, `app-error.ts` | Developer | Rarely (only if backend adds new schemas or error contract changes) |
 | Feature API | `features/*/api.ts` | Developer | Frequently |
 
 **Key rules:**
@@ -254,17 +272,22 @@ Business domain logic separated by feature. Each feature has an `api.ts` (API fu
   - `types.ts`: Upload domain contracts (`UploadItem`, `UseFileUploadReturn` including `batchError`/`clearBatchError`).
   - `index.ts`: Public barrel exports (`FileUploader`, `UploadProgress`, `UploadList`, `useFileUpload`, `UploadItem`).
 - **transcription**:
-  - `api.ts`: `createTask` (accept `CreateTaskPayload`, filter undefined), `listTasks` (status filter), `getTask`, `cancelTask`, `getDefaultOptions`.
-  - `components/OptionsBar.tsx`: Render language/task selectors, initial prompt textarea, and "Start Transcription" button. Use `useRef` lock to prevent double-click reentry.
-  - `components/AdvancedOptions.tsx`: Collapsible panel rendering option groups (decoding, quality, context, timestamps, advanced). Include `NumberListField` with draft-on-type/commit-on-blur strategy and inline error display.
+  - `api.ts`: `createTask` (accept `CreateTaskPayload`, filter undefined), `listTasks` (status filter), `getTask`, `cancelTask`.
+  - `components/OptionsBar.tsx`: Render schema-adapted language/task selectors, initial prompt textarea, defaults save/reset actions, and "Start Transcription" button. Validate selected task values against schema-derived options before state update.
+  - `components/AdvancedOptions.tsx`: Render schema-driven advanced groups and keep top-level controls (`language`/`task`/`initial_prompt`) out of the advanced panel.
   - `components/__tests__/OptionsBar.test.tsx`: Component tests covering disabled state, initial prompt edits, task creation results, and fallback error mapping.
   - `components/__tests__/AdvancedOptions.test.tsx`: Component tests covering slider default display, temperature commit, and reset behavior.
-  - `hooks/useTranscriptionOptions.ts`: Manage language, task, initialPrompt, and advancedOptions state. Expose `buildRequest(fileId)` to compose `CreateTaskPayload`. Enforce mutual exclusion between `word_timestamps` and `without_timestamps`.
+  - `hooks/useTranscriptionOptions.ts`: Manage language, task, initialPrompt, and advancedOptions state from shared config defaults. Expose `buildRequest(fileId)` to compose `CreateTaskPayload`. Enforce mutual exclusion between `word_timestamps` and `without_timestamps`. Keep persisted defaults hydration aligned with shared app-config state.
   - `hooks/__tests__/useTranscriptionOptions.test.ts`: Hook behavior tests (initial state, setters, bidirectional mutual exclusion, reset isolation, buildRequest payload).
+  - `lib/defaults-patch.ts`: Build PATCH payloads against engine defaults and effective defaults. Keep three-state semantics (`undefined` unchanged, `null` clear, concrete value override) and preserve primitive replacements in nested transitions.
+  - `lib/object-path.ts`: Resolve dot-path reads/writes for nested request payloads.
+  - `lib/schema-adapter.ts`: Adapt backend schema into top-level controls and advanced groups.
   - `lib/temperature.ts`: Parse and validate comma-separated temperature lists. Return structured errors with i18n keys.
+  - `lib/__tests__/defaults-patch.test.ts`: Defaults PATCH payload builder tests.
+  - `lib/__tests__/schema-adapter.test.ts`: Schema adapter extraction and fallback tests.
   - `lib/__tests__/temperature.test.ts`: Temperature parse/validate unit tests.
   - `__tests__/build-request.test.ts`: Payload composition tests (defaults, single/multiple options, undefined filtering, full merge).
-  - `types.ts`: Transcription domain types (`AdvancedTranscriptionOptions`, `CreateTaskPayload`, `OptionFieldType`, `OPTION_GROUPS`).
+  - `types.ts`: Transcription domain types (`AdvancedTranscriptionOptions`, `CreateTaskPayload`, task option state contracts).
 - **export**: `downloadExport` (blob), `saveExport` (server path), `batchExport` (ZIP blob).
 - **history**: Placeholder for paginated viewing of past tasks.
 - **realtime**: Placeholder for future WebSocket-based live transcription.
@@ -286,6 +309,7 @@ Cross-feature shared code, split into `ui/`, `lib/`, and `types/`.
 - **types/openapi.d.ts**: Auto-generated by `pnpm gen:types`. Never edit manually.
 - **types/api-error.ts**: Backend error payload contracts (`ApiError`, `ValidationErrorItem`).
 - **types/app-error.ts**: Frontend error contract (`AppError`: `code`, `i18nKey`, `params`, `retriable`).
+- **types/config.ts**: Thin aliases for config contracts (`AppConfig`, `EngineDefaults`, `TranscriptionDefaultsUpdateRequest`).
 - **types/file.ts**: Thin aliases over OpenAPI file schemas (`FileInfo`, `FileUploadResponse`, etc.).
 - **types/task.ts**: Thin aliases over OpenAPI task schemas + derived types (`TaskStatus`, `ExportFormat` from schema enums).
 - **types/index.ts**: Barrel re-export for `import type { ... } from '@/shared/types'`.
@@ -303,9 +327,11 @@ i18next bootstrap and locale dictionaries.
 - **locales/en.json**, **locales/zh.json**: Locale resource files.
 
 ### src/config/
-Bootstrap constants overriding magic strings.
+Runtime config access and fallback constants.
+- **api.ts**: Config endpoints (`fetchAppConfig`, `fetchEngineDefaults`, defaults `PATCH`/`DELETE`).
+- **use-app-config.ts**: Shared config singleton store using `useSyncExternalStore`, plus `refreshAppConfig()`. Notify all mounted consumers when the shared snapshot changes.
+- **constants.ts**: Fallback values used when config fetch fails or before first load.
 - **env.ts**: Safely extracts `import.meta.env.VITE_*` using Nullish Coalescing (`??`).
-- **constants.ts**: Manually synced values from backend (`POLL_INTERVAL_MS`, `ALLOWED_EXTENSIONS`, etc.).
 - **logger.ts**: Lightweight logger prefixing output with `[Nola]` and suppressing `debug` and `info` in production. Only `warn` and `error` are visible to end users.
 
 ### src/test/

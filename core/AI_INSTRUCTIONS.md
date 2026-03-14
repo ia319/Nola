@@ -1,4 +1,4 @@
-# AI Instructions - Nola Project
+# AI Instructions - Nola Core
 
 > This file helps AI quickly understand the project structure.
 
@@ -6,8 +6,8 @@
 
 | Key | Value |
 |-----|-------|
-| Name | Nola - Speech-to-text Software |
-| Stack | Python (FastAPI) + React (Tauri) |
+| Name | Nola Core - Speech-to-text Backend |
+| Stack | Python (FastAPI) + SQLite + Faster-Whisper worker |
 
 ---
 
@@ -23,57 +23,68 @@
 
 ## Directory Structure
 
-```
-Nola/
-├── core/                      # Python backend (Flat Layout)
-│   ├── pyproject.toml         # Poetry config + ruff/mypy settings
-│   ├── README.md              # Backend docs
-│   ├── nola/                  # Main package
-│   │   ├── __init__.py        # Version info (v0.1.0)
-│   │   ├── main.py            # FastAPI entry point
-│   │   ├── config/            # Configuration
-│   │   │   ├── settings.py    # Pydantic Settings (paths, limits, model)
-│   │   │   └── constants.py   # Validation constants (MIME types, extensions)
-│   │   ├── utils/             # Utility functions
-│   │   │   └── mime.py        # MIME type inference
-│   │   ├── api/               # API layer
-│   │   │   ├── deps.py        # Dependency injection
-│   │   │   ├── routes/        # API endpoints
-│   │   │   │   ├── files.py   # File upload/management
-│   │   │   │   └── transcriptions.py  # Task + export endpoints
-│   │   │   └── schemas/       # Pydantic request/response models
-│   │   │       ├── files.py   # FileResponse, FileListResponse, etc.
-│   │   │       ├── responses.py  # TaskDetailResponse, CreateTaskResponse, etc.
-│   │   │       ├── transcriptions.py  # TranscriptionRequest, BatchExportRequest
-│   │   │       └── validators.py      # Reusable schema validators
-│   │   ├── engines/           # Transcription engines
-│   │   │   ├── base.py        # Segment, EngineConfig, TranscriptionEngine
-│   │   │   └── faster_whisper.py  # FasterWhisperEngine implementation
-│   │   ├── models/            # Data models & Database
-│   │   │   ├── database.py    # Schema & init
-│   │   │   ├── files.py       # FileDatabase class
-│   │   │   ├── tasks.py       # TaskDatabase (job queue)
-│   │   │   └── utils.py       # SQLite utilities
-│   │   └── services/          # Business logic
-│   │       ├── worker.py      # Background worker process
-│   │       └── formatters/    # Subtitle formatters
-│   │           ├── base.py    # BaseFormatter, SegmentData
-│   │           ├── srt.py     # SRT formatter
-│   │           ├── vtt.py     # VTT formatter
-│   │           ├── txt.py     # TXT formatter
-│   │           ├── ass.py     # ASS formatter
-│   │           └── __init__.py  # get_formatter() registry
-│   └── tests/                 # Test directory
-│       ├── test_api.py        # API endpoint tests
-│       ├── test_engines.py    # Engine tests
-│       ├── test_models.py     # Database tests
-│       ├── test_worker.py     # Worker tests
-│       └── test_formatters.py # Formatter tests
-├── app/                       # Frontend GUI (TODO)
-├── .pre-commit-config.yaml    # Pre-commit hooks
-├── .editorconfig              # Editor config
-├── .gitignore
-└── AI_INSTRUCTIONS.md         # This file
+```text
+core/
+├── AI_INSTRUCTIONS.md         # This file
+├── pyproject.toml             # Poetry config + ruff/mypy settings
+├── README.md                  # Backend docs
+├── nola/                      # Main package
+│   ├── __init__.py            # Version info (v0.1.0)
+│   ├── main.py                # FastAPI entry point
+│   ├── config/                # Settings, constants, and transcription config contract
+│   │   ├── settings.py        # Pydantic Settings (paths, limits, model)
+│   │   ├── constants.py       # Validation constants (MIME types, extensions)
+│   │   └── transcription/     # Config metadata, defaults, and language helpers
+│   │       ├── __init__.py    # Transcription config package exports
+│   │       ├── metadata.py    # Option schema models and grouped field metadata
+│   │       ├── defaults.py    # Engine/effective defaults and sentinel conversion
+│   │       └── languages.py   # Language capability mapping for effective options
+│   ├── common/                # Shared backend helpers
+│   │   ├── __init__.py        # Common helper package exports
+│   │   └── merge.py           # Recursive deep-merge helper
+│   ├── utils/                 # Utility functions
+│   │   └── mime.py            # MIME type inference
+│   ├── api/                   # API layer
+│   │   ├── deps.py            # Dependency injection
+│   │   ├── routes/            # API endpoints
+│   │   │   ├── config.py      # Config aggregation and defaults endpoints
+│   │   │   ├── files.py       # File upload/management
+│   │   │   └── transcriptions.py  # Task + export endpoints
+│   │   └── schemas/           # Pydantic request/response models
+│   │       ├── files.py       # FileResponse, FileListResponse, etc.
+│   │       ├── responses.py   # TaskDetailResponse, CreateTaskResponse, etc.
+│   │       ├── transcriptions.py  # TranscriptionRequest, BatchExportRequest, defaults update
+│   │       └── validators.py  # Reusable schema validators
+│   ├── engines/               # Transcription engines
+│   │   ├── base.py            # Segment, EngineConfig, TranscriptionEngine
+│   │   └── faster_whisper.py  # FasterWhisperEngine implementation
+│   ├── models/                # Data models & Database
+│   │   ├── app_config.py      # AppConfigDatabase for persisted defaults
+│   │   ├── database.py        # Schema & init
+│   │   ├── files.py           # FileDatabase class
+│   │   ├── tasks.py           # TaskDatabase (job queue)
+│   │   └── utils.py           # SQLite utilities
+│   └── services/              # Business logic
+│       ├── worker.py          # Background worker process
+│       └── formatters/        # Subtitle formatters
+│           ├── base.py        # BaseFormatter, SegmentData
+│           ├── srt.py         # SRT formatter
+│           ├── vtt.py         # VTT formatter
+│           ├── txt.py         # TXT formatter
+│           ├── ass.py         # ASS formatter
+│           └── __init__.py    # get_formatter() registry
+└── tests/                     # Test directory
+    ├── __init__.py            # Test package marker
+    ├── conftest.py            # Shared pytest fixtures
+    ├── test_api.py            # API endpoint tests
+    ├── test_config_api.py     # Config endpoint contract tests
+    ├── test_config_db.py      # App config persistence tests
+    ├── test_engines.py        # Engine tests
+    ├── test_models.py         # Database tests
+    ├── test_transcription_config.py # Transcription metadata/defaults tests
+    ├── test_transcription_schemas.py # Request schema validation tests
+    ├── test_worker.py         # Worker tests
+    └── test_formatters.py     # Formatter tests
 ```
 
 ---
@@ -82,7 +93,7 @@ Nola/
 
 > [!IMPORTANT]
 > **Database Operations Must Follow:**
-> 1.  **Context Managers**: Use `with sqlite3.connect(...) as conn:` to prevent leaks.
+> 1.  **Connection Lifetime**: Do not rely on `with sqlite3.connect(...) as conn:` to close connections. Explicitly close SQLite connections, and preserve transaction semantics for write operations.
 > 2.  **Atomic Updates**: Use `UPDATE ... WHERE ... RETURNING` for queue operations to avoid race conditions.
 > 3.  **Poison Pill Protection**: Increment `retry_count` even when requeuing timeout/dead tasks.
 > 4.  **Environment Check**: Verify `sqlite3` version >= 3.35.0 on startup.
@@ -112,14 +123,19 @@ Nola/
 
 ## Detailed Module Overview
 
-### core/nola/models/
+### nola/models/
 Data persistence layer (SQLite):
 - `database.py`: Schema initialization, connection management, and foreign key enforcement.
+- `app_config.py`: `AppConfigDatabase` for persisted application defaults under `app_config`.
 - `files.py`: `FileDatabase` for managing audio file metadata. Uses `FileRow` TypedDict.
 - `tasks.py`: `TaskDatabase` implementing the production-grade job queue. Uses `TaskRowRaw`/`TaskRow` TypedDicts.
-- `utils/db.py`: Database utilities (e.g., `ensure_sqlite_version`).
+- `utils.py`: Database utilities (e.g., `ensure_sqlite_version`).
 
-### core/nola/engines/
+### nola/common/
+Shared backend helper layer:
+- `merge.py`: Provide recursive deep-merge behavior for defaults composition.
+
+### nola/engines/
 Transcription engine layer:
 - `Segment`: Data class for transcribed segment with timing
 - `EngineConfig`: Engine initialization configuration
@@ -127,30 +143,35 @@ Transcription engine layer:
 - `TranscriptionEngine`: Abstract interface for transcription engines
 - `FasterWhisperEngine`: Faster-Whisper implementation
 
-### core/nola/api/
+### nola/api/
 REST API layer:
 - `deps.py`: Dependency injection for database instances (singletons)
+- `routes/config.py`: Aggregated config endpoints and transcription-defaults management.
 - `routes/files.py`: File upload/list/delete with validation. All endpoints use `response_model`.
 - `routes/transcriptions.py`: Task CRUD + export endpoints. CRUD endpoints use `response_model`.
 - `schemas/files.py`: 8 Pydantic response models (`FileResponse`, `FileListResponse`, etc.)
 - `schemas/responses.py`: 7 Pydantic response models (`TaskDetailResponse`, `CreateTaskResponse`, etc.)
-- `schemas/transcriptions.py`: Request models (`TranscriptionRequest`, `BatchExportRequest`)
-- `schemas/validators.py`: Reusable validation functions (e.g., language, temperature)
+- `schemas/transcriptions.py`: Request models (`TranscriptionRequest`, `BatchExportRequest`, `TranscriptionDefaultsUpdateRequest`) with typed `VadParametersRequest` and `extra=forbid`
+- `schemas/validators.py`: Reusable validation functions for language, task options, temperature, and nested `vad_parameters` keys
 
-### core/nola/services/
+### nola/services/
 Background services:
 - `worker.py`: Independent worker process that dequeues and executes transcription tasks
   - Loads engine once for performance
-  - `build_transcribe_options()` filters invalid option keys
+  - `build_transcribe_options()` merges engine defaults, app defaults, and task overrides
   - JSON options parsing with error handling
 - `formatters/`: Subtitle export formatters (SRT, VTT, TXT, ASS)
   - `get_formatter(format, include_timestamps)` factory function
   - Static registry pattern for format discovery
 
-### core/nola/main.py
+### nola/main.py
 FastAPI entry point with lifespan management:
 - `GET /` - API info
 - `GET /health` - Health check
+- `GET /api/config` - Aggregated frontend-facing configuration
+- `GET /api/config/transcription/engine-defaults` - Raw engine defaults
+- `PATCH /api/config/transcription/defaults` - Persist transcription default overrides
+- `DELETE /api/config/transcription/defaults` - Reset persisted transcription defaults
 - `POST /api/files/` - Upload audio file
 - `GET /api/files/` - List all files
 - `GET /api/files/{file_id}` - Get file metadata
@@ -161,16 +182,25 @@ FastAPI entry point with lifespan management:
 - `GET /api/transcriptions/` - List tasks (with filtering)
 - `GET /api/transcriptions/{task_id}` - Get task status/result
 - `DELETE /api/transcriptions/{task_id}` - Cancel task
-- `GET /api/transcriptions/options/defaults` - Get default options
 - `GET /api/transcriptions/{task_id}/export` - Export as subtitle (SRT/VTT/TXT/ASS)
 - `POST /api/transcriptions/export/batch` - Batch export as ZIP
 
-### core/nola/config/
+### nola/config/
 Configuration and constants:
 - `settings.py`: Pydantic Settings (data_dir, exports_dir, max_file_size, model defaults, host/port)
 - `constants.py`: Validation constants (MIME/extension allowlists, language set, batch limits)
+- `transcription/`: Backend source of truth for config metadata, defaults, and language options
 
-### core/nola/utils/
+### Transcription Rules
+Apply config-driven schema as the only source for frontend option metadata and task option values.
+Apply defaults precedence as `engine defaults < persisted app defaults < task overrides`.
+Treat explicit `null` in `PATCH /api/config/transcription/defaults` as remove-override semantics.
+Merge nested defaults objects in PATCH flows without replacing untouched subkeys.
+Reject unknown top-level options and unknown `vad_parameters` keys at request validation with `422`.
+Apply the same schema-level range validation in `POST /api/transcriptions` and `PATCH /api/config/transcription/defaults`, and return `422` for out-of-range values.
+Serialize infinity as `"inf"` at API boundaries and deserialize it back before engine invocation.
+
+### nola/utils/
 Utility functions:
 - `mime.py`: MIME type inference from file extension
 
@@ -180,13 +210,13 @@ Utility functions:
 
 ```bash
 # Install dependencies
-cd core && poetry install
+poetry install
 
 # Start dev server
 poetry run uvicorn nola.main:app --reload
 
 # Run linter
-poetry run ruff check .
+poetry run ruff check nola tests
 
 # Run type checker
 poetry run mypy nola
@@ -195,10 +225,10 @@ poetry run mypy nola
 poetry run pytest
 
 # Auto-fix lint issues
-poetry run ruff check . --fix
+poetry run ruff check nola tests --fix
 
 # Format code
-poetry run ruff format .
+poetry run ruff format nola tests
 
 # Start worker (in a separate terminal)
 poetry run python -m nola.services.worker
@@ -221,6 +251,15 @@ Client ──▶ FastAPI Server ──▶ SQLite DB ◀── Worker Process
 
 ## API Reference
 
+### Config API
+
+| Endpoint | Method | Body/Query | Response Model |
+|----------|--------|------------|----------------|
+| `/api/config` | GET | - | `AppConfigResponse` |
+| `/api/config/transcription/engine-defaults` | GET | - | `EngineDefaultsResponse` |
+| `/api/config/transcription/defaults` | PATCH | `TranscriptionDefaultsUpdateRequest` | `TranscriptionDefaultsPatchResponse` |
+| `/api/config/transcription/defaults` | DELETE | - | `204 No Content` |
+
 ### Files API
 
 | Endpoint | Method | Body/Query | Response Model |
@@ -240,7 +279,6 @@ Client ──▶ FastAPI Server ──▶ SQLite DB ◀── Worker Process
 | `/api/transcriptions/` | GET | `?status=&limit=&offset=` | `TaskListResponse` |
 | `/api/transcriptions/{task_id}` | GET | - | `TaskDetailResponse` |
 | `/api/transcriptions/{task_id}` | DELETE | - | `CancelTaskResponse` |
-| `/api/transcriptions/options/defaults` | GET | - | `dict` (dynamic) |
 | `/api/transcriptions/{task_id}/export` | GET | `?format=srt&save=false` | Binary or `{saved_path}` |
 | `/api/transcriptions/export/batch` | POST | `BatchExportRequest` | ZIP binary |
 
