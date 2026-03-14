@@ -151,6 +151,26 @@ class TestTranscriptionParamSchema:
 
         assert max_speech_field.special_values == ["inf"]
 
+    def test_number_list_schema_exposes_list_parsing_constraints(self):
+        """Number-list metadata should expose parser-relevant constraints."""
+        schema = get_transcription_param_schema()
+        number_list_fields = {
+            field.key: field
+            for group in schema
+            for field in group.fields
+            if field.type == "number_list"
+        }
+
+        temperature_field = number_list_fields["temperature"]
+        suppress_tokens_field = number_list_fields["suppress_tokens"]
+
+        assert temperature_field.collapse_single_value is True
+        assert temperature_field.allow_negative is False
+        assert temperature_field.integer_only is False
+        assert suppress_tokens_field.allow_negative is True
+        assert suppress_tokens_field.integer_only is True
+        assert suppress_tokens_field.collapse_single_value is False
+
     def test_param_schema_returns_a_defensive_copy(self):
         """The public schema accessor should not expose shared mutable state."""
         first = get_transcription_param_schema()

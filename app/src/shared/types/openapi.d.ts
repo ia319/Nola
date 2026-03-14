@@ -609,6 +609,21 @@ export interface components {
        * @enum {string}
        */
       type: 'number_list'
+      /**
+       * Allow Negative
+       * @default false
+       */
+      allow_negative: boolean
+      /**
+       * Integer Only
+       * @default false
+       */
+      integer_only: boolean
+      /**
+       * Collapse Single Value
+       * @default false
+       */
+      collapse_single_value: boolean
       /** Depends On */
       depends_on?: string | null
     }

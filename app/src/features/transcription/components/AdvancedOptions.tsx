@@ -112,7 +112,7 @@ interface NumberListFieldProps {
   parser: (raw: string) => NumberListParseResult
   serializer: (value: TemperatureInputValue) => string
   collapseSingleValue?: boolean
-  onChange: (parsed: number | number[] | undefined) => void
+  onChange: (parsed: number | number[] | null | undefined) => void
 }
 
 function NumberListField({
@@ -130,6 +130,7 @@ function NumberListField({
 }: NumberListFieldProps) {
   const [draft, setDraft] = useState(() => serializer(value))
   const [error, setError] = useState<TemperatureParseErrorCode | null>(null)
+  const [isDirty, setIsDirty] = useState(false)
   const descriptionId = `opt-${fieldKey}-hint`
   const errorId = `opt-${fieldKey}-error`
 
@@ -139,7 +140,7 @@ function NumberListField({
     if (result.kind === 'empty') {
       setError(null)
       setDraft('')
-      onChange(undefined)
+      onChange(isDirty ? null : undefined)
       return
     }
 
@@ -175,6 +176,7 @@ function NumberListField({
         placeholder={placeholder}
         onChange={(e) => {
           setDraft(e.target.value)
+          setIsDirty(true)
           if (error) setError(null)
         }}
         onBlur={commitDraft}
@@ -360,7 +362,7 @@ function AdvancedOptionsInner({
                                 }
                                 onChange={(e) => {
                                   const raw = e.target.value
-                                  onOptionChange(field.key, raw === '' ? undefined : Number(raw))
+                                  onOptionChange(field.key, raw === '' ? null : Number(raw))
                                 }}
                               />
                               {hasSpecials &&
@@ -401,27 +403,31 @@ function AdvancedOptionsInner({
                               placeholder={
                                 typeof placeholder === 'string' ? placeholder : undefined
                               }
-                              onChange={(e) =>
-                                onOptionChange(field.key, e.target.value || undefined)
-                              }
+                              onChange={(e) => {
+                                const next = e.target.value
+                                onOptionChange(field.key, next === '' ? null : next)
+                              }}
                             />
                           </div>
                         )
 
                       case 'number_list': {
-                        const isTemperatureField = field.key === 'temperature'
-                        const isIntegerListField = field.key === 'suppress_tokens'
-                        const parser = isTemperatureField
+                        const allowNegative = field.allow_negative ?? false
+                        const integerOnly = field.integer_only ?? false
+                        const collapseSingleValue = field.collapse_single_value ?? false
+                        const useTemperatureCodec =
+                          collapseSingleValue && !allowNegative && !integerOnly
+                        const parser = useTemperatureCodec
                           ? parseTemperatureDraft
                           : (raw: string) =>
                               parseNumberListDraft(raw, {
-                                allowNegative: true,
-                                integerOnly: isIntegerListField,
+                                allowNegative,
+                                integerOnly,
                               })
-                        const serializer = isTemperatureField
+                        const serializer = useTemperatureCodec
                           ? serializeTemperatureValue
                           : (input: TemperatureInputValue) =>
-                              serializeGenericNumberList(input, isIntegerListField)
+                              serializeGenericNumberList(input, integerOnly)
 
                         return (
                           <NumberListField
@@ -441,7 +447,7 @@ function AdvancedOptionsInner({
                             errorMessages={numberListErrorMessages}
                             parser={parser}
                             serializer={serializer}
-                            collapseSingleValue={isTemperatureField}
+                            collapseSingleValue={collapseSingleValue}
                             onChange={(parsed) => onOptionChange(field.key, parsed)}
                           />
                         )

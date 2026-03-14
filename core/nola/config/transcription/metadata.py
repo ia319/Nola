@@ -53,6 +53,9 @@ class NumberListFieldSchema(BaseModel):
     key: str
     label_key: str
     type: Literal["number_list"]
+    allow_negative: bool = False
+    integer_only: bool = False
+    collapse_single_value: bool = False
     depends_on: str | None = None
 
 
@@ -286,6 +289,7 @@ _TRANSCRIPTION_PARAM_SCHEMA: list[OptionGroupSchema] = [
                 key="temperature",
                 label_key="options.field.temperature",
                 type="number_list",
+                collapse_single_value=True,
             ),
         ],
     ),
@@ -357,6 +361,8 @@ _TRANSCRIPTION_PARAM_SCHEMA: list[OptionGroupSchema] = [
                 key="suppress_tokens",
                 label_key="options.field.suppressTokens",
                 type="number_list",
+                allow_negative=True,
+                integer_only=True,
             ),
             NumberFieldSchema(
                 key="max_new_tokens",
