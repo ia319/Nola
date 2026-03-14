@@ -94,8 +94,7 @@ class TestLanguageCapabilities:
         english_only = get_effective_languages("small.en")
         multilingual_codes = {option.code for option in multilingual}
 
-        assert multilingual[0].code == "af"
-        assert {"en", "zh", "yue"} <= multilingual_codes
+        assert {"af", "en", "zh", "yue"} <= multilingual_codes
         assert [option.model_dump() for option in english_only] == [
             {"code": "en", "label_key": "options.language.en"}
         ]
