@@ -314,6 +314,36 @@ describe('AdvancedOptions', () => {
     expect(onOptionChange).toHaveBeenCalledWith('log_prob_threshold', 0.5)
   })
 
+  it('keeps untouched number fields as implicit defaults on blur', () => {
+    const onOptionChange = vi.fn()
+    const schema: TranscriptionOptionGroup[] = [
+      {
+        group: 'quality',
+        group_label_key: 'options.group.quality',
+        fields: [
+          {
+            key: 'log_prob_threshold',
+            label_key: 'options.field.logProbThreshold',
+            type: 'number',
+            step: 0.1,
+          },
+        ],
+      },
+    ]
+
+    renderAdvancedOptions(schema, {
+      onOptionChange,
+      defaults: { log_prob_threshold: -1 },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'options.advanced.toggle' }))
+
+    const input = screen.getByLabelText('options.field.logProbThreshold') as HTMLInputElement
+    fireEvent.blur(input)
+
+    expect(onOptionChange).toHaveBeenCalledWith('log_prob_threshold', undefined)
+    expect(onOptionChange).not.toHaveBeenCalledWith('log_prob_threshold', null)
+  })
+
   it('renders array placeholders for text fields', () => {
     const schema: TranscriptionOptionGroup[] = [
       {

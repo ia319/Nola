@@ -204,6 +204,7 @@ interface NumberFieldProps {
 
 function NumberField({ field, label, disabled, value, placeholder, onChange }: NumberFieldProps) {
   const [draft, setDraft] = useState(() => (typeof value === 'number' ? String(value) : ''))
+  const [isDirty, setIsDirty] = useState(false)
   const hasSpecials = Array.isArray(field.special_values) && field.special_values.length > 0
   const activeSpecial =
     typeof value === 'string' && hasSpecialValue(field, value) ? value.toLowerCase() : null
@@ -211,7 +212,7 @@ function NumberField({ field, label, disabled, value, placeholder, onChange }: N
   function commitDraft() {
     const raw = draft.trim()
     if (raw === '') {
-      onChange(null)
+      onChange(isDirty ? null : undefined)
       return
     }
 
@@ -239,7 +240,10 @@ function NumberField({ field, label, disabled, value, placeholder, onChange }: N
           step={field.step ?? undefined}
           value={draft}
           placeholder={placeholder}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value)
+            setIsDirty(true)
+          }}
           onBlur={commitDraft}
         />
         {hasSpecials &&
