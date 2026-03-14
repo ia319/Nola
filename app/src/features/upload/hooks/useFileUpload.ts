@@ -31,11 +31,6 @@ export function useFileUpload(validationConfig: FileValidationConfig): UseFileUp
   const controllersRef = useRef<Map<string, AbortController>>(new Map())
   const lockRef = useRef(false)
 
-  // Mirror mutable values into refs so callbacks always read the latest version
-  // without needing to be recreated (same pattern as uploadsRef below).
-  const validationConfigRef = useRef(validationConfig)
-  validationConfigRef.current = validationConfig
-
   const uploadsRef = useRef<UploadItem[]>([])
   const setUploadsSync = useCallback((updater: UploadsUpdater) => {
     const next = typeof updater === 'function' ? updater(uploadsRef.current) : updater
@@ -66,11 +61,7 @@ export function useFileUpload(validationConfig: FileValidationConfig): UseFileUp
     (files: File[]) => {
       setBatchError(null)
 
-      const { items, batchError } = admitFiles(
-        files,
-        uploadsRef.current,
-        validationConfigRef.current,
-      )
+      const { items, batchError } = admitFiles(files, uploadsRef.current, validationConfig)
       if (batchError) setBatchError(batchError)
       if (items.length === 0) return
 
@@ -81,7 +72,7 @@ export function useFileUpload(validationConfig: FileValidationConfig): UseFileUp
 
       setUploadsSync((prev) => [...prev, ...items])
     },
-    [setUploadsSync],
+    [setUploadsSync, validationConfig],
   )
 
   const cancelUpload = useCallback(
