@@ -19,7 +19,10 @@ export async function fetchEngineDefaults(signal?: AbortSignal): Promise<EngineD
   return data
 }
 
-/** Persist transcription-default overrides via `PATCH /api/config/transcription/defaults`. */
+/**
+ * Persist transcription-default overrides via `PATCH /api/config/transcription/defaults`.
+ * Keep write requests non-cancelable until the UI adds an explicit cancel/retry flow.
+ */
 export async function patchTranscriptionDefaults(
   payload: TranscriptionDefaultsUpdateRequest,
 ): Promise<TranscriptionDefaultsPatchResponse> {
@@ -30,7 +33,10 @@ export async function patchTranscriptionDefaults(
   return data
 }
 
-/** Remove all persisted transcription-default overrides via `DELETE /api/config/transcription/defaults`. */
+/**
+ * Remove all persisted transcription-default overrides via `DELETE /api/config/transcription/defaults`.
+ * Keep write requests non-cancelable until the UI adds an explicit cancel/retry flow.
+ */
 export async function deleteTranscriptionDefaults(): Promise<void> {
   await apiClient.delete('/api/config/transcription/defaults')
 }

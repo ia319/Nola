@@ -155,9 +155,9 @@
       "numberListHint": "使用逗号分隔非负数字，例如 0.0, 0.2, 0.4",
       "numberListError": {
         "emptySegment": "逗号只能用于分隔数字",
-        "invalidCharacter": "请输入用逗号分隔的小数",
-        "invalidNumber": "每个温度值都必须是合法的小数",
-        "negativeNotAllowed": "温度值必须为非负数"
+        "invalidCharacter": "请输入用逗号分隔的数字",
+        "invalidNumber": "每个值都必须是合法数字",
+        "negativeNotAllowed": "数值必须为非负数字"
       }
     },
     "group": {

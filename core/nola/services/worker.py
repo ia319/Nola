@@ -45,6 +45,7 @@ def _deserialize_special_values(value: Any, *, key: str | None = None) -> Any:
     Symmetric counterpart to ``_serialize_special_values`` in defaults.py,
     including recursive list/tuple handling. The ``"inf"`` sentinel is only
     converted for known numeric fields to avoid mutating user text values.
+    The current API contract only serializes positive infinity as ``"inf"``.
     """
     if isinstance(value, dict):
         return {
