@@ -263,7 +263,10 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
           placeholder={
             typeof defaults?.initial_prompt === 'string' ? defaults.initial_prompt : undefined
           }
-          onChange={(e) => setInitialPrompt(e.target.value || undefined)}
+          onChange={(e) => {
+            const next = e.target.value
+            setInitialPrompt(next === '' ? null : next)
+          }}
         />
       </div>
 

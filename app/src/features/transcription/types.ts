@@ -1,7 +1,7 @@
 import type { CreateTaskPayload, TranscriptionDefaults } from '@/shared/types'
 
 /** Leaf value types emitted by schema-driven transcription controls. */
-export type AdvancedOptionValue = string | number | boolean | number[]
+export type AdvancedOptionValue = string | number | boolean | number[] | null
 
 /**
  * Dot-path keyed option state (for example: `beam_size`,
@@ -25,6 +25,6 @@ export interface UseTranscriptionOptionsReturn {
   resetAdvancedOptions: () => void
   resetOptionOverrides: () => void
   buildRequest: (fileId: string) => CreateTaskPayload
-  initialPrompt: string | undefined
-  setInitialPrompt: (value: string | undefined) => void
+  initialPrompt: string | null | undefined
+  setInitialPrompt: (value: string | null | undefined) => void
 }

@@ -104,7 +104,7 @@ interface BuildEffectiveDefaultsInput {
   defaults: TranscriptionDefaults
   language: string | undefined
   task: TranscriptionTaskType
-  initialPrompt: string | undefined
+  initialPrompt: string | null | undefined
   advancedOptions: AdvancedTranscriptionOptions
 }
 

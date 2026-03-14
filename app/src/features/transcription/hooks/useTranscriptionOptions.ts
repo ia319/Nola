@@ -14,7 +14,7 @@ export function useTranscriptionOptions(): UseTranscriptionOptionsReturn {
   const [languageOverride, setLanguageOverride] = useState<string | null | undefined>(undefined)
   const [taskOverride, setTaskOverride] = useState<TranscriptionTaskType | undefined>(undefined)
   const [advancedOptions, setAdvancedOptions] = useState<AdvancedTranscriptionOptions>({})
-  const [initialPrompt, setInitialPrompt] = useState<string | undefined>(undefined)
+  const [initialPrompt, setInitialPrompt] = useState<string | null | undefined>(undefined)
 
   const { config } = useAppConfig()
   const defaults: TranscriptionDefaults | null = config?.transcription.defaults ?? null

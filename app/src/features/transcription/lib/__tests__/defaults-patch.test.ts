@@ -68,4 +68,45 @@ describe('defaults-patch', () => {
       },
     })
   })
+
+  it('keeps explicit null clears when building effective defaults and patch payload', () => {
+    const engineDefaults = defaults({
+      language: null,
+      task: 'transcribe',
+      beam_size: 5,
+      initial_prompt: null,
+      hotwords: null,
+    })
+    const previousEffective = defaults({
+      language: null,
+      task: 'transcribe',
+      beam_size: 3,
+      initial_prompt: 'keep context',
+      hotwords: 'brand name',
+    })
+    const nextEffective = buildEffectiveDefaults({
+      defaults: previousEffective,
+      language: undefined,
+      task: 'transcribe',
+      initialPrompt: null,
+      advancedOptions: {
+        beam_size: null,
+        hotwords: null,
+      },
+    })
+
+    const payload = buildDefaultsPatchPayload({
+      engineDefaults,
+      previousEffectiveDefaults: previousEffective,
+      nextEffectiveDefaults: nextEffective,
+    })
+
+    expect(nextEffective.initial_prompt).toBeNull()
+    expect(nextEffective.hotwords).toBeNull()
+    expect(payload).toEqual({
+      beam_size: null,
+      initial_prompt: null,
+      hotwords: null,
+    })
+  })
 })
