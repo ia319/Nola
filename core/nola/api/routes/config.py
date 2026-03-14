@@ -95,7 +95,7 @@ def _build_app_config_response(config_db: AppConfigDatabase) -> AppConfigRespons
     response_model=AppConfigResponse,
     status_code=status.HTTP_200_OK,
 )
-async def get_config() -> AppConfigResponse:
+def get_config() -> AppConfigResponse:
     """Return the aggregated config contract required by the frontend."""
     return _build_app_config_response(get_app_config_db())
 
@@ -110,7 +110,7 @@ async def get_config() -> AppConfigResponse:
     response_model=EngineDefaultsResponse,
     status_code=status.HTTP_200_OK,
 )
-async def get_transcription_engine_defaults() -> EngineDefaultsResponse:
+def get_transcription_engine_defaults() -> EngineDefaultsResponse:
     """Return the source-of-truth engine defaults for reset and diff flows."""
     return EngineDefaultsResponse(defaults=get_engine_defaults())
 
