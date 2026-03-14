@@ -243,6 +243,47 @@ describe('OptionsBar', () => {
     })
   })
 
+  it('shows an error toast when saving defaults fails', async () => {
+    const defaults = buildDefaults({
+      language: null,
+      task: 'transcribe',
+      beam_size: 3,
+    })
+    const appError: AppError = {
+      code: 'API_CLIENT_400',
+      i18nKey: 'error.api.clientError',
+      retriable: false,
+      params: { status: 400 },
+    }
+
+    useTranscriptionOptionsMock.mockReturnValue(
+      buildHookReturn({
+        defaults,
+        language: 'en',
+        task: 'translate',
+        advancedOptions: { beam_size: 4 },
+      }),
+    )
+    fetchEngineDefaultsMock.mockResolvedValue({
+      defaults: buildDefaults({
+        language: null,
+        task: 'transcribe',
+        beam_size: 5,
+      }),
+    })
+    patchTranscriptionDefaultsMock.mockRejectedValue(appError)
+
+    render(<OptionsBar fileIds={[]} onTasksCreated={() => {}} />)
+
+    fireEvent.click(document.querySelector('#save-defaults') as HTMLButtonElement)
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith('error.api.clientError')
+    })
+    expect(refreshAppConfigMock).not.toHaveBeenCalled()
+    expect(toastSuccessMock).not.toHaveBeenCalled()
+  })
+
   it('resets persisted defaults and clears local option overrides', async () => {
     const resetOptionOverrides = vi.fn()
     useTranscriptionOptionsMock.mockReturnValue(
@@ -269,5 +310,31 @@ describe('OptionsBar', () => {
       expect(refreshAppConfigMock).toHaveBeenCalledTimes(1)
       expect(toastSuccessMock).toHaveBeenCalledWith('options.defaults.resetDone')
     })
+  })
+
+  it('shows an error toast when resetting defaults fails', async () => {
+    const resetOptionOverrides = vi.fn()
+    useTranscriptionOptionsMock.mockReturnValue(
+      buildHookReturn({
+        defaults: buildDefaults({
+          language: 'ja',
+          task: 'translate',
+          beam_size: 3,
+        }),
+        resetOptionOverrides,
+      }),
+    )
+    deleteTranscriptionDefaultsMock.mockRejectedValue(new Error('boom'))
+
+    render(<OptionsBar fileIds={[]} onTasksCreated={() => {}} />)
+
+    fireEvent.click(document.querySelector('#reset-engine-defaults') as HTMLButtonElement)
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith('error.api.serverError')
+    })
+    expect(refreshAppConfigMock).not.toHaveBeenCalled()
+    expect(resetOptionOverrides).not.toHaveBeenCalled()
+    expect(toastSuccessMock).not.toHaveBeenCalled()
   })
 })

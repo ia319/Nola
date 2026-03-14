@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -26,6 +26,7 @@ import {
   buildEffectiveDefaults,
 } from '@/features/transcription/lib/defaults-patch'
 import { buildTranscriptionSchemaUiModel } from '@/features/transcription/lib/schema-adapter'
+import type { TranscriptionTaskType } from '@/features/transcription/types'
 import { isAppError } from '@/shared/lib/error-factory'
 import type { AppError } from '@/shared/types'
 
@@ -45,6 +46,10 @@ export interface OptionsBarProps {
   /** Callback after batch task creation attempt. */
   onTasksCreated: (results: TaskCreateResult[]) => void
   disabled?: boolean
+}
+
+function isTranscriptionTaskType(value: string): value is TranscriptionTaskType {
+  return value === 'transcribe' || value === 'translate'
 }
 
 /**
@@ -78,10 +83,27 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
     setInitialPrompt,
   } = useTranscriptionOptions()
 
-  const schemaUiModel = buildTranscriptionSchemaUiModel({
-    schema: config?.transcription.schema ?? [],
-    effectiveLanguages: config?.effective_languages ?? [],
-  })
+  const schema = config?.transcription.schema
+  const effectiveLanguages = config?.effective_languages
+
+  const schemaUiModel = useMemo(
+    () =>
+      buildTranscriptionSchemaUiModel({
+        schema: schema ?? [],
+        effectiveLanguages: effectiveLanguages ?? [],
+      }),
+    [schema, effectiveLanguages],
+  )
+
+  const supportedTaskValues = useMemo(
+    () =>
+      new Set(
+        schemaUiModel.taskControl.options
+          .map((option) => option.value)
+          .filter(isTranscriptionTaskType),
+      ),
+    [schemaUiModel.taskControl.options],
+  )
 
   function toAppError(err: unknown): AppError {
     if (isAppError(err)) return err
@@ -201,7 +223,13 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
           <Label htmlFor="task-select">{t(schemaUiModel.taskControl.labelKey)}</Label>
           <Select
             value={task}
-            onValueChange={(value) => setTask(value === 'translate' ? 'translate' : 'transcribe')}
+            onValueChange={(value) => {
+              if (!isTranscriptionTaskType(value) || !supportedTaskValues.has(value)) {
+                logger.warn('task.unsupportedTaskOption', { value })
+                return
+              }
+              setTask(value)
+            }}
             disabled={controlsDisabled}
           >
             <SelectTrigger id="task-select" className="w-[260px]">
