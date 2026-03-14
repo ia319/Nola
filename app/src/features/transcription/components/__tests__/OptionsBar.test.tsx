@@ -284,6 +284,43 @@ describe('OptionsBar', () => {
     expect(toastSuccessMock).not.toHaveBeenCalled()
   })
 
+  it('keeps save success when refresh fails after defaults write', async () => {
+    const defaults = buildDefaults({
+      language: null,
+      task: 'transcribe',
+      beam_size: 3,
+    })
+
+    useTranscriptionOptionsMock.mockReturnValue(
+      buildHookReturn({
+        defaults,
+        language: 'en',
+        task: 'translate',
+        advancedOptions: { beam_size: 4 },
+      }),
+    )
+    fetchEngineDefaultsMock.mockResolvedValue({
+      defaults: buildDefaults({
+        language: null,
+        task: 'transcribe',
+        beam_size: 5,
+      }),
+    })
+    patchTranscriptionDefaultsMock.mockResolvedValue({ defaults })
+    refreshAppConfigMock.mockRejectedValue(new Error('refresh failed'))
+
+    render(<OptionsBar fileIds={[]} onTasksCreated={() => {}} />)
+
+    fireEvent.click(document.querySelector('#save-defaults') as HTMLButtonElement)
+
+    await waitFor(() => {
+      expect(patchTranscriptionDefaultsMock).toHaveBeenCalledTimes(1)
+      expect(refreshAppConfigMock).toHaveBeenCalledTimes(1)
+      expect(toastSuccessMock).toHaveBeenCalledWith('options.defaults.saved')
+    })
+    expect(toastErrorMock).not.toHaveBeenCalled()
+  })
+
   it('resets persisted defaults and clears local option overrides', async () => {
     const resetOptionOverrides = vi.fn()
     useTranscriptionOptionsMock.mockReturnValue(
@@ -336,5 +373,33 @@ describe('OptionsBar', () => {
     expect(refreshAppConfigMock).not.toHaveBeenCalled()
     expect(resetOptionOverrides).not.toHaveBeenCalled()
     expect(toastSuccessMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps reset success but preserves local overrides when refresh fails', async () => {
+    const resetOptionOverrides = vi.fn()
+    useTranscriptionOptionsMock.mockReturnValue(
+      buildHookReturn({
+        defaults: buildDefaults({
+          language: 'ja',
+          task: 'translate',
+          beam_size: 3,
+        }),
+        resetOptionOverrides,
+      }),
+    )
+    deleteTranscriptionDefaultsMock.mockResolvedValue(undefined)
+    refreshAppConfigMock.mockRejectedValue(new Error('refresh failed'))
+
+    render(<OptionsBar fileIds={[]} onTasksCreated={() => {}} />)
+
+    fireEvent.click(document.querySelector('#reset-engine-defaults') as HTMLButtonElement)
+
+    await waitFor(() => {
+      expect(deleteTranscriptionDefaultsMock).toHaveBeenCalledTimes(1)
+      expect(refreshAppConfigMock).toHaveBeenCalledTimes(1)
+      expect(toastSuccessMock).toHaveBeenCalledWith('options.defaults.resetDone')
+    })
+    expect(resetOptionOverrides).not.toHaveBeenCalled()
+    expect(toastErrorMock).not.toHaveBeenCalled()
   })
 })

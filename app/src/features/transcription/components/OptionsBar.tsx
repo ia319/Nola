@@ -114,6 +114,16 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
     }
   }
 
+  async function refreshDefaultsView(context: 'save' | 'reset'): Promise<boolean> {
+    try {
+      await refreshAppConfig()
+      return true
+    } catch (err: unknown) {
+      logger.error('config.defaults.refreshFailed', { context, error: err })
+      return false
+    }
+  }
+
   /** Create tasks for all available file IDs, collecting per-file results. */
   async function handleStart() {
     if (creatingRef.current || fileIds.length === 0) return
@@ -163,7 +173,7 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
       })
 
       await patchTranscriptionDefaults(payload)
-      await refreshAppConfig()
+      await refreshDefaultsView('save')
       toast.success(t('options.defaults.saved'))
     } catch (err: unknown) {
       logger.error('config.defaults.saveFailed', { error: err })
@@ -180,8 +190,10 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
     setIsResettingDefaults(true)
     try {
       await deleteTranscriptionDefaults()
-      resetOptionOverrides()
-      await refreshAppConfig()
+      const refreshed = await refreshDefaultsView('reset')
+      if (refreshed) {
+        resetOptionOverrides()
+      }
       toast.success(t('options.defaults.resetDone'))
     } catch (err: unknown) {
       logger.error('config.defaults.resetFailed', { error: err })
