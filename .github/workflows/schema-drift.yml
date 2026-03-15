@@ -25,9 +25,6 @@ on:
 jobs:
   schema-drift:
     runs-on: ubuntu-latest
-    env:
-      POETRY_VIRTUALENVS_IN_PROJECT: "true"
-      POETRY_NO_INTERACTION: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,6 +33,7 @@ jobs:
         uses: ./.github/actions/setup-core-python
         with:
           python-version: '3.11'
+          poetry-version: '2.2.1'
           project-dir: core
           with-groups: dev
           install-deps: 'true'
