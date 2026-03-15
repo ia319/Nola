@@ -1,0 +1,60 @@
+﻿name: App Quality
+
+on:
+  pull_request:
+    paths:
+      - 'app/**'
+      - '.github/workflows/app-quality.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+      - '.github/workflows/app-quality.yml'
+  workflow_dispatch:
+
+jobs:
+  app-quality:
+    name: app-quality (node-${{ matrix.node }})
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.required == false }}
+    strategy:
+      matrix:
+        include:
+          - node: '24.x'
+            required: true
+          - node: '22.13.x'
+            required: false
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'pnpm'
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test:ci
+
+      - name: Build
+        run: pnpm build
