@@ -16,7 +16,7 @@
     "test:ci": "vitest run --reporter=dot",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "preview": "vite preview",
-    "gen:types": "openapi-typescript http://127.0.0.1:8000/openapi.json -o src/shared/types/openapi.d.ts",
+    "gen:types": "openapi-typescript http://127.0.0.1:8000/openapi.json -o src/shared/types/openapi.d.ts && prettier --write src/shared/types/openapi.d.ts",
     "gen:types:check": "pnpm gen:types && git diff --exit-code -- src/shared/types/openapi.d.ts"
   },
   "dependencies": {
