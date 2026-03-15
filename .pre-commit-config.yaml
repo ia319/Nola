@@ -5,9 +5,9 @@ repos:
     hooks:
       - id: ruff
         args: [--fix]
-        files: ^core/
+        files: ^core/(nola|tests)/.*\.py$
       - id: ruff-format
-        files: ^core/
+        files: ^core/(nola|tests)/.*\.py$
 
   # Frontend linting and formatting (app/ only)
   - repo: local
@@ -24,3 +24,17 @@ repos:
         language: system
         files: ^app/src/
         pass_filenames: false
+      - id: frontend-typecheck
+        name: TypeScript typecheck (app)
+        entry: pnpm --dir app typecheck
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-push]
+      - id: backend-typecheck
+        name: Mypy (core)
+        entry: poetry -C core run mypy nola
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-push]

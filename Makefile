@@ -1,4 +1,8 @@
-.PHONY: setup install lint typecheck test dev clean
+.PHONY: setup install \
+	core-lint core-format core-typecheck core-test core-check \
+	app-lint app-typecheck app-test app-build app-check \
+	lint format typecheck test check \
+	api worker dev clean
 
 # Setup development environment
 setup: install
@@ -6,23 +10,61 @@ setup: install
 
 # Install dependencies
 install:
-	cd core && poetry install
+	poetry -C core install
+	pnpm --dir app install
 
-# Run linter
-lint:
-	poetry -C core run ruff check core/
+# Backend quality commands
+core-lint:
+	poetry -C core run ruff check nola tests
 
-# Run type checker
-typecheck:
-	poetry -C core run mypy core/nola
+core-format:
+	poetry -C core run ruff format --check nola tests
 
-# Run tests
-test:
-	poetry -C core run pytest core/
+core-typecheck:
+	poetry -C core run mypy nola
 
-# Start development server
-dev:
-	poetry -C core run uvicorn nola.main:app --reload --app-dir core
+core-test:
+	poetry -C core run pytest tests -v --tb=short
+
+core-check: core-lint core-format core-typecheck core-test
+
+# Frontend quality commands
+app-lint:
+	pnpm --dir app lint
+
+app-typecheck:
+	pnpm --dir app typecheck
+
+app-test:
+	pnpm --dir app test
+
+app-build:
+	pnpm --dir app build
+
+app-check:
+	pnpm --dir app check
+
+# Unified repository commands
+lint: core-lint app-lint
+
+format:
+	poetry -C core run ruff format --check nola tests
+	pnpm --dir app format:check
+
+typecheck: core-typecheck app-typecheck
+
+test: core-test app-test
+
+check: core-check app-check
+
+# Runtime commands
+api:
+	poetry -C core run uvicorn nola.main:app --reload --host 127.0.0.1 --port 8000
+
+worker:
+	poetry -C core run python -m nola.services.worker
+
+dev: api
 
 # Clean cache files
 clean:

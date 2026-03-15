@@ -6,14 +6,18 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest",
+    "test:watch": "vitest --watch",
+    "test:ci": "vitest run --reporter=dot",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "preview": "vite preview",
-    "gen:types": "openapi-typescript http://localhost:8000/openapi.json -o src/shared/types/openapi.d.ts"
+    "gen:types": "openapi-typescript http://127.0.0.1:8000/openapi.json -o src/shared/types/openapi.d.ts",
+    "gen:types:check": "pnpm gen:types && git diff --exit-code -- src/shared/types/openapi.d.ts"
   },
   "dependencies": {
     "@tanstack/react-router": "^1.162.8",
