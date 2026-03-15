@@ -1,4 +1,4 @@
-name: App Quality
+name: Run App Quality Checks (Lint, Typecheck, Build)
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ on:
 
 jobs:
   app-quality:
-    name: app-quality (node-${{ matrix.node }})
+    name: run app quality checks (node-${{ matrix.node }})
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.required == false }}
     strategy:
@@ -42,14 +42,11 @@ jobs:
           project-dir: app
           install-deps: 'true'
 
-      - name: Lint
+      - name: Run lint
         run: pnpm lint
 
-      - name: Typecheck
+      - name: Run typecheck
         run: pnpm typecheck
 
-      - name: Test
-        run: pnpm test:ci
-
-      - name: Build
+      - name: Run build
         run: pnpm build

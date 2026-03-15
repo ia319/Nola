@@ -1,4 +1,4 @@
-name: Schema Drift
+name: Check Schema Drift (OpenAPI Types)
 
 on:
   pull_request:
@@ -24,6 +24,7 @@ on:
   workflow_dispatch:
 jobs:
   schema-drift:
+    name: check schema drift
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
