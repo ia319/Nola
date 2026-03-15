@@ -4,12 +4,22 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from math import isinf
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeAlias, cast
 
 from faster_whisper.vad import VadOptions
 
 from nola.common.merge import deep_merge
 from nola.engines.base import TranscribeOptions
+
+SerializedDefaultValue: TypeAlias = (
+    str
+    | int
+    | float
+    | bool
+    | None
+    | list["SerializedDefaultValue"]
+    | dict[str, "SerializedDefaultValue"]
+)
 
 
 class SupportsConfigRead(Protocol):
@@ -19,7 +29,7 @@ class SupportsConfigRead(Protocol):
         """Return all config values matching the provided prefix."""
 
 
-def _serialize_special_values(value: Any) -> Any:
+def _serialize_special_values(value: object) -> SerializedDefaultValue:
     """Convert non-JSON engine defaults into API-safe values."""
     if isinstance(value, float) and isinf(value):
         return "inf"
@@ -29,7 +39,7 @@ def _serialize_special_values(value: Any) -> Any:
         return [_serialize_special_values(item) for item in value]
     if isinstance(value, tuple):
         return [_serialize_special_values(item) for item in value]
-    return value
+    return cast(SerializedDefaultValue, value)
 
 
 def _build_engine_defaults() -> dict[str, Any]:
@@ -39,14 +49,22 @@ def _build_engine_defaults() -> dict[str, Any]:
     return defaults
 
 
-def get_engine_defaults() -> dict[str, Any]:
+def get_engine_defaults() -> dict[str, SerializedDefaultValue]:
     """Return non-batched WhisperModel defaults with expanded VAD options."""
-    return _serialize_special_values(_build_engine_defaults())
+    serialized = _serialize_special_values(_build_engine_defaults())
+    if not isinstance(serialized, dict):
+        raise TypeError("Serialized engine defaults must be a dictionary")
+    return serialized
 
 
-def get_effective_defaults(config_db: SupportsConfigRead) -> dict[str, Any]:
+def get_effective_defaults(
+    config_db: SupportsConfigRead,
+) -> dict[str, SerializedDefaultValue]:
     """Return engine defaults merged with persisted application overrides."""
     engine_defaults = _build_engine_defaults()
     app_defaults = config_db.get_all("transcription.")
     merged = deep_merge(engine_defaults, app_defaults)
-    return _serialize_special_values(merged)
+    serialized = _serialize_special_values(merged)
+    if not isinstance(serialized, dict):
+        raise TypeError("Serialized effective defaults must be a dictionary")
+    return serialized

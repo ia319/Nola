@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from fastapi import APIRouter, Response, status
@@ -22,6 +23,7 @@ from nola.config.transcription import (
     get_transcription_param_schema,
     is_multilingual,
 )
+from nola.config.transcription.metadata import TranscriptionResolvedDefaultsResponse
 from nola.models import AppConfigDatabase
 
 router = APIRouter(prefix="/api/config", tags=["config"])
@@ -71,13 +73,20 @@ def _build_engine_config() -> EngineConfigResponse:
     )
 
 
+def _to_resolved_defaults(
+    defaults: Mapping[str, object],
+) -> TranscriptionResolvedDefaultsResponse:
+    """Validate defaults payloads against the typed API response contract."""
+    return TranscriptionResolvedDefaultsResponse.model_validate(dict(defaults))
+
+
 def _build_app_config_response(config_db: AppConfigDatabase) -> AppConfigResponse:
     """Assemble the aggregated configuration payload used by the frontend."""
     return AppConfigResponse(
         engine=_build_engine_config(),
         transcription=TranscriptionConfigResponse(
-            defaults=get_effective_defaults(config_db),
-            schema_=get_transcription_param_schema(),
+            defaults=_to_resolved_defaults(get_effective_defaults(config_db)),
+            schema=get_transcription_param_schema(),
         ),
         file=build_file_config(),
         effective_languages=get_effective_languages(settings.model_size),
@@ -112,7 +121,7 @@ def get_config() -> AppConfigResponse:
 )
 def get_transcription_engine_defaults() -> EngineDefaultsResponse:
     """Return the source-of-truth engine defaults for reset and diff flows."""
-    return EngineDefaultsResponse(defaults=get_engine_defaults())
+    return EngineDefaultsResponse(defaults=_to_resolved_defaults(get_engine_defaults()))
 
 
 @router.patch(
@@ -143,7 +152,7 @@ def patch_transcription_defaults(
         config_db.replace_many("transcription.", next_overrides)
 
     return TranscriptionDefaultsPatchResponse(
-        defaults=get_effective_defaults(config_db)
+        defaults=_to_resolved_defaults(get_effective_defaults(config_db))
     )
 
 
