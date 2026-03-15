@@ -22,14 +22,20 @@ export default defineConfig([
     },
     rules: {
       // Allow underscore-prefixed unused vars (e.g. _event)
-      '@typescript-eslint/no-unused-vars': ['error', {
-        argsIgnorePattern: '^_',
-        varsIgnorePattern: '^_',
-      }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
       // Enforce consistent type imports
-      '@typescript-eslint/consistent-type-imports': ['error', {
-        prefer: 'type-imports',
-      }],
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        {
+          prefer: 'type-imports',
+        },
+      ],
       // Warn on console.log (allow warn/error)
       'no-console': ['warn', { allow: ['warn', 'error', 'info', 'debug'] }],
     },

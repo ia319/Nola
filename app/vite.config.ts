@@ -6,17 +6,15 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
-  ],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
   test: {
-    environment: 'jsdom',
+    // Default to node for faster cold starts; DOM-heavy suites opt in to jsdom.
+    environment: 'node',
     globals: true,
     setupFiles: './src/test/setup.ts',
   },

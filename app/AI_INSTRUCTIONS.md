@@ -4,15 +4,16 @@
 
 ## Project Overview
 
-| Key | Value |
-|-----|-------|
-| Name | Nola - Frontend Workspace |
+| Key   | Value                                                                       |
+| ----- | --------------------------------------------------------------------------- |
+| Name  | Nola - Frontend Workspace                                                   |
 | Stack | React 19 + TypeScript + Vite + TailwindCSS v4 + shadcn/ui + i18next + Axios |
 
 ## Code Style
 
 > [!IMPORTANT]
 > **Code & Comments must be:**
+>
 > - In English
 > - Brief and objective
 > - Imperative mood for function docs (e.g., "Return the config" not "Returns the config")
@@ -173,6 +174,7 @@ app/                          # Frontend workspace root
 
 > [!IMPORTANT]
 > **Architecture Rules:**
+>
 > 1. **Feature Cohesion**: Keep feature logic colocated; add `components/`, `hooks/`, `lib/`, and `store/` only when that feature needs them.
 > 2. **Barrel Exports**: Every feature must expose its public methods/components via an `index.ts`. External files should ONLY import from a feature's index.
 > 3. **Shared UI**: Any component used by >1 feature should be promoted to `src/components/` (or `src/components/ui/` for shared primitives).
@@ -207,13 +209,14 @@ Backend (Pydantic) ──► openapi.json ──► openapi.d.ts ──► domai
    (Source)         (gen:types auto)   (generated types)   (typed functions)
 ```
 
-| Layer | Path | Maintained by | Edit? |
-|-------|------|--------------|-------|
-| Raw types | `shared/types/openapi.d.ts` | `pnpm gen:types` (auto) | Never |
-| Domain aliases/contracts | `shared/types/config.ts`, `task.ts`, `file.ts`, `api-error.ts`, `app-error.ts` | Developer | Rarely (only if backend adds new schemas or error contract changes) |
-| Feature API | `features/*/api.ts` | Developer | Frequently |
+| Layer                    | Path                                                                           | Maintained by           | Edit?                                                               |
+| ------------------------ | ------------------------------------------------------------------------------ | ----------------------- | ------------------------------------------------------------------- |
+| Raw types                | `shared/types/openapi.d.ts`                                                    | `pnpm gen:types` (auto) | Never                                                               |
+| Domain aliases/contracts | `shared/types/config.ts`, `task.ts`, `file.ts`, `api-error.ts`, `app-error.ts` | Developer               | Rarely (only if backend adds new schemas or error contract changes) |
+| Feature API              | `features/*/api.ts`                                                            | Developer               | Frequently                                                          |
 
 **Key rules:**
+
 - `TaskStatus` and `ExportFormat` are **derived from OpenAPI enum**, not hardcoded. This ensures Single Source of Truth — backend adds a new status/format, frontend auto-inherits after `pnpm gen:types`.
 - Domain aliases/contracts avoid verbose `components['schemas']['TaskSummaryResponse']` paths in business code.
 - Runtime helpers such as `formatApiError` and AppError factories live in `shared/lib/*`, not in `shared/types/*`.
@@ -225,34 +228,36 @@ Backend (Pydantic) ──► openapi.json ──► openapi.d.ts ──► domai
 
 ## Dependencies
 
-| Package | Version |
-|---------|---------|
-| React / React DOM | ^19.2.0 |
-| @tanstack/react-router | ^1.162.8 |
-| zustand | ^5.0.11 |
-| axios | ^1.13.5 |
-| shadcn/ui (radix-ui) | latest |
-| next-themes | ^0.4.6 |
+| Package                 | Version       |
+| ----------------------- | ------------- |
+| React / React DOM       | ^19.2.0       |
+| @tanstack/react-router  | ^1.162.8      |
+| zustand                 | ^5.0.11       |
+| axios                   | ^1.13.5       |
+| shadcn/ui (radix-ui)    | latest        |
+| next-themes             | ^0.4.6        |
 | i18next / react-i18next | ^25.8 / ^16.5 |
 
 ### Dev Dependencies
 
-| Package | Version |
-|---------|---------|
-| Vite | ^7.3.1 |
-| TypeScript | ~5.9.3 |
-| TailwindCSS | ^4.2.1 |
-| Prettier / eslint-config-prettier| ^3.8.1 / ^10.1.8 |
-| ESLint | ^9.39.1 |
-| Vitest | ^4.0.18 |
-| openapi-typescript | ^7.13.0 |
+| Package                           | Version          |
+| --------------------------------- | ---------------- |
+| Vite                              | ^7.3.1           |
+| TypeScript                        | ~5.9.3           |
+| TailwindCSS                       | ^4.2.1           |
+| Prettier / eslint-config-prettier | ^3.8.1 / ^10.1.8 |
+| ESLint                            | ^9.39.1          |
+| Vitest                            | ^4.0.18          |
+| openapi-typescript                | ^7.13.0          |
 
 ---
 
 ## Detailed Module Overview
 
 ### src/features/
+
 Business domain logic separated by feature. Each feature has an `api.ts` (API functions) and `index.ts` (barrel export).
+
 - **upload**:
   - `api.ts`: `uploadFile` (FormData + progress + AbortSignal), `listFiles`, `getFile`, `deleteFile`, `checkIntegrity`.
   - `components/FileUploader.tsx`: Select files via drag/drop or click and pass raw `File[]` upward.
@@ -293,15 +298,17 @@ Business domain logic separated by feature. Each feature has an `api.ts` (API fu
 - **realtime**: Placeholder for future WebSocket-based live transcription.
 
 ### src/shared/
+
 Cross-feature shared code, split into `ui/`, `lib/`, and `types/`.
+
 - **ui/ErrorBoundary.tsx**: Class-based error boundary wrapping child components. Catch render-time exceptions and display i18n-powered fallback UI with retry button. Use `withTranslation` HOC for i18n access in class components.
-- **ui/__tests__/ErrorBoundary.test.tsx**: Component tests covering fallback rendering and retry recovery.
+- **ui/**tests**/ErrorBoundary.test.tsx**: Component tests covering fallback rendering and retry recovery.
 - **lib/api-client.ts**: Axios instance (30s timeout, no global Content-Type). Request interceptor logs debug. Response interceptor converts HTTP errors to `AppError` via `createApiError` and network failures to `createNetworkError`. Preserve `CanceledError` for upload cancellation semantics.
-- **lib/__tests__/api-client.test.ts**: Interceptor tests covering cancel passthrough plus client, server, timeout, and offline mappings.
+- **lib/**tests**/api-client.test.ts**: Interceptor tests covering cancel passthrough plus client, server, timeout, and offline mappings.
 - **lib/error-factory.ts**: Central factory functions for `AppError` (`createValidationError`, `createNetworkError`, `createApiError`, `isAppError`). Mark 408/429 as `retriable: true`; other 4xx as `retriable: false`; 5xx as `retriable: true`.
-- **lib/__tests__/error-factory.test.ts**: Factory contract tests for retry semantics and `isAppError`.
+- **lib/**tests**/error-factory.test.ts**: Factory contract tests for retry semantics and `isAppError`.
 - **lib/error-utils.ts**: `formatApiError()` converts FastAPI error payloads into readable messages.
-- **lib/__tests__/error-utils.test.ts**: Formatting tests for string and validation-array payloads.
+- **lib/**tests**/error-utils.test.ts**: Formatting tests for string and validation-array payloads.
 - **lib/file-validation.ts**: Pure function `validateFile(file, config)` with config injection. Checks extension, MIME, size, empty file, no extension. Returns `AppError` on failure.
 - **lib/format.ts**: `formatFileSize(bytes)` — base-1024 human-readable string (B/KB/MB/GB/TB). Guards against negative/NaN/Infinity.
 - **lib/utils.ts**: `downloadBlob()` triggers browser file download from Blob (appends `<a>` to DOM, defers `URL.revokeObjectURL`).
@@ -315,19 +322,26 @@ Cross-feature shared code, split into `ui/`, `lib/`, and `types/`.
 - **types/index.ts**: Barrel re-export for `import type { ... } from '@/shared/types'`.
 
 ### src/routes/
+
 Reserve this directory for future TanStack Router route definitions. It is currently a placeholder (`.gitkeep`).
 
 ### src/lib/
+
 Autogenerated by shadcn.
+
 - **utils.ts**: Contains the canonical `cn()` utility for merging Tailwind classes with `clsx` and `tailwind-merge`. Do not duplicate `cn` in `shared/lib`.
 
 ### src/i18n/
+
 i18next bootstrap and locale dictionaries.
+
 - **index.ts**: Initializes i18next + react-i18next integration.
 - **locales/en.json**, **locales/zh.json**: Locale resource files.
 
 ### src/config/
+
 Runtime config access and fallback constants.
+
 - **api.ts**: Config endpoints (`fetchAppConfig`, `fetchEngineDefaults`, defaults `PATCH`/`DELETE`).
 - **use-app-config.ts**: Shared config singleton store using `useSyncExternalStore`, plus `refreshAppConfig()`. Notify all mounted consumers when the shared snapshot changes.
 - **constants.ts**: Fallback values used when config fetch fails or before first load.
@@ -335,7 +349,9 @@ Runtime config access and fallback constants.
 - **logger.ts**: Lightweight logger prefixing output with `[Nola]` and suppressing `debug` and `info` in production. Only `warn` and `error` are visible to end users.
 
 ### src/test/
+
 Shared Vitest bootstrap.
+
 - **setup.ts**: Register `@testing-library/jest-dom/vitest` and provide a `ResizeObserver` mock required by Radix-based component tests.
 
 ---
@@ -386,9 +402,9 @@ Frontend (Vite/React) ───[ HTTP Proxy /api/* ]───▶ Backend (FastAP
 
 ## Limits & Notes
 
-| Item | Limit/Detail |
-|------|-------|
-| Allowed Uploads | mp3, wav, flac, m4a, ogg, webm, aac, mp4, wma |
-| Max File Size | 500 MB (Client-side validation required) |
-| Polling Interval | 2000 ms (Long-term plan to switch to WS/SSE) |
-| Theme | `next-themes` installed; no active theme shell or toggle yet |
+| Item             | Limit/Detail                                                 |
+| ---------------- | ------------------------------------------------------------ |
+| Allowed Uploads  | mp3, wav, flac, m4a, ogg, webm, aac, mp4, wma                |
+| Max File Size    | 500 MB (Client-side validation required)                     |
+| Polling Interval | 2000 ms (Long-term plan to switch to WS/SSE)                 |
+| Theme            | `next-themes` installed; no active theme shell or toggle yet |
