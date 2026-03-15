@@ -186,11 +186,11 @@ app/                          # Frontend workspace root
 > 8. **Defaults Priority**: Apply `engine defaults < persisted defaults < task overrides` when composing request payloads and defaults patches.
 > 9. **Defaults Patch Semantics**: Use `undefined` for unchanged fields, use `null` to clear persisted overrides, and send concrete values for explicit overrides.
 > 10. **Language Ordering**: Consume `effective_languages` in backend return order; do not assume alphabetical ordering.
-
+>
 > [!IMPORTANT]
 > Use `GET /api/config` and `GET /api/config/transcription/engine-defaults` as the only defaults source.
 > Do not add new frontend calls to `/api/transcriptions/options/defaults`.
-
+>
 > [!NOTE]
 > `@tanstack/react-router`, `zustand`, and `next-themes` are installed, but the current
 > implementation does not yet use router/store wiring as the active app shell. `App.tsx`
