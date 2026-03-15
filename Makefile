@@ -1,6 +1,6 @@
 .PHONY: setup install \
 	core-lint core-format core-typecheck core-test core-check \
-	app-lint app-typecheck app-test app-build app-check \
+	app-lint app-format app-typecheck app-test app-build app-check \
 	lint format typecheck test check \
 	api worker dev clean
 
@@ -32,6 +32,9 @@ core-check: core-lint core-format core-typecheck core-test
 app-lint:
 	pnpm --dir app lint
 
+app-format:
+	pnpm --dir app format:check
+
 app-typecheck:
 	pnpm --dir app typecheck
 
@@ -47,9 +50,7 @@ app-check:
 # Unified repository commands
 lint: core-lint app-lint
 
-format:
-	poetry -C core run ruff format --check nola tests
-	pnpm --dir app format:check
+format: core-format app-format
 
 typecheck: core-typecheck app-typecheck
 
