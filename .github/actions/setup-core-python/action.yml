@@ -43,8 +43,8 @@ runs:
     - name: Configure Poetry virtualenv behavior
       shell: bash
       run: |
-        poetry config virtualenvs.in-project true --local
-        poetry config installer.max-workers 10 --local
+        poetry -C "${{ inputs.project-dir }}" config virtualenvs.in-project true --local
+        poetry -C "${{ inputs.project-dir }}" config installer.max-workers 10 --local
 
     - name: Cache Poetry and virtualenv
       uses: actions/cache@v4
