@@ -302,13 +302,13 @@ Business domain logic separated by feature. Each feature has an `api.ts` (API fu
 Cross-feature shared code, split into `ui/`, `lib/`, and `types/`.
 
 - **ui/ErrorBoundary.tsx**: Class-based error boundary wrapping child components. Catch render-time exceptions and display i18n-powered fallback UI with retry button. Use `withTranslation` HOC for i18n access in class components.
-- **ui/**tests**/ErrorBoundary.test.tsx**: Component tests covering fallback rendering and retry recovery.
+- **ui/__tests__/ErrorBoundary.test.tsx**: Component tests covering fallback rendering and retry recovery.
 - **lib/api-client.ts**: Axios instance (30s timeout, no global Content-Type). Request interceptor logs debug. Response interceptor converts HTTP errors to `AppError` via `createApiError` and network failures to `createNetworkError`. Preserve `CanceledError` for upload cancellation semantics.
-- **lib/**tests**/api-client.test.ts**: Interceptor tests covering cancel passthrough plus client, server, timeout, and offline mappings.
+- **lib/__tests__/api-client.test.ts**: Interceptor tests covering cancel passthrough plus client, server, timeout, and offline mappings.
 - **lib/error-factory.ts**: Central factory functions for `AppError` (`createValidationError`, `createNetworkError`, `createApiError`, `isAppError`). Mark 408/429 as `retriable: true`; other 4xx as `retriable: false`; 5xx as `retriable: true`.
-- **lib/**tests**/error-factory.test.ts**: Factory contract tests for retry semantics and `isAppError`.
+- **lib/__tests__/error-factory.test.ts**: Factory contract tests for retry semantics and `isAppError`.
 - **lib/error-utils.ts**: `formatApiError()` converts FastAPI error payloads into readable messages.
-- **lib/**tests**/error-utils.test.ts**: Formatting tests for string and validation-array payloads.
+- **lib/__tests__/error-utils.test.ts**: Formatting tests for string and validation-array payloads.
 - **lib/file-validation.ts**: Pure function `validateFile(file, config)` with config injection. Checks extension, MIME, size, empty file, no extension. Returns `AppError` on failure.
 - **lib/format.ts**: `formatFileSize(bytes)` — base-1024 human-readable string (B/KB/MB/GB/TB). Guards against negative/NaN/Infinity.
 - **lib/utils.ts**: `downloadBlob()` triggers browser file download from Blob (appends `<a>` to DOM, defers `URL.revokeObjectURL`).

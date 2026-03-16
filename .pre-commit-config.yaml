@@ -23,7 +23,7 @@ repos:
         name: Prettier (app)
         entry: pnpm --dir app format:check
         language: system
-        files: ^app/(src/.*\.(ts|tsx|css)|[^/]+\.(js|ts|json|md|yml|yaml))$
+        files: ^app/(src/.*\.(ts|tsx|css)|[^/]+\.(js|ts|json|yml|yaml))$
         pass_filenames: false
       - id: frontend-typecheck
         name: TypeScript typecheck (app)
