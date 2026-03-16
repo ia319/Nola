@@ -1,25 +1,31 @@
+import { muteLogsInTest } from './test-env'
+
 /**
  * Lightweight logger with [Nola] prefix.
  *
  * - `debug` and `info` are suppressed in production builds.
- * - To integrate Sentry later, add a call inside `error()`.
+ * - Tests mute logs by default; set `NOLA_TEST_LOG=1` to opt in.
  */
 const logger = {
   debug: (...args: unknown[]) => {
-    if (import.meta.env.DEV) {
+    if (import.meta.env.DEV && !muteLogsInTest) {
       console.debug('[Nola]', ...args)
     }
   },
   info: (...args: unknown[]) => {
-    if (import.meta.env.DEV) {
+    if (import.meta.env.DEV && !muteLogsInTest) {
       console.info('[Nola]', ...args)
     }
   },
   warn: (...args: unknown[]) => {
-    console.warn('[Nola]', ...args)
+    if (!muteLogsInTest) {
+      console.warn('[Nola]', ...args)
+    }
   },
   error: (...args: unknown[]) => {
-    console.error('[Nola]', ...args)
+    if (!muteLogsInTest) {
+      console.error('[Nola]', ...args)
+    }
   },
 }
 

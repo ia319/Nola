@@ -1,0 +1,192 @@
+﻿name: Run CI
+
+on:
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'core/**'
+      - '.github/actions/setup-core-python/**'
+      - '.github/actions/setup-app-node/**'
+      - '.github/workflows/ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+      - 'core/**'
+      - '.github/actions/setup-core-python/**'
+      - '.github/actions/setup-app-node/**'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  app-quality:
+    name: run app quality checks (lint, typecheck, build; node-${{ matrix.node }})
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        node:
+          - '24.x'
+          - '22.13.x'
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup app runtime
+        uses: ./.github/actions/setup-app-node
+        with:
+          node-version: ${{ matrix.node }}
+          pnpm-version: '10'
+          project-dir: app
+          install-deps: 'true'
+
+      - name: Run lint
+        run: pnpm lint
+
+      - name: Run typecheck
+        run: pnpm typecheck
+
+      - name: Run build
+        run: pnpm build
+
+  core-quality:
+    name: run core quality checks (ruff, mypy)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup core runtime
+        uses: ./.github/actions/setup-core-python
+        with:
+          python-version: '3.11'
+          poetry-version: '2.2.1'
+          project-dir: core
+          with-groups: dev
+          install-deps: 'true'
+
+      - name: Run Ruff lint
+        run: poetry -C core run ruff check nola tests
+
+      - name: Run Ruff format check
+        run: poetry -C core run ruff format --check nola tests
+
+      - name: Run mypy
+        run: poetry -C core run mypy nola
+
+  app-test:
+    name: run app tests (vitest)
+    runs-on: ubuntu-24.04
+    needs:
+      - app-quality
+      - core-quality
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup app runtime
+        uses: ./.github/actions/setup-app-node
+        with:
+          node-version: '24.x'
+          pnpm-version: '10'
+          project-dir: app
+          install-deps: 'true'
+
+      - name: Run vitest
+        run: pnpm test:ci
+
+  core-test:
+    name: run core tests (pytest)
+    runs-on: ubuntu-24.04
+    needs:
+      - app-quality
+      - core-quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup core runtime
+        uses: ./.github/actions/setup-core-python
+        with:
+          python-version: '3.11'
+          poetry-version: '2.2.1'
+          project-dir: core
+          with-groups: dev
+          install-deps: 'true'
+
+      - name: Run pytest
+        run: poetry -C core run pytest tests -v --tb=short
+
+  schema-drift:
+    name: check schema drift (openapi types)
+    runs-on: ubuntu-24.04
+    needs:
+      - app-quality
+      - core-quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup core runtime
+        uses: ./.github/actions/setup-core-python
+        with:
+          python-version: '3.11'
+          poetry-version: '2.2.1'
+          project-dir: core
+          with-groups: dev
+          install-deps: 'true'
+
+      - name: Setup app runtime
+        uses: ./.github/actions/setup-app-node
+        with:
+          node-version: '24.x'
+          pnpm-version: '10'
+          project-dir: app
+          install-deps: 'true'
+
+      - name: Start backend
+        run: |
+          mkdir -p /tmp/nola
+          poetry -C core run uvicorn nola.main:app --host 127.0.0.1 --port 8000 > /tmp/nola/uvicorn.log 2>&1 &
+          echo $! > /tmp/nola/uvicorn.pid
+
+      - name: Wait backend health
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo 'Backend not ready'
+          exit 1
+
+      - name: Regenerate OpenAPI types
+        run: pnpm --dir app gen:types
+
+      - name: Check drift
+        run: git diff --exit-code -- app/src/shared/types/openapi.d.ts
+
+      - name: Dump backend logs on failure
+        if: ${{ failure() }}
+        run: |
+          if [ -f /tmp/nola/uvicorn.log ]; then
+            echo '--- backend log tail ---'
+            tail -n 200 /tmp/nola/uvicorn.log
+          fi
+
+      - name: Stop backend
+        if: ${{ always() }}
+        run: |
+          if [ -f /tmp/nola/uvicorn.pid ]; then
+            kill "$(cat /tmp/nola/uvicorn.pid)" || true
+          fi
