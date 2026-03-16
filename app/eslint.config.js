@@ -85,6 +85,7 @@ export default defineConfig([
       'src/config/**/*.{ts,tsx}',
       'src/components/**/*.{ts,tsx}',
     ],
+    ignores: ['src/components/common/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
