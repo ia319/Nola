@@ -6,6 +6,22 @@ import tseslint from 'typescript-eslint'
 import prettierConfig from 'eslint-config-prettier'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
+const featureNames = ['upload', 'transcription', 'export', 'history', 'realtime']
+
+const crossFeatureDeepImportRules = featureNames.map((feature) => ({
+  files: [`src/features/${feature}/**/*.{ts,tsx}`],
+  rules: {
+    'no-restricted-imports': [
+      'error',
+      {
+        patterns: featureNames
+          .filter((name) => name !== feature)
+          .flatMap((name) => [`@/features/${name}/*`, `@/features/${name}/**`]),
+      },
+    ],
+  },
+}))
+
 export default defineConfig([
   globalIgnores(['dist']),
   {
@@ -47,5 +63,38 @@ export default defineConfig([
       'react-refresh/only-export-components': 'off',
     },
   },
+  // Keep common components feature-agnostic.
+  {
+    files: ['src/components/common/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['@/features/*', '@/features/*/**'],
+        },
+      ],
+    },
+  },
+  // Enforce feature public API imports outside feature internals.
+  {
+    files: [
+      'src/App.tsx',
+      'src/main.tsx',
+      'src/routes/**/*.{ts,tsx}',
+      'src/shared/**/*.{ts,tsx}',
+      'src/config/**/*.{ts,tsx}',
+      'src/components/**/*.{ts,tsx}',
+    ],
+    ignores: ['src/components/common/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['@/features/*/**'],
+        },
+      ],
+    },
+  },
+  ...crossFeatureDeepImportRules,
   prettierConfig,
 ])
