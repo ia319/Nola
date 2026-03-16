@@ -33,14 +33,14 @@ app/                          # Frontend workspace root
 ├── tsconfig.json             # TypeScript 5.9 project references
 ├── tsconfig.app.json         # App-level TS config (src/)
 ├── tsconfig.node.json        # Node-level TS config (vite.config.ts)
-├── vite.config.ts            # Vite 7 + proxy to backend + Vitest config + test setup
+├── vite.config.ts            # Vite 7 + proxy to backend + Vitest config (default node env)
 ├── src/                      # Frontend source code
 │   ├── App.css               # App-level styles
 │   ├── App.tsx               # Root shell wiring upload + transcription features
 │   ├── index.css             # Tailwind v4 entry + shadcn variables
 │   ├── main.tsx              # React mounting + temporary App shell entry
 │   ├── test/                 # Shared Vitest setup
-│   │   └── setup.ts          # jest-dom + ResizeObserver test polyfill
+│   │   └── setup.ts          # jest-dom + ResizeObserver polyfill + test log silencing
 │   │
 │   ├── assets/               # Static assets
 │   │   └── react.svg         # Example asset
@@ -51,7 +51,8 @@ app/                          # Frontend workspace root
 │   │   │   └── use-app-config.test.ts # Shared config cache/store tests
 │   │   ├── constants.ts      # App constants (synced with backend)
 │   │   ├── env.ts            # Typed environment variables (import.meta.env)
-│   │   ├── logger.ts         # Lightweight logger ([Nola] prefix, skips debug+info in prod)
+│   │   ├── logger.ts         # Lightweight logger ([Nola] prefix, test-aware mute)
+│   │   ├── test-env.ts       # Shared test-runtime flags and log opt-in env
 │   │   └── use-app-config.ts # Shared config store + refresh API
 │   │
 │   ├── i18n/                 # i18next bootstrap + locale resources
@@ -188,6 +189,7 @@ app/                          # Frontend workspace root
 > 8. **Defaults Priority**: Apply `engine defaults < persisted defaults < task overrides` when composing request payloads and defaults patches.
 > 9. **Defaults Patch Semantics**: Use `undefined` for unchanged fields, use `null` to clear persisted overrides, and send concrete values for explicit overrides.
 > 10. **Language Ordering**: Consume `effective_languages` in backend return order; do not assume alphabetical ordering.
+> 11. **Vitest Environment Split**: Keep `node` as default test environment. Add `// @vitest-environment jsdom` only for DOM-driven tests.
 >
 > [!IMPORTANT]
 > Use `GET /api/config` and `GET /api/config/transcription/engine-defaults` as the only defaults source.
@@ -346,13 +348,14 @@ Runtime config access and fallback constants.
 - **use-app-config.ts**: Shared config singleton store using `useSyncExternalStore`, plus `refreshAppConfig()`. Notify all mounted consumers when the shared snapshot changes.
 - **constants.ts**: Fallback values used when config fetch fails or before first load.
 - **env.ts**: Safely extracts `import.meta.env.VITE_*` using Nullish Coalescing (`??`).
-- **logger.ts**: Lightweight logger prefixing output with `[Nola]` and suppressing `debug` and `info` in production. Only `warn` and `error` are visible to end users.
+- **test-env.ts**: Shared test-runtime detection and `NOLA_TEST_LOG` opt-in switch.
+- **logger.ts**: Lightweight logger prefixing output with `[Nola]`. Mute logs by default in tests unless `NOLA_TEST_LOG=1`.
 
 ### src/test/
 
 Shared Vitest bootstrap.
 
-- **setup.ts**: Register `@testing-library/jest-dom/vitest` and provide a `ResizeObserver` mock required by Radix-based component tests.
+- **setup.ts**: Register `@testing-library/jest-dom/vitest`, provide a `ResizeObserver` mock, and silence `console.warn`/`console.error` in tests unless `NOLA_TEST_LOG=1`.
 
 ---
 
@@ -376,12 +379,36 @@ pnpm lint
 pnpm lint:fix
 
 # Run tests
+# test is one-shot; watch mode is explicit
 pnpm test
 pnpm test:watch
+pnpm test:ci
+
+# Type checking and full app quality
+pnpm typecheck
+pnpm check
+
+# Verify generated OpenAPI types are committed
+pnpm gen:types:check
 
 # Build production bundle
 pnpm build
 ```
+
+---
+
+## CI Contract
+
+- Workflow entry: `.github/workflows/ci.yml`
+- App quality matrix: Node `24.x` and `22.13.x` (both required)
+- App quality commands:
+  - `pnpm lint`
+  - `pnpm typecheck`
+  - `pnpm build`
+- App test command: `pnpm test:ci`
+- Schema drift command path:
+  - `pnpm --dir app gen:types`
+  - `git diff --exit-code -- app/src/shared/types/openapi.d.ts`
 
 ---
 

@@ -218,11 +218,14 @@ poetry run uvicorn nola.main:app --reload
 # Run linter
 poetry run ruff check nola tests
 
+# Check format (same as CI)
+poetry run ruff format --check nola tests
+
 # Run type checker
 poetry run mypy nola
 
 # Run tests
-poetry run pytest
+poetry run pytest tests -v --tb=short
 
 # Auto-fix lint issues
 poetry run ruff check nola tests --fix
@@ -233,6 +236,22 @@ poetry run ruff format nola tests
 # Start worker (in a separate terminal)
 poetry run python -m nola.services.worker
 ```
+
+> From repository root, use `poetry -C core run ...` equivalents.
+
+---
+
+## CI Contract
+
+- Workflow entry: `.github/workflows/ci.yml`
+- Core quality commands:
+  - `poetry -C core run ruff check nola tests`
+  - `poetry -C core run ruff format --check nola tests`
+  - `poetry -C core run mypy nola`
+- Core test command:
+  - `poetry -C core run pytest tests -v --tb=short`
+- Schema-drift backend startup command:
+  - `poetry -C core run uvicorn nola.main:app --host 127.0.0.1 --port 8000`
 
 ---
 
