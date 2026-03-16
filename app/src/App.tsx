@@ -5,7 +5,7 @@ import { toast, Toaster } from 'sonner'
 import { ErrorBoundary } from '@/shared/ui/ErrorBoundary'
 import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
 import { OptionsBar } from '@/features/transcription'
-import type { TaskCreateResult } from '@/features/transcription/components/OptionsBar'
+import type { TaskCreateResult } from '@/features/transcription'
 import { Button } from '@/components/ui/button'
 import { useAppConfig } from '@/config/use-app-config'
 
