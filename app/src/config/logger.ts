@@ -1,19 +1,11 @@
+import { muteLogsInTest } from './test-env'
+
 /**
  * Lightweight logger with [Nola] prefix.
  *
  * - `debug` and `info` are suppressed in production builds.
  * - Tests mute logs by default; set `NOLA_TEST_LOG=1` to opt in.
  */
-const isTestRuntime =
-  import.meta.env.MODE === 'test' || Boolean((import.meta.env as Record<string, unknown>).VITEST)
-
-type EnvCarrier = { process?: { env?: Record<string, string | undefined> } }
-
-const runtimeEnv = (globalThis as EnvCarrier).process?.env
-const testLogOptIn = runtimeEnv?.NOLA_TEST_LOG === '1'
-
-const muteLogsInTest = isTestRuntime && !testLogOptIn
-
 const logger = {
   debug: (...args: unknown[]) => {
     if (import.meta.env.DEV && !muteLogsInTest) {

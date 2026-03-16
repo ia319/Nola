@@ -19,10 +19,13 @@ on:
       - '.github/workflows/ci.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   app-quality:
     name: run app quality checks (lint, typecheck, build; node-${{ matrix.node }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         node:
@@ -54,7 +57,7 @@ jobs:
 
   core-quality:
     name: run core quality checks (ruff, mypy)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -79,7 +82,7 @@ jobs:
 
   app-test:
     name: run app tests (vitest)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - app-quality
       - core-quality
@@ -103,7 +106,7 @@ jobs:
 
   core-test:
     name: run core tests (pytest)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - app-quality
       - core-quality
@@ -125,7 +128,7 @@ jobs:
 
   schema-drift:
     name: check schema drift (openapi types)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - app-quality
       - core-quality
@@ -151,7 +154,10 @@ jobs:
           install-deps: 'true'
 
       - name: Start backend
-        run: poetry -C core run uvicorn nola.main:app --host 127.0.0.1 --port 8000 &
+        run: |
+          mkdir -p /tmp/nola
+          poetry -C core run uvicorn nola.main:app --host 127.0.0.1 --port 8000 > /tmp/nola/uvicorn.log 2>&1 &
+          echo $! > /tmp/nola/uvicorn.pid
 
       - name: Wait backend health
         run: |
@@ -170,7 +176,17 @@ jobs:
       - name: Check drift
         run: git diff --exit-code -- app/src/shared/types/openapi.d.ts
 
+      - name: Dump backend logs on failure
+        if: ${{ failure() }}
+        run: |
+          if [ -f /tmp/nola/uvicorn.log ]; then
+            echo '--- backend log tail ---'
+            tail -n 200 /tmp/nola/uvicorn.log
+          fi
 
-
-
-
+      - name: Stop backend
+        if: ${{ always() }}
+        run: |
+          if [ -f /tmp/nola/uvicorn.pid ]; then
+            kill "$(cat /tmp/nola/uvicorn.pid)" || true
+          fi
