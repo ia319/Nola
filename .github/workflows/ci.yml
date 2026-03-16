@@ -23,14 +23,11 @@ jobs:
   app-quality:
     name: run app quality checks (lint, typecheck, build; node-${{ matrix.node }})
     runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.required == false }}
     strategy:
       matrix:
-        include:
-          - node: '24.x'
-            required: true
-          - node: '22.13.x'
-            required: false
+        node:
+          - '24.x'
+          - '22.13.x'
     defaults:
       run:
         working-directory: app
@@ -172,4 +169,8 @@ jobs:
 
       - name: Check drift
         run: git diff --exit-code -- app/src/shared/types/openapi.d.ts
+
+
+
+
 
