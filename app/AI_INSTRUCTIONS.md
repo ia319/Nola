@@ -62,6 +62,8 @@ app/                          # Frontend workspace root
 │   │       └── zh.json       # Chinese translations
 │   │
 │   ├── components/           # Shared UI components (mostly shadcn generated)
+│   │   ├── common/           # Cross-feature common components barrel
+│   │   │   └── index.ts      # Common export entry (feature-agnostic)
 │   │   └── ui/               # Radix + Tailwind primitives
 │   │       ├── button.tsx    # Button variants
 │   │       ├── card.tsx      # Card container primitives
@@ -190,6 +192,10 @@ app/                          # Frontend workspace root
 > 9. **Defaults Patch Semantics**: Use `undefined` for unchanged fields, use `null` to clear persisted overrides, and send concrete values for explicit overrides.
 > 10. **Language Ordering**: Consume `effective_languages` in backend return order; do not assume alphabetical ordering.
 > 11. **Vitest Environment Split**: Keep `node` as default test environment. Add `// @vitest-environment jsdom` only for DOM-driven tests.
+> 12. **Import Boundaries (ESLint-Enforced)**:
+>     - Outside `src/features/*`, import features only from `@/features/<name>`; do not deep import `@/features/<name>/**`.
+>     - `src/components/common/*` must not import from `@/features/*`.
+>     - Inside `src/features/<name>/*`, do not deep import from other features; import only via feature public entry.
 >
 > [!IMPORTANT]
 > Use `GET /api/config` and `GET /api/config/transcription/engine-defaults` as the only defaults source.
