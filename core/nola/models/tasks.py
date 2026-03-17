@@ -595,6 +595,8 @@ class TaskDatabase:
 
         if q:
             from_sql += " JOIN files f ON f.id = t.file_id"
+            # Keep contains search semantics (%keyword%) for UX consistency.
+            # This may full-scan on SQLite; move to FTS when data volume grows.
             where_clauses.append("LOWER(f.filename) LIKE ?")
             params.append(f"%{q.lower()}%")
 
@@ -624,6 +626,8 @@ class TaskDatabase:
 
         if q:
             from_sql += " JOIN files f ON f.id = t.file_id"
+            # Keep contains search semantics (%keyword%) for UX consistency.
+            # This may full-scan on SQLite; move to FTS when data volume grows.
             where_clauses.append("LOWER(f.filename) LIKE ?")
             params.append(f"%{q.lower()}%")
 
