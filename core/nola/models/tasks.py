@@ -76,6 +76,11 @@ TASK_SORT_COLUMNS: dict[TaskSortField, str] = {
     "status": "t.status",
     "progress": "t.progress",
 }
+TERMINAL_TASK_STATUSES = (
+    TaskStatus.COMPLETED.value,
+    TaskStatus.FAILED.value,
+    TaskStatus.CANCELLED.value,
+)
 
 
 class TaskDatabase:
@@ -472,12 +477,18 @@ class TaskDatabase:
             task_id: Task identifier
 
         Returns:
-            True if deleted, False if not found
+            True if deleted, False if task is missing or non-terminal
         """
         with closing(self._connect()) as conn:
             with conn:
+                # Enforce terminal-only deletion at the data layer so direct model
+                # callers cannot bypass route-level status checks.
                 cursor = conn.execute(
-                    "DELETE FROM transcription_tasks WHERE id = ?", (task_id,)
+                    """
+                    DELETE FROM transcription_tasks
+                    WHERE id = ? AND status IN (?, ?, ?)
+                    """,
+                    (task_id, *TERMINAL_TASK_STATUSES),
                 )
                 return cursor.rowcount > 0
 
