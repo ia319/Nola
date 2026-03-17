@@ -8,7 +8,7 @@ import type {
   TaskStatus,
 } from '@/shared/types'
 
-const BASE = '/api/transcriptions'
+const BASE = '/api/transcription-tasks'
 
 /** Create a transcription task for an uploaded file. */
 export async function createTask(payload: CreateTaskPayload): Promise<CreateTaskResponse> {

@@ -1,7 +1,7 @@
 import apiClient from '@/shared/lib/api-client'
 import type { BatchExportRequest, ExportFormat, SavedExportResponse } from '@/shared/types'
 
-const BASE = '/api/transcriptions'
+const BASE = '/api/transcription-tasks'
 
 /** Download export as Blob for browser file download. */
 export async function downloadExport(

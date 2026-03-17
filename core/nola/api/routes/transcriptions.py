@@ -23,7 +23,9 @@ from nola.api.schemas import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/transcriptions", tags=["transcriptions"])
+router = APIRouter(
+    prefix="/api/transcription-tasks", tags=["transcription-tasks"]
+)
 
 # Valid status values for filtering
 StatusFilter = Literal["pending", "processing", "completed", "failed", "cancelled"]
@@ -39,7 +41,7 @@ async def create_transcription(request: TranscriptionRequest) -> dict[str, Any]:
     1. Upload file via POST /api/files → get file_id
     2. Create task via this endpoint with file_id and optional parameters
     3. Worker will automatically process the task
-    4. Query status via GET /api/transcriptions/{task_id}
+    4. Query status via GET /api/transcription-tasks/{task_id}
 
     All transcription parameters are optional. If omitted, the effective defaults
     (engine defaults plus persisted application overrides) will be used.

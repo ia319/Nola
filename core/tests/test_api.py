@@ -95,7 +95,7 @@ class TestTranscriptionsAPI:
 
     def test_list_transcriptions_empty(self, client):
         """Test listing transcriptions when none exist."""
-        response = client.get("/api/transcriptions")
+        response = client.get("/api/transcription-tasks")
         assert response.status_code == 200
         data = response.json()
         assert data["tasks"] == []
@@ -103,18 +103,18 @@ class TestTranscriptionsAPI:
 
     def test_get_nonexistent_task(self, client):
         """Test getting a task that doesn't exist."""
-        response = client.get("/api/transcriptions/nonexistent-id")
+        response = client.get("/api/transcription-tasks/nonexistent-id")
         assert response.status_code == 404
 
     def test_cancel_nonexistent_task(self, client):
         """Test cancelling a task that doesn't exist."""
-        response = client.delete("/api/transcriptions/nonexistent-id")
+        response = client.delete("/api/transcription-tasks/nonexistent-id")
         assert response.status_code == 404
 
     def test_create_task_with_invalid_file_id(self, client):
         """Test creating task with non-existent file_id."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file"},
         )
         assert response.status_code == 404
@@ -122,7 +122,7 @@ class TestTranscriptionsAPI:
     def test_create_task_with_options(self, client):
         """Test creating task with custom transcription options."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={
                 "file_id": "nonexistent-file",
                 "language": "zh",
@@ -148,7 +148,7 @@ class TestInputValidation:
         )
 
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "uppercase-lang-file", "language": "EN"},
         )
 
@@ -158,7 +158,7 @@ class TestInputValidation:
     def test_language_invalid_code_returns_422(self, client: TestClient):
         """Test unsupported language code returns 422."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file", "language": "chinese"},
         )
 
@@ -170,7 +170,7 @@ class TestInputValidation:
     def test_language_locale_style_returns_422(self, client: TestClient):
         """Test locale-style language code returns 422."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file", "language": "zh-CN"},
         )
 
@@ -182,7 +182,7 @@ class TestInputValidation:
     def test_language_valid_code_passes_schema_validation(self, client: TestClient):
         """Test valid ISO 639-1 code reaches business logic layer."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file", "language": "zh"},
         )
 
@@ -192,7 +192,7 @@ class TestInputValidation:
     def test_language_none_passes_schema_validation(self, client: TestClient):
         """Test null language reaches business logic layer."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file", "language": None},
         )
 
@@ -202,7 +202,7 @@ class TestInputValidation:
     def test_temperature_negative_returns_422(self, client: TestClient):
         """Test negative temperature is rejected."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file", "temperature": -0.1},
         )
 
@@ -214,7 +214,7 @@ class TestInputValidation:
     def test_temperature_list_with_negative_returns_422(self, client: TestClient):
         """Test negative element in temperature list is rejected."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file", "temperature": [0.0, -0.2]},
         )
 
@@ -226,7 +226,7 @@ class TestInputValidation:
     def test_vad_parameters_unknown_key_returns_422(self, client: TestClient):
         """Test unknown nested VAD key is rejected at request validation."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={
                 "file_id": "nonexistent-file",
                 "vad_filter": True,
@@ -242,7 +242,7 @@ class TestInputValidation:
     def test_vad_parameters_out_of_range_value_returns_422(self, client: TestClient):
         """Test out-of-range nested VAD value is rejected at request validation."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={
                 "file_id": "nonexistent-file",
                 "vad_filter": True,
@@ -257,7 +257,7 @@ class TestInputValidation:
     def test_language_detection_segments_zero_returns_422(self, client: TestClient):
         """Test zero language_detection_segments is rejected."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={
                 "file_id": "nonexistent-file",
                 "language_detection_segments": 0,
@@ -271,7 +271,7 @@ class TestInputValidation:
     def test_unknown_top_level_option_key_returns_422(self, client: TestClient):
         """Test unknown top-level options are rejected instead of ignored."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file", "beam_sizee": 3},
         )
 
@@ -282,7 +282,7 @@ class TestInputValidation:
     def test_batch_export_empty_task_ids_returns_422(self, client: TestClient):
         """Test batch export rejects empty task_ids."""
         response = client.post(
-            "/api/transcriptions/export/batch",
+            "/api/transcription-tasks/export/batch",
             json={"task_ids": [], "format": "srt"},
         )
 
@@ -294,7 +294,7 @@ class TestInputValidation:
         """Test batch export rejects task_ids longer than max length."""
         task_ids = [f"task-{i}" for i in range(MAX_BATCH_EXPORT_TASKS + 1)]
         response = client.post(
-            "/api/transcriptions/export/batch",
+            "/api/transcription-tasks/export/batch",
             json={"task_ids": task_ids, "format": "srt"},
         )
 
@@ -346,7 +346,7 @@ class TestExportAPI:
 
     def test_export_nonexistent_task(self, client):
         """Test exporting a task that doesn't exist."""
-        response = client.get("/api/transcriptions/nonexistent-id/export")
+        response = client.get("/api/transcription-tasks/nonexistent-id/export")
         assert response.status_code == 404
 
     def test_export_uncompleted_task(self, client):
@@ -361,7 +361,7 @@ class TestExportAPI:
         )
         task_db.enqueue(task_id="test-task", file_id="test-file", options=None)
 
-        response = client.get("/api/transcriptions/test-task/export")
+        response = client.get("/api/transcription-tasks/test-task/export")
         assert response.status_code == 400
         assert "not completed" in response.json()["detail"]
 
@@ -386,7 +386,7 @@ class TestExportAPI:
             duration=5.0,
         )
 
-        response = client.get("/api/transcriptions/test-task-srt/export?format=srt")
+        response = client.get("/api/transcription-tasks/test-task-srt/export?format=srt")
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("application/x-subrip")
         content = response.text
@@ -411,7 +411,7 @@ class TestExportAPI:
             duration=1.0,
         )
 
-        response = client.get("/api/transcriptions/test-vtt/export?format=vtt")
+        response = client.get("/api/transcription-tasks/test-vtt/export?format=vtt")
         assert response.status_code == 200
         assert "text/vtt" in response.headers["content-type"]
         assert response.text.startswith("WEBVTT")
@@ -435,7 +435,7 @@ class TestExportAPI:
         )
 
         response = client.get(
-            "/api/transcriptions/test-txt/export?format=txt&include_timestamps=false"
+            "/api/transcription-tasks/test-txt/export?format=txt&include_timestamps=false"
         )
         assert response.status_code == 200
         assert response.text == "Plain text"
@@ -459,7 +459,7 @@ class TestExportAPI:
             duration=1.0,
         )
 
-        response = client.get("/api/transcriptions/test-ass/export?format=ass")
+        response = client.get("/api/transcription-tasks/test-ass/export?format=ass")
         assert response.status_code == 200
         assert "[Script Info]" in response.text
         assert "Dialogue:" in response.text
@@ -491,7 +491,7 @@ class TestExportAPI:
                 return_value=exports_path,
             ):
                 response = client.get(
-                    "/api/transcriptions/test-save/export?format=srt&save=true"
+                    "/api/transcription-tasks/test-save/export?format=srt&save=true"
                 )
                 assert response.status_code == 200
                 data = response.json()
@@ -529,7 +529,7 @@ class TestBatchExportAPI:
             )
 
         response = client.post(
-            "/api/transcriptions/export/batch",
+            "/api/transcription-tasks/export/batch",
             json={"task_ids": ["batch-task-0", "batch-task-1"], "format": "srt"},
         )
 
@@ -568,7 +568,7 @@ class TestBatchExportAPI:
         )
 
         response = client.post(
-            "/api/transcriptions/export/batch",
+            "/api/transcription-tasks/export/batch",
             json={
                 "task_ids": ["partial-task", "nonexistent-task"],
                 "format": "srt",
@@ -588,7 +588,7 @@ class TestBatchExportAPI:
     def test_batch_export_all_failed(self, client: TestClient):
         """Test batch export when all tasks fail."""
         response = client.post(
-            "/api/transcriptions/export/batch",
+            "/api/transcription-tasks/export/batch",
             json={"task_ids": ["fake-1", "fake-2"], "format": "srt"},
         )
 
@@ -615,7 +615,7 @@ class TestBatchExportAPI:
         )
 
         response = client.post(
-            "/api/transcriptions/export/batch",
+            "/api/transcription-tasks/export/batch",
             json={
                 "task_ids": ["zip-name-task"],
                 "format": "srt",
@@ -647,7 +647,7 @@ class TestBatchExportAPI:
         )
 
         response = client.post(
-            "/api/transcriptions/export/batch",
+            "/api/transcription-tasks/export/batch",
             json={
                 "task_ids": ["inject-task"],
                 "format": "srt",

@@ -68,7 +68,7 @@ export interface paths {
     patch: operations['patch_transcription_defaults_api_config_transcription_defaults_patch']
     trace?: never
   }
-  '/api/transcriptions/': {
+  '/api/transcription-tasks/': {
     parameters: {
       query?: never
       header?: never
@@ -87,7 +87,7 @@ export interface paths {
      *     Returns:
      *         List of tasks with pagination info
      */
-    get: operations['list_transcriptions_api_transcriptions__get']
+    get: operations['list_transcriptions_api_transcription_tasks__get']
     put?: never
     /**
      * Create transcription task
@@ -97,21 +97,21 @@ export interface paths {
      *     1. Upload file via POST /api/files → get file_id
      *     2. Create task via this endpoint with file_id and optional parameters
      *     3. Worker will automatically process the task
-     *     4. Query status via GET /api/transcriptions/{task_id}
+     *     4. Query status via GET /api/transcription-tasks/{task_id}
      *
      *     All transcription parameters are optional. If omitted, the effective defaults
      *     (engine defaults plus persisted application overrides) will be used.
      *     See GET /api/config for effective defaults and
      *     GET /api/config/transcription/engine-defaults for raw engine defaults.
      */
-    post: operations['create_transcription_api_transcriptions__post']
+    post: operations['create_transcription_api_transcription_tasks__post']
     delete?: never
     options?: never
     head?: never
     patch?: never
     trace?: never
   }
-  '/api/transcriptions/{task_id}': {
+  '/api/transcription-tasks/{task_id}': {
     parameters: {
       query?: never
       header?: never
@@ -128,7 +128,7 @@ export interface paths {
      *     Returns:
      *         Task status and result
      */
-    get: operations['get_transcription_api_transcriptions__task_id__get']
+    get: operations['get_transcription_api_transcription_tasks__task_id__get']
     put?: never
     post?: never
     /**
@@ -141,13 +141,13 @@ export interface paths {
      *     Returns:
      *         Cancellation result
      */
-    delete: operations['cancel_transcription_api_transcriptions__task_id__delete']
+    delete: operations['cancel_transcription_api_transcription_tasks__task_id__delete']
     options?: never
     head?: never
     patch?: never
     trace?: never
   }
-  '/api/transcriptions/{task_id}/export': {
+  '/api/transcription-tasks/{task_id}/export': {
     parameters: {
       query?: never
       header?: never
@@ -161,7 +161,7 @@ export interface paths {
      *     Supports SRT, VTT, TXT, and ASS formats.
      *     Use save=true to store file on server, save=false to download directly.
      */
-    get: operations['export_transcription_api_transcriptions__task_id__export_get']
+    get: operations['export_transcription_api_transcription_tasks__task_id__export_get']
     put?: never
     post?: never
     delete?: never
@@ -170,7 +170,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/api/transcriptions/export/batch': {
+  '/api/transcription-tasks/export/batch': {
     parameters: {
       query?: never
       header?: never
@@ -185,7 +185,7 @@ export interface paths {
      *
      *     Failed tasks are skipped and logged in _errors.txt within the archive.
      */
-    post: operations['batch_export_api_transcriptions_export_batch_post']
+    post: operations['batch_export_api_transcription_tasks_export_batch_post']
     delete?: never
     options?: never
     head?: never
@@ -1521,7 +1521,7 @@ export interface operations {
       }
     }
   }
-  list_transcriptions_api_transcriptions__get: {
+  list_transcriptions_api_transcription_tasks__get: {
     parameters: {
       query?: {
         /** @description Filter by status */
@@ -1557,7 +1557,7 @@ export interface operations {
       }
     }
   }
-  create_transcription_api_transcriptions__post: {
+  create_transcription_api_transcription_tasks__post: {
     parameters: {
       query?: never
       header?: never
@@ -1590,7 +1590,7 @@ export interface operations {
       }
     }
   }
-  get_transcription_api_transcriptions__task_id__get: {
+  get_transcription_api_transcription_tasks__task_id__get: {
     parameters: {
       query?: never
       header?: never
@@ -1621,7 +1621,7 @@ export interface operations {
       }
     }
   }
-  cancel_transcription_api_transcriptions__task_id__delete: {
+  cancel_transcription_api_transcription_tasks__task_id__delete: {
     parameters: {
       query?: never
       header?: never
@@ -1652,7 +1652,7 @@ export interface operations {
       }
     }
   }
-  export_transcription_api_transcriptions__task_id__export_get: {
+  export_transcription_api_transcription_tasks__task_id__export_get: {
     parameters: {
       query?: {
         /** @description Output format */
@@ -1690,7 +1690,7 @@ export interface operations {
       }
     }
   }
-  batch_export_api_transcriptions_export_batch_post: {
+  batch_export_api_transcription_tasks_export_batch_post: {
     parameters: {
       query?: never
       header?: never
