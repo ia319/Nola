@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast, Toaster } from 'sonner'
 
-import { ErrorBoundary } from '@/shared/ui/ErrorBoundary'
+import { ErrorBoundary } from '@/components/common'
 import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
 import { OptionsBar } from '@/features/transcription'
 import type { TaskCreateResult } from '@/features/transcription'

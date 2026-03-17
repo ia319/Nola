@@ -63,7 +63,10 @@ app/                          # Frontend workspace root
 │   │
 │   ├── components/           # Shared UI components (mostly shadcn generated)
 │   │   ├── common/           # Cross-feature common components barrel
-│   │   │   └── index.ts      # Common export entry (feature-agnostic)
+│   │   │   ├── ErrorBoundary.tsx # Render-error catch + i18n fallback + retry
+│   │   │   ├── index.ts      # Common export entry (feature-agnostic)
+│   │   │   └── __tests__/
+│   │   │       └── ErrorBoundary.test.tsx # Fallback and retry tests
 │   │   └── ui/               # Radix + Tailwind primitives
 │   │       ├── button.tsx    # Button variants
 │   │       ├── card.tsx      # Card container primitives
@@ -141,10 +144,6 @@ app/                          # Frontend workspace root
 │   │   └── utils.ts          # Canonical `cn()` helper
 │   │
 │   ├── shared/               # Cross-feature shared code
-│   │   ├── ui/               # Shared UI components
-│   │   │   ├── ErrorBoundary.tsx # Render-error catch + i18n fallback + retry
-│   │   │   └── __tests__/        # Component tests
-│   │   │       └── ErrorBoundary.test.tsx # Fallback and retry tests
 │   │   ├── lib/              # Shared runtime helpers
 │   │   │   ├── api-client.ts       # Axios instance + structured error interceptors
 │   │   │   ├── error-factory.ts    # AppError factory helpers (408/429 retriable)
@@ -305,12 +304,17 @@ Business domain logic separated by feature. Each feature has an `api.ts` (API fu
 - **history**: Placeholder for paginated viewing of past tasks.
 - **realtime**: Placeholder for future WebSocket-based live transcription.
 
+### src/components/common/
+
+Cross-feature composite components with feature-agnostic behavior.
+
+- **ErrorBoundary.tsx**: Class-based error boundary wrapping child components. Catch render-time exceptions and display i18n-powered fallback UI with retry button. Use `withTranslation` HOC for i18n access in class components.
+- **__tests__/ErrorBoundary.test.tsx**: Component tests covering fallback rendering and retry recovery.
+- **index.ts**: Barrel entry for common components. Prefer importing via `@/components/common`.
+
 ### src/shared/
 
-Cross-feature shared code, split into `ui/`, `lib/`, and `types/`.
-
-- **ui/ErrorBoundary.tsx**: Class-based error boundary wrapping child components. Catch render-time exceptions and display i18n-powered fallback UI with retry button. Use `withTranslation` HOC for i18n access in class components.
-- **ui/__tests__/ErrorBoundary.test.tsx**: Component tests covering fallback rendering and retry recovery.
+Cross-feature shared code, split into `lib/` and `types/`.
 - **lib/api-client.ts**: Axios instance (30s timeout, no global Content-Type). Request interceptor logs debug. Response interceptor converts HTTP errors to `AppError` via `createApiError` and network failures to `createNetworkError`. Preserve `CanceledError` for upload cancellation semantics.
 - **lib/__tests__/api-client.test.ts**: Interceptor tests covering cancel passthrough plus client, server, timeout, and offline mappings.
 - **lib/error-factory.ts**: Central factory functions for `AppError` (`createValidationError`, `createNetworkError`, `createApiError`, `isAppError`). Mark 408/429 as `retriable: true`; other 4xx as `retriable: false`; 5xx as `retriable: true`.
