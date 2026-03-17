@@ -15,22 +15,35 @@ from nola.api.schemas import (
     BatchExportRequest,
     CancelTaskResponse,
     CreateTaskResponse,
+    DeleteTaskRecordResponse,
     SavedExportResponse,
     TaskDetailResponse,
     TaskListResponse,
     TranscriptionRequest,
 )
+from nola.models.tasks import (
+    DEFAULT_TASK_SORT_BY,
+    DEFAULT_TASK_SORT_ORDER,
+    TaskSortField,
+    TaskSortOrder,
+)
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(
-    prefix="/api/transcription-tasks", tags=["transcription-tasks"]
-)
+router = APIRouter(prefix="/api/transcription-tasks", tags=["transcription-tasks"])
+legacy_router = APIRouter(prefix="/api/transcriptions", tags=["transcriptions"])
 
 # Valid status values for filtering
 StatusFilter = Literal["pending", "processing", "completed", "failed", "cancelled"]
+TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
 
 
+@legacy_router.post(
+    "/",
+    summary="Create transcription task",
+    response_model=CreateTaskResponse,
+    deprecated=True,
+)
 @router.post(
     "/", summary="Create transcription task", response_model=CreateTaskResponse
 )
@@ -75,11 +88,15 @@ async def create_transcription(request: TranscriptionRequest) -> dict[str, Any]:
     }
 
 
+@legacy_router.get("/", response_model=TaskListResponse, deprecated=True)
 @router.get("/", response_model=TaskListResponse)
 async def list_transcriptions(
     status: StatusFilter | None = Query(None, description="Filter by status"),
     limit: int = Query(50, ge=1, le=100, description="Max results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
+    q: str | None = Query(None, description="Search keyword for filename"),
+    sort_by: TaskSortField = Query(DEFAULT_TASK_SORT_BY, description="Sort field"),
+    order: TaskSortOrder = Query(DEFAULT_TASK_SORT_ORDER, description="Sort order"),
 ) -> dict[str, Any]:
     """List all transcription tasks.
 
@@ -87,14 +104,24 @@ async def list_transcriptions(
         status: Optional status filter (pending, processing, completed, failed)
         limit: Maximum number of results
         offset: Pagination offset
+        q: Optional filename search keyword
+        sort_by: Sort field
+        order: Sort order (asc or desc)
 
     Returns:
         List of tasks with pagination info
     """
     task_db = get_task_db()
 
-    tasks = task_db.list_tasks(status=status, limit=limit, offset=offset)
-    total = task_db.count_tasks(status=status)
+    tasks = task_db.list_tasks(
+        status=status,
+        limit=limit,
+        offset=offset,
+        q=q,
+        sort_by=sort_by,
+        order=order,
+    )
+    total = task_db.count_tasks(status=status, q=q)
 
     return {
         "tasks": [
@@ -114,6 +141,7 @@ async def list_transcriptions(
     }
 
 
+@legacy_router.get("/{task_id}", response_model=TaskDetailResponse, deprecated=True)
 @router.get("/{task_id}", response_model=TaskDetailResponse)
 async def get_transcription(task_id: str) -> dict[str, Any]:
     """Get transcription task status and result.
@@ -143,6 +171,7 @@ async def get_transcription(task_id: str) -> dict[str, Any]:
     }
 
 
+@legacy_router.delete("/{task_id}", response_model=CancelTaskResponse, deprecated=True)
 @router.delete("/{task_id}", response_model=CancelTaskResponse)
 async def cancel_transcription(task_id: str) -> dict[str, Any]:
     """Cancel a transcription task.
@@ -175,12 +204,50 @@ async def cancel_transcription(task_id: str) -> dict[str, Any]:
     }
 
 
+@legacy_router.delete(
+    "/{task_id}/record",
+    summary="Delete task record",
+    response_model=DeleteTaskRecordResponse,
+    deprecated=True,
+)
+@router.delete(
+    "/{task_id}/record",
+    summary="Delete task record",
+    response_model=DeleteTaskRecordResponse,
+)
+async def delete_task_record(task_id: str) -> dict[str, str]:
+    """Delete a terminal task record without deleting its file."""
+    task_db = get_task_db()
+    task = task_db.get_task(task_id)
+
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task["status"] not in TERMINAL_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=("Only terminal tasks can be deleted (completed/failed/cancelled)"),
+        )
+
+    deleted = task_db.delete_task_record(task_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return {"task_id": task_id, "message": "Task record deleted successfully"}
+
+
 ExportFormat = Literal["srt", "vtt", "txt", "ass"]
 
 
 # NOTE: OpenAPI only models the save=true JSON response.
 # Default (save=false) returns binary file content.
 # FE: downloadExport -> blob; saveExport -> JSON.
+@legacy_router.get(
+    "/{task_id}/export",
+    summary="Export transcription result",
+    responses={200: {"model": SavedExportResponse, "description": "When save=true"}},
+    deprecated=True,
+)
 @router.get(
     "/{task_id}/export",
     summary="Export transcription result",
@@ -271,6 +338,9 @@ async def export_transcription(
     )
 
 
+@legacy_router.post(
+    "/export/batch", summary="Batch export transcriptions", deprecated=True
+)
 @router.post("/export/batch", summary="Batch export transcriptions")
 async def batch_export(
     request: "BatchExportRequest",

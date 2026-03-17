@@ -134,6 +134,148 @@ class TestTranscriptionsAPI:
         assert response.status_code == 404
 
 
+class TestTranscriptionTasksPhaseA:
+    """Test Phase A additions: alias compatibility and task list/delete features."""
+
+    def test_legacy_list_alias_still_works(self, client: TestClient):
+        """Legacy /api/transcriptions list path should remain available."""
+        response = client.get("/api/transcriptions")
+        assert response.status_code == 200
+        data = response.json()
+        assert "tasks" in data
+
+    def test_list_supports_filename_keyword_search(self, client: TestClient):
+        """List endpoint should filter tasks by filename keyword."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="search-file-1",
+            filename="meeting-alpha.mp3",
+            path="/tmp/meeting-alpha.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="search-file-2",
+            filename="lecture-beta.mp3",
+            path="/tmp/lecture-beta.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="search-task-1", file_id="search-file-1", options=None)
+        task_db.enqueue(task_id="search-task-2", file_id="search-file-2", options=None)
+
+        response = client.get("/api/transcription-tasks?q=meeting")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["tasks"][0]["task_id"] == "search-task-1"
+
+    def test_list_supports_sort_order(self, client: TestClient):
+        """List endpoint should apply sort_by and order parameters."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="sort-file-1",
+            filename="sort-a.mp3",
+            path="/tmp/sort-a.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="sort-file-2",
+            filename="sort-b.mp3",
+            path="/tmp/sort-b.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="sort-task-1", file_id="sort-file-1", options=None)
+        task_db.enqueue(task_id="sort-task-2", file_id="sort-file-2", options=None)
+
+        response = client.get(
+            "/api/transcription-tasks?sort_by=created_at&order=asc&limit=2"
+        )
+        assert response.status_code == 200
+        tasks = response.json()["tasks"]
+        assert tasks[0]["task_id"] == "sort-task-1"
+        assert tasks[1]["task_id"] == "sort-task-2"
+
+    def test_delete_record_rejects_non_terminal_task(self, client: TestClient):
+        """Delete-record endpoint should reject pending/processing tasks."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="delete-pending-file",
+            filename="pending.mp3",
+            path="/tmp/pending.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="delete-pending-task",
+            file_id="delete-pending-file",
+            options=None,
+        )
+
+        response = client.delete("/api/transcription-tasks/delete-pending-task/record")
+        assert response.status_code == 400
+        assert "Only terminal tasks can be deleted" in response.json()["detail"]
+
+    def test_delete_record_removes_terminal_task(self, client: TestClient):
+        """Delete-record endpoint should remove completed tasks."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="delete-completed-file",
+            filename="completed.mp3",
+            path="/tmp/completed.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="delete-completed-task",
+            file_id="delete-completed-file",
+            options=None,
+        )
+        _claim_pending_task(task_db, "delete-completed-task")
+        task_db.complete(
+            task_id="delete-completed-task",
+            segments=[{"start": 0.0, "end": 1.0, "text": "done"}],
+            duration=1.0,
+        )
+
+        response = client.delete(
+            "/api/transcription-tasks/delete-completed-task/record"
+        )
+        assert response.status_code == 200
+        assert response.json()["task_id"] == "delete-completed-task"
+
+        get_response = client.get("/api/transcription-tasks/delete-completed-task")
+        assert get_response.status_code == 404
+
+    def test_legacy_delete_record_alias_still_works(self, client: TestClient):
+        """Legacy delete-record path should remain available during transition."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="delete-legacy-file",
+            filename="legacy.mp3",
+            path="/tmp/legacy.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="delete-legacy-task",
+            file_id="delete-legacy-file",
+            options=None,
+        )
+        _claim_pending_task(task_db, "delete-legacy-task")
+        task_db.fail(
+            task_id="delete-legacy-task",
+            error="intentional",
+            should_retry=False,
+        )
+
+        response = client.delete("/api/transcriptions/delete-legacy-task/record")
+        assert response.status_code == 200
+        assert response.json()["task_id"] == "delete-legacy-task"
+
+
 class TestInputValidation:
     """Test API input validation behavior."""
 
@@ -386,7 +528,9 @@ class TestExportAPI:
             duration=5.0,
         )
 
-        response = client.get("/api/transcription-tasks/test-task-srt/export?format=srt")
+        response = client.get(
+            "/api/transcription-tasks/test-task-srt/export?format=srt"
+        )
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("application/x-subrip")
         content = response.text

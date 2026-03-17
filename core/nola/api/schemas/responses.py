@@ -62,6 +62,13 @@ class CancelTaskResponse(BaseModel):
     message: str
 
 
+class DeleteTaskRecordResponse(BaseModel):
+    """Task record deletion response."""
+
+    task_id: str
+    message: str
+
+
 class SavedExportResponse(BaseModel):
     """Response when export is saved to server (save=true)."""
 
