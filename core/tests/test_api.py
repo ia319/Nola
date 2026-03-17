@@ -195,8 +195,18 @@ class TestTranscriptionTasksPhaseA:
         )
         assert response.status_code == 200
         tasks = response.json()["tasks"]
-        assert tasks[0]["task_id"] == "sort-task-1"
-        assert tasks[1]["task_id"] == "sort-task-2"
+        assert len(tasks) == 2
+        assert {tasks[0]["task_id"], tasks[1]["task_id"]} == {
+            "sort-task-1",
+            "sort-task-2",
+        }
+
+        first_created_at = tasks[0]["created_at"]
+        second_created_at = tasks[1]["created_at"]
+        assert first_created_at <= second_created_at
+        if first_created_at == second_created_at:
+            # list_tasks() uses task_id DESC as the deterministic tie-breaker.
+            assert tasks[0]["task_id"] > tasks[1]["task_id"]
 
     def test_delete_record_rejects_non_terminal_task(self, client: TestClient):
         """Delete-record endpoint should reject pending/processing tasks."""
