@@ -4,7 +4,12 @@ import { toast, Toaster } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
 import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
-import { OptionsBar, useSessionTasksStore, useTaskPolling } from '@/features/transcription'
+import {
+  OptionsBar,
+  requestTaskRefresh,
+  useSessionTasksStore,
+  useTaskPolling,
+} from '@/features/transcription'
 import type { TaskCreateResult } from '@/features/transcription'
 import { Button } from '@/components/ui/button'
 import { useAppConfig } from '@/config/use-app-config'
@@ -19,7 +24,7 @@ function App() {
   const { t } = useTranslation()
   const { fileValidationConfig } = useAppConfig()
   const addCreatedTask = useSessionTasksStore((state) => state.addCreatedTask)
-  const { refreshNow } = useTaskPolling()
+  useTaskPolling()
 
   const {
     uploads,
@@ -68,7 +73,7 @@ function App() {
     }
 
     if (hasNewTask) {
-      void refreshNow()
+      requestTaskRefresh()
     }
   }
 
