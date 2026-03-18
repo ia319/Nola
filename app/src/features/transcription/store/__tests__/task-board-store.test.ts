@@ -21,7 +21,7 @@ afterEach(() => {
 })
 
 describe('task board store', () => {
-  it('sets task list with dedupe and sync metadata', () => {
+  it('sets task list with latest duplicate wins and sync metadata', () => {
     const store = useTaskBoardStore.getState()
     store.setError('network')
 
@@ -33,6 +33,7 @@ describe('task board store', () => {
 
     const snapshot = useTaskBoardStore.getState()
     expect(snapshot.tasks.map((task) => task.task_id)).toEqual(['task-1', 'task-2'])
+    expect(snapshot.tasks.find((task) => task.task_id === 'task-1')?.progress).toBe(60)
     expect(snapshot.error).toBeNull()
     expect(snapshot.lastSyncedAt).not.toBeNull()
   })

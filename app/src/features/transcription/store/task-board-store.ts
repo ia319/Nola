@@ -16,16 +16,12 @@ export interface TaskBoardState {
 }
 
 function dedupeTasks(tasks: TaskSummary[]): TaskSummary[] {
-  const seen = new Set<string>()
-  const deduped: TaskSummary[] = []
-
+  const latestById = new Map<string, TaskSummary>()
   for (const task of tasks) {
-    if (seen.has(task.task_id)) continue
-    seen.add(task.task_id)
-    deduped.push(task)
+    // Keep first-seen order and let later duplicates overwrite payload.
+    latestById.set(task.task_id, task)
   }
-
-  return deduped
+  return Array.from(latestById.values())
 }
 
 /**
