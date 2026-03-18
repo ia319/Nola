@@ -55,11 +55,13 @@ describe('task board store', () => {
     const store = useTaskBoardStore.getState()
     store.setTasks([buildTask('task-1'), buildTask('task-2')])
     store.removeTask('task-1')
+    store.setPolling(true)
     store.setFetching(true)
     store.setError('failed')
 
     const snapshot = useTaskBoardStore.getState()
     expect(snapshot.tasks.map((task) => task.task_id)).toEqual(['task-2'])
+    expect(snapshot.isPolling).toBe(true)
     expect(snapshot.isFetching).toBe(true)
     expect(snapshot.error).toBe('failed')
   })
