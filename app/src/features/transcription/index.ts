@@ -3,8 +3,11 @@ export type { OptionsBarProps, TaskCreateResult } from './components/OptionsBar'
 export { AdvancedOptions } from './components/AdvancedOptions'
 export type { AdvancedOptionsProps } from './components/AdvancedOptions'
 export { useTranscriptionOptions } from './hooks/useTranscriptionOptions'
+export { selectActiveTasks, selectRecentTerminalTasks } from './lib/task-selectors'
 export { useSessionTasksStore } from './store/session-tasks-store'
 export type { SessionTask, SessionTaskInput, SessionTasksState } from './store/session-tasks-store'
+export { useTaskBoardStore } from './store/task-board-store'
+export type { TaskBoardState } from './store/task-board-store'
 export type {
   AdvancedOptionValue,
   AdvancedTranscriptionOptions,
