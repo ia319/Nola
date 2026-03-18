@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { POLL_INTERVAL_MS } from '@/config/constants'
 import { listTasks } from '@/features/transcription/api'
+import { subscribeTaskRefresh } from '@/features/transcription/lib/task-refresh'
 import { ACTIVE_TASK_STATUSES } from '@/features/transcription/lib/task-status-groups'
 import { useSessionTasksStore } from '@/features/transcription/store/session-tasks-store'
 import { useTaskBoardStore } from '@/features/transcription/store/task-board-store'
@@ -189,6 +190,12 @@ export function useTaskPolling(): UseTaskPollingReturn {
       stopPolling()
     }
   }, [stopPolling])
+
+  useEffect(() => {
+    return subscribeTaskRefresh(() => {
+      void refreshNow()
+    })
+  }, [refreshNow])
 
   return { refreshNow }
 }
