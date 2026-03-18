@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { listTasks } from '@/features/transcription/api'
+import { requestTaskRefresh } from '@/features/transcription/lib/task-refresh'
 import { useSessionTasksStore } from '@/features/transcription/store/session-tasks-store'
 import { useTaskBoardStore } from '@/features/transcription/store/task-board-store'
 import type { TaskListResponse, TaskSummary } from '@/shared/types'
@@ -229,6 +230,20 @@ describe('useTaskPolling', () => {
     await act(async () => {
       await result.current.refreshNow()
     })
+
+    expect(listTasksMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('supports external refresh events for action-triggered immediate sync', async () => {
+    listTasksMock.mockResolvedValue(buildTaskList([]))
+
+    renderHook(() => useTaskPolling())
+    expect(listTasksMock).not.toHaveBeenCalled()
+
+    act(() => {
+      requestTaskRefresh()
+    })
+    await flushAsyncWork()
 
     expect(listTasksMock).toHaveBeenCalledTimes(1)
   })
