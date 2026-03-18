@@ -69,6 +69,55 @@ describe('session tasks store', () => {
     })
   })
 
+  it('preserves existing fields on partial upsert payload', () => {
+    const store = useSessionTasksStore.getState()
+    store.addCreatedTask({
+      task_id: 'task-1',
+      file_id: 'file-1',
+      status: 'processing',
+      progress: 45,
+      created_at: '2026-03-18T09:00:00.000Z',
+    })
+
+    store.upsertSessionTask({
+      task_id: 'task-1',
+      file_id: 'file-1',
+      status: 'processing',
+    })
+
+    const snapshot = useSessionTasksStore.getState().byId['task-1']
+    expect(snapshot).toEqual({
+      task_id: 'task-1',
+      file_id: 'file-1',
+      status: 'processing',
+      progress: 45,
+      created_at: '2026-03-18T09:00:00.000Z',
+      completed_at: null,
+    })
+  })
+
+  it('fills completed progress for completed upserts without progress', () => {
+    const store = useSessionTasksStore.getState()
+    store.addCreatedTask({
+      task_id: 'task-1',
+      file_id: 'file-1',
+      status: 'processing',
+      progress: 80,
+      created_at: '2026-03-18T09:00:00.000Z',
+    })
+
+    store.upsertSessionTask({
+      task_id: 'task-1',
+      file_id: 'file-1',
+      status: 'completed',
+    })
+
+    const snapshot = useSessionTasksStore.getState().byId['task-1']
+    expect(snapshot.progress).toBe(100)
+    expect(snapshot.completed_at).not.toBeNull()
+    expect(snapshot.created_at).toBe('2026-03-18T09:00:00.000Z')
+  })
+
   it('removes one task and keeps other session entries untouched', () => {
     const store = useSessionTasksStore.getState()
     store.addCreatedTask({

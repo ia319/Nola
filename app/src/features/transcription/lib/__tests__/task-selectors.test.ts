@@ -32,6 +32,16 @@ describe('task selectors', () => {
     expect(active.map((task) => task.task_id)).toEqual(['task-b', 'task-a'])
   })
 
+  it('uses task_id tie-breaker when active created_at values are equal', () => {
+    const tasks = [
+      buildTask('task-a', 'pending', '2026-03-18T10:00:00.000Z'),
+      buildTask('task-b', 'processing', '2026-03-18T10:00:00.000Z'),
+    ]
+
+    const active = selectActiveTasks(tasks)
+    expect(active.map((task) => task.task_id)).toEqual(['task-b', 'task-a'])
+  })
+
   it('selects terminal tasks by completion recency and limits count', () => {
     const tasks = [
       buildTask('task-a', 'completed', '2026-03-18T08:00:00.000Z', '2026-03-18T08:10:00.000Z'),
@@ -42,6 +52,17 @@ describe('task selectors', () => {
 
     const recent = selectRecentTerminalTasks(tasks, 2)
     expect(recent.map((task) => task.task_id)).toEqual(['task-b', 'task-c'])
+  })
+
+  it('uses created_at tie-breaker when terminal completed_at values are equal', () => {
+    const tasks = [
+      buildTask('task-a', 'completed', '2026-03-18T08:00:00.000Z', '2026-03-18T10:00:00.000Z'),
+      buildTask('task-b', 'failed', '2026-03-18T09:00:00.000Z', '2026-03-18T10:00:00.000Z'),
+      buildTask('task-c', 'cancelled', '2026-03-18T09:00:00.000Z', '2026-03-18T10:00:00.000Z'),
+    ]
+
+    const recent = selectRecentTerminalTasks(tasks)
+    expect(recent.map((task) => task.task_id)).toEqual(['task-c', 'task-b', 'task-a'])
   })
 
   it('returns empty list when maxCount is zero or negative', () => {
