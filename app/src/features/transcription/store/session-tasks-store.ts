@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-import type { TaskStatus, TaskSummary } from '@/shared/types'
+import type { TaskSummary } from '@/shared/types'
 
 export type SessionTask = TaskSummary
 
@@ -16,20 +16,28 @@ export interface SessionTasksState {
   clearSession: () => void
 }
 
-function isTerminalStatus(status: TaskStatus): boolean {
+function isTerminalTaskStatus(status: TaskSummary['status']): boolean {
   return status === 'completed' || status === 'failed' || status === 'cancelled'
 }
 
-function normalizeSessionTask(task: SessionTaskInput): SessionTask {
+function normalizeSessionTask(task: SessionTaskInput, previous?: SessionTask): SessionTask {
   const status = task.status
-  const createdAt = task.created_at ?? new Date().toISOString()
-  const completedAt = task.completed_at ?? (isTerminalStatus(status) ? createdAt : null)
+  const createdAt = task.created_at ?? previous?.created_at ?? new Date().toISOString()
+
+  const progress = task.progress ?? (status === 'completed' ? 100 : (previous?.progress ?? 0))
+
+  const completedAt =
+    task.completed_at !== undefined
+      ? task.completed_at
+      : isTerminalTaskStatus(status)
+        ? (previous?.completed_at ?? new Date().toISOString())
+        : null
 
   return {
     task_id: task.task_id,
     file_id: task.file_id,
     status,
-    progress: task.progress ?? (status === 'completed' ? 100 : 0),
+    progress,
     created_at: createdAt,
     completed_at: completedAt,
   }
@@ -39,7 +47,8 @@ function upsertState(
   state: Pick<SessionTasksState, 'order' | 'byId'>,
   input: SessionTaskInput,
 ): Pick<SessionTasksState, 'order' | 'byId'> {
-  const normalized = normalizeSessionTask(input)
+  const previous = state.byId[input.task_id]
+  const normalized = normalizeSessionTask(input, previous)
   const exists = Boolean(state.byId[normalized.task_id])
 
   return {
