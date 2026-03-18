@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 import type { TaskSummary } from '@/shared/types'
+import { isTerminalTaskStatus } from '../lib/task-status-groups'
 
 export type SessionTask = TaskSummary
 
@@ -14,10 +15,6 @@ export interface SessionTasksState {
   upsertSessionTask: (task: SessionTaskInput) => void
   removeSessionTask: (taskId: string) => void
   clearSession: () => void
-}
-
-function isTerminalTaskStatus(status: TaskSummary['status']): boolean {
-  return status === 'completed' || status === 'failed' || status === 'cancelled'
 }
 
 function normalizeSessionTask(task: SessionTaskInput, previous?: SessionTask): SessionTask {

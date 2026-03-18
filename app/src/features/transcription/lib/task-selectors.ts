@@ -1,7 +1,6 @@
 import type { TaskSummary } from '@/shared/types'
 
-const ACTIVE_STATUSES = new Set(['pending', 'processing'])
-const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled'])
+import { ACTIVE_TASK_STATUSES, TERMINAL_TASK_STATUSES } from './task-status-groups'
 
 function toTimestamp(value: string | null): number {
   if (!value) return Number.NEGATIVE_INFINITY
@@ -26,7 +25,7 @@ function compareByTerminalRecency(a: TaskSummary, b: TaskSummary): number {
  */
 export function selectActiveTasks(tasks: TaskSummary[]): TaskSummary[] {
   return tasks
-    .filter((task) => ACTIVE_STATUSES.has(task.status))
+    .filter((task) => ACTIVE_TASK_STATUSES.has(task.status))
     .slice()
     .sort(compareByCreatedAtDesc)
 }
@@ -41,7 +40,7 @@ export function selectRecentTerminalTasks(
   if (maxCount <= 0) return []
 
   return tasks
-    .filter((task) => TERMINAL_STATUSES.has(task.status))
+    .filter((task) => TERMINAL_TASK_STATUSES.has(task.status))
     .slice()
     .sort(compareByTerminalRecency)
     .slice(0, maxCount)
