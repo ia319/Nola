@@ -48,6 +48,17 @@ function seedActiveSessionTask(taskId: string): void {
   })
 }
 
+function createDeferred<T>(): {
+  promise: Promise<T>
+  resolve: (value: T | PromiseLike<T>) => void
+} {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>((res) => {
+    resolve = res
+  })
+  return { promise, resolve }
+}
+
 async function flushAsyncWork(): Promise<void> {
   await act(async () => {
     await Promise.resolve()
@@ -80,13 +91,10 @@ describe('useTaskPolling', () => {
     vi.useFakeTimers()
     seedActiveSessionTask('task-1')
 
-    let resolveFirst: ((value: TaskListResponse) => void) | null = null
-    const firstPromise = new Promise<TaskListResponse>((resolve) => {
-      resolveFirst = resolve
-    })
+    const firstPoll = createDeferred<TaskListResponse>()
 
     listTasksMock
-      .mockImplementationOnce(() => firstPromise)
+      .mockImplementationOnce(() => firstPoll.promise)
       .mockResolvedValue(buildTaskList([buildTask('task-1', 'processing')]))
 
     renderHook(() => useTaskPolling())
@@ -99,7 +107,7 @@ describe('useTaskPolling', () => {
     })
     expect(listTasksMock).toHaveBeenCalledTimes(1)
 
-    resolveFirst?.(buildTaskList([buildTask('task-1', 'processing')]))
+    firstPoll.resolve(buildTaskList([buildTask('task-1', 'processing')]))
     await flushAsyncWork()
 
     await act(async () => {
