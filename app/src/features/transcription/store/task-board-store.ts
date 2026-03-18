@@ -4,12 +4,14 @@ import type { TaskSummary } from '@/shared/types'
 
 export interface TaskBoardState {
   tasks: TaskSummary[]
+  isPolling: boolean
   isFetching: boolean
   lastSyncedAt: number | null
   error: string | null
   setTasks: (tasks: TaskSummary[]) => void
   upsertTask: (task: TaskSummary) => void
   removeTask: (taskId: string) => void
+  setPolling: (value: boolean) => void
   setFetching: (value: boolean) => void
   setError: (message: string | null) => void
   clearTaskBoard: () => void
@@ -29,6 +31,7 @@ function dedupeTasks(tasks: TaskSummary[]): TaskSummary[] {
  */
 export const useTaskBoardStore = create<TaskBoardState>((set) => ({
   tasks: [],
+  isPolling: false,
   isFetching: false,
   lastSyncedAt: null,
   error: null,
@@ -59,6 +62,11 @@ export const useTaskBoardStore = create<TaskBoardState>((set) => ({
       tasks: state.tasks.filter((task) => task.task_id !== taskId),
     })),
 
+  setPolling: (value) =>
+    set({
+      isPolling: value,
+    }),
+
   setFetching: (value) =>
     set({
       isFetching: value,
@@ -72,6 +80,7 @@ export const useTaskBoardStore = create<TaskBoardState>((set) => ({
   clearTaskBoard: () =>
     set({
       tasks: [],
+      isPolling: false,
       isFetching: false,
       lastSyncedAt: null,
       error: null,
