@@ -4,7 +4,7 @@ import { toast, Toaster } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
 import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
-import { OptionsBar, useSessionTasksStore } from '@/features/transcription'
+import { OptionsBar, useSessionTasksStore, useTaskPolling } from '@/features/transcription'
 import type { TaskCreateResult } from '@/features/transcription'
 import { Button } from '@/components/ui/button'
 import { useAppConfig } from '@/config/use-app-config'
@@ -19,6 +19,7 @@ function App() {
   const { t } = useTranslation()
   const { fileValidationConfig } = useAppConfig()
   const addCreatedTask = useSessionTasksStore((state) => state.addCreatedTask)
+  const { refreshNow } = useTaskPolling()
 
   const {
     uploads,
@@ -44,6 +45,8 @@ function App() {
 
   /** Mark successful task creations and notify via toast. */
   function handleTasksCreated(results: TaskCreateResult[]) {
+    let hasNewTask = false
+
     for (const result of results) {
       if (result.ok && result.fileId && result.taskId) {
         addCreatedTask({
@@ -51,6 +54,7 @@ function App() {
           file_id: result.fileId,
           status: 'pending',
         })
+        hasNewTask = true
         markTaskCreated(result.fileId)
         toast.success(t('options.taskCreated', { taskId: result.taskId }))
         continue
@@ -61,6 +65,10 @@ function App() {
           ? t(result.error.i18nKey, result.error.params ?? {})
           : t('error.generic'),
       )
+    }
+
+    if (hasNewTask) {
+      void refreshNow()
     }
   }
 
