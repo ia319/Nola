@@ -4,7 +4,7 @@ import { toast, Toaster } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
 import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
-import { OptionsBar } from '@/features/transcription'
+import { OptionsBar, useSessionTasksStore } from '@/features/transcription'
 import type { TaskCreateResult } from '@/features/transcription'
 import { Button } from '@/components/ui/button'
 import { useAppConfig } from '@/config/use-app-config'
@@ -18,6 +18,7 @@ import { useAppConfig } from '@/config/use-app-config'
 function App() {
   const { t } = useTranslation()
   const { fileValidationConfig } = useAppConfig()
+  const addCreatedTask = useSessionTasksStore((state) => state.addCreatedTask)
 
   const {
     uploads,
@@ -44,7 +45,12 @@ function App() {
   /** Mark successful task creations and notify via toast. */
   function handleTasksCreated(results: TaskCreateResult[]) {
     for (const result of results) {
-      if (result.ok && result.fileId) {
+      if (result.ok && result.fileId && result.taskId) {
+        addCreatedTask({
+          task_id: result.taskId,
+          file_id: result.fileId,
+          status: 'pending',
+        })
         markTaskCreated(result.fileId)
         toast.success(t('options.taskCreated', { taskId: result.taskId }))
         continue
