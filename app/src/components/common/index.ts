@@ -6,3 +6,4 @@
  */
 
 export { ErrorBoundary } from './ErrorBoundary'
+export { TaskListPanel } from './TaskListPanel'
