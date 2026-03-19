@@ -162,7 +162,15 @@ describe('OptionsBar', () => {
       retriable: true,
     }
 
-    createTaskMock.mockResolvedValueOnce({ task_id: 'task-1' }).mockRejectedValueOnce(appError)
+    createTaskMock
+      .mockResolvedValueOnce({
+        task_id: 'task-1',
+        file_id: 'file-1',
+        filename: 'sample-a.wav',
+        status: 'pending',
+        options: null,
+      })
+      .mockRejectedValueOnce(appError)
 
     render(<OptionsBar fileIds={['file-1', 'file-2']} onTasksCreated={onTasksCreated} />)
 
@@ -170,7 +178,7 @@ describe('OptionsBar', () => {
 
     await waitFor(() => {
       expect(onTasksCreated).toHaveBeenCalledWith([
-        { fileId: 'file-1', taskId: 'task-1', ok: true },
+        { fileId: 'file-1', taskId: 'task-1', filename: 'sample-a.wav', ok: true },
         { fileId: 'file-2', ok: false, error: appError },
       ])
     })

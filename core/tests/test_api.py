@@ -169,6 +169,24 @@ class TestTranscriptionTasksPhaseA:
         data = response.json()
         assert data["total"] == 1
         assert data["tasks"][0]["task_id"] == "search-task-1"
+        assert data["tasks"][0]["filename"] == "meeting-alpha.mp3"
+
+    def test_get_task_detail_includes_filename(self, client: TestClient):
+        """Task detail endpoint should include filename for display use."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="detail-file-1",
+            filename="detail-audio.mp3",
+            path="/tmp/detail-audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="detail-task-1", file_id="detail-file-1", options=None)
+
+        response = client.get("/api/transcription-tasks/detail-task-1")
+        assert response.status_code == 200
+        assert response.json()["filename"] == "detail-audio.mp3"
 
     def test_list_supports_sort_order(self, client: TestClient):
         """List endpoint should apply sort_by and order parameters."""

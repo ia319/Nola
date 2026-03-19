@@ -62,6 +62,7 @@ describe('session tasks store', () => {
     expect(snapshot.byId['task-1']).toEqual({
       task_id: 'task-1',
       file_id: 'file-1',
+      filename: null,
       status: 'completed',
       progress: 100,
       created_at: '2026-03-18T09:00:00.000Z',
@@ -89,6 +90,7 @@ describe('session tasks store', () => {
     expect(snapshot).toEqual({
       task_id: 'task-1',
       file_id: 'file-1',
+      filename: null,
       status: 'processing',
       progress: 45,
       created_at: '2026-03-18T09:00:00.000Z',
