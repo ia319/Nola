@@ -128,6 +128,7 @@ async def list_transcriptions(
             {
                 "task_id": t["id"],
                 "file_id": t["file_id"],
+                "filename": t.get("filename"),
                 "status": t["status"],
                 "progress": t["progress"],
                 "created_at": t["created_at"],
@@ -153,14 +154,18 @@ async def get_transcription(task_id: str) -> dict[str, Any]:
         Task status and result
     """
     task_db = get_task_db()
+    file_db = get_file_db()
     task = task_db.get_task(task_id)
 
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    file = file_db.get_file(task["file_id"])
+
     return {
         "task_id": task["id"],
         "file_id": task["file_id"],
+        "filename": file["filename"] if file else None,
         "status": task["status"],
         "progress": task["progress"],
         "duration": task["duration"],

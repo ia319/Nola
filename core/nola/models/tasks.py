@@ -7,7 +7,7 @@ from contextlib import closing
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal, TypedDict, cast
+from typing import Any, Literal, NotRequired, TypedDict, cast
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +17,7 @@ class TaskRowRaw(TypedDict):
 
     id: str
     file_id: str
+    filename: NotRequired[str | None]
     status: str
     priority: int
     retry_count: int
@@ -39,6 +40,7 @@ class TaskRow(TypedDict):
 
     id: str
     file_id: str
+    filename: NotRequired[str | None]
     status: str
     priority: int
     retry_count: int
@@ -589,12 +591,11 @@ class TaskDatabase:
         sort_column = TASK_SORT_COLUMNS[sort_by]
         sort_order = "ASC" if order == "asc" else "DESC"
 
-        from_sql = "FROM transcription_tasks t"
+        from_sql = "FROM transcription_tasks t LEFT JOIN files f ON f.id = t.file_id"
         where_clauses: list[str] = []
         params: list[str | int] = []
 
         if q:
-            from_sql += " JOIN files f ON f.id = t.file_id"
             # Keep contains search semantics (%keyword%) for UX consistency.
             # This may full-scan on SQLite; move to FTS when data volume grows.
             where_clauses.append("LOWER(f.filename) LIKE ?")
@@ -606,7 +607,7 @@ class TaskDatabase:
 
         where_sql = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
         query = (
-            "SELECT t.* "
+            "SELECT t.*, f.filename AS filename "
             f"{from_sql}{where_sql} "
             f"ORDER BY {sort_column} {sort_order}, t.id DESC "
             "LIMIT ? OFFSET ?"
