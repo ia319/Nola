@@ -1,18 +1,22 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast, Toaster } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
 import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
 import {
+  cancelTaskAndRefresh,
+  CurrentBatchTasksPanel,
   OptionsBar,
   requestTaskRefresh,
+  retryTaskAndRefresh,
   useSessionTasksStore,
   useTaskPolling,
 } from '@/features/transcription'
 import type { TaskCreateResult } from '@/features/transcription'
 import { Button } from '@/components/ui/button'
 import { useAppConfig } from '@/config/use-app-config'
+import type { TaskSummary } from '@/shared/types'
 
 /**
  * Root application shell.
@@ -24,6 +28,7 @@ function App() {
   const { t } = useTranslation()
   const { fileValidationConfig } = useAppConfig()
   const addCreatedTask = useSessionTasksStore((state) => state.addCreatedTask)
+  const upsertSessionTask = useSessionTasksStore((state) => state.upsertSessionTask)
   useTaskPolling()
 
   const {
@@ -42,6 +47,15 @@ function App() {
   } = useFileUpload(fileValidationConfig)
 
   const hasPending = uploads.some((u) => u.status === 'pending')
+  const fileNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const item of uploads) {
+      if (item.fileId) {
+        map.set(item.fileId, item.file.name)
+      }
+    }
+    return map
+  }, [uploads])
 
   /** Forward selected files to the upload queue for admission and validation. */
   function handleFilesSelected(files: File[]) {
@@ -80,6 +94,34 @@ function App() {
   /** Reset all upload state with orphan cleanup. */
   async function handleReset() {
     await reset()
+  }
+
+  async function handleCancelRecentTask(task: TaskSummary) {
+    try {
+      await cancelTaskAndRefresh(task.task_id)
+      upsertSessionTask({
+        task_id: task.task_id,
+        file_id: task.file_id,
+        status: 'cancelled',
+      })
+      toast.success(t('tasks.toast.cancelled', { taskId: task.task_id }))
+    } catch {
+      toast.error(t('tasks.toast.actionFailed'))
+    }
+  }
+
+  async function handleRetryRecentTask(task: TaskSummary) {
+    try {
+      const response = await retryTaskAndRefresh({ file_id: task.file_id })
+      addCreatedTask({
+        task_id: response.task_id,
+        file_id: task.file_id,
+        status: 'pending',
+      })
+      toast.success(t('tasks.toast.retried', { taskId: response.task_id }))
+    } catch {
+      toast.error(t('tasks.toast.actionFailed'))
+    }
   }
 
   // Surface batch-level errors (e.g. duplicate file skip) as toast.
@@ -123,6 +165,14 @@ function App() {
           fileIds={availableFileIds}
           onTasksCreated={handleTasksCreated}
           disabled={isUploading}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary>
+        <CurrentBatchTasksPanel
+          resolveFileName={(task) => fileNameById.get(task.file_id)}
+          onCancelTask={handleCancelRecentTask}
+          onRetryTask={handleRetryRecentTask}
         />
       </ErrorBoundary>
 
