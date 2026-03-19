@@ -6,7 +6,7 @@ import { isTerminalTaskStatus } from '../lib/task-status-groups'
 export type SessionTask = TaskSummary
 
 export type SessionTaskInput = Pick<TaskSummary, 'task_id' | 'file_id' | 'status'> &
-  Partial<Pick<TaskSummary, 'progress' | 'created_at' | 'completed_at'>>
+  Partial<Pick<TaskSummary, 'progress' | 'created_at' | 'completed_at' | 'filename'>>
 
 export interface SessionTasksState {
   order: string[]
@@ -22,6 +22,7 @@ function normalizeSessionTask(task: SessionTaskInput, previous?: SessionTask): S
   const createdAt = task.created_at ?? previous?.created_at ?? new Date().toISOString()
 
   const progress = task.progress ?? (status === 'completed' ? 100 : (previous?.progress ?? 0))
+  const filename = task.filename ?? previous?.filename ?? null
 
   const completedAt =
     task.completed_at !== undefined
@@ -33,6 +34,7 @@ function normalizeSessionTask(task: SessionTaskInput, previous?: SessionTask): S
   return {
     task_id: task.task_id,
     file_id: task.file_id,
+    filename,
     status,
     progress,
     created_at: createdAt,

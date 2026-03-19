@@ -116,7 +116,7 @@ export function TaskListPanel({
           <p className="text-muted-foreground text-sm">{emptyText}</p>
         ) : (
           tasks.map((task) => {
-            const fileLabel = resolveFileName?.(task) ?? task.file_id
+            const fileLabel = task.filename ?? resolveFileName?.(task) ?? task.file_id
             const pendingOrProcessing = task.status === 'pending' || task.status === 'processing'
             const retryable = task.status === 'failed' || task.status === 'cancelled'
             const deletable =

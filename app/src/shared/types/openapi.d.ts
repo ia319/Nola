@@ -933,6 +933,8 @@ export interface components {
       task_id: string
       /** File Id */
       file_id: string
+      /** Filename */
+      filename?: string | null
       /**
        * Status
        * @enum {string}
@@ -974,6 +976,8 @@ export interface components {
       task_id: string
       /** File Id */
       file_id: string
+      /** Filename */
+      filename?: string | null
       /**
        * Status
        * @enum {string}

@@ -35,6 +35,7 @@ import { AdvancedOptions } from './AdvancedOptions'
 export interface TaskCreateResult {
   fileId: string
   taskId?: string
+  filename?: string
   ok: boolean
   error?: AppError
 }
@@ -128,7 +129,12 @@ export function OptionsBar({ fileIds, onTasksCreated, disabled }: OptionsBarProp
           const payload = buildRequest(fileId)
           logger.info('task.create', { fileId, optionsCount: Object.keys(payload).length - 1 })
           const res = await createTask(payload)
-          results.push({ fileId, taskId: res.task_id, ok: true })
+          results.push({
+            fileId,
+            taskId: res.task_id,
+            filename: res.filename,
+            ok: true,
+          })
         } catch (err: unknown) {
           logger.error('task.createFailed', { fileId, error: err })
           const appError = toAppError(err)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast, Toaster } from 'sonner'
 
@@ -47,15 +47,6 @@ function App() {
   } = useFileUpload(fileValidationConfig)
 
   const hasPending = uploads.some((u) => u.status === 'pending')
-  const fileNameById = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const item of uploads) {
-      if (item.fileId) {
-        map.set(item.fileId, item.file.name)
-      }
-    }
-    return map
-  }, [uploads])
 
   /** Forward selected files to the upload queue for admission and validation. */
   function handleFilesSelected(files: File[]) {
@@ -71,6 +62,7 @@ function App() {
         addCreatedTask({
           task_id: result.taskId,
           file_id: result.fileId,
+          filename: result.filename,
           status: 'pending',
         })
         hasNewTask = true
@@ -116,6 +108,7 @@ function App() {
       addCreatedTask({
         task_id: response.task_id,
         file_id: task.file_id,
+        filename: response.filename,
         status: 'pending',
       })
       toast.success(t('tasks.toast.retried', { taskId: response.task_id }))
@@ -170,7 +163,6 @@ function App() {
 
       <ErrorBoundary>
         <CurrentBatchTasksPanel
-          resolveFileName={(task) => fileNameById.get(task.file_id)}
           onCancelTask={handleCancelRecentTask}
           onRetryTask={handleRetryRecentTask}
         />
