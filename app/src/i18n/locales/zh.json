@@ -212,6 +212,47 @@
       "languageDetectionSegments": "语言检测片段数"
     }
   },
+  "tasks": {
+    "currentBatch": {
+      "title": "本次任务",
+      "description": "当前应用会话内创建的任务",
+      "empty": "本次会话暂无任务"
+    },
+    "history": {
+      "title": "任务历史",
+      "description": "所有转写任务",
+      "empty": "暂无历史任务"
+    },
+    "fields": {
+      "taskId": "任务 ID",
+      "file": "文件",
+      "fileId": "文件 ID",
+      "status": "状态",
+      "progress": "进度",
+      "createdAt": "创建时间",
+      "completedAt": "完成时间"
+    },
+    "status": {
+      "pending": "等待中",
+      "processing": "处理中",
+      "completed": "已完成",
+      "failed": "失败",
+      "cancelled": "已取消"
+    },
+    "actions": {
+      "cancel": "取消",
+      "cancelling": "取消中...",
+      "retry": "重试",
+      "retrying": "重试中...",
+      "deleteRecord": "删除记录",
+      "deleting": "删除中..."
+    },
+    "toast": {
+      "cancelled": "任务已取消: {{taskId}}",
+      "retried": "已创建重试任务: {{taskId}}",
+      "actionFailed": "任务操作失败，请重试"
+    }
+  },
   "error": {
     "generic": "发生错误",
     "api": {

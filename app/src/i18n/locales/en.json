@@ -213,6 +213,47 @@
       "languageDetectionSegments": "Language Detection Segments"
     }
   },
+  "tasks": {
+    "currentBatch": {
+      "title": "Current Session Tasks",
+      "description": "Tasks created since this app session started",
+      "empty": "No tasks in the current session"
+    },
+    "history": {
+      "title": "Task History",
+      "description": "All transcription tasks",
+      "empty": "No history tasks"
+    },
+    "fields": {
+      "taskId": "Task ID",
+      "file": "File",
+      "fileId": "File ID",
+      "status": "Status",
+      "progress": "Progress",
+      "createdAt": "Created",
+      "completedAt": "Completed"
+    },
+    "status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "cancelling": "Cancelling...",
+      "retry": "Retry",
+      "retrying": "Retrying...",
+      "deleteRecord": "Delete Record",
+      "deleting": "Deleting..."
+    },
+    "toast": {
+      "cancelled": "Task cancelled: {{taskId}}",
+      "retried": "Retry created: {{taskId}}",
+      "actionFailed": "Task action failed, please retry"
+    }
+  },
   "error": {
     "generic": "An error occurred",
     "api": {
