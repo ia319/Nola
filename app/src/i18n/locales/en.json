@@ -248,9 +248,30 @@
       "deleteRecord": "Delete Record",
       "deleting": "Deleting..."
     },
+    "filters": {
+      "searchPlaceholder": "Search by task ID, file ID, or filename",
+      "statusAll": "All Statuses",
+      "sortBy": {
+        "created_at": "Created Time",
+        "completed_at": "Completed Time",
+        "status": "Status",
+        "progress": "Progress"
+      },
+      "order": {
+        "desc": "Desc",
+        "asc": "Asc"
+      }
+    },
+    "pagination": {
+      "summary": "Showing {{start}}-{{end}} of {{total}}",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {{current}} / {{total}}"
+    },
     "toast": {
       "cancelled": "Task cancelled: {{taskId}}",
       "retried": "Retry created: {{taskId}}",
+      "recordDeleted": "Task record deleted: {{taskId}}",
       "actionFailed": "Task action failed, please retry"
     }
   },

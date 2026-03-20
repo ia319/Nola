@@ -247,9 +247,30 @@
       "deleteRecord": "删除记录",
       "deleting": "删除中..."
     },
+    "filters": {
+      "searchPlaceholder": "按任务 ID、文件 ID 或文件名搜索",
+      "statusAll": "全部状态",
+      "sortBy": {
+        "created_at": "创建时间",
+        "completed_at": "完成时间",
+        "status": "状态",
+        "progress": "进度"
+      },
+      "order": {
+        "desc": "降序",
+        "asc": "升序"
+      }
+    },
+    "pagination": {
+      "summary": "显示 {{start}}-{{end}} / 共 {{total}} 条",
+      "previous": "上一页",
+      "next": "下一页",
+      "page": "第 {{current}} / {{total}} 页"
+    },
     "toast": {
       "cancelled": "任务已取消: {{taskId}}",
       "retried": "已创建重试任务: {{taskId}}",
+      "recordDeleted": "任务记录已删除: {{taskId}}",
       "actionFailed": "任务操作失败，请重试"
     }
   },
