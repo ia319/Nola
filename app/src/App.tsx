@@ -3,10 +3,12 @@ import { useTranslation } from 'react-i18next'
 import { toast, Toaster } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
+import { TaskHistoryPanel, useHistoryTasks } from '@/features/history'
 import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
 import {
   cancelTaskAndRefresh,
   CurrentBatchTasksPanel,
+  deleteTaskRecordAndRefresh,
   OptionsBar,
   requestTaskRefresh,
   retryTaskAndRefresh,
@@ -28,8 +30,10 @@ function App() {
   const { t } = useTranslation()
   const { fileValidationConfig } = useAppConfig()
   const addCreatedTask = useSessionTasksStore((state) => state.addCreatedTask)
+  const removeSessionTask = useSessionTasksStore((state) => state.removeSessionTask)
   const upsertSessionTask = useSessionTasksStore((state) => state.upsertSessionTask)
   useTaskPolling()
+  const historyTasks = useHistoryTasks()
 
   const {
     uploads,
@@ -113,6 +117,47 @@ function App() {
     }
   }
 
+  async function handleCancelHistoryTask(task: TaskSummary) {
+    try {
+      const response = await cancelTaskAndRefresh(task.task_id)
+      upsertSessionTask(response.task)
+      toast.success(t('tasks.toast.cancelled', { taskId: task.task_id }))
+    } catch {
+      toast.error(t('tasks.toast.actionFailed'))
+    } finally {
+      await historyTasks.refresh()
+    }
+  }
+
+  async function handleRetryHistoryTask(task: TaskSummary) {
+    try {
+      const response = await retryTaskAndRefresh({ file_id: task.file_id })
+      addCreatedTask({
+        task_id: response.task_id,
+        file_id: task.file_id,
+        filename: response.filename,
+        status: 'pending',
+      })
+      toast.success(t('tasks.toast.retried', { taskId: response.task_id }))
+    } catch {
+      toast.error(t('tasks.toast.actionFailed'))
+    } finally {
+      await historyTasks.refresh()
+    }
+  }
+
+  async function handleDeleteHistoryTask(task: TaskSummary) {
+    try {
+      await deleteTaskRecordAndRefresh(task.task_id)
+      removeSessionTask(task.task_id)
+      toast.success(t('tasks.toast.recordDeleted', { taskId: task.task_id }))
+    } catch {
+      toast.error(t('tasks.toast.actionFailed'))
+    } finally {
+      await historyTasks.refresh()
+    }
+  }
+
   // Surface batch-level errors (e.g. duplicate file skip) as toast.
   useEffect(() => {
     if (!batchError) return
@@ -161,6 +206,28 @@ function App() {
         <CurrentBatchTasksPanel
           onCancelTask={handleCancelRecentTask}
           onRetryTask={handleRetryRecentTask}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary>
+        <TaskHistoryPanel
+          tasks={historyTasks.tasks}
+          query={historyTasks.query}
+          total={historyTasks.total}
+          isLoading={historyTasks.isLoading}
+          errorMessage={
+            historyTasks.error
+              ? t(historyTasks.error.i18nKey, historyTasks.error.params ?? {})
+              : null
+          }
+          onSearchChange={historyTasks.setSearch}
+          onStatusChange={historyTasks.setStatus}
+          onSortByChange={historyTasks.setSortBy}
+          onOrderChange={historyTasks.setOrder}
+          onPageChange={historyTasks.setPage}
+          onCancelTask={handleCancelHistoryTask}
+          onRetryTask={handleRetryHistoryTask}
+          onDeleteTaskRecord={handleDeleteHistoryTask}
         />
       </ErrorBoundary>
 
