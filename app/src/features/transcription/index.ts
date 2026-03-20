@@ -1,4 +1,4 @@
-export { cancelTaskAndRefresh, retryTaskAndRefresh } from './actions'
+export { cancelTaskAndRefresh, deleteTaskRecordAndRefresh, retryTaskAndRefresh } from './actions'
 export { OptionsBar } from './components/OptionsBar'
 export type { OptionsBarProps, TaskCreateResult } from './components/OptionsBar'
 export { AdvancedOptions } from './components/AdvancedOptions'

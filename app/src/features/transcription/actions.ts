@@ -1,6 +1,11 @@
-import { cancelTask, createTask } from '@/features/transcription/api'
+import { cancelTask, createTask, deleteTaskRecord } from '@/features/transcription/api'
 import { requestTaskRefresh } from '@/features/transcription/lib/task-refresh'
-import type { CancelTaskResponse, CreateTaskPayload, CreateTaskResponse } from '@/shared/types'
+import type {
+  CancelTaskResponse,
+  CreateTaskPayload,
+  CreateTaskResponse,
+  DeleteTaskRecordResponse,
+} from '@/shared/types'
 
 /** Keep action-triggered sync consistent across create/cancel/retry flows. */
 export async function cancelTaskAndRefresh(taskId: string): Promise<CancelTaskResponse> {
@@ -18,4 +23,15 @@ export async function retryTaskAndRefresh(payload: CreateTaskPayload): Promise<C
   const response = await createTask(payload)
   requestTaskRefresh()
   return response
+}
+
+/** Keep action-triggered sync consistent for delete-record flow. */
+export async function deleteTaskRecordAndRefresh(
+  taskId: string,
+): Promise<DeleteTaskRecordResponse> {
+  try {
+    return await deleteTaskRecord(taskId)
+  } finally {
+    requestTaskRefresh()
+  }
 }
