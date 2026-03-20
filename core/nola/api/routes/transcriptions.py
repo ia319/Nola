@@ -24,6 +24,8 @@ from nola.api.schemas import (
 from nola.models.tasks import (
     DEFAULT_TASK_SORT_BY,
     DEFAULT_TASK_SORT_ORDER,
+    TaskRow,
+    TaskRowRaw,
     TaskSortField,
     TaskSortOrder,
 )
@@ -36,6 +38,24 @@ legacy_router = APIRouter(prefix="/api/transcriptions", tags=["transcriptions"])
 # Valid status values for filtering
 StatusFilter = Literal["pending", "processing", "completed", "failed", "cancelled"]
 TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
+CANCELLABLE_STATUSES = {"pending", "processing"}
+
+
+def _to_task_summary_payload(
+    task: TaskRow | TaskRowRaw,
+    *,
+    filename: str | None = None,
+) -> dict[str, Any]:
+    """Normalize task row payload into TaskSummaryResponse shape."""
+    return {
+        "task_id": task["id"],
+        "file_id": task["file_id"],
+        "filename": filename,
+        "status": task["status"],
+        "progress": task["progress"],
+        "created_at": task["created_at"],
+        "completed_at": task["completed_at"],
+    }
 
 
 @legacy_router.post(
@@ -125,16 +145,7 @@ async def list_transcriptions(
 
     return {
         "tasks": [
-            {
-                "task_id": t["id"],
-                "file_id": t["file_id"],
-                "filename": t.get("filename"),
-                "status": t["status"],
-                "progress": t["progress"],
-                "created_at": t["created_at"],
-                "completed_at": t["completed_at"],
-            }
-            for t in tasks
+            _to_task_summary_payload(t, filename=t.get("filename")) for t in tasks
         ],
         "total": total,
         "limit": limit,
@@ -163,16 +174,10 @@ async def get_transcription(task_id: str) -> dict[str, Any]:
     file = file_db.get_file(task["file_id"])
 
     return {
-        "task_id": task["id"],
-        "file_id": task["file_id"],
-        "filename": file["filename"] if file else None,
-        "status": task["status"],
-        "progress": task["progress"],
+        **_to_task_summary_payload(task, filename=file["filename"] if file else None),
         "duration": task["duration"],
         "segments": task["segments"],
         "error": task["error"],
-        "created_at": task["created_at"],
-        "completed_at": task["completed_at"],
     }
 
 
@@ -188,24 +193,53 @@ async def cancel_transcription(task_id: str) -> dict[str, Any]:
         Cancellation result
     """
     task_db = get_task_db()
+    file_db = get_file_db()
 
-    # Attempt to cancel - returns False if not found or not cancellable
-    cancelled = task_db.cancel(task_id)
+    task = task_db.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
 
-    if not cancelled:
-        # Check if task exists to provide appropriate error
-        task = task_db.get_task(task_id)
-        if task is None:
-            raise HTTPException(status_code=404, detail="Task not found")
+    message = "Task cancelled successfully"
+    status = task["status"]
+
+    if status == "cancelled":
+        cancelled_task: TaskRow = task
+        message = "Task already cancelled"
+    elif status not in CANCELLABLE_STATUSES:
         raise HTTPException(
-            status_code=400,
-            detail=f"Cannot cancel task with status: {task['status']}",
+            status_code=409,
+            detail=f"Cannot cancel task with status: {status}",
         )
+    else:
+        cancelled = task_db.cancel(task_id)
+        if not cancelled:
+            latest_task = task_db.get_task(task_id)
+            if latest_task is None:
+                raise HTTPException(status_code=404, detail="Task not found")
+            latest_status = latest_task["status"]
+            if latest_status == "cancelled":
+                cancelled_task = latest_task
+                message = "Task already cancelled"
+            else:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Cannot cancel task with status: {latest_status}",
+                )
+        else:
+            refreshed_task = task_db.get_task(task_id)
+            if refreshed_task is None:
+                raise HTTPException(status_code=404, detail="Task not found")
+            cancelled_task = refreshed_task
 
+    file = file_db.get_file(cancelled_task["file_id"])
+    task_summary = _to_task_summary_payload(
+        cancelled_task, filename=file["filename"] if file else None
+    )
     return {
-        "task_id": task_id,
-        "status": "cancelled",
-        "message": "Task cancelled successfully",
+        "task_id": task_summary["task_id"],
+        "status": task_summary["status"],
+        "message": message,
+        "task": task_summary,
     }
 
 

@@ -61,6 +61,7 @@ class CancelTaskResponse(BaseModel):
     task_id: str
     status: TaskStatusLiteral
     message: str
+    task: TaskSummaryResponse
 
 
 class DeleteTaskRecordResponse(BaseModel):
