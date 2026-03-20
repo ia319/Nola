@@ -219,6 +219,16 @@ describe('useTaskPolling', () => {
 
     hidden = false
     document.dispatchEvent(new Event('visibilitychange'))
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_999)
+    })
+    expect(listTasksMock).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+    })
+    expect(listTasksMock).toHaveBeenCalledTimes(3)
   })
 
   it('supports manual refresh for action-triggered immediate sync', async () => {
