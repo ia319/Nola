@@ -1,2 +1,5 @@
+export { listHistoryTasks } from './api'
 export { TaskHistoryPanel } from './components/TaskHistoryPanel'
 export type { TaskHistoryPanelProps } from './components/TaskHistoryPanel'
+export { useHistoryTasks } from './hooks/useHistoryTasks'
+export type { UseHistoryTasksResult } from './hooks/useHistoryTasks'
