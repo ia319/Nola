@@ -90,12 +90,8 @@ function App() {
 
   async function handleCancelRecentTask(task: TaskSummary) {
     try {
-      await cancelTaskAndRefresh(task.task_id)
-      upsertSessionTask({
-        task_id: task.task_id,
-        file_id: task.file_id,
-        status: 'cancelled',
-      })
+      const response = await cancelTaskAndRefresh(task.task_id)
+      upsertSessionTask(response.task)
       toast.success(t('tasks.toast.cancelled', { taskId: task.task_id }))
     } catch {
       toast.error(t('tasks.toast.actionFailed'))

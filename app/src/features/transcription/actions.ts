@@ -4,9 +4,13 @@ import type { CancelTaskResponse, CreateTaskPayload, CreateTaskResponse } from '
 
 /** Keep action-triggered sync consistent across create/cancel/retry flows. */
 export async function cancelTaskAndRefresh(taskId: string): Promise<CancelTaskResponse> {
-  const response = await cancelTask(taskId)
-  requestTaskRefresh()
-  return response
+  try {
+    return await cancelTask(taskId)
+  } finally {
+    // Always refresh after cancel attempt so race outcomes (e.g. already completed)
+    // are reconciled even when the request returns conflict.
+    requestTaskRefresh()
+  }
 }
 
 /** Keep action-triggered sync consistent across create/cancel/retry flows. */

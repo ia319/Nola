@@ -589,6 +589,7 @@ export interface components {
       status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
       /** Message */
       message: string
+      task: components['schemas']['TaskSummaryResponse']
     }
     /**
      * CleanupResponse
