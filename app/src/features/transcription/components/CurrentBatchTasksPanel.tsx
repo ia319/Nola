@@ -31,6 +31,8 @@ export function CurrentBatchTasksPanel({
   pageSize,
 }: CurrentBatchTasksPanelProps) {
   const { t } = useTranslation()
+  // NOTE: Keep selectors independent to avoid object-identity churn from composed selectors;
+  // consolidate only after profiling shows re-render pressure in this panel.
   const order = useSessionTasksStore((state) => state.order)
   const byId = useSessionTasksStore((state) => state.byId)
 
