@@ -6,4 +6,5 @@
  */
 
 export { ErrorBoundary } from './ErrorBoundary'
+export { ListToolbar } from './ListToolbar'
 export { TaskListPanel } from './TaskListPanel'

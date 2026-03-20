@@ -1,0 +1,127 @@
+import { useTranslation } from 'react-i18next'
+
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { cn } from '@/lib/utils'
+import type { SortOrder, TaskFilterStatus, TaskSortBy } from '@/shared/types'
+
+export interface ListToolbarProps {
+  searchValue: string
+  statusValue: TaskFilterStatus
+  sortByValue: TaskSortBy
+  orderValue: SortOrder
+  onSearchChange: (value: string) => void
+  onStatusChange: (value: TaskFilterStatus) => void
+  onSortByChange: (value: TaskSortBy) => void
+  onOrderChange: (value: SortOrder) => void
+  disabled?: boolean
+  className?: string
+}
+
+const STATUS_OPTIONS: TaskFilterStatus[] = [
+  'all',
+  'pending',
+  'processing',
+  'completed',
+  'failed',
+  'cancelled',
+]
+
+const SORT_OPTIONS: TaskSortBy[] = ['created_at', 'completed_at', 'status', 'progress']
+
+const ORDER_OPTIONS: SortOrder[] = ['desc', 'asc']
+
+/**
+ * Keep list query controls consistent between recent and history panels.
+ */
+export function ListToolbar({
+  searchValue,
+  statusValue,
+  sortByValue,
+  orderValue,
+  onSearchChange,
+  onStatusChange,
+  onSortByChange,
+  onOrderChange,
+  disabled = false,
+  className,
+}: ListToolbarProps) {
+  const { t } = useTranslation()
+
+  return (
+    <div className={cn('flex flex-wrap items-center gap-2', className)}>
+      <Input
+        value={searchValue}
+        disabled={disabled}
+        onChange={(event) => {
+          onSearchChange(event.target.value)
+        }}
+        className="min-w-[220px] flex-1"
+        placeholder={t('tasks.filters.searchPlaceholder')}
+      />
+
+      <Select
+        value={statusValue}
+        disabled={disabled}
+        onValueChange={(value) => {
+          onStatusChange(value as TaskFilterStatus)
+        }}
+      >
+        <SelectTrigger className="w-[160px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {STATUS_OPTIONS.map((option) => (
+            <SelectItem key={option} value={option}>
+              {option === 'all' ? t('tasks.filters.statusAll') : t(`tasks.status.${option}`)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={sortByValue}
+        disabled={disabled}
+        onValueChange={(value) => {
+          onSortByChange(value as TaskSortBy)
+        }}
+      >
+        <SelectTrigger className="w-[180px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {SORT_OPTIONS.map((option) => (
+            <SelectItem key={option} value={option}>
+              {t(`tasks.filters.sortBy.${option}`)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={orderValue}
+        disabled={disabled}
+        onValueChange={(value) => {
+          onOrderChange(value as SortOrder)
+        }}
+      >
+        <SelectTrigger className="w-[120px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {ORDER_OPTIONS.map((option) => (
+            <SelectItem key={option} value={option}>
+              {t(`tasks.filters.order.${option}`)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
