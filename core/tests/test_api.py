@@ -235,6 +235,67 @@ class TestTranscriptionTasksPhaseA:
         assert data["tasks"][0]["task_id"] == "search-task-1"
         assert data["tasks"][0]["filename"] == "meeting-alpha.mp3"
 
+    def test_list_search_escapes_like_wildcards(self, client: TestClient):
+        """List search should treat % and _ as literal characters."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="wildcard-file-1",
+            filename="episode_01.mp3",
+            path="/tmp/episode_01.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="wildcard-file-2",
+            filename="episodeA01.mp3",
+            path="/tmp/episodeA01.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="wildcard-file-3",
+            filename="ratio-100%.mp3",
+            path="/tmp/ratio-100%.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="wildcard-file-4",
+            filename="ratio-100x.mp3",
+            path="/tmp/ratio-100x.mp3",
+            size=1000,
+        )
+
+        task_db.enqueue(
+            task_id="wildcard-task-1", file_id="wildcard-file-1", options=None
+        )
+        task_db.enqueue(
+            task_id="wildcard-task-2", file_id="wildcard-file-2", options=None
+        )
+        task_db.enqueue(
+            task_id="wildcard-task-3", file_id="wildcard-file-3", options=None
+        )
+        task_db.enqueue(
+            task_id="wildcard-task-4", file_id="wildcard-file-4", options=None
+        )
+
+        underscore_response = client.get(
+            "/api/transcription-tasks",
+            params={"q": "episode_01"},
+        )
+        assert underscore_response.status_code == 200
+        underscore_payload = underscore_response.json()
+        assert underscore_payload["total"] == 1
+        assert underscore_payload["tasks"][0]["task_id"] == "wildcard-task-1"
+
+        percent_response = client.get(
+            "/api/transcription-tasks",
+            params={"q": "100%"},
+        )
+        assert percent_response.status_code == 200
+        percent_payload = percent_response.json()
+        assert percent_payload["total"] == 1
+        assert percent_payload["tasks"][0]["task_id"] == "wildcard-task-3"
+
     def test_get_task_detail_includes_filename(self, client: TestClient):
         """Task detail endpoint should include filename for display use."""
         file_db = get_file_db()
@@ -733,6 +794,30 @@ class TestExportAPI:
                 data = response.json()
                 assert "saved_path" in data
                 assert data["saved_path"].endswith(".srt")
+
+    def test_export_openapi_declares_file_and_json_responses(self, client: TestClient):
+        """OpenAPI should describe both file download and save=true JSON responses."""
+        response = client.get("/openapi.json")
+        assert response.status_code == 200
+        schema = response.json()
+
+        export_get = schema["paths"]["/api/transcription-tasks/{task_id}/export"]["get"]
+        export_content = export_get["responses"]["200"]["content"]
+        assert "application/json" in export_content
+        assert "application/x-subrip" in export_content
+        assert "text/vtt" in export_content
+        assert "text/plain" in export_content
+        assert "text/x-ssa" in export_content
+
+    def test_batch_export_openapi_declares_zip_response(self, client: TestClient):
+        """OpenAPI should describe ZIP download for batch export."""
+        response = client.get("/openapi.json")
+        assert response.status_code == 200
+        schema = response.json()
+
+        batch_post = schema["paths"]["/api/transcription-tasks/export/batch"]["post"]
+        batch_content = batch_post["responses"]["200"]["content"]
+        assert "application/zip" in batch_content
 
 
 class TestBatchExportAPI:

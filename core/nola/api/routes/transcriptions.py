@@ -8,7 +8,7 @@ from typing import Any, Literal
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from nola.api.deps import get_file_db, get_task_db
 from nola.api.schemas import (
@@ -277,20 +277,51 @@ async def delete_task_record(task_id: str) -> dict[str, str]:
 
 ExportFormat = Literal["srt", "vtt", "txt", "ass"]
 
+EXPORT_FILE_RESPONSE_CONTENT: dict[str, dict[str, dict[str, str]]] = {
+    "application/x-subrip": {"schema": {"type": "string", "format": "binary"}},
+    "text/vtt": {"schema": {"type": "string", "format": "binary"}},
+    "text/plain": {"schema": {"type": "string", "format": "binary"}},
+    "text/x-ssa": {"schema": {"type": "string", "format": "binary"}},
+}
 
-# NOTE: OpenAPI only models the save=true JSON response.
-# Default (save=false) returns binary file content.
-# FE: downloadExport -> blob; saveExport -> JSON.
+# Keep OpenAPI aligned with runtime behavior:
+# save=false downloads subtitle content, save=true returns JSON metadata.
+EXPORT_TRANSCRIPTION_RESPONSES: dict[int | str, dict[str, object]] = {
+    200: {
+        "description": (
+            "save=false returns subtitle file; " "save=true returns saved path JSON"
+        ),
+        "content": {
+            "application/json": {
+                "schema": {"$ref": "#/components/schemas/SavedExportResponse"}
+            },
+            **EXPORT_FILE_RESPONSE_CONTENT,
+        },
+    }
+}
+
+BATCH_EXPORT_RESPONSES: dict[int | str, dict[str, object]] = {
+    200: {
+        "description": "ZIP archive download",
+        "content": {
+            "application/zip": {"schema": {"type": "string", "format": "binary"}}
+        },
+    }
+}
+
+
 @legacy_router.get(
     "/{task_id}/export",
     summary="Export transcription result",
-    responses={200: {"model": SavedExportResponse, "description": "When save=true"}},
+    response_model=SavedExportResponse,
+    responses=EXPORT_TRANSCRIPTION_RESPONSES,
     deprecated=True,
 )
 @router.get(
     "/{task_id}/export",
     summary="Export transcription result",
-    responses={200: {"model": SavedExportResponse, "description": "When save=true"}},
+    response_model=SavedExportResponse,
+    responses=EXPORT_TRANSCRIPTION_RESPONSES,
 )
 async def export_transcription(
     task_id: str,
@@ -378,9 +409,18 @@ async def export_transcription(
 
 
 @legacy_router.post(
-    "/export/batch", summary="Batch export transcriptions", deprecated=True
+    "/export/batch",
+    summary="Batch export transcriptions",
+    response_class=StreamingResponse,
+    responses=BATCH_EXPORT_RESPONSES,
+    deprecated=True,
 )
-@router.post("/export/batch", summary="Batch export transcriptions")
+@router.post(
+    "/export/batch",
+    summary="Batch export transcriptions",
+    response_class=StreamingResponse,
+    responses=BATCH_EXPORT_RESPONSES,
+)
 async def batch_export(
     request: "BatchExportRequest",
 ) -> Response:
@@ -391,8 +431,6 @@ async def batch_export(
     import io
     import zipfile
     from datetime import datetime
-
-    from fastapi.responses import StreamingResponse
 
     from nola.models.tasks import TaskStatus
     from nola.services.formatters import get_formatter

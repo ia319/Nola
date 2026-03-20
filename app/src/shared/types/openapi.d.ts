@@ -1899,13 +1899,17 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description When save=true */
+      /** @description save=false returns subtitle file; save=true returns saved path JSON */
       200: {
         headers: {
           [name: string]: unknown
         }
         content: {
           'application/json': components['schemas']['SavedExportResponse']
+          'application/x-subrip': string
+          'text/vtt': string
+          'text/plain': string
+          'text/x-ssa': string
         }
       }
       /** @description Validation Error */
@@ -1932,13 +1936,13 @@ export interface operations {
       }
     }
     responses: {
-      /** @description Successful Response */
+      /** @description ZIP archive download */
       200: {
         headers: {
           [name: string]: unknown
         }
         content: {
-          'application/json': unknown
+          'application/zip': string
         }
       }
       /** @description Validation Error */
@@ -2138,13 +2142,17 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description When save=true */
+      /** @description save=false returns subtitle file; save=true returns saved path JSON */
       200: {
         headers: {
           [name: string]: unknown
         }
         content: {
           'application/json': components['schemas']['SavedExportResponse']
+          'application/x-subrip': string
+          'text/vtt': string
+          'text/plain': string
+          'text/x-ssa': string
         }
       }
       /** @description Validation Error */
@@ -2171,13 +2179,13 @@ export interface operations {
       }
     }
     responses: {
-      /** @description Successful Response */
+      /** @description ZIP archive download */
       200: {
         headers: {
           [name: string]: unknown
         }
         content: {
-          'application/json': unknown
+          'application/zip': string
         }
       }
       /** @description Validation Error */
