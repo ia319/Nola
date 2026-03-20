@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,14 @@ export interface TaskListPanelProps {
   onCancelTask?: TaskActionHandler
   onRetryTask?: TaskActionHandler
   onDeleteTaskRecord?: TaskActionHandler
+  toolbar?: ReactNode
+  pagination?: {
+    page: number
+    pageSize: number
+    total: number
+    isLoading?: boolean
+    onPageChange: (nextPage: number) => void
+  }
 }
 
 function formatDatetime(value: string | null): string {
@@ -68,6 +76,8 @@ function clampProgress(progress: number): number {
  * @param onCancelTask Optional cancel action callback.
  * @param onRetryTask Optional retry action callback.
  * @param onDeleteTaskRecord Optional delete-record action callback.
+ * @param toolbar Optional query toolbar rendered above list rows.
+ * @param pagination Optional page controls rendered below list rows.
  * @returns Task list panel with row actions.
  */
 export function TaskListPanel({
@@ -79,6 +89,8 @@ export function TaskListPanel({
   onCancelTask,
   onRetryTask,
   onDeleteTaskRecord,
+  toolbar,
+  pagination,
 }: TaskListPanelProps) {
   const { t } = useTranslation()
   const [runningAction, setRunningAction] = useState<{
@@ -105,6 +117,24 @@ export function TaskListPanel({
     }
   }
 
+  const paginationModel = useMemo(() => {
+    if (!pagination) return null
+
+    const { page, pageSize, total } = pagination
+    const totalPages = Math.max(1, Math.ceil(Math.max(total, 0) / Math.max(pageSize, 1)))
+    const currentPage = Math.min(Math.max(page, 1), totalPages)
+    const start = total === 0 ? 0 : (currentPage - 1) * pageSize + 1
+    const end = total === 0 ? 0 : Math.min(total, currentPage * pageSize)
+
+    return {
+      currentPage,
+      totalPages,
+      start,
+      end,
+      total,
+    }
+  }, [pagination])
+
   return (
     <Card>
       <CardHeader>
@@ -112,6 +142,8 @@ export function TaskListPanel({
         {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
       <CardContent className="space-y-3">
+        {toolbar}
+
         {tasks.length === 0 ? (
           <p className="text-muted-foreground text-sm">{emptyText}</p>
         ) : (
@@ -203,6 +235,48 @@ export function TaskListPanel({
             )
           })
         )}
+
+        {pagination && paginationModel ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-2">
+            <p className="text-muted-foreground text-xs">
+              {t('tasks.pagination.summary', {
+                start: paginationModel.start,
+                end: paginationModel.end,
+                total: paginationModel.total,
+              })}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pagination.isLoading || paginationModel.currentPage <= 1}
+                onClick={() => {
+                  pagination.onPageChange(paginationModel.currentPage - 1)
+                }}
+              >
+                {t('tasks.pagination.previous')}
+              </Button>
+              <span className="text-muted-foreground text-xs">
+                {t('tasks.pagination.page', {
+                  current: paginationModel.currentPage,
+                  total: paginationModel.totalPages,
+                })}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={
+                  pagination.isLoading || paginationModel.currentPage >= paginationModel.totalPages
+                }
+                onClick={() => {
+                  pagination.onPageChange(paginationModel.currentPage + 1)
+                }}
+              >
+                {t('tasks.pagination.next')}
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )
