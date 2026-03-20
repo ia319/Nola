@@ -111,6 +111,70 @@ class TestTranscriptionsAPI:
         response = client.delete("/api/transcription-tasks/nonexistent-id")
         assert response.status_code == 404
 
+    def test_cancel_pending_task_returns_task_snapshot(self, client: TestClient):
+        """Cancel should return the authoritative task snapshot."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="cancel-file-1",
+            filename="cancel-audio.mp3",
+            path="/tmp/cancel-audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="cancel-task-1", file_id="cancel-file-1", options=None)
+
+        response = client.delete("/api/transcription-tasks/cancel-task-1")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["task_id"] == "cancel-task-1"
+        assert data["status"] == "cancelled"
+        assert data["message"] == "Task cancelled successfully"
+        assert data["task"]["task_id"] == "cancel-task-1"
+        assert data["task"]["status"] == "cancelled"
+        assert data["task"]["filename"] == "cancel-audio.mp3"
+
+    def test_cancel_already_cancelled_task_is_idempotent(self, client: TestClient):
+        """Repeated cancel should be idempotent and still return cancelled task."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="cancel-file-2",
+            filename="already-cancelled.mp3",
+            path="/tmp/already-cancelled.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="cancel-task-2", file_id="cancel-file-2", options=None)
+        task_db.cancel("cancel-task-2")
+
+        response = client.delete("/api/transcription-tasks/cancel-task-2")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "cancelled"
+        assert data["message"] == "Task already cancelled"
+        assert data["task"]["status"] == "cancelled"
+
+    def test_cancel_completed_task_returns_conflict(self, client: TestClient):
+        """Cancel should return conflict when task already reached completed status."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="cancel-file-3",
+            filename="completed.mp3",
+            path="/tmp/completed.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="cancel-task-3", file_id="cancel-file-3", options=None)
+        _claim_pending_task(task_db, "cancel-task-3")
+        task_db.complete(
+            task_id="cancel-task-3",
+            segments=[{"start": 0.0, "end": 1.0, "text": "done"}],
+            duration=1.0,
+        )
+
+        response = client.delete("/api/transcription-tasks/cancel-task-3")
+        assert response.status_code == 409
+        assert "Cannot cancel task with status: completed" in response.json()["detail"]
+
     def test_create_task_with_invalid_file_id(self, client):
         """Test creating task with non-existent file_id."""
         response = client.post(

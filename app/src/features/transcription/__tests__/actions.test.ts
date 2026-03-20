@@ -29,6 +29,15 @@ describe('task actions', () => {
       task_id: 'task-1',
       status: 'cancelled',
       message: 'Task cancelled successfully',
+      task: {
+        task_id: 'task-1',
+        file_id: 'file-1',
+        filename: 'demo.wav',
+        status: 'cancelled',
+        progress: 100,
+        created_at: '2026-03-20T10:00:00.000Z',
+        completed_at: '2026-03-20T10:01:00.000Z',
+      },
     })
 
     const response = await cancelTaskAndRefresh('task-1')
@@ -38,11 +47,11 @@ describe('task actions', () => {
     expect(response.task_id).toBe('task-1')
   })
 
-  it('does not request sync when cancel fails', async () => {
+  it('requests sync even when cancel fails', async () => {
     cancelTaskMock.mockRejectedValue(new Error('cancel failed'))
 
     await expect(cancelTaskAndRefresh('task-1')).rejects.toThrow('cancel failed')
-    expect(requestTaskRefreshMock).not.toHaveBeenCalled()
+    expect(requestTaskRefreshMock).toHaveBeenCalledTimes(1)
   })
 
   it('requests immediate sync after retry succeeds', async () => {
