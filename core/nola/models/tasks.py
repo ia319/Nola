@@ -7,7 +7,9 @@ from contextlib import closing
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal, NotRequired, TypedDict, cast
+from typing import Any, Literal, TypedDict, cast
+
+from typing_extensions import NotRequired
 
 logger = logging.getLogger(__name__)
 
