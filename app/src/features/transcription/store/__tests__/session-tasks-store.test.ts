@@ -120,6 +120,27 @@ describe('session tasks store', () => {
     expect(snapshot.created_at).toBe('2026-03-18T09:00:00.000Z')
   })
 
+  it('applies explicit null filename during upsert', () => {
+    const store = useSessionTasksStore.getState()
+    store.addCreatedTask({
+      task_id: 'task-1',
+      file_id: 'file-1',
+      filename: 'origin-name.mp3',
+      status: 'processing',
+      created_at: '2026-03-18T09:00:00.000Z',
+    })
+
+    store.upsertSessionTask({
+      task_id: 'task-1',
+      file_id: 'file-1',
+      status: 'processing',
+      filename: null,
+    })
+
+    const snapshot = useSessionTasksStore.getState().byId['task-1']
+    expect(snapshot.filename).toBeNull()
+  })
+
   it('removes one task and keeps other session entries untouched', () => {
     const store = useSessionTasksStore.getState()
     store.addCreatedTask({

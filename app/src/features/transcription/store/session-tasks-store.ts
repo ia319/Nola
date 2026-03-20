@@ -22,7 +22,7 @@ function normalizeSessionTask(task: SessionTaskInput, previous?: SessionTask): S
   const createdAt = task.created_at ?? previous?.created_at ?? new Date().toISOString()
 
   const progress = task.progress ?? (status === 'completed' ? 100 : (previous?.progress ?? 0))
-  const filename = task.filename ?? previous?.filename ?? null
+  const filename = task.filename !== undefined ? task.filename : (previous?.filename ?? null)
 
   const completedAt =
     task.completed_at !== undefined
