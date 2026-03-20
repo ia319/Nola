@@ -29,6 +29,7 @@ from nola.models.tasks import (
     TaskSortField,
     TaskSortOrder,
 )
+from nola.services.formatters import ExportFormat, list_export_content_types
 
 logger = logging.getLogger(__name__)
 
@@ -275,13 +276,9 @@ async def delete_task_record(task_id: str) -> dict[str, str]:
     return {"task_id": task_id, "message": "Task record deleted successfully"}
 
 
-ExportFormat = Literal["srt", "vtt", "txt", "ass"]
-
 EXPORT_FILE_RESPONSE_CONTENT: dict[str, dict[str, dict[str, str]]] = {
-    "application/x-subrip": {"schema": {"type": "string", "format": "binary"}},
-    "text/vtt": {"schema": {"type": "string", "format": "binary"}},
-    "text/plain": {"schema": {"type": "string", "format": "binary"}},
-    "text/x-ssa": {"schema": {"type": "string", "format": "binary"}},
+    media_type: {"schema": {"type": "string", "format": "binary"}}
+    for media_type in list_export_content_types()
 }
 
 # Keep OpenAPI aligned with runtime behavior:
@@ -289,7 +286,7 @@ EXPORT_FILE_RESPONSE_CONTENT: dict[str, dict[str, dict[str, str]]] = {
 EXPORT_TRANSCRIPTION_RESPONSES: dict[int | str, dict[str, object]] = {
     200: {
         "description": (
-            "save=false returns subtitle file; " "save=true returns saved path JSON"
+            "save=false returns subtitle file; save=true returns saved path JSON"
         ),
         "content": {
             "application/json": {
@@ -325,7 +322,7 @@ BATCH_EXPORT_RESPONSES: dict[int | str, dict[str, object]] = {
 )
 async def export_transcription(
     task_id: str,
-    format: ExportFormat = Query("srt", description="Output format"),
+    format: ExportFormat = Query(ExportFormat.SRT, description="Output format"),
     include_timestamps: bool = Query(True, description="Include timestamps (TXT only)"),
     save: bool = Query(False, description="Save to server instead of download"),
 ) -> Response:

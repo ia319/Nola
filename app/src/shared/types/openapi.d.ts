@@ -548,12 +548,10 @@ export interface components {
        */
       task_ids: string[]
       /**
-       * Format
        * @description Output format for all files
        * @default srt
-       * @enum {string}
        */
-      format: 'srt' | 'vtt' | 'txt' | 'ass'
+      format: components['schemas']['ExportFormat']
       /**
        * Include Timestamps
        * @description Include timestamps in TXT format
@@ -663,6 +661,12 @@ export interface components {
     EngineDefaultsResponse: {
       defaults: components['schemas']['TranscriptionResolvedDefaultsResponse']
     }
+    /**
+     * ExportFormat
+     * @description Supported export format identifiers.
+     * @enum {string}
+     */
+    ExportFormat: 'srt' | 'vtt' | 'txt' | 'ass'
     /**
      * FileConfigResponse
      * @description Expose upload-related configuration needed by the frontend.
@@ -1885,7 +1889,7 @@ export interface operations {
     parameters: {
       query?: {
         /** @description Output format */
-        format?: 'srt' | 'vtt' | 'txt' | 'ass'
+        format?: components['schemas']['ExportFormat']
         /** @description Include timestamps (TXT only) */
         include_timestamps?: boolean
         /** @description Save to server instead of download */
@@ -2128,7 +2132,7 @@ export interface operations {
     parameters: {
       query?: {
         /** @description Output format */
-        format?: 'srt' | 'vtt' | 'txt' | 'ass'
+        format?: components['schemas']['ExportFormat']
         /** @description Include timestamps (TXT only) */
         include_timestamps?: boolean
         /** @description Save to server instead of download */

@@ -13,6 +13,7 @@ from nola.api.schemas.validators import (
 )
 from nola.config.constants import MAX_BATCH_EXPORT_TASKS
 from nola.engines.base import TranscribeOptions
+from nola.services.formatters import ExportFormat
 
 _ENGINE_DEFAULTS = TranscribeOptions()
 
@@ -347,8 +348,8 @@ class BatchExportRequest(BaseModel):
         max_length=MAX_BATCH_EXPORT_TASKS,
         description="List of task IDs to export",
     )
-    format: Literal["srt", "vtt", "txt", "ass"] = Field(
-        "srt", description="Output format for all files"
+    format: ExportFormat = Field(
+        ExportFormat.SRT, description="Output format for all files"
     )
     include_timestamps: bool = Field(
         True, description="Include timestamps in TXT format"
