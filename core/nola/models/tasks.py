@@ -87,6 +87,11 @@ TERMINAL_TASK_STATUSES = (
 )
 
 
+def _escape_like_fragment(fragment: str) -> str:
+    """Escape LIKE wildcards so filename search keeps literal contains semantics."""
+    return fragment.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 class TaskDatabase:
     """Manage transcription tasks with production-grade queue operations."""
 
@@ -600,8 +605,9 @@ class TaskDatabase:
         if q:
             # Keep contains search semantics (%keyword%) for UX consistency.
             # This may full-scan on SQLite; move to FTS when data volume grows.
-            where_clauses.append("LOWER(f.filename) LIKE ?")
-            params.append(f"%{q.lower()}%")
+            escaped_q = _escape_like_fragment(q.lower())
+            where_clauses.append("LOWER(f.filename) LIKE ? ESCAPE '\\'")
+            params.append(f"%{escaped_q}%")
 
         if status:
             where_clauses.append("t.status = ?")
@@ -631,8 +637,9 @@ class TaskDatabase:
             from_sql += " JOIN files f ON f.id = t.file_id"
             # Keep contains search semantics (%keyword%) for UX consistency.
             # This may full-scan on SQLite; move to FTS when data volume grows.
-            where_clauses.append("LOWER(f.filename) LIKE ?")
-            params.append(f"%{q.lower()}%")
+            escaped_q = _escape_like_fragment(q.lower())
+            where_clauses.append("LOWER(f.filename) LIKE ? ESCAPE '\\'")
+            params.append(f"%{escaped_q}%")
 
         if status:
             where_clauses.append("t.status = ?")
