@@ -1,9 +1,8 @@
 import { useTranslation } from 'react-i18next'
 
 import { ListToolbar, TaskListPanel } from '@/components/common'
+import type { TaskActionHandler } from '@/components/common'
 import type { TaskFilterStatus, TaskQueryModel, TaskSortBy, TaskSummary } from '@/shared/types'
-
-type TaskActionHandler = (task: TaskSummary) => Promise<void>
 
 export interface TaskHistoryPanelProps {
   tasks: TaskSummary[]

@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import type { TaskSummary } from '@/shared/types'
-
-type TaskActionHandler = (task: TaskSummary) => Promise<void>
+import type { TaskActionHandler } from './types'
 
 export interface TaskListPanelProps {
   title: string
@@ -186,6 +185,7 @@ export function TaskListPanel({
                   <div className="flex flex-wrap gap-2">
                     {pendingOrProcessing && onCancelTask ? (
                       <Button
+                        type="button"
                         size="sm"
                         variant="outline"
                         disabled={cancelBusy}
@@ -199,6 +199,7 @@ export function TaskListPanel({
 
                     {retryable && onRetryTask ? (
                       <Button
+                        type="button"
                         size="sm"
                         variant="outline"
                         disabled={retryBusy}
@@ -212,6 +213,7 @@ export function TaskListPanel({
 
                     {deletable && onDeleteTaskRecord ? (
                       <Button
+                        type="button"
                         size="sm"
                         variant="outline"
                         disabled={deleteBusy}
@@ -247,6 +249,7 @@ export function TaskListPanel({
             </p>
             <div className="flex items-center gap-2">
               <Button
+                type="button"
                 size="sm"
                 variant="outline"
                 disabled={pagination.isLoading || paginationModel.currentPage <= 1}
@@ -263,6 +266,7 @@ export function TaskListPanel({
                 })}
               </span>
               <Button
+                type="button"
                 size="sm"
                 variant="outline"
                 disabled={

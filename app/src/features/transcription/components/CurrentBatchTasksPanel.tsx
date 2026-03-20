@@ -2,11 +2,10 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ListToolbar, TaskListPanel } from '@/components/common'
+import type { TaskActionHandler } from '@/components/common'
 import { useSessionTasksStore } from '@/features/transcription/store/session-tasks-store'
 import { useRecentTaskQuery } from '@/features/transcription/hooks/useRecentTaskQuery'
 import type { TaskSummary } from '@/shared/types'
-
-type TaskActionHandler = (task: TaskSummary) => Promise<void>
 
 export interface CurrentBatchTasksPanelProps {
   resolveFileName?: (task: TaskSummary) => string | undefined
