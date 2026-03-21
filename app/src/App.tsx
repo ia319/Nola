@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { toast, Toaster } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
-import { TaskHistoryPanel, useHistoryTasks } from '@/features/history'
+import { TaskHistoryPanel, useHistoryTaskActions, useHistoryTasks } from '@/features/history'
 import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
 import {
   cancelTaskAndRefresh,
@@ -34,6 +34,29 @@ function App() {
   const upsertSessionTask = useSessionTasksStore((state) => state.upsertSessionTask)
   useTaskPolling()
   const historyTasks = useHistoryTasks()
+  const historyTaskActions = useHistoryTaskActions({
+    refresh: historyTasks.refresh,
+    onRetryCreatedTask: (task) => {
+      addCreatedTask({
+        task_id: task.taskId,
+        file_id: task.fileId,
+        filename: task.filename,
+        status: 'pending',
+      })
+    },
+    onCancelledTask: (task) => {
+      if (!useSessionTasksStore.getState().byId[task.taskId]) {
+        return
+      }
+      upsertSessionTask({
+        task_id: task.taskId,
+        file_id: task.fileId,
+        filename: task.filename,
+        status: task.status,
+      })
+    },
+    onActionSettled: requestTaskRefresh,
+  })
 
   const {
     uploads,
@@ -118,32 +141,11 @@ function App() {
   }
 
   async function handleCancelHistoryTask(task: TaskSummary) {
-    try {
-      const response = await cancelTaskAndRefresh(task.task_id)
-      upsertSessionTask(response.task)
-      toast.success(t('tasks.toast.cancelled', { taskId: task.task_id }))
-    } catch {
-      toast.error(t('tasks.toast.actionFailed'))
-    } finally {
-      await historyTasks.refresh()
-    }
+    await historyTaskActions.cancelTasks([task.task_id])
   }
 
   async function handleRetryHistoryTask(task: TaskSummary) {
-    try {
-      const response = await retryTaskAndRefresh({ file_id: task.file_id })
-      addCreatedTask({
-        task_id: response.task_id,
-        file_id: task.file_id,
-        filename: response.filename,
-        status: 'pending',
-      })
-      toast.success(t('tasks.toast.retried', { taskId: response.task_id }))
-    } catch {
-      toast.error(t('tasks.toast.actionFailed'))
-    } finally {
-      await historyTasks.refresh()
-    }
+    await historyTaskActions.retryTasks([task.task_id])
   }
 
   async function handleDeleteHistoryTask(task: TaskSummary) {
