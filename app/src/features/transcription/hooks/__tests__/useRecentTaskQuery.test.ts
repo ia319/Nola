@@ -37,12 +37,14 @@ describe('useRecentTaskQuery', () => {
       result.current.setStatus('failed')
     })
     expect(result.current.total).toBe(2)
+    expect(result.current.totalPages).toBe(2)
     expect(result.current.tasks).toHaveLength(1)
 
     act(() => {
       result.current.setSearch('gamma')
     })
     expect(result.current.total).toBe(1)
+    expect(result.current.totalPages).toBe(1)
     expect(result.current.tasks[0]?.task_id).toBe('task-3')
   })
 

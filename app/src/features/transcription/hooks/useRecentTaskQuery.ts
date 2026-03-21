@@ -7,6 +7,7 @@ export interface UseRecentTaskQueryResult {
   query: TaskQueryModel
   tasks: TaskSummary[]
   total: number
+  totalPages: number
   setSearch: (value: string) => void
   setStatus: (value: TaskFilterStatus) => void
   setSortBy: (value: TaskSortBy) => void
@@ -143,6 +144,7 @@ export function useRecentTaskQuery(
     },
     tasks,
     total,
+    totalPages,
     setSearch,
     setStatus,
     setSortBy,
