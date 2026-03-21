@@ -6,6 +6,12 @@ from pydantic import BaseModel
 
 # Derive from backend TaskStatus enum values.
 TaskStatusLiteral = Literal["pending", "processing", "completed", "failed", "cancelled"]
+BatchTaskActionErrorCode = Literal[
+    "not_found",
+    "invalid_status",
+    "duplicate_task_id",
+    "file_missing",
+]
 
 
 class SegmentResponse(BaseModel):
@@ -75,3 +81,32 @@ class SavedExportResponse(BaseModel):
     """Response when export is saved to server (save=true)."""
 
     saved_path: str
+
+
+class BatchTaskActionResultResponse(BaseModel):
+    """Per-task result for batch task actions."""
+
+    task_id: str
+    ok: bool
+    message: str
+    error_code: BatchTaskActionErrorCode | None = None
+    status: TaskStatusLiteral | None = None
+    new_task_id: str | None = None
+    file_id: str | None = None
+    filename: str | None = None
+
+
+class BatchTaskActionSummaryResponse(BaseModel):
+    """Batch task action summary counts."""
+
+    requested: int
+    succeeded: int
+    failed: int
+
+
+class BatchTaskActionResponse(BaseModel):
+    """Response for batch cancel/retry actions."""
+
+    action: Literal["cancel", "retry"]
+    summary: BatchTaskActionSummaryResponse
+    results: list[BatchTaskActionResultResponse]

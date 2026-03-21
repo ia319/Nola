@@ -13,6 +13,8 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from nola.api.deps import get_file_db, get_task_db
 from nola.api.schemas import (
     BatchExportRequest,
+    BatchTaskActionRequest,
+    BatchTaskActionResponse,
     CancelTaskResponse,
     CreateTaskResponse,
     DeleteTaskRecordResponse,
@@ -25,6 +27,7 @@ from nola.models.tasks import (
     CANCELLABLE_TASK_STATUSES,
     DEFAULT_TASK_SORT_BY,
     DEFAULT_TASK_SORT_ORDER,
+    RETRYABLE_TASK_STATUSES,
     TERMINAL_TASK_STATUSES,
     TaskRow,
     TaskRowRaw,
@@ -56,6 +59,23 @@ def _to_task_summary_payload(
         "progress": task["progress"],
         "created_at": task["created_at"],
         "completed_at": task["completed_at"],
+    }
+
+
+def _build_batch_action_response(
+    action: Literal["cancel", "retry"], results: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Build a stable batch action payload with summary counts."""
+    succeeded = sum(1 for item in results if item["ok"])
+    failed = len(results) - succeeded
+    return {
+        "action": action,
+        "summary": {
+            "requested": len(results),
+            "succeeded": succeeded,
+            "failed": failed,
+        },
+        "results": results,
     }
 
 
@@ -240,6 +260,235 @@ async def cancel_transcription(task_id: str) -> dict[str, Any]:
         "message": message,
         "task": task_summary,
     }
+
+
+@legacy_router.post(
+    "/batch/cancel",
+    summary="Batch cancel transcription tasks",
+    response_model=BatchTaskActionResponse,
+    deprecated=True,
+)
+@router.post(
+    "/batch/cancel",
+    summary="Batch cancel transcription tasks",
+    response_model=BatchTaskActionResponse,
+)
+async def batch_cancel_transcriptions(
+    request: BatchTaskActionRequest,
+) -> dict[str, Any]:
+    """Cancel multiple tasks and return per-task outcomes."""
+    task_db = get_task_db()
+    file_db = get_file_db()
+    seen_task_ids: set[str] = set()
+    results: list[dict[str, Any]] = []
+
+    for task_id in request.task_ids:
+        if task_id in seen_task_ids:
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": False,
+                    "message": "Duplicate task_id in request",
+                    "error_code": "duplicate_task_id",
+                }
+            )
+            continue
+        seen_task_ids.add(task_id)
+
+        task = task_db.get_task(task_id)
+        if task is None:
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": False,
+                    "message": "Task not found",
+                    "error_code": "not_found",
+                }
+            )
+            continue
+
+        file = file_db.get_file(task["file_id"])
+        filename = file["filename"] if file else None
+        status = task["status"]
+
+        if status == "cancelled":
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": True,
+                    "message": "Task already cancelled",
+                    "status": status,
+                    "file_id": task["file_id"],
+                    "filename": filename,
+                }
+            )
+            continue
+
+        if status not in CANCELLABLE_TASK_STATUSES:
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": False,
+                    "message": f"Cannot cancel task with status: {status}",
+                    "error_code": "invalid_status",
+                    "status": status,
+                    "file_id": task["file_id"],
+                    "filename": filename,
+                }
+            )
+            continue
+
+        cancelled_snapshot = task_db.cancel_with_snapshot(task_id)
+        if cancelled_snapshot is None:
+            latest_task = task_db.get_task(task_id)
+            if latest_task is None:
+                results.append(
+                    {
+                        "task_id": task_id,
+                        "ok": False,
+                        "message": "Task not found",
+                        "error_code": "not_found",
+                    }
+                )
+                continue
+
+            latest_file = file_db.get_file(latest_task["file_id"])
+            latest_filename = latest_file["filename"] if latest_file else None
+            latest_status = latest_task["status"]
+            if latest_status == "cancelled":
+                results.append(
+                    {
+                        "task_id": task_id,
+                        "ok": True,
+                        "message": "Task already cancelled",
+                        "status": latest_status,
+                        "file_id": latest_task["file_id"],
+                        "filename": latest_filename,
+                    }
+                )
+            else:
+                results.append(
+                    {
+                        "task_id": task_id,
+                        "ok": False,
+                        "message": f"Cannot cancel task with status: {latest_status}",
+                        "error_code": "invalid_status",
+                        "status": latest_status,
+                        "file_id": latest_task["file_id"],
+                        "filename": latest_filename,
+                    }
+                )
+            continue
+
+        cancelled_file = file_db.get_file(cancelled_snapshot["file_id"])
+        cancelled_filename = cancelled_file["filename"] if cancelled_file else None
+        results.append(
+            {
+                "task_id": task_id,
+                "ok": True,
+                "message": "Task cancelled successfully",
+                "status": cancelled_snapshot["status"],
+                "file_id": cancelled_snapshot["file_id"],
+                "filename": cancelled_filename,
+            }
+        )
+
+    return _build_batch_action_response("cancel", results)
+
+
+@legacy_router.post(
+    "/batch/retry",
+    summary="Batch retry transcription tasks",
+    response_model=BatchTaskActionResponse,
+    deprecated=True,
+)
+@router.post(
+    "/batch/retry",
+    summary="Batch retry transcription tasks",
+    response_model=BatchTaskActionResponse,
+)
+async def batch_retry_transcriptions(request: BatchTaskActionRequest) -> dict[str, Any]:
+    """Retry failed/cancelled tasks by creating new pending tasks."""
+    task_db = get_task_db()
+    file_db = get_file_db()
+    seen_task_ids: set[str] = set()
+    results: list[dict[str, Any]] = []
+
+    for task_id in request.task_ids:
+        if task_id in seen_task_ids:
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": False,
+                    "message": "Duplicate task_id in request",
+                    "error_code": "duplicate_task_id",
+                }
+            )
+            continue
+        seen_task_ids.add(task_id)
+
+        task = task_db.get_task(task_id)
+        if task is None:
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": False,
+                    "message": "Task not found",
+                    "error_code": "not_found",
+                }
+            )
+            continue
+
+        file = file_db.get_file(task["file_id"])
+        filename = file["filename"] if file else None
+        status = task["status"]
+
+        if status not in RETRYABLE_TASK_STATUSES:
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": False,
+                    "message": f"Cannot retry task with status: {status}",
+                    "error_code": "invalid_status",
+                    "status": status,
+                    "file_id": task["file_id"],
+                    "filename": filename,
+                }
+            )
+            continue
+
+        if file is None:
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": False,
+                    "message": f"File not found: {task['file_id']}",
+                    "error_code": "file_missing",
+                    "status": status,
+                    "file_id": task["file_id"],
+                }
+            )
+            continue
+
+        new_task_id = str(uuid.uuid4())
+        task_db.enqueue(
+            task_id=new_task_id,
+            file_id=task["file_id"],
+            options=task.get("options"),
+        )
+        results.append(
+            {
+                "task_id": task_id,
+                "ok": True,
+                "message": "Retry task created successfully",
+                "status": status,
+                "new_task_id": new_task_id,
+                "file_id": task["file_id"],
+                "filename": filename,
+            }
+        )
+
+    return _build_batch_action_response("retry", results)
 
 
 @legacy_router.delete(

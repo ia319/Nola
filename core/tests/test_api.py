@@ -351,6 +351,230 @@ class TestTranscriptionTasksPhaseA:
             # list_tasks() uses task_id DESC as the deterministic tie-breaker.
             assert tasks[0]["task_id"] > tasks[1]["task_id"]
 
+    def test_list_supports_filename_sort(self, client: TestClient):
+        """List endpoint should support sort_by=filename."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="filename-sort-file-1",
+            filename="zeta.mp3",
+            path="/tmp/zeta.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="filename-sort-file-2",
+            filename="alpha.mp3",
+            path="/tmp/alpha.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="filename-sort-task-1",
+            file_id="filename-sort-file-1",
+            options=None,
+        )
+        task_db.enqueue(
+            task_id="filename-sort-task-2",
+            file_id="filename-sort-file-2",
+            options=None,
+        )
+
+        response = client.get(
+            "/api/transcription-tasks?sort_by=filename&order=asc&limit=2"
+        )
+        assert response.status_code == 200
+        tasks = response.json()["tasks"]
+        assert [task["filename"] for task in tasks] == ["alpha.mp3", "zeta.mp3"]
+
+    def test_batch_cancel_returns_mixed_outcomes(self, client: TestClient):
+        """Batch cancel should return per-item outcomes and summary counts."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="batch-cancel-file-pending",
+            filename="pending.mp3",
+            path="/tmp/pending.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="batch-cancel-file-completed",
+            filename="completed.mp3",
+            path="/tmp/completed.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="batch-cancel-completed",
+            file_id="batch-cancel-file-completed",
+            options=None,
+        )
+        task_db.enqueue(
+            task_id="batch-cancel-pending",
+            file_id="batch-cancel-file-pending",
+            options=None,
+        )
+        _claim_pending_task(task_db, "batch-cancel-completed")
+        task_db.complete(
+            task_id="batch-cancel-completed",
+            segments=[{"start": 0.0, "end": 1.0, "text": "done"}],
+            duration=1.0,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks/batch/cancel",
+            json={
+                "task_ids": [
+                    "batch-cancel-pending",
+                    "batch-cancel-completed",
+                    "batch-cancel-missing",
+                    "batch-cancel-pending",
+                ]
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["action"] == "cancel"
+        assert payload["summary"] == {"requested": 4, "succeeded": 1, "failed": 3}
+
+        results = payload["results"]
+        assert results[0]["task_id"] == "batch-cancel-pending"
+        assert results[0]["ok"] is True
+        assert results[0]["status"] == "cancelled"
+
+        assert results[1]["task_id"] == "batch-cancel-completed"
+        assert results[1]["ok"] is False
+        assert results[1]["error_code"] == "invalid_status"
+
+        assert results[2]["task_id"] == "batch-cancel-missing"
+        assert results[2]["ok"] is False
+        assert results[2]["error_code"] == "not_found"
+
+        assert results[3]["task_id"] == "batch-cancel-pending"
+        assert results[3]["ok"] is False
+        assert results[3]["error_code"] == "duplicate_task_id"
+
+        pending_task = task_db.get_task("batch-cancel-pending")
+        assert pending_task is not None
+        assert pending_task["status"] == "cancelled"
+
+    def test_batch_retry_returns_mixed_outcomes(self, client: TestClient):
+        """Batch retry should create new tasks for retryable statuses."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="batch-retry-file-failed",
+            filename="failed.mp3",
+            path="/tmp/failed.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="batch-retry-file-cancelled",
+            filename="cancelled.mp3",
+            path="/tmp/cancelled.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="batch-retry-file-pending",
+            filename="pending.mp3",
+            path="/tmp/pending.mp3",
+            size=1000,
+        )
+
+        task_db.enqueue(
+            task_id="batch-retry-failed",
+            file_id="batch-retry-file-failed",
+            options={"language": "zh"},
+        )
+        _claim_pending_task(task_db, "batch-retry-failed")
+        task_db.fail(
+            task_id="batch-retry-failed",
+            error="forced failure",
+            should_retry=False,
+        )
+
+        task_db.enqueue(
+            task_id="batch-retry-cancelled",
+            file_id="batch-retry-file-cancelled",
+            options=None,
+        )
+        task_db.cancel("batch-retry-cancelled")
+
+        task_db.enqueue(
+            task_id="batch-retry-pending",
+            file_id="batch-retry-file-pending",
+            options=None,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks/batch/retry",
+            json={
+                "task_ids": [
+                    "batch-retry-failed",
+                    "batch-retry-cancelled",
+                    "batch-retry-pending",
+                    "batch-retry-missing",
+                    "batch-retry-failed",
+                ]
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["action"] == "retry"
+        assert payload["summary"] == {"requested": 5, "succeeded": 2, "failed": 3}
+
+        results = payload["results"]
+        success_results = [item for item in results if item["ok"]]
+        assert len(success_results) == 2
+        for item in success_results:
+            assert item["new_task_id"]
+            created_task = task_db.get_task(item["new_task_id"])
+            assert created_task is not None
+            assert created_task["status"] == "pending"
+
+        pending_result = next(
+            item for item in results if item["task_id"] == "batch-retry-pending"
+        )
+        assert pending_result["ok"] is False
+        assert pending_result["error_code"] == "invalid_status"
+
+        missing_result = next(
+            item for item in results if item["task_id"] == "batch-retry-missing"
+        )
+        assert missing_result["ok"] is False
+        assert missing_result["error_code"] == "not_found"
+
+        duplicate_result = results[-1]
+        assert duplicate_result["task_id"] == "batch-retry-failed"
+        assert duplicate_result["ok"] is False
+        assert duplicate_result["error_code"] == "duplicate_task_id"
+
+    def test_legacy_batch_cancel_alias_still_works(self, client: TestClient):
+        """Legacy batch cancel alias should remain available during transition."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="legacy-batch-cancel-file",
+            filename="legacy.mp3",
+            path="/tmp/legacy.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="legacy-batch-cancel-task",
+            file_id="legacy-batch-cancel-file",
+            options=None,
+        )
+
+        response = client.post(
+            "/api/transcriptions/batch/cancel",
+            json={"task_ids": ["legacy-batch-cancel-task"]},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["summary"] == {"requested": 1, "succeeded": 1, "failed": 0}
+        assert payload["results"][0]["status"] == "cancelled"
+
     def test_delete_record_rejects_non_terminal_task(self, client: TestClient):
         """Delete-record endpoint should reject pending/processing tasks."""
         file_db = get_file_db()

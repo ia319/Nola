@@ -11,6 +11,9 @@ from nola.api.schemas.files import (
     MissingFileInfo,
 )
 from nola.api.schemas.responses import (
+    BatchTaskActionResponse,
+    BatchTaskActionResultResponse,
+    BatchTaskActionSummaryResponse,
     CancelTaskResponse,
     CreateTaskResponse,
     DeleteTaskRecordResponse,
@@ -22,11 +25,16 @@ from nola.api.schemas.responses import (
 )
 from nola.api.schemas.transcriptions import (
     BatchExportRequest,
+    BatchTaskActionRequest,
     TranscriptionDefaultsUpdateRequest,
     TranscriptionRequest,
 )
 
 __all__ = [
+    "BatchTaskActionRequest",
+    "BatchTaskActionResponse",
+    "BatchTaskActionResultResponse",
+    "BatchTaskActionSummaryResponse",
     "BatchExportRequest",
     "CancelTaskResponse",
     "CleanupResponse",

@@ -339,6 +339,17 @@ class TranscriptionDefaultsUpdateRequest(TranscriptionOptionsPayload):
         return self.model_dump(exclude_unset=True)
 
 
+class BatchTaskActionRequest(BaseModel):
+    """Batch action request for task-level operations."""
+
+    task_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_BATCH_EXPORT_TASKS,
+        description="List of task IDs to process",
+    )
+
+
 class BatchExportRequest(BaseModel):
     """Batch export request for multiple transcriptions."""
 
