@@ -168,6 +168,20 @@ class TestTaskDatabase:
         task = task_db.get_task("task-001")
         assert task["status"] == TaskStatus.CANCELLED.value
 
+    def test_cancel_with_snapshot(self, test_db):
+        """cancel_with_snapshot() should return cancelled task row."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+        task_db.enqueue("task-001", "file-001")
+
+        snapshot = task_db.cancel_with_snapshot("task-001")
+
+        assert snapshot is not None
+        assert snapshot["id"] == "task-001"
+        assert snapshot["status"] == TaskStatus.CANCELLED.value
+        assert snapshot["completed_at"] is not None
+
     def test_requeue_timeout_tasks(self, test_db):
         """Test timeout task recovery."""
         file_db, task_db = test_db

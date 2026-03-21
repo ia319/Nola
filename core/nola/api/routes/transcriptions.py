@@ -22,8 +22,10 @@ from nola.api.schemas import (
     TranscriptionRequest,
 )
 from nola.models.tasks import (
+    CANCELLABLE_TASK_STATUSES,
     DEFAULT_TASK_SORT_BY,
     DEFAULT_TASK_SORT_ORDER,
+    TERMINAL_TASK_STATUSES,
     TaskRow,
     TaskRowRaw,
     TaskSortField,
@@ -38,8 +40,6 @@ legacy_router = APIRouter(prefix="/api/transcriptions", tags=["transcriptions"])
 
 # Valid status values for filtering
 StatusFilter = Literal["pending", "processing", "completed", "failed", "cancelled"]
-TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
-CANCELLABLE_STATUSES = {"pending", "processing"}
 
 
 def _to_task_summary_payload(
@@ -202,18 +202,19 @@ async def cancel_transcription(task_id: str) -> dict[str, Any]:
 
     message = "Task cancelled successfully"
     status = task["status"]
+    cancelled_task: TaskRow | TaskRowRaw
 
     if status == "cancelled":
-        cancelled_task: TaskRow = task
+        cancelled_task = task
         message = "Task already cancelled"
-    elif status not in CANCELLABLE_STATUSES:
+    elif status not in CANCELLABLE_TASK_STATUSES:
         raise HTTPException(
             status_code=409,
             detail=f"Cannot cancel task with status: {status}",
         )
     else:
-        cancelled = task_db.cancel(task_id)
-        if not cancelled:
+        cancelled_snapshot = task_db.cancel_with_snapshot(task_id)
+        if cancelled_snapshot is None:
             latest_task = task_db.get_task(task_id)
             if latest_task is None:
                 raise HTTPException(status_code=404, detail="Task not found")
@@ -227,10 +228,7 @@ async def cancel_transcription(task_id: str) -> dict[str, Any]:
                     detail=f"Cannot cancel task with status: {latest_status}",
                 )
         else:
-            refreshed_task = task_db.get_task(task_id)
-            if refreshed_task is None:
-                raise HTTPException(status_code=404, detail="Task not found")
-            cancelled_task = refreshed_task
+            cancelled_task = cancelled_snapshot
 
     file = file_db.get_file(cancelled_task["file_id"])
     task_summary = _to_task_summary_payload(
@@ -263,7 +261,7 @@ async def delete_task_record(task_id: str) -> dict[str, str]:
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    if task["status"] not in TERMINAL_STATUSES:
+    if task["status"] not in TERMINAL_TASK_STATUSES:
         raise HTTPException(
             status_code=400,
             detail=("Only terminal tasks can be deleted (completed/failed/cancelled)"),

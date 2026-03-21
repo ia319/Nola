@@ -85,6 +85,10 @@ TERMINAL_TASK_STATUSES = (
     TaskStatus.FAILED.value,
     TaskStatus.CANCELLED.value,
 )
+CANCELLABLE_TASK_STATUSES = (
+    TaskStatus.PENDING.value,
+    TaskStatus.PROCESSING.value,
+)
 
 
 def _escape_like_fragment(fragment: str) -> str:
@@ -312,6 +316,17 @@ class TaskDatabase:
         Returns:
             True if cancelled, False if not found or already completed
         """
+        return self.cancel_with_snapshot(task_id) is not None
+
+    def cancel_with_snapshot(self, task_id: str) -> TaskRowRaw | None:
+        """Cancel a pending/processing task and return the updated row snapshot.
+
+        Args:
+            task_id: Task identifier
+
+        Returns:
+            Updated task row when cancellation succeeds, otherwise None
+        """
         with closing(self._connect()) as conn:
             with conn:
                 cursor = conn.execute(
@@ -319,19 +334,19 @@ class TaskDatabase:
                     UPDATE transcription_tasks
                     SET status = ?, completed_at = ?
                     WHERE id = ? AND status IN (?, ?)
+                    RETURNING *
                     """,
                     (
                         TaskStatus.CANCELLED.value,
                         datetime.now().isoformat(),
                         task_id,
-                        TaskStatus.PENDING.value,
-                        TaskStatus.PROCESSING.value,
+                        *CANCELLABLE_TASK_STATUSES,
                     ),
                 )
-
-                cancelled = cursor.rowcount > 0
-
-                return cancelled
+                row = cursor.fetchone()
+                if row is None:
+                    return None
+                return cast(TaskRowRaw, dict(row))
 
     # === Maintenance Operations ===
 
