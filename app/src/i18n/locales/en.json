@@ -258,7 +258,8 @@
         "created_at": "Created Time",
         "completed_at": "Completed Time",
         "status": "Status",
-        "progress": "Progress"
+        "progress": "Progress",
+        "filename": "Filename"
       },
       "order": {
         "desc": "Desc",
@@ -275,7 +276,23 @@
       "cancelled": "Task cancelled: {{taskId}}",
       "retried": "Retry created: {{taskId}}",
       "recordDeleted": "Task record deleted: {{taskId}}",
-      "actionFailed": "Task action failed, please retry"
+      "actionFailed": "Task action failed, please retry",
+      "batch": {
+        "cancel": {
+          "success_one": "Cancelled {{count}} task",
+          "success_other": "Cancelled {{count}} tasks",
+          "partial": "Cancelled {{succeeded}} tasks, {{failed}} failed",
+          "failed_one": "Cancel failed for {{count}} task",
+          "failed_other": "Cancel failed for {{count}} tasks"
+        },
+        "retry": {
+          "success_one": "Retried {{count}} task",
+          "success_other": "Retried {{count}} tasks",
+          "partial": "Retried {{succeeded}} tasks, {{failed}} failed",
+          "failed_one": "Retry failed for {{count}} task",
+          "failed_other": "Retry failed for {{count}} tasks"
+        }
+      }
     }
   },
   "error": {

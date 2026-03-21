@@ -257,7 +257,8 @@
         "created_at": "创建时间",
         "completed_at": "完成时间",
         "status": "状态",
-        "progress": "进度"
+        "progress": "进度",
+        "filename": "文件名"
       },
       "order": {
         "desc": "降序",
@@ -274,7 +275,23 @@
       "cancelled": "任务已取消: {{taskId}}",
       "retried": "已创建重试任务: {{taskId}}",
       "recordDeleted": "任务记录已删除: {{taskId}}",
-      "actionFailed": "任务操作失败，请重试"
+      "actionFailed": "任务操作失败，请重试",
+      "batch": {
+        "cancel": {
+          "success_one": "已取消 {{count}} 个任务",
+          "success_other": "已取消 {{count}} 个任务",
+          "partial": "已取消 {{succeeded}} 个任务，{{failed}} 个失败",
+          "failed_one": "{{count}} 个任务取消失败",
+          "failed_other": "{{count}} 个任务取消失败"
+        },
+        "retry": {
+          "success_one": "已重试 {{count}} 个任务",
+          "success_other": "已重试 {{count}} 个任务",
+          "partial": "已重试 {{succeeded}} 个任务，{{failed}} 个失败",
+          "failed_one": "{{count}} 个任务重试失败",
+          "failed_other": "{{count}} 个任务重试失败"
+        }
+      }
     }
   },
   "error": {
