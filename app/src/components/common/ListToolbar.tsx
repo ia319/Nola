@@ -33,7 +33,7 @@ const STATUS_OPTIONS: TaskFilterStatus[] = [
   'cancelled',
 ]
 
-const SORT_OPTIONS: TaskSortBy[] = ['created_at', 'completed_at', 'status', 'progress']
+const SORT_OPTIONS: TaskSortBy[] = ['created_at', 'completed_at', 'status', 'progress', 'filename']
 
 const ORDER_OPTIONS: SortOrder[] = ['desc', 'asc']
 
