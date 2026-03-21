@@ -52,6 +52,7 @@ export function useHistoryTasks(pageSize: number = HISTORY_PAGE_SIZE): UseHistor
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<AppError | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const skipNextEffectRefreshRef = useRef(false)
   const refresh = useCallback(async () => {
     if (abortRef.current) {
       abortRef.current.abort()
@@ -62,26 +63,45 @@ export function useHistoryTasks(pageSize: number = HISTORY_PAGE_SIZE): UseHistor
     setIsLoading(true)
     setError(null)
 
-    const params = {
+    const baseParams = {
       q: query.q.trim() === '' ? undefined : query.q.trim(),
       status: query.status === 'all' ? undefined : query.status,
       sort_by: query.sort_by,
       order: query.order,
       limit: query.page_size,
-      offset: (query.page - 1) * query.page_size,
     }
 
     try {
-      const response = await listHistoryTasks(params, controller.signal)
+      const response = await listHistoryTasks(
+        {
+          ...baseParams,
+          offset: (query.page - 1) * query.page_size,
+        },
+        controller.signal,
+      )
 
       if (controller.signal.aborted) return
 
       const totalPages = Math.max(1, Math.ceil(response.total / Math.max(query.page_size, 1)))
       if (query.page > totalPages) {
+        const clampedResponse = await listHistoryTasks(
+          {
+            ...baseParams,
+            offset: (totalPages - 1) * query.page_size,
+          },
+          controller.signal,
+        )
+
+        if (controller.signal.aborted) return
+
+        // Keep query.page synchronized without triggering a redundant refresh cycle.
+        skipNextEffectRefreshRef.current = true
         setQuery((previous) => ({
           ...previous,
           page: totalPages,
         }))
+        setTasks(clampedResponse.tasks)
+        setTotal(clampedResponse.total)
         return
       }
 
@@ -103,6 +123,10 @@ export function useHistoryTasks(pageSize: number = HISTORY_PAGE_SIZE): UseHistor
   }, [query.order, query.page, query.page_size, query.q, query.sort_by, query.status])
 
   useEffect(() => {
+    if (skipNextEffectRefreshRef.current) {
+      skipNextEffectRefreshRef.current = false
+      return
+    }
     void refresh()
   }, [refresh])
 

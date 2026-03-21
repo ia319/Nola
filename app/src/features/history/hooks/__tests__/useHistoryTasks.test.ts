@@ -81,6 +81,60 @@ describe('useHistoryTasks', () => {
     )
   })
 
+  it('clamps out-of-range pages in one refresh cycle without extra refetch', async () => {
+    listTasksMock
+      .mockResolvedValueOnce(buildResponse([buildTask('task-1', 'pending')], 60))
+      .mockResolvedValueOnce(buildResponse([], 25))
+      .mockResolvedValueOnce(buildResponse([buildTask('task-2', 'failed')], 25))
+
+    const { result } = renderHook(() => useHistoryTasks(20))
+
+    await waitFor(() => {
+      expect(listTasksMock).toHaveBeenCalledTimes(1)
+    })
+
+    await act(async () => {
+      result.current.setPage(3)
+    })
+
+    await waitFor(() => {
+      expect(listTasksMock).toHaveBeenCalledTimes(3)
+    })
+
+    expect(listTasksMock).toHaveBeenNthCalledWith(
+      2,
+      {
+        q: undefined,
+        status: undefined,
+        sort_by: 'created_at',
+        order: 'desc',
+        limit: 20,
+        offset: 40,
+      },
+      expect.any(AbortSignal),
+    )
+    expect(listTasksMock).toHaveBeenNthCalledWith(
+      3,
+      {
+        q: undefined,
+        status: undefined,
+        sort_by: 'created_at',
+        order: 'desc',
+        limit: 20,
+        offset: 20,
+      },
+      expect.any(AbortSignal),
+    )
+    expect(result.current.query.page).toBe(2)
+    expect(result.current.tasks.map((task) => task.task_id)).toEqual(['task-2'])
+    expect(result.current.isLoading).toBe(false)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(listTasksMock).toHaveBeenCalledTimes(3)
+  })
+
   it('exposes AppError shape when list request fails', async () => {
     listTasksMock.mockRejectedValue(new Error('boom'))
 
