@@ -31,8 +31,8 @@ ALLOWED_EXTENSIONS = {
     ".wma",
 }
 
-# Maximum task IDs allowed in a single batch export request.
-MAX_BATCH_EXPORT_TASKS = 500
+# Maximum task IDs allowed in a single batch request.
+MAX_BATCH_TASK_IDS = 500
 
 # Supported language codes from whisper/tokenizer.py LANGUAGES dict.
 SUPPORTED_LANGUAGES: frozenset[str] = frozenset(

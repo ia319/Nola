@@ -11,7 +11,7 @@ from nola.api.schemas.validators import (
     validate_temperature,
     validate_vad_parameter_keys,
 )
-from nola.config.constants import MAX_BATCH_EXPORT_TASKS
+from nola.config.constants import MAX_BATCH_TASK_IDS
 from nola.engines.base import TranscribeOptions
 from nola.services.formatters import ExportFormat
 
@@ -345,7 +345,7 @@ class BatchTaskActionRequest(BaseModel):
     task_ids: list[str] = Field(
         ...,
         min_length=1,
-        max_length=MAX_BATCH_EXPORT_TASKS,
+        max_length=MAX_BATCH_TASK_IDS,
         description="List of task IDs to process",
     )
 
@@ -356,7 +356,7 @@ class BatchExportRequest(BaseModel):
     task_ids: list[str] = Field(
         ...,
         min_length=1,
-        max_length=MAX_BATCH_EXPORT_TASKS,
+        max_length=MAX_BATCH_TASK_IDS,
         description="List of task IDs to export",
     )
     format: ExportFormat = Field(

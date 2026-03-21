@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from nola.api.deps import get_app_config_db, get_file_db, get_task_db
-from nola.config.constants import MAX_BATCH_EXPORT_TASKS
+from nola.config.constants import MAX_BATCH_TASK_IDS
 from nola.config.settings import Settings
 from nola.main import app
 from nola.models import init_db
@@ -811,7 +811,7 @@ class TestInputValidation:
 
     def test_batch_export_task_ids_exceed_max_returns_422(self, client: TestClient):
         """Test batch export rejects task_ids longer than max length."""
-        task_ids = [f"task-{i}" for i in range(MAX_BATCH_EXPORT_TASKS + 1)]
+        task_ids = [f"task-{i}" for i in range(MAX_BATCH_TASK_IDS + 1)]
         response = client.post(
             "/api/transcription-tasks/export/batch",
             json={"task_ids": task_ids, "format": "srt"},
