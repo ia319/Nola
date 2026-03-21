@@ -1,9 +1,10 @@
-import { type ReactNode, useMemo, useState } from 'react'
+import { type ReactNode, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
+import logger from '@/config/logger'
 import type { TaskSummary } from '@/shared/types'
 import type { TaskActionHandler } from './types'
 
@@ -64,6 +65,12 @@ function clampProgress(progress: number): number {
   return progress
 }
 
+type TaskActionType = 'cancel' | 'retry' | 'delete'
+
+function buildActionKey(taskId: string, action: TaskActionType): string {
+  return `${taskId}:${action}`
+}
+
 /**
  * Keep task list rendering centralized so recent/history panels only handle data mapping.
  *
@@ -92,27 +99,63 @@ export function TaskListPanel({
   pagination,
 }: TaskListPanelProps) {
   const { t } = useTranslation()
-  const [runningAction, setRunningAction] = useState<{
-    taskId: string
-    action: 'cancel' | 'retry' | 'delete'
-  } | null>(null)
+  const runningActionsRef = useRef<Set<string>>(new Set())
+  const [runningActions, setRunningActions] = useState<Set<string>>(() => new Set())
+
+  function markActionRunning(actionKey: string): boolean {
+    if (runningActionsRef.current.has(actionKey)) {
+      return false
+    }
+
+    runningActionsRef.current.add(actionKey)
+    setRunningActions((previous) => {
+      if (previous.has(actionKey)) {
+        return previous
+      }
+      const next = new Set(previous)
+      next.add(actionKey)
+      return next
+    })
+    return true
+  }
+
+  function clearActionRunning(actionKey: string): void {
+    if (!runningActionsRef.current.has(actionKey)) {
+      return
+    }
+
+    runningActionsRef.current.delete(actionKey)
+    setRunningActions((previous) => {
+      if (!previous.has(actionKey)) {
+        return previous
+      }
+      const next = new Set(previous)
+      next.delete(actionKey)
+      return next
+    })
+  }
 
   async function runTaskAction(
     task: TaskSummary,
-    action: 'cancel' | 'retry' | 'delete',
+    action: TaskActionType,
     handler?: TaskActionHandler,
   ) {
     if (!handler) return
-    setRunningAction({ taskId: task.task_id, action })
+    const actionKey = buildActionKey(task.task_id, action)
+    if (!markActionRunning(actionKey)) {
+      return
+    }
+
     try {
       await handler(task)
-    } finally {
-      setRunningAction((previous) => {
-        if (!previous || previous.taskId !== task.task_id || previous.action !== action) {
-          return previous
-        }
-        return null
+    } catch (error: unknown) {
+      logger.error('task.actionHandlerFailed', {
+        taskId: task.task_id,
+        action,
+        error,
       })
+    } finally {
+      clearActionRunning(actionKey)
     }
   }
 
@@ -120,10 +163,11 @@ export function TaskListPanel({
     if (!pagination) return null
 
     const { page, pageSize, total } = pagination
-    const totalPages = Math.max(1, Math.ceil(Math.max(total, 0) / Math.max(pageSize, 1)))
+    const normalizedPageSize = Math.max(pageSize, 1)
+    const totalPages = Math.max(1, Math.ceil(Math.max(total, 0) / normalizedPageSize))
     const currentPage = Math.min(Math.max(page, 1), totalPages)
-    const start = total === 0 ? 0 : (currentPage - 1) * pageSize + 1
-    const end = total === 0 ? 0 : Math.min(total, currentPage * pageSize)
+    const start = total === 0 ? 0 : (currentPage - 1) * normalizedPageSize + 1
+    const end = total === 0 ? 0 : Math.min(total, currentPage * normalizedPageSize)
 
     return {
       currentPage,
@@ -154,12 +198,9 @@ export function TaskListPanel({
               task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
             const progress = clampProgress(task.progress)
 
-            const cancelBusy =
-              runningAction?.taskId === task.task_id && runningAction.action === 'cancel'
-            const retryBusy =
-              runningAction?.taskId === task.task_id && runningAction.action === 'retry'
-            const deleteBusy =
-              runningAction?.taskId === task.task_id && runningAction.action === 'delete'
+            const cancelBusy = runningActions.has(buildActionKey(task.task_id, 'cancel'))
+            const retryBusy = runningActions.has(buildActionKey(task.task_id, 'retry'))
+            const deleteBusy = runningActions.has(buildActionKey(task.task_id, 'delete'))
 
             return (
               <div key={task.task_id} className="space-y-2 rounded-lg border p-3">

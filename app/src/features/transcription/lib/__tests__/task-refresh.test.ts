@@ -29,12 +29,14 @@ describe('task refresh', () => {
     const unsubscribeThrowing = subscribeTaskRefresh(throwingListener)
     const unsubscribeHealthy = subscribeTaskRefresh(healthyListener)
 
-    expect(() => requestTaskRefresh()).not.toThrow()
-    expect(throwingListener).toHaveBeenCalledTimes(1)
-    expect(healthyListener).toHaveBeenCalledTimes(1)
-    expect(loggerErrorMock).toHaveBeenCalledTimes(1)
-
-    unsubscribeThrowing()
-    unsubscribeHealthy()
+    try {
+      expect(() => requestTaskRefresh()).not.toThrow()
+      expect(throwingListener).toHaveBeenCalledTimes(1)
+      expect(healthyListener).toHaveBeenCalledTimes(1)
+      expect(loggerErrorMock).toHaveBeenCalledTimes(1)
+    } finally {
+      unsubscribeThrowing()
+      unsubscribeHealthy()
+    }
   })
 })
