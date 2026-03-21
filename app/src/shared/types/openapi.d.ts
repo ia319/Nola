@@ -150,6 +150,46 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/transcription-tasks/batch/cancel': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch cancel transcription tasks
+     * @description Cancel multiple tasks and return per-task outcomes.
+     */
+    post: operations['batch_cancel_transcriptions_api_transcription_tasks_batch_cancel_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/transcription-tasks/batch/retry': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch retry transcription tasks
+     * @description Retry failed/cancelled tasks by creating new pending tasks.
+     */
+    post: operations['batch_retry_transcriptions_api_transcription_tasks_batch_retry_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/transcription-tasks/{task_id}/record': {
     parameters: {
       query?: never
@@ -296,6 +336,48 @@ export interface paths {
      *         Cancellation result
      */
     delete: operations['cancel_transcription_api_transcriptions__task_id__delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/transcriptions/batch/cancel': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch cancel transcription tasks
+     * @deprecated
+     * @description Cancel multiple tasks and return per-task outcomes.
+     */
+    post: operations['batch_cancel_transcriptions_api_transcriptions_batch_cancel_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/transcriptions/batch/retry': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch retry transcription tasks
+     * @deprecated
+     * @description Retry failed/cancelled tasks by creating new pending tasks.
+     */
+    post: operations['batch_retry_transcriptions_api_transcriptions_batch_retry_post']
+    delete?: never
     options?: never
     head?: never
     patch?: never
@@ -563,6 +645,65 @@ export interface components {
        * @description Custom ZIP filename (without extension)
        */
       zip_name?: string | null
+    }
+    /**
+     * BatchTaskActionRequest
+     * @description Batch action request for task-level operations.
+     */
+    BatchTaskActionRequest: {
+      /**
+       * Task Ids
+       * @description List of task IDs to process
+       */
+      task_ids: string[]
+    }
+    /**
+     * BatchTaskActionResponse
+     * @description Response for batch cancel/retry actions.
+     */
+    BatchTaskActionResponse: {
+      /**
+       * Action
+       * @enum {string}
+       */
+      action: 'cancel' | 'retry'
+      summary: components['schemas']['BatchTaskActionSummaryResponse']
+      /** Results */
+      results: components['schemas']['BatchTaskActionResultResponse'][]
+    }
+    /**
+     * BatchTaskActionResultResponse
+     * @description Per-task result for batch task actions.
+     */
+    BatchTaskActionResultResponse: {
+      /** Task Id */
+      task_id: string
+      /** Ok */
+      ok: boolean
+      /** Message */
+      message: string
+      /** Error Code */
+      error_code?: ('not_found' | 'invalid_status' | 'duplicate_task_id' | 'file_missing') | null
+      /** Status */
+      status?: ('pending' | 'processing' | 'completed' | 'failed' | 'cancelled') | null
+      /** New Task Id */
+      new_task_id?: string | null
+      /** File Id */
+      file_id?: string | null
+      /** Filename */
+      filename?: string | null
+    }
+    /**
+     * BatchTaskActionSummaryResponse
+     * @description Batch task action summary counts.
+     */
+    BatchTaskActionSummaryResponse: {
+      /** Requested */
+      requested: number
+      /** Succeeded */
+      succeeded: number
+      /** Failed */
+      failed: number
     }
     /** Body_upload_file_api_files__post */
     Body_upload_file_api_files__post: {
@@ -1729,7 +1870,7 @@ export interface operations {
         /** @description Search keyword for filename */
         q?: string | null
         /** @description Sort field */
-        sort_by?: 'created_at' | 'completed_at' | 'status' | 'progress'
+        sort_by?: 'created_at' | 'completed_at' | 'status' | 'progress' | 'filename'
         /** @description Sort order */
         order?: 'asc' | 'desc'
       }
@@ -1841,6 +1982,72 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['CancelTaskResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  batch_cancel_transcriptions_api_transcription_tasks_batch_cancel_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BatchTaskActionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BatchTaskActionResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  batch_retry_transcriptions_api_transcription_tasks_batch_retry_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BatchTaskActionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BatchTaskActionResponse']
         }
       }
       /** @description Validation Error */
@@ -1972,7 +2179,7 @@ export interface operations {
         /** @description Search keyword for filename */
         q?: string | null
         /** @description Sort field */
-        sort_by?: 'created_at' | 'completed_at' | 'status' | 'progress'
+        sort_by?: 'created_at' | 'completed_at' | 'status' | 'progress' | 'filename'
         /** @description Sort order */
         order?: 'asc' | 'desc'
       }
@@ -2084,6 +2291,72 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['CancelTaskResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  batch_cancel_transcriptions_api_transcriptions_batch_cancel_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BatchTaskActionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BatchTaskActionResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  batch_retry_transcriptions_api_transcriptions_batch_retry_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BatchTaskActionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BatchTaskActionResponse']
         }
       }
       /** @description Validation Error */

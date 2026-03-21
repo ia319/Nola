@@ -10,11 +10,14 @@ export type TaskListResponse = Schemas['TaskListResponse']
 export type CreateTaskResponse = Schemas['CreateTaskResponse']
 export type CancelTaskResponse = Schemas['CancelTaskResponse']
 export type DeleteTaskRecordResponse = Schemas['DeleteTaskRecordResponse']
+export type BatchTaskActionRequest = Schemas['BatchTaskActionRequest']
+export type BatchTaskActionResponse = Schemas['BatchTaskActionResponse']
+export type BatchTaskActionResult = Schemas['BatchTaskActionResultResponse']
 export type Segment = Schemas['SegmentResponse']
 
 /** Task status derived from OpenAPI enum constraint. */
 export type TaskStatus = Schemas['TaskSummaryResponse']['status']
-export type TaskSortBy = 'created_at' | 'completed_at' | 'status' | 'progress'
+export type TaskSortBy = 'created_at' | 'completed_at' | 'status' | 'progress' | 'filename'
 export type SortOrder = 'asc' | 'desc'
 
 /** GET /{task_id}/export?save=true response. */
