@@ -188,6 +188,7 @@ export function TaskListPanel({
                         type="button"
                         size="sm"
                         variant="outline"
+                        aria-busy={cancelBusy}
                         disabled={cancelBusy}
                         onClick={() => {
                           void runTaskAction(task, 'cancel', onCancelTask)
@@ -202,6 +203,7 @@ export function TaskListPanel({
                         type="button"
                         size="sm"
                         variant="outline"
+                        aria-busy={retryBusy}
                         disabled={retryBusy}
                         onClick={() => {
                           void runTaskAction(task, 'retry', onRetryTask)
@@ -216,6 +218,7 @@ export function TaskListPanel({
                         type="button"
                         size="sm"
                         variant="outline"
+                        aria-busy={deleteBusy}
                         disabled={deleteBusy}
                         onClick={() => {
                           void runTaskAction(task, 'delete', onDeleteTaskRecord)
