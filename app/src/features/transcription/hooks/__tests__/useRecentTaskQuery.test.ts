@@ -69,4 +69,66 @@ describe('useRecentTaskQuery', () => {
     expect(result.current.query.page).toBe(1)
     expect(result.current.tasks.map((task) => task.task_id)).toEqual(['task-2', 'task-3'])
   })
+
+  it('tracks newly added matching tasks while user stays on later pages', () => {
+    const sourceTasks = [
+      buildTask('task-1', 'processing', { created_at: '2026-03-20T09:00:00.000Z' }),
+      buildTask('task-2', 'processing', { created_at: '2026-03-20T09:01:00.000Z' }),
+      buildTask('task-3', 'processing', { created_at: '2026-03-20T09:02:00.000Z' }),
+    ]
+
+    const { result, rerender } = renderHook(({ source }) => useRecentTaskQuery(source, 1), {
+      initialProps: { source: sourceTasks },
+    })
+
+    act(() => {
+      result.current.setPage(2)
+    })
+    expect(result.current.query.page).toBe(2)
+    expect(result.current.newTaskCount).toBe(0)
+
+    rerender({
+      source: [
+        buildTask('task-4', 'processing', { created_at: '2026-03-20T09:03:00.000Z' }),
+        ...sourceTasks,
+      ],
+    })
+
+    expect(result.current.query.page).toBe(2)
+    expect(result.current.newTaskCount).toBe(1)
+
+    act(() => {
+      result.current.goToFirstPageForNewTasks()
+    })
+
+    expect(result.current.query.page).toBe(1)
+    expect(result.current.newTaskCount).toBe(0)
+  })
+
+  it('does not treat status/progress updates as new tasks', () => {
+    const sourceTasks = [
+      buildTask('task-1', 'processing'),
+      buildTask('task-2', 'processing'),
+      buildTask('task-3', 'processing'),
+    ]
+
+    const { result, rerender } = renderHook(({ source }) => useRecentTaskQuery(source, 1), {
+      initialProps: { source: sourceTasks },
+    })
+
+    act(() => {
+      result.current.setPage(2)
+    })
+    expect(result.current.query.page).toBe(2)
+
+    rerender({
+      source: [
+        buildTask('task-1', 'processing', { progress: 55 }),
+        buildTask('task-2', 'processing', { progress: 40 }),
+        buildTask('task-3', 'processing', { progress: 30 }),
+      ],
+    })
+
+    expect(result.current.newTaskCount).toBe(0)
+  })
 })

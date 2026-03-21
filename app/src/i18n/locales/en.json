@@ -217,7 +217,10 @@
     "currentBatch": {
       "title": "Current Session Tasks",
       "description": "Tasks created since this app session started",
-      "empty": "No tasks in the current session"
+      "empty": "No tasks in the current session",
+      "newTasksNotice_one": "{{count}} new task available",
+      "newTasksNotice_other": "{{count}} new tasks available",
+      "backToFirstPage": "Back to first page"
     },
     "history": {
       "title": "Task History",

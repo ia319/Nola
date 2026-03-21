@@ -8,11 +8,13 @@ export interface UseRecentTaskQueryResult {
   tasks: TaskSummary[]
   total: number
   totalPages: number
+  newTaskCount: number
   setSearch: (value: string) => void
   setStatus: (value: TaskFilterStatus) => void
   setSortBy: (value: TaskSortBy) => void
   setOrder: (value: TaskQueryModel['order']) => void
   setPage: (value: number) => void
+  goToFirstPageForNewTasks: () => void
 }
 
 function toTimestamp(value: string | null): number {
@@ -92,50 +94,84 @@ export function useRecentTaskQuery(
   const total = filteredTasks.length
   const totalPages = Math.max(1, Math.ceil(total / Math.max(query.page_size, 1)))
   const currentPage = Math.min(query.page, totalPages)
+  const [acknowledgedTotal, setAcknowledgedTotal] = useState(total)
 
   const tasks = useMemo(() => {
     const offset = (currentPage - 1) * query.page_size
     return filteredTasks.slice(offset, offset + query.page_size)
   }, [currentPage, filteredTasks, query.page_size])
 
-  const setSearch = useCallback((value: string) => {
+  const newTaskCount = currentPage > 1 ? Math.max(0, total - acknowledgedTotal) : 0
+
+  const setSearch = useCallback(
+    (value: string) => {
+      setAcknowledgedTotal(total)
+      setQuery((previous) => ({
+        ...previous,
+        q: value,
+        page: 1,
+      }))
+    },
+    [total],
+  )
+
+  const setStatus = useCallback(
+    (value: TaskFilterStatus) => {
+      setAcknowledgedTotal(total)
+      setQuery((previous) => ({
+        ...previous,
+        status: value,
+        page: 1,
+      }))
+    },
+    [total],
+  )
+
+  const setSortBy = useCallback(
+    (value: TaskSortBy) => {
+      setAcknowledgedTotal(total)
+      setQuery((previous) => ({
+        ...previous,
+        sort_by: value,
+        page: 1,
+      }))
+    },
+    [total],
+  )
+
+  const setOrder = useCallback(
+    (value: TaskQueryModel['order']) => {
+      setAcknowledgedTotal(total)
+      setQuery((previous) => ({
+        ...previous,
+        order: value,
+        page: 1,
+      }))
+    },
+    [total],
+  )
+
+  const setPage = useCallback(
+    (value: number) => {
+      const safePage = Math.max(1, value)
+      if ((currentPage === 1 && safePage > 1) || safePage === 1) {
+        setAcknowledgedTotal(total)
+      }
+      setQuery((previous) => ({
+        ...previous,
+        page: safePage,
+      }))
+    },
+    [currentPage, total],
+  )
+
+  const goToFirstPageForNewTasks = useCallback(() => {
+    setAcknowledgedTotal(total)
     setQuery((previous) => ({
       ...previous,
-      q: value,
       page: 1,
     }))
-  }, [])
-
-  const setStatus = useCallback((value: TaskFilterStatus) => {
-    setQuery((previous) => ({
-      ...previous,
-      status: value,
-      page: 1,
-    }))
-  }, [])
-
-  const setSortBy = useCallback((value: TaskSortBy) => {
-    setQuery((previous) => ({
-      ...previous,
-      sort_by: value,
-      page: 1,
-    }))
-  }, [])
-
-  const setOrder = useCallback((value: TaskQueryModel['order']) => {
-    setQuery((previous) => ({
-      ...previous,
-      order: value,
-      page: 1,
-    }))
-  }, [])
-
-  const setPage = useCallback((value: number) => {
-    setQuery((previous) => ({
-      ...previous,
-      page: Math.max(1, value),
-    }))
-  }, [])
+  }, [total])
 
   return {
     query: {
@@ -145,10 +181,12 @@ export function useRecentTaskQuery(
     tasks,
     total,
     totalPages,
+    newTaskCount,
     setSearch,
     setStatus,
     setSortBy,
     setOrder,
     setPage,
+    goToFirstPageForNewTasks,
   }
 }

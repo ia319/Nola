@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import { ListToolbar, TaskListPanel } from '@/components/common'
 import type { TaskActionHandler } from '@/components/common'
+import { Button } from '@/components/ui/button'
 import { useSessionTasksStore } from '@/features/transcription/store/session-tasks-store'
 import { useRecentTaskQuery } from '@/features/transcription/hooks/useRecentTaskQuery'
 import type { TaskSummary } from '@/shared/types'
@@ -43,11 +44,13 @@ export function CurrentBatchTasksPanel({
     query,
     tasks: pagedTasks,
     total,
+    newTaskCount,
     setSearch,
     setStatus,
     setSortBy,
     setOrder,
     setPage,
+    goToFirstPageForNewTasks,
   } = useRecentTaskQuery(tasks, pageSize)
 
   return (
@@ -60,16 +63,28 @@ export function CurrentBatchTasksPanel({
       onCancelTask={onCancelTask}
       onRetryTask={onRetryTask}
       toolbar={
-        <ListToolbar
-          searchValue={query.q}
-          statusValue={query.status}
-          sortByValue={query.sort_by}
-          orderValue={query.order}
-          onSearchChange={setSearch}
-          onStatusChange={setStatus}
-          onSortByChange={setSortBy}
-          onOrderChange={setOrder}
-        />
+        <div className="space-y-2">
+          {newTaskCount > 0 ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-dashed p-2">
+              <p className="text-muted-foreground text-xs">
+                {t('tasks.currentBatch.newTasksNotice', { count: newTaskCount })}
+              </p>
+              <Button type="button" size="sm" variant="outline" onClick={goToFirstPageForNewTasks}>
+                {t('tasks.currentBatch.backToFirstPage')}
+              </Button>
+            </div>
+          ) : null}
+          <ListToolbar
+            searchValue={query.q}
+            statusValue={query.status}
+            sortByValue={query.sort_by}
+            orderValue={query.order}
+            onSearchChange={setSearch}
+            onStatusChange={setStatus}
+            onSortByChange={setSortBy}
+            onOrderChange={setOrder}
+          />
+        </div>
       }
       pagination={{
         page: query.page,

@@ -216,7 +216,10 @@
     "currentBatch": {
       "title": "本次任务",
       "description": "当前应用会话内创建的任务",
-      "empty": "本次会话暂无任务"
+      "empty": "本次会话暂无任务",
+      "newTasksNotice_one": "有 {{count}} 个新任务",
+      "newTasksNotice_other": "有 {{count}} 个新任务",
+      "backToFirstPage": "返回第一页"
     },
     "history": {
       "title": "任务历史",
