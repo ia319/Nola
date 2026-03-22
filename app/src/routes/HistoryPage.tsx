@@ -1,0 +1,193 @@
+import { useCallback, useMemo } from 'react'
+import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
+
+import { ErrorBoundary } from '@/components/common'
+import type { SingleExportRequestOptions } from '@/features/export'
+import { TaskHistoryPanel, useHistoryTaskActions, useHistoryTasks } from '@/features/history'
+import {
+  deleteTaskRecordAndRefresh,
+  requestTaskRefresh,
+  useSessionTasksStore,
+} from '@/features/transcription'
+import type {
+  SortOrder,
+  TaskFilterStatus,
+  TaskQueryModel,
+  TaskSortBy,
+  TaskSummary,
+} from '@/shared/types'
+import {
+  buildHistoryQuery,
+  isSameHistorySearch,
+  normalizeHistorySearch,
+  type HistoryRouteSearch,
+} from '@/routes/history-search'
+
+/**
+ * History route composition layer.
+ *
+ * Drive query state from URL while reusing session task store updates.
+ */
+export function HistoryPage() {
+  const { t } = useTranslation()
+  const navigate = useNavigate({ from: '/history' })
+  const search = useSearch({ from: '/history' })
+  const query = useMemo<TaskQueryModel>(() => buildHistoryQuery(search), [search])
+
+  const updateSearch = useCallback(
+    (patch: Partial<HistoryRouteSearch>, replace: boolean) => {
+      void navigate({
+        replace,
+        search: (previous) => {
+          const next = normalizeHistorySearch({ ...previous, ...patch })
+          return isSameHistorySearch(previous, next) ? previous : next
+        },
+      })
+    },
+    [navigate],
+  )
+
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      updateSearch({ q: value, page: undefined }, false)
+    },
+    [updateSearch],
+  )
+
+  const handleStatusChange = useCallback(
+    (value: TaskFilterStatus) => {
+      updateSearch(
+        {
+          status: value === 'all' ? undefined : value,
+          page: undefined,
+        },
+        true,
+      )
+    },
+    [updateSearch],
+  )
+
+  const handleSortByChange = useCallback(
+    (value: TaskSortBy) => {
+      updateSearch(
+        {
+          sort_by: value === 'created_at' ? undefined : value,
+          page: undefined,
+        },
+        false,
+      )
+    },
+    [updateSearch],
+  )
+
+  const handleOrderChange = useCallback(
+    (value: SortOrder) => {
+      updateSearch(
+        {
+          order: value === 'desc' ? undefined : value,
+          page: undefined,
+        },
+        false,
+      )
+    },
+    [updateSearch],
+  )
+
+  const handlePageChange = useCallback(
+    (value: number) => {
+      const nextPage = Math.max(1, Math.floor(value))
+      updateSearch({ page: nextPage <= 1 ? undefined : nextPage }, false)
+    },
+    [updateSearch],
+  )
+
+  const handlePageClamp = useCallback(
+    (page: number) => {
+      updateSearch({ page: page <= 1 ? undefined : page }, true)
+    },
+    [updateSearch],
+  )
+
+  const addCreatedTask = useSessionTasksStore((state) => state.addCreatedTask)
+  const removeSessionTask = useSessionTasksStore((state) => state.removeSessionTask)
+  const upsertSessionTask = useSessionTasksStore((state) => state.upsertSessionTask)
+  const historyTasks = useHistoryTasks({
+    query,
+    onPageClamp: handlePageClamp,
+  })
+  const historyTaskActions = useHistoryTaskActions({
+    refresh: historyTasks.refresh,
+    onRetryCreatedTask: (task) => {
+      addCreatedTask({
+        task_id: task.taskId,
+        file_id: task.fileId,
+        filename: task.filename,
+        status: 'pending',
+      })
+    },
+    onCancelledTask: (task) => {
+      if (!useSessionTasksStore.getState().byId[task.taskId]) {
+        return
+      }
+      upsertSessionTask({
+        task_id: task.taskId,
+        file_id: task.fileId,
+        filename: task.filename,
+        status: task.status,
+      })
+    },
+    onActionSettled: requestTaskRefresh,
+  })
+
+  async function handleCancelHistoryTask(task: TaskSummary) {
+    await historyTaskActions.cancelTasks([task.task_id])
+  }
+
+  async function handleRetryHistoryTask(task: TaskSummary) {
+    await historyTaskActions.retryTasks([task.task_id])
+  }
+
+  async function handleExportHistoryTask(task: TaskSummary, options: SingleExportRequestOptions) {
+    return historyTaskActions.exportTask(task, options)
+  }
+
+  async function handleDeleteHistoryTask(task: TaskSummary) {
+    try {
+      await deleteTaskRecordAndRefresh(task.task_id)
+      removeSessionTask(task.task_id)
+      toast.success(t('tasks.toast.recordDeleted', { taskId: task.task_id }))
+    } catch {
+      toast.error(t('tasks.toast.actionFailed'))
+    } finally {
+      await historyTasks.refresh()
+    }
+  }
+
+  return (
+    <ErrorBoundary>
+      <TaskHistoryPanel
+        tasks={historyTasks.tasks}
+        query={query}
+        total={historyTasks.total}
+        isLoading={historyTasks.isLoading}
+        errorMessage={
+          historyTasks.error ? t(historyTasks.error.i18nKey, historyTasks.error.params ?? {}) : null
+        }
+        onSearchChange={handleSearchChange}
+        onStatusChange={handleStatusChange}
+        onSortByChange={handleSortByChange}
+        onOrderChange={handleOrderChange}
+        onPageChange={handlePageChange}
+        onCancelTask={handleCancelHistoryTask}
+        onRetryTask={handleRetryHistoryTask}
+        onDeleteTaskRecord={handleDeleteHistoryTask}
+        onExportTask={handleExportHistoryTask}
+        onBatchCancelTasks={historyTaskActions.cancelTasks}
+        onBatchRetryTasks={historyTaskActions.retryTasks}
+        onBatchExportTasks={historyTaskActions.exportTasks}
+      />
+    </ErrorBoundary>
+  )
+}

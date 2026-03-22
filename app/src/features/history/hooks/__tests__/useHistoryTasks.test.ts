@@ -3,7 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { listHistoryTasks } from '@/features/history/api'
-import type { TaskListResponse, TaskSummary } from '@/shared/types'
+import type { TaskListResponse, TaskQueryModel, TaskSummary } from '@/shared/types'
 
 import { useHistoryTasks } from '../useHistoryTasks'
 
@@ -39,10 +39,35 @@ afterEach(() => {
 })
 
 describe('useHistoryTasks', () => {
-  it('maps local query state to backend list params', async () => {
+  it('maps route query state to backend list params', async () => {
     listTasksMock.mockResolvedValue(buildResponse([buildTask('task-1', 'pending')], 25))
 
-    const { result } = renderHook(() => useHistoryTasks(20))
+    const defaultQuery: TaskQueryModel = {
+      q: '',
+      status: 'all',
+      sort_by: 'created_at',
+      order: 'desc',
+      page: 1,
+      page_size: 20,
+    }
+    const nextQuery: TaskQueryModel = {
+      q: 'alpha',
+      status: 'failed',
+      sort_by: 'created_at',
+      order: 'desc',
+      page: 2,
+      page_size: 20,
+    }
+
+    const { rerender } = renderHook(
+      ({ query }) =>
+        useHistoryTasks({
+          query,
+        }),
+      {
+        initialProps: { query: defaultQuery },
+      },
+    )
 
     await waitFor(() => {
       expect(listTasksMock).toHaveBeenCalledTimes(1)
@@ -60,9 +85,7 @@ describe('useHistoryTasks', () => {
     )
 
     await act(async () => {
-      result.current.setSearch('alpha')
-      result.current.setStatus('failed')
-      result.current.setPage(2)
+      rerender({ query: nextQuery })
     })
 
     await waitFor(() => {
@@ -81,28 +104,52 @@ describe('useHistoryTasks', () => {
     )
   })
 
-  it('clamps out-of-range pages in one refresh cycle without extra refetch', async () => {
+  it('clamps out-of-range pages and skips one follow-up refetch', async () => {
+    const onPageClamp = vi.fn()
     listTasksMock
-      .mockResolvedValueOnce(buildResponse([buildTask('task-1', 'pending')], 60))
       .mockResolvedValueOnce(buildResponse([], 25))
       .mockResolvedValueOnce(buildResponse([buildTask('task-2', 'failed')], 25))
 
-    const { result } = renderHook(() => useHistoryTasks(20))
+    const initialQuery: TaskQueryModel = {
+      q: '',
+      status: 'all',
+      sort_by: 'created_at',
+      order: 'desc',
+      page: 3,
+      page_size: 20,
+    }
+
+    const { result, rerender } = renderHook(
+      ({ query }) =>
+        useHistoryTasks({
+          query,
+          onPageClamp,
+        }),
+      {
+        initialProps: { query: initialQuery },
+      },
+    )
 
     await waitFor(() => {
-      expect(listTasksMock).toHaveBeenCalledTimes(1)
+      expect(listTasksMock).toHaveBeenCalledTimes(2)
+    })
+    expect(onPageClamp).toHaveBeenCalledWith(2)
+
+    await act(async () => {
+      rerender({
+        query: {
+          ...initialQuery,
+          page: 2,
+        },
+      })
     })
 
     await act(async () => {
-      result.current.setPage(3)
-    })
-
-    await waitFor(() => {
-      expect(listTasksMock).toHaveBeenCalledTimes(3)
+      await Promise.resolve()
     })
 
     expect(listTasksMock).toHaveBeenNthCalledWith(
-      2,
+      1,
       {
         q: undefined,
         status: undefined,
@@ -114,7 +161,7 @@ describe('useHistoryTasks', () => {
       expect.any(AbortSignal),
     )
     expect(listTasksMock).toHaveBeenNthCalledWith(
-      3,
+      2,
       {
         q: undefined,
         status: undefined,
@@ -125,20 +172,26 @@ describe('useHistoryTasks', () => {
       },
       expect.any(AbortSignal),
     )
-    expect(result.current.query.page).toBe(2)
     expect(result.current.tasks.map((task) => task.task_id)).toEqual(['task-2'])
     expect(result.current.isLoading).toBe(false)
-
-    await act(async () => {
-      await Promise.resolve()
-    })
-    expect(listTasksMock).toHaveBeenCalledTimes(3)
+    expect(listTasksMock).toHaveBeenCalledTimes(2)
   })
 
   it('exposes AppError shape when list request fails', async () => {
     listTasksMock.mockRejectedValue(new Error('boom'))
 
-    const { result } = renderHook(() => useHistoryTasks(20))
+    const { result } = renderHook(() =>
+      useHistoryTasks({
+        query: {
+          q: '',
+          status: 'all',
+          sort_by: 'created_at',
+          order: 'desc',
+          page: 1,
+          page_size: 20,
+        },
+      }),
+    )
 
     await waitFor(() => {
       expect(result.current.error).not.toBeNull()

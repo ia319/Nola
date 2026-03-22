@@ -1,16 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { HISTORY_PAGE_SIZE } from '@/config/constants'
 import { listHistoryTasks } from '@/features/history/api'
 import { isAppError } from '@/shared/lib/error-factory'
-import type {
-  AppError,
-  SortOrder,
-  TaskFilterStatus,
-  TaskQueryModel,
-  TaskSortBy,
-  TaskSummary,
-} from '@/shared/types'
+import type { AppError, TaskQueryModel, TaskSummary } from '@/shared/types'
 
 export interface UseHistoryTasksResult {
   query: TaskQueryModel
@@ -18,12 +10,12 @@ export interface UseHistoryTasksResult {
   total: number
   isLoading: boolean
   error: AppError | null
-  setSearch: (value: string) => void
-  setStatus: (value: TaskFilterStatus) => void
-  setSortBy: (value: TaskSortBy) => void
-  setOrder: (value: SortOrder) => void
-  setPage: (value: number) => void
   refresh: () => Promise<void>
+}
+
+export interface UseHistoryTasksOptions {
+  query: TaskQueryModel
+  onPageClamp?: (page: number) => void
 }
 
 function toAppError(error: unknown): AppError {
@@ -36,23 +28,23 @@ function toAppError(error: unknown): AppError {
 }
 
 /**
- * Keep history query state and backend pagination in one reusable hook.
+ * Keep history backend pagination fetch logic independent from route state wiring.
  */
-export function useHistoryTasks(pageSize: number = HISTORY_PAGE_SIZE): UseHistoryTasksResult {
-  const [query, setQuery] = useState<TaskQueryModel>({
-    q: '',
-    status: 'all',
-    sort_by: 'created_at',
-    order: 'desc',
-    page: 1,
-    page_size: pageSize,
-  })
+export function useHistoryTasks({
+  query,
+  onPageClamp,
+}: UseHistoryTasksOptions): UseHistoryTasksResult {
   const [tasks, setTasks] = useState<TaskSummary[]>([])
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<AppError | null>(null)
   const abortRef = useRef<AbortController | null>(null)
-  const skipNextEffectRefreshRef = useRef(false)
+  const skipQuerySignatureRef = useRef<string | null>(null)
+
+  const querySignature = useMemo(() => {
+    return `${query.q}|${query.status}|${query.sort_by}|${query.order}|${query.page}|${query.page_size}`
+  }, [query.order, query.page, query.page_size, query.q, query.sort_by, query.status])
+
   const refresh = useCallback(async () => {
     if (abortRef.current) {
       abortRef.current.abort()
@@ -94,14 +86,11 @@ export function useHistoryTasks(pageSize: number = HISTORY_PAGE_SIZE): UseHistor
 
         if (controller.signal.aborted) return
 
-        // Keep query.page synchronized without triggering a redundant refresh cycle.
-        skipNextEffectRefreshRef.current = true
-        setQuery((previous) => ({
-          ...previous,
-          page: totalPages,
-        }))
+        // Skip one follow-up request when route state catches up to clamped page.
+        skipQuerySignatureRef.current = `${query.q}|${query.status}|${query.sort_by}|${query.order}|${totalPages}|${query.page_size}`
         setTasks(clampedResponse.tasks)
         setTotal(clampedResponse.total)
+        onPageClamp?.(totalPages)
         return
       }
 
@@ -120,15 +109,15 @@ export function useHistoryTasks(pageSize: number = HISTORY_PAGE_SIZE): UseHistor
         setIsLoading(false)
       }
     }
-  }, [query.order, query.page, query.page_size, query.q, query.sort_by, query.status])
+  }, [onPageClamp, query.order, query.page, query.page_size, query.q, query.sort_by, query.status])
 
   useEffect(() => {
-    if (skipNextEffectRefreshRef.current) {
-      skipNextEffectRefreshRef.current = false
+    if (skipQuerySignatureRef.current === querySignature) {
+      skipQuerySignatureRef.current = null
       return
     }
     void refresh()
-  }, [refresh])
+  }, [querySignature, refresh])
 
   useEffect(() => {
     return () => {
@@ -138,56 +127,12 @@ export function useHistoryTasks(pageSize: number = HISTORY_PAGE_SIZE): UseHistor
     }
   }, [])
 
-  const setSearch = useCallback((value: string) => {
-    setQuery((previous) => ({
-      ...previous,
-      q: value,
-      page: 1,
-    }))
-  }, [])
-
-  const setStatus = useCallback((value: TaskFilterStatus) => {
-    setQuery((previous) => ({
-      ...previous,
-      status: value,
-      page: 1,
-    }))
-  }, [])
-
-  const setSortBy = useCallback((value: TaskSortBy) => {
-    setQuery((previous) => ({
-      ...previous,
-      sort_by: value,
-      page: 1,
-    }))
-  }, [])
-
-  const setOrder = useCallback((value: SortOrder) => {
-    setQuery((previous) => ({
-      ...previous,
-      order: value,
-      page: 1,
-    }))
-  }, [])
-
-  const setPage = useCallback((value: number) => {
-    setQuery((previous) => ({
-      ...previous,
-      page: Math.max(1, value),
-    }))
-  }, [])
-
   return {
     query,
     tasks,
     total,
     isLoading,
     error,
-    setSearch,
-    setStatus,
-    setSortBy,
-    setOrder,
-    setPage,
     refresh,
   }
 }
