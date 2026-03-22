@@ -1,63 +1,30 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { toast, Toaster } from 'sonner'
+import { toast } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
-import type { SingleExportRequestOptions } from '@/features/export'
-import { TaskHistoryPanel, useHistoryTaskActions, useHistoryTasks } from '@/features/history'
+import { Button } from '@/components/ui/button'
+import { useAppConfig } from '@/config/use-app-config'
 import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
 import {
   cancelTaskAndRefresh,
   CurrentBatchTasksPanel,
-  deleteTaskRecordAndRefresh,
   OptionsBar,
   requestTaskRefresh,
   retryTaskAndRefresh,
   useSessionTasksStore,
-  useTaskPolling,
 } from '@/features/transcription'
 import type { TaskCreateResult } from '@/features/transcription'
-import { Button } from '@/components/ui/button'
-import { useAppConfig } from '@/config/use-app-config'
 import type { TaskSummary } from '@/shared/types'
 
 /**
- * Root application shell.
- *
- * Wire upload and transcription features together with independent
- * ErrorBoundary panels so a crash in one section does not take down the other.
+ * Home page composition layer for upload, options, and recent session tasks.
  */
 function App() {
   const { t } = useTranslation()
   const { fileValidationConfig } = useAppConfig()
   const addCreatedTask = useSessionTasksStore((state) => state.addCreatedTask)
-  const removeSessionTask = useSessionTasksStore((state) => state.removeSessionTask)
   const upsertSessionTask = useSessionTasksStore((state) => state.upsertSessionTask)
-  useTaskPolling()
-  const historyTasks = useHistoryTasks()
-  const historyTaskActions = useHistoryTaskActions({
-    refresh: historyTasks.refresh,
-    onRetryCreatedTask: (task) => {
-      addCreatedTask({
-        task_id: task.taskId,
-        file_id: task.fileId,
-        filename: task.filename,
-        status: 'pending',
-      })
-    },
-    onCancelledTask: (task) => {
-      if (!useSessionTasksStore.getState().byId[task.taskId]) {
-        return
-      }
-      upsertSessionTask({
-        task_id: task.taskId,
-        file_id: task.fileId,
-        filename: task.filename,
-        status: task.status,
-      })
-    },
-    onActionSettled: requestTaskRefresh,
-  })
 
   const {
     uploads,
@@ -141,30 +108,6 @@ function App() {
     }
   }
 
-  async function handleCancelHistoryTask(task: TaskSummary) {
-    await historyTaskActions.cancelTasks([task.task_id])
-  }
-
-  async function handleRetryHistoryTask(task: TaskSummary) {
-    await historyTaskActions.retryTasks([task.task_id])
-  }
-
-  async function handleExportHistoryTask(task: TaskSummary, options: SingleExportRequestOptions) {
-    return historyTaskActions.exportTask(task, options)
-  }
-
-  async function handleDeleteHistoryTask(task: TaskSummary) {
-    try {
-      await deleteTaskRecordAndRefresh(task.task_id)
-      removeSessionTask(task.task_id)
-      toast.success(t('tasks.toast.recordDeleted', { taskId: task.task_id }))
-    } catch {
-      toast.error(t('tasks.toast.actionFailed'))
-    } finally {
-      await historyTasks.refresh()
-    }
-  }
-
   // Surface batch-level errors (e.g. duplicate file skip) as toast.
   useEffect(() => {
     if (!batchError) return
@@ -173,8 +116,7 @@ function App() {
   }, [batchError, clearBatchError, t])
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-6">
-      {/* Upload panel */}
+    <div className="space-y-6">
       <ErrorBoundary>
         <FileUploader onFilesSelected={handleFilesSelected} disabled={isUploading} />
 
@@ -185,7 +127,6 @@ function App() {
           onRemove={removeFile}
         />
 
-        {/* Upload / reset actions */}
         {uploads.length > 0 && (
           <div className="flex gap-2 pt-2">
             {hasPending && (
@@ -200,7 +141,6 @@ function App() {
         )}
       </ErrorBoundary>
 
-      {/* Transcription options panel */}
       <ErrorBoundary>
         <OptionsBar
           fileIds={availableFileIds}
@@ -215,34 +155,6 @@ function App() {
           onRetryTask={handleRetryRecentTask}
         />
       </ErrorBoundary>
-
-      <ErrorBoundary>
-        <TaskHistoryPanel
-          tasks={historyTasks.tasks}
-          query={historyTasks.query}
-          total={historyTasks.total}
-          isLoading={historyTasks.isLoading}
-          errorMessage={
-            historyTasks.error
-              ? t(historyTasks.error.i18nKey, historyTasks.error.params ?? {})
-              : null
-          }
-          onSearchChange={historyTasks.setSearch}
-          onStatusChange={historyTasks.setStatus}
-          onSortByChange={historyTasks.setSortBy}
-          onOrderChange={historyTasks.setOrder}
-          onPageChange={historyTasks.setPage}
-          onCancelTask={handleCancelHistoryTask}
-          onRetryTask={handleRetryHistoryTask}
-          onDeleteTaskRecord={handleDeleteHistoryTask}
-          onExportTask={handleExportHistoryTask}
-          onBatchCancelTasks={historyTaskActions.cancelTasks}
-          onBatchRetryTasks={historyTaskActions.retryTasks}
-          onBatchExportTasks={historyTaskActions.exportTasks}
-        />
-      </ErrorBoundary>
-
-      <Toaster />
     </div>
   )
 }
