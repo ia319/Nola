@@ -14,6 +14,18 @@ export type TranscriptionDefaultsPatchResponse = Schemas['TranscriptionDefaultsP
 /** PATCH /api/config/transcription/defaults request body. */
 export type TranscriptionDefaultsUpdateRequest = Schemas['TranscriptionDefaultsUpdateRequest']
 
+/** GET /api/config/export response. */
+export type ExportConfig = Schemas['ExportConfigResponse']
+
+/** Effective export defaults exposed inside GET /api/config/export. */
+export type ExportDefaults = Schemas['ExportConfigResponse']['defaults']
+
+/** PATCH /api/config/export/defaults response. */
+export type ExportDefaultsPatchResponse = Schemas['ExportDefaultsPatchResponse']
+
+/** PATCH /api/config/export/defaults request body. */
+export type ExportDefaultsUpdateRequest = Schemas['ExportDefaultsUpdateRequest']
+
 /** Effective transcription defaults exposed inside GET /api/config. */
 export type TranscriptionDefaults = Schemas['TranscriptionConfigResponse']['defaults']
 

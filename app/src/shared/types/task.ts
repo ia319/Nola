@@ -35,5 +35,5 @@ export type BatchExportRequest = Schemas['BatchExportRequest']
 
 // Derived convenience types for frontend use.
 
-/** Export format derived from OpenAPI BatchExportRequest.format enum. */
-export type ExportFormat = Schemas['BatchExportRequest']['format']
+/** Export format enum defined by backend formatter registry contract. */
+export type ExportFormat = Schemas['ExportFormat']

@@ -68,6 +68,50 @@ export interface paths {
     patch: operations['patch_transcription_defaults_api_config_transcription_defaults_patch']
     trace?: never
   }
+  '/api/config/export': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get effective export defaults
+     * @description Return export defaults after applying persisted overrides on top of the built-in server defaults.
+     */
+    get: operations['get_export_config_api_config_export_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/config/export/defaults': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Reset persisted export defaults
+     * @description Delete persisted export-default overrides and fall back to built-in server defaults.
+     */
+    delete: operations['delete_export_defaults_api_config_export_defaults_delete']
+    options?: never
+    head?: never
+    /**
+     * Update persisted export defaults
+     * @description Apply a partial update to application-level export defaults. Explicit null removes an override key.
+     */
+    patch: operations['patch_export_defaults_api_config_export_defaults_patch']
+    trace?: never
+  }
   '/api/transcription-tasks/': {
     parameters: {
       query?: never
@@ -629,17 +673,13 @@ export interface components {
        * @description List of task IDs to export
        */
       task_ids: string[]
-      /**
-       * @description Output format for all files
-       * @default srt
-       */
-      format: components['schemas']['ExportFormat']
+      /** @description Output format for all files. If omitted, resolve from persisted export defaults. */
+      format?: components['schemas']['ExportFormat'] | null
       /**
        * Include Timestamps
-       * @description Include timestamps in TXT format
-       * @default true
+       * @description Include timestamps in TXT format. If omitted, resolve from persisted export defaults.
        */
-      include_timestamps: boolean
+      include_timestamps?: boolean | null
       /**
        * Zip Name
        * @description Custom ZIP filename (without extension)
@@ -803,11 +843,51 @@ export interface components {
       defaults: components['schemas']['TranscriptionResolvedDefaultsResponse']
     }
     /**
+     * ExportConfigResponse
+     * @description Expose effective export defaults required by frontend clients.
+     */
+    ExportConfigResponse: {
+      defaults: components['schemas']['ExportResolvedDefaultsResponse']
+    }
+    /**
+     * ExportDefaultsPatchResponse
+     * @description Return effective export defaults after a PATCH update.
+     */
+    ExportDefaultsPatchResponse: {
+      defaults: components['schemas']['ExportResolvedDefaultsResponse']
+    }
+    /**
+     * ExportDefaultsUpdateRequest
+     * @description Partial update payload for application-level export defaults.
+     * @example {
+     *       "format": "vtt",
+     *       "include_timestamps": false
+     *     }
+     */
+    ExportDefaultsUpdateRequest: {
+      /** @description Default export format */
+      format?: components['schemas']['ExportFormat'] | null
+      /**
+       * Include Timestamps
+       * @description Whether TXT export includes timestamp prefixes by default
+       */
+      include_timestamps?: boolean | null
+    }
+    /**
      * ExportFormat
      * @description Supported export format identifiers.
      * @enum {string}
      */
     ExportFormat: 'srt' | 'vtt' | 'txt' | 'ass'
+    /**
+     * ExportResolvedDefaultsResponse
+     * @description Expose fully resolved export defaults used at runtime.
+     */
+    ExportResolvedDefaultsResponse: {
+      format: components['schemas']['ExportFormat']
+      /** Include Timestamps */
+      include_timestamps: boolean
+    }
     /**
      * FileConfigResponse
      * @description Expose upload-related configuration needed by the frontend.
@@ -1858,6 +1938,77 @@ export interface operations {
       }
     }
   }
+  get_export_config_api_config_export_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExportConfigResponse']
+        }
+      }
+    }
+  }
+  delete_export_defaults_api_config_export_defaults_delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  patch_export_defaults_api_config_export_defaults_patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ExportDefaultsUpdateRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExportDefaultsPatchResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   list_transcriptions_api_transcription_tasks__get: {
     parameters: {
       query?: {
@@ -2095,10 +2246,10 @@ export interface operations {
   export_transcription_api_transcription_tasks__task_id__export_get: {
     parameters: {
       query?: {
-        /** @description Output format */
-        format?: components['schemas']['ExportFormat']
-        /** @description Include timestamps (TXT only) */
-        include_timestamps?: boolean
+        /** @description Output format; omitted values use persisted export defaults */
+        format?: components['schemas']['ExportFormat'] | null
+        /** @description Include timestamps (TXT only); omitted values use persisted defaults */
+        include_timestamps?: boolean | null
         /** @description Save to server instead of download */
         save?: boolean
       }
@@ -2404,10 +2555,10 @@ export interface operations {
   export_transcription_api_transcriptions__task_id__export_get: {
     parameters: {
       query?: {
-        /** @description Output format */
-        format?: components['schemas']['ExportFormat']
-        /** @description Include timestamps (TXT only) */
-        include_timestamps?: boolean
+        /** @description Output format; omitted values use persisted export defaults */
+        format?: components['schemas']['ExportFormat'] | null
+        /** @description Include timestamps (TXT only); omitted values use persisted defaults */
+        include_timestamps?: boolean | null
         /** @description Save to server instead of download */
         save?: boolean
       }
