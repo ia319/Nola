@@ -170,6 +170,42 @@ describe('useHistoryTaskActions', () => {
     expect(onActionSettled).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps action result when refresh fails and still notifies settled', async () => {
+    batchCancelMock.mockResolvedValue({
+      action: 'cancel',
+      summary: { requested: 1, succeeded: 1, failed: 0 },
+      results: [
+        {
+          task_id: 'task-1',
+          ok: true,
+          message: 'Task cancelled successfully',
+          status: 'cancelled',
+          file_id: 'file-1',
+          filename: 'alpha.mp3',
+        },
+      ],
+    })
+
+    const refresh = vi.fn().mockRejectedValue(new Error('refresh-failed'))
+    const onActionSettled = vi.fn()
+
+    const { result } = renderHook(() =>
+      useHistoryTaskActions({
+        refresh,
+        onActionSettled,
+      }),
+    )
+
+    await act(async () => {
+      const response = await result.current.cancelTasks(['task-1'])
+      expect(response.summary).toEqual({ requested: 1, succeeded: 1, failed: 0 })
+    })
+
+    expect(refresh).toHaveBeenCalledTimes(1)
+    expect(onActionSettled).toHaveBeenCalledTimes(1)
+    expect(toast.success).toHaveBeenCalledWith('tasks.toast.batch.cancel.success')
+  })
+
   it('uses server filename when exporting a single task', async () => {
     const blob = new Blob(['srt-content'], { type: 'application/x-subrip' })
     downloadExportMock.mockResolvedValue({

@@ -6,6 +6,11 @@ import type { TaskSummary } from '@/shared/types'
 import { TaskHistoryPanel } from '../TaskHistoryPanel'
 
 const exportDefaultsMocks = vi.hoisted(() => ({
+  defaults: {
+    format: 'srt',
+    include_timestamps: true,
+  },
+  isLoading: false,
   refreshMock: vi.fn(),
   updateDefaultsMock: vi.fn().mockResolvedValue({
     format: 'srt',
@@ -22,11 +27,8 @@ vi.mock('@/features/export', async () => {
   return {
     ...actual,
     useExportDefaults: () => ({
-      defaults: {
-        format: 'srt',
-        include_timestamps: true,
-      },
-      isLoading: false,
+      defaults: exportDefaultsMocks.defaults,
+      isLoading: exportDefaultsMocks.isLoading,
       refresh: exportDefaultsMocks.refreshMock,
       updateDefaults: exportDefaultsMocks.updateDefaultsMock,
       resetDefaults: exportDefaultsMocks.resetDefaultsMock,
@@ -60,6 +62,15 @@ function buildTask(taskId: string, status: TaskSummary['status']): TaskSummary {
 
 afterEach(() => {
   vi.clearAllMocks()
+  exportDefaultsMocks.defaults = {
+    format: 'srt',
+    include_timestamps: true,
+  }
+  exportDefaultsMocks.isLoading = false
+  exportDefaultsMocks.refreshMock.mockResolvedValue({
+    format: 'srt',
+    include_timestamps: true,
+  })
 })
 
 describe('TaskHistoryPanel', () => {
@@ -222,5 +233,87 @@ describe('TaskHistoryPanel', () => {
     await waitFor(() => {
       expect(exportDefaultsMocks.resetDefaultsMock).toHaveBeenCalledTimes(1)
     })
+  })
+
+  it('loads persisted defaults before opening export dialog while loading', async () => {
+    exportDefaultsMocks.isLoading = true
+    exportDefaultsMocks.refreshMock.mockResolvedValue({
+      format: 'ass',
+      include_timestamps: false,
+    })
+    const onExportTask = vi.fn().mockResolvedValue({ mode: 'download' })
+
+    render(
+      <TaskHistoryPanel
+        tasks={[buildTask('task-completed', 'completed')]}
+        query={{
+          q: '',
+          status: 'all',
+          sort_by: 'created_at',
+          order: 'desc',
+          page: 1,
+          page_size: 20,
+        }}
+        total={1}
+        onSearchChange={vi.fn()}
+        onStatusChange={vi.fn()}
+        onSortByChange={vi.fn()}
+        onOrderChange={vi.fn()}
+        onPageChange={vi.fn()}
+        onExportTask={onExportTask}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'tasks.actions.export' }))
+
+    await waitFor(() => {
+      expect(exportDefaultsMocks.refreshMock).toHaveBeenCalledTimes(1)
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'tasks.exportDialog.actions.confirm' }))
+
+    await waitFor(() => {
+      expect(onExportTask).toHaveBeenCalledWith(
+        expect.objectContaining({ task_id: 'task-completed' }),
+        {
+          format: 'ass',
+          include_timestamps: false,
+          target: 'download',
+          filename: undefined,
+        },
+      )
+    })
+  })
+
+  it('keeps export dialog open when export request fails', async () => {
+    const onExportTask = vi.fn().mockRejectedValue(new Error('export-failed'))
+
+    render(
+      <TaskHistoryPanel
+        tasks={[buildTask('task-completed', 'completed')]}
+        query={{
+          q: '',
+          status: 'all',
+          sort_by: 'created_at',
+          order: 'desc',
+          page: 1,
+          page_size: 20,
+        }}
+        total={1}
+        onSearchChange={vi.fn()}
+        onStatusChange={vi.fn()}
+        onSortByChange={vi.fn()}
+        onOrderChange={vi.fn()}
+        onPageChange={vi.fn()}
+        onExportTask={onExportTask}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'tasks.actions.export' }))
+    fireEvent.click(screen.getByRole('button', { name: 'tasks.exportDialog.actions.confirm' }))
+
+    await waitFor(() => {
+      expect(onExportTask).toHaveBeenCalledTimes(1)
+    })
+    expect(screen.getByRole('button', { name: 'tasks.exportDialog.actions.confirm' })).toBeTruthy()
   })
 })

@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import logger from '@/config/logger'
 import {
   batchExport,
   buildSingleExportFilename,
@@ -144,8 +145,17 @@ export function useHistoryTaskActions({
         toast.error(t('tasks.toast.actionFailed'))
         throw error
       } finally {
-        await refresh()
-        onActionSettled?.()
+        try {
+          await refresh()
+        } catch (error: unknown) {
+          logger.error('history.refreshAfterActionFailed', { action, error })
+        } finally {
+          try {
+            onActionSettled?.()
+          } catch (error: unknown) {
+            logger.error('history.onActionSettledFailed', { action, error })
+          }
+        }
       }
     },
     [onActionSettled, onCancelledTask, onRetryCreatedTask, refresh, t],

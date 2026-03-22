@@ -217,17 +217,37 @@ export function TaskHistoryPanel({
     }
   }
 
-  function openSingleExportDialog(task: TaskSummary): void {
+  async function resolveDialogDefaults(): Promise<ExportRequestOptions | null> {
+    if (!exportDefaults.isLoading) {
+      return {
+        format: exportDefaults.defaults.format,
+        include_timestamps: exportDefaults.defaults.include_timestamps,
+      }
+    }
+
+    try {
+      const defaults = await exportDefaults.refresh()
+      return {
+        format: defaults.format,
+        include_timestamps: defaults.include_timestamps,
+      }
+    } catch {
+      toast.error(t('tasks.toast.actionFailed'))
+      return null
+    }
+  }
+
+  async function openSingleExportDialog(task: TaskSummary): Promise<void> {
     if (!onExportTask) {
       return
     }
 
-    setExportValue(
-      createExportDialogValue({
-        format: exportDefaults.defaults.format,
-        include_timestamps: exportDefaults.defaults.include_timestamps,
-      }),
-    )
+    const defaults = await resolveDialogDefaults()
+    if (!defaults) {
+      return
+    }
+
+    setExportValue(createExportDialogValue(defaults))
     setExportDialog({
       open: true,
       mode: 'single',
@@ -236,17 +256,17 @@ export function TaskHistoryPanel({
     })
   }
 
-  function openBatchExportDialog(taskIds: string[]): void {
+  async function openBatchExportDialog(taskIds: string[]): Promise<void> {
     if (!onBatchExportTasks || taskIds.length === 0) {
       return
     }
 
-    setExportValue(
-      createExportDialogValue({
-        format: exportDefaults.defaults.format,
-        include_timestamps: exportDefaults.defaults.include_timestamps,
-      }),
-    )
+    const defaults = await resolveDialogDefaults()
+    if (!defaults) {
+      return
+    }
+
+    setExportValue(createExportDialogValue(defaults))
     setExportDialog({
       open: true,
       mode: 'batch',
@@ -274,23 +294,28 @@ export function TaskHistoryPanel({
 
     setIsSubmittingExport(true)
     try {
-      if (exportDialog.mode === 'single') {
-        if (!onExportTask || !exportDialog.task) {
-          return
+      try {
+        if (exportDialog.mode === 'single') {
+          if (!onExportTask || !exportDialog.task) {
+            return
+          }
+          const result = await onExportTask(exportDialog.task, buildSingleExportOptions())
+          if (result.mode === 'save') {
+            setLastSavedPath(result.savedPath)
+          }
+        } else {
+          if (!onBatchExportTasks || exportDialog.taskIds.length === 0) {
+            return
+          }
+          await onBatchExportTasks(exportDialog.taskIds, {
+            ...options,
+            zip_name: exportValue.zipName.trim() || undefined,
+          })
+          setSelectedTaskIds([])
         }
-        const result = await onExportTask(exportDialog.task, buildSingleExportOptions())
-        if (result.mode === 'save') {
-          setLastSavedPath(result.savedPath)
-        }
-      } else {
-        if (!onBatchExportTasks || exportDialog.taskIds.length === 0) {
-          return
-        }
-        await onBatchExportTasks(exportDialog.taskIds, {
-          ...options,
-          zip_name: exportValue.zipName.trim() || undefined,
-        })
-        setSelectedTaskIds([])
+      } catch {
+        // Keep dialog open so users can retry after export action failure.
+        return
       }
 
       if (exportValue.saveAsDefault) {
@@ -421,7 +446,7 @@ export function TaskHistoryPanel({
                     !onBatchExportTasks
                   }
                   onClick={() => {
-                    openBatchExportDialog(exportableTaskIds)
+                    void openBatchExportDialog(exportableTaskIds)
                   }}
                 >
                   {t('tasks.history.batchActions.export', { count: exportableTaskIds.length })}
@@ -476,7 +501,7 @@ export function TaskHistoryPanel({
         onExportTask={
           onExportTask
             ? async (task) => {
-                openSingleExportDialog(task)
+                await openSingleExportDialog(task)
               }
             : undefined
         }
