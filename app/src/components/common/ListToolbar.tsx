@@ -17,6 +17,7 @@ export interface ListToolbarProps {
   sortByValue: TaskSortBy
   orderValue: SortOrder
   onSearchChange: (value: string) => void
+  onSearchSubmit?: (value: string) => void
   onStatusChange: (value: TaskFilterStatus) => void
   onSortByChange: (value: TaskSortBy) => void
   onOrderChange: (value: SortOrder) => void
@@ -46,6 +47,7 @@ export function ListToolbar({
   sortByValue,
   orderValue,
   onSearchChange,
+  onSearchSubmit,
   onStatusChange,
   onSortByChange,
   onOrderChange,
@@ -61,6 +63,14 @@ export function ListToolbar({
         disabled={disabled}
         onChange={(event) => {
           onSearchChange(event.target.value)
+        }}
+        onKeyDown={(event) => {
+          if (!onSearchSubmit) return
+          if (event.key !== 'Enter') return
+          if (event.nativeEvent.isComposing) return
+          // TODO: Add an explicit search trigger control when product requires click-based submit.
+          event.preventDefault()
+          onSearchSubmit(searchValue)
         }}
         className="min-w-[220px] flex-1"
         placeholder={t('tasks.filters.searchPlaceholder')}

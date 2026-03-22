@@ -74,6 +74,41 @@ afterEach(() => {
 })
 
 describe('TaskHistoryPanel', () => {
+  it('submits search only on explicit Enter action', async () => {
+    const onSearchChange = vi.fn()
+
+    render(
+      <TaskHistoryPanel
+        tasks={[buildTask('task-processing', 'processing')]}
+        query={{
+          q: '',
+          status: 'all',
+          sort_by: 'created_at',
+          order: 'desc',
+          page: 1,
+          page_size: 20,
+        }}
+        total={1}
+        onSearchChange={onSearchChange}
+        onStatusChange={vi.fn()}
+        onSortByChange={vi.fn()}
+        onOrderChange={vi.fn()}
+        onPageChange={vi.fn()}
+      />,
+    )
+
+    const searchInput = screen.getByPlaceholderText('tasks.filters.searchPlaceholder')
+    fireEvent.change(searchInput, { target: { value: 'alpha' } })
+
+    expect(onSearchChange).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(searchInput, { key: 'Enter' })
+
+    await waitFor(() => {
+      expect(onSearchChange).toHaveBeenCalledWith('alpha')
+    })
+  })
+
   it('routes batch actions with status-based eligible task ids', async () => {
     const onBatchCancelTasks = vi.fn().mockResolvedValue(undefined)
     const onBatchRetryTasks = vi.fn().mockResolvedValue(undefined)

@@ -124,6 +124,12 @@ export function TaskHistoryPanel({
   const [isSubmittingExport, setIsSubmittingExport] = useState(false)
   const [isUpdatingDefaults, setIsUpdatingDefaults] = useState(false)
   const [lastSavedPath, setLastSavedPath] = useState<string | null>(null)
+  const [searchDraft, setSearchDraft] = useState(query.q)
+
+  useEffect(() => {
+    // Keep input draft aligned when search state is changed externally via URL navigation.
+    setSearchDraft(query.q)
+  }, [query.q])
 
   useEffect(() => {
     setSelectedTaskIds([])
@@ -469,11 +475,12 @@ export function TaskHistoryPanel({
               </div>
             </div>
             <ListToolbar
-              searchValue={query.q}
+              searchValue={searchDraft}
               statusValue={query.status}
               sortByValue={query.sort_by}
               orderValue={query.order}
-              onSearchChange={onSearchChange}
+              onSearchChange={setSearchDraft}
+              onSearchSubmit={onSearchChange}
               onStatusChange={onStatusChange}
               onSortByChange={onSortByChange}
               onOrderChange={onOrderChange}
