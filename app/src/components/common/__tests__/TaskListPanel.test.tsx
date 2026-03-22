@@ -217,11 +217,7 @@ describe('TaskListPanel', () => {
     task.filename = ''
 
     render(
-      <TaskListPanel
-        title="tasks.history.title"
-        emptyText="tasks.history.empty"
-        tasks={[task]}
-      />,
+      <TaskListPanel title="tasks.history.title" emptyText="tasks.history.empty" tasks={[task]} />,
     )
 
     expect(screen.getByText('tasks.fields.file: file-task-1')).toBeTruthy()

@@ -178,7 +178,8 @@ export function TaskListPanel({
     const totalPages = Math.max(1, Math.ceil(normalizedTotal / normalizedPageSize))
     const currentPage = Math.min(Math.max(page, 1), totalPages)
     const start = normalizedTotal === 0 ? 0 : (currentPage - 1) * normalizedPageSize + 1
-    const end = normalizedTotal === 0 ? 0 : Math.min(normalizedTotal, currentPage * normalizedPageSize)
+    const end =
+      normalizedTotal === 0 ? 0 : Math.min(normalizedTotal, currentPage * normalizedPageSize)
 
     return {
       currentPage,
