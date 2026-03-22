@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { toast, Toaster } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
+import type { SingleExportRequestOptions } from '@/features/export'
 import { TaskHistoryPanel, useHistoryTaskActions, useHistoryTasks } from '@/features/history'
 import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
 import {
@@ -148,6 +149,10 @@ function App() {
     await historyTaskActions.retryTasks([task.task_id])
   }
 
+  async function handleExportHistoryTask(task: TaskSummary, options: SingleExportRequestOptions) {
+    await historyTaskActions.exportTask(task, options)
+  }
+
   async function handleDeleteHistoryTask(task: TaskSummary) {
     try {
       await deleteTaskRecordAndRefresh(task.task_id)
@@ -230,6 +235,10 @@ function App() {
           onCancelTask={handleCancelHistoryTask}
           onRetryTask={handleRetryHistoryTask}
           onDeleteTaskRecord={handleDeleteHistoryTask}
+          onExportTask={handleExportHistoryTask}
+          onBatchCancelTasks={historyTaskActions.cancelTasks}
+          onBatchRetryTasks={historyTaskActions.retryTasks}
+          onBatchExportTasks={historyTaskActions.exportTasks}
         />
       </ErrorBoundary>
 
