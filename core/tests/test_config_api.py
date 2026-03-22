@@ -212,3 +212,84 @@ class TestConfigAPI:
         defaults = config_response.json()["transcription"]["defaults"]
         assert defaults["beam_size"] == 5
         assert defaults["vad_filter"] is False
+
+    def test_get_export_config_returns_effective_defaults(self, client: TestClient):
+        """Get /api/config/export should expose export defaults for the UI."""
+        response = client.get("/api/config/export")
+
+        assert response.status_code == 200
+        defaults = response.json()["defaults"]
+        assert defaults["format"] == "srt"
+        assert defaults["include_timestamps"] is True
+
+    def test_patch_export_defaults_updates_persisted_values(self, client: TestClient):
+        """PATCH export defaults should persist selected override values."""
+        response = client.patch(
+            "/api/config/export/defaults",
+            json={"format": "vtt", "include_timestamps": False},
+        )
+
+        assert response.status_code == 200
+        patched = response.json()["defaults"]
+        assert patched["format"] == "vtt"
+        assert patched["include_timestamps"] is False
+
+        get_response = client.get("/api/config/export")
+        assert get_response.status_code == 200
+        stored = get_response.json()["defaults"]
+        assert stored["format"] == "vtt"
+        assert stored["include_timestamps"] is False
+
+    def test_patch_export_defaults_clears_override_with_null(self, client: TestClient):
+        """Explicit null should remove one export override key."""
+        client.patch(
+            "/api/config/export/defaults",
+            json={"format": "ass", "include_timestamps": False},
+        )
+
+        response = client.patch(
+            "/api/config/export/defaults",
+            json={"format": None},
+        )
+
+        assert response.status_code == 200
+        defaults = response.json()["defaults"]
+        assert defaults["format"] == "srt"
+        assert defaults["include_timestamps"] is False
+
+    def test_delete_export_defaults_resets_override_layer(self, client: TestClient):
+        """Delete should clear export overrides and restore built-in defaults."""
+        client.patch(
+            "/api/config/export/defaults",
+            json={"format": "txt", "include_timestamps": False},
+        )
+
+        delete_response = client.delete("/api/config/export/defaults")
+        get_response = client.get("/api/config/export")
+
+        assert delete_response.status_code == 204
+        defaults = get_response.json()["defaults"]
+        assert defaults["format"] == "srt"
+        assert defaults["include_timestamps"] is True
+
+    def test_patch_export_defaults_rejects_unknown_key(self, client: TestClient):
+        """Unknown export defaults keys should fail validation."""
+        response = client.patch(
+            "/api/config/export/defaults",
+            json={"zip_name": "custom"},
+        )
+
+        assert response.status_code == 422
+        detail = response.json()["detail"]
+        assert any(item.get("loc", [None])[-1] == "zip_name" for item in detail)
+
+    def test_patch_export_defaults_rejects_invalid_format(self, client: TestClient):
+        """Unsupported export format should fail before persisting defaults."""
+        response = client.patch(
+            "/api/config/export/defaults",
+            json={"format": "docx"},
+        )
+
+        assert response.status_code == 422
+        detail = response.json()["detail"]
+        assert any(item.get("loc", [None])[-1] == "format" for item in detail)
