@@ -196,9 +196,7 @@ def patch_export_defaults(
     patch_values = request.get_options_dict()
 
     if patch_values:
-        current_overrides = config_db.get_all(EXPORT_CONFIG_PREFIX)
-        next_overrides = apply_override_patch(current_overrides, patch_values)
-        config_db.replace_many(EXPORT_CONFIG_PREFIX, next_overrides)
+        config_db.patch_many(EXPORT_CONFIG_PREFIX, patch_values)
 
     return ExportDefaultsPatchResponse(
         defaults=_to_export_resolved_defaults(get_effective_export_defaults(config_db))

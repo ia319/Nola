@@ -149,3 +149,28 @@ class TestAppConfigDatabase:
             "vad_parameters": {"speech_pad_ms": 500}
         }
         assert store.get_all("ui.") == {"language": "en"}
+
+    def test_patch_many_applies_partial_updates_without_prefix_rewrite(self, config_db):
+        """patch_many() should update and delete without clearing untouched keys."""
+        store, _ = config_db
+
+        store.set_many(
+            "export.",
+            {
+                "format": "srt",
+                "include_timestamps": True,
+            },
+        )
+        store.set_many("ui.", {"language": "en"})
+
+        touched = store.patch_many(
+            "export.",
+            {
+                "format": "vtt",
+                "include_timestamps": None,
+            },
+        )
+
+        assert set(touched) == {"export.format", "export.include_timestamps"}
+        assert store.get_all("export.") == {"format": "vtt"}
+        assert store.get_all("ui.") == {"language": "en"}

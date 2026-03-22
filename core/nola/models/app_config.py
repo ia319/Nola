@@ -89,6 +89,40 @@ class AppConfigDatabase:
                     written_keys.append(full_key)
         return written_keys
 
+    def patch_many(self, prefix: str, values: ConfigMap) -> list[str]:
+        """Patch configuration keys under a prefix in one transaction.
+
+        Values set to ``None`` remove the key; other values are upserted.
+        This supports PATCH semantics without read-merge-replace on the full
+        prefix, so concurrent updates to different keys do not clobber each
+        other.
+
+        Args:
+            prefix: Key prefix to patch (e.g. ``"export."``)
+            values: Mapping of unprefixed keys to values or ``None`` to delete
+
+        Returns:
+            List of full keys touched by the patch operation.
+        """
+        touched_keys: list[str] = []
+        with closing(self._connect()) as conn:
+            with conn:
+                for key, value in values.items():
+                    full_key = f"{prefix}{key}"
+                    if value is None:
+                        conn.execute(
+                            "DELETE FROM app_config WHERE key = ?",
+                            (full_key,),
+                        )
+                    else:
+                        conn.execute(
+                            "INSERT INTO app_config (key, value) VALUES (?, ?) "
+                            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                            (full_key, json.dumps(value)),
+                        )
+                    touched_keys.append(full_key)
+        return touched_keys
+
     def replace_many(self, prefix: str, values: ConfigMap) -> list[str]:
         """Replace all entries under a prefix in one transaction.
 

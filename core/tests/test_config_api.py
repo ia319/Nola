@@ -242,10 +242,11 @@ class TestConfigAPI:
 
     def test_patch_export_defaults_clears_override_with_null(self, client: TestClient):
         """Explicit null should remove one export override key."""
-        client.patch(
+        precondition = client.patch(
             "/api/config/export/defaults",
             json={"format": "ass", "include_timestamps": False},
         )
+        assert precondition.status_code == 200
 
         response = client.patch(
             "/api/config/export/defaults",
@@ -259,10 +260,11 @@ class TestConfigAPI:
 
     def test_delete_export_defaults_resets_override_layer(self, client: TestClient):
         """Delete should clear export overrides and restore built-in defaults."""
-        client.patch(
+        precondition = client.patch(
             "/api/config/export/defaults",
             json={"format": "txt", "include_timestamps": False},
         )
+        assert precondition.status_code == 200
 
         delete_response = client.delete("/api/config/export/defaults")
         get_response = client.get("/api/config/export")
