@@ -2,7 +2,13 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -73,20 +79,24 @@ export function ExportDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onCancel}
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          onCancel()
+        }
+      }}
     >
-      <Card className="w-full max-w-md" onClick={(event) => event.stopPropagation()}>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>
+      <DialogContent className="w-full max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
             {mode === 'single'
               ? t('tasks.exportDialog.descriptionSingle')
               : t('tasks.exportDialog.descriptionBatch')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="export-format">{t('tasks.exportDialog.fields.format')}</Label>
             <Select
@@ -244,8 +254,8 @@ export function ExportDialog({
                 : t('tasks.exportDialog.actions.confirm')}
             </Button>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

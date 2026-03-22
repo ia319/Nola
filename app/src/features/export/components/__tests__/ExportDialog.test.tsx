@@ -45,6 +45,7 @@ describe('ExportDialog', () => {
       />,
     )
 
+    expect(screen.getByRole('dialog')).toBeTruthy()
     expect(screen.getByLabelText('tasks.exportDialog.fields.target')).toBeTruthy()
     expect(screen.getByLabelText('tasks.exportDialog.fields.filename')).toBeTruthy()
     expect(
