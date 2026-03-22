@@ -2,8 +2,16 @@ import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import {
+  batchExport,
+  buildSingleExportFilename,
+  downloadExport,
+  saveExport,
+} from '@/features/export'
+import type { ExportRequestOptions, SingleExportRequestOptions } from '@/features/export'
 import { batchCancelHistoryTasks, batchRetryHistoryTasks } from '@/features/history/api'
-import type { BatchTaskActionResponse, TaskStatus } from '@/shared/types'
+import { downloadBlob } from '@/shared/lib/utils'
+import type { BatchTaskActionResponse, TaskStatus, TaskSummary } from '@/shared/types'
 
 interface RetryCreatedTask {
   taskId: string
@@ -28,6 +36,14 @@ export interface UseHistoryTaskActionsOptions {
 export interface UseHistoryTaskActionsResult {
   cancelTasks: (taskIds: string[]) => Promise<BatchTaskActionResponse>
   retryTasks: (taskIds: string[]) => Promise<BatchTaskActionResponse>
+  exportTask: (
+    task: Pick<TaskSummary, 'task_id' | 'filename'>,
+    options: SingleExportRequestOptions,
+  ) => Promise<{ mode: 'download' } | { mode: 'save'; savedPath: string }>
+  exportTasks: (
+    taskIds: string[],
+    options: ExportRequestOptions & { zip_name?: string | null },
+  ) => Promise<void>
 }
 
 type HistoryTaskAction = 'cancel' | 'retry'
@@ -149,8 +165,84 @@ export function useHistoryTaskActions({
     [runAction],
   )
 
+  const exportTask = useCallback(
+    async (
+      task: Pick<TaskSummary, 'task_id' | 'filename'>,
+      options: SingleExportRequestOptions,
+    ): Promise<{ mode: 'download' } | { mode: 'save'; savedPath: string }> => {
+      const target = options.target ?? 'download'
+      const requestOptions: ExportRequestOptions = {
+        format: options.format,
+        include_timestamps: options.include_timestamps,
+      }
+      const customFilename = options.filename?.trim()
+      try {
+        if (target === 'save') {
+          const response = await saveExport(task.task_id, {
+            ...requestOptions,
+            filename: customFilename || undefined,
+          })
+          toast.success(t('tasks.toast.export.saved', { path: response.saved_path }))
+          return {
+            mode: 'save',
+            savedPath: response.saved_path,
+          }
+        }
+
+        const blob = await downloadExport(task.task_id, {
+          ...requestOptions,
+          filename: customFilename || undefined,
+        })
+        const filename = buildSingleExportFilename({
+          format: options.format,
+          taskId: task.task_id,
+          taskFilename: task.filename,
+          customFilename,
+        })
+        downloadBlob(blob, filename)
+        toast.success(t('tasks.toast.export.one'))
+        return { mode: 'download' }
+      } catch (error: unknown) {
+        toast.error(t('tasks.toast.actionFailed'))
+        throw error
+      }
+    },
+    [t],
+  )
+
+  const exportTasks = useCallback(
+    async (
+      taskIds: string[],
+      options: ExportRequestOptions & { zip_name?: string | null },
+    ): Promise<void> => {
+      const normalizedTaskIds = normalizeTaskIds(taskIds)
+      if (normalizedTaskIds.length === 0) {
+        return
+      }
+
+      const normalizedZipName = options.zip_name?.trim()
+
+      try {
+        const { blob, filename } = await batchExport({
+          task_ids: normalizedTaskIds,
+          format: options.format,
+          include_timestamps: options.include_timestamps,
+          zip_name: normalizedZipName ? normalizedZipName : undefined,
+        })
+        downloadBlob(blob, filename || 'export.zip')
+        toast.success(t('tasks.toast.batch.export.success', { count: normalizedTaskIds.length }))
+      } catch (error: unknown) {
+        toast.error(t('tasks.toast.actionFailed'))
+        throw error
+      }
+    },
+    [t],
+  )
+
   return {
     cancelTasks,
     retryTasks,
+    exportTask,
+    exportTasks,
   }
 }
