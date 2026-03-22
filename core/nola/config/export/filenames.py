@@ -57,3 +57,20 @@ def resolve_unique_export_path(directory: Path, filename: str) -> Path:
         if not next_candidate.exists():
             return next_candidate
         counter += 1
+
+
+def write_unique_export_text(directory: Path, filename: str, content: str) -> Path:
+    """Write text to a unique filename using atomic exclusive create."""
+    stem = Path(filename).stem
+    suffix = Path(filename).suffix
+
+    counter = 0
+    while True:
+        candidate_name = filename if counter == 0 else f"{stem}_{counter}{suffix}"
+        candidate = directory / candidate_name
+        try:
+            with candidate.open("x", encoding="utf-8") as handle:
+                handle.write(content)
+            return candidate
+        except FileExistsError:
+            counter += 1

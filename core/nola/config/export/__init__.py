@@ -8,6 +8,7 @@ from nola.config.export.defaults import (
 from nola.config.export.filenames import (
     build_export_filename,
     resolve_unique_export_path,
+    write_unique_export_text,
 )
 from nola.config.export.metadata import (
     ExportConfigResponse,
@@ -24,4 +25,5 @@ __all__ = [
     "get_effective_defaults",
     "get_engine_defaults",
     "resolve_unique_export_path",
+    "write_unique_export_text",
 ]

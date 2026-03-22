@@ -25,7 +25,7 @@ from nola.api.schemas import (
 )
 from nola.config.export import (
     build_export_filename,
-    resolve_unique_export_path,
+    write_unique_export_text,
 )
 from nola.config.export import (
     get_effective_defaults as get_effective_export_defaults,
@@ -677,8 +677,7 @@ async def export_transcription(
     if save:
         exports_dir = settings.exports_dir
         exports_dir.mkdir(parents=True, exist_ok=True)
-        export_path = resolve_unique_export_path(exports_dir, export_filename)
-        export_path.write_text(content, encoding="utf-8")
+        export_path = write_unique_export_text(exports_dir, export_filename, content)
 
         relative_path = f"exports/{export_path.name}"
         return JSONResponse(content={"saved_path": relative_path})
