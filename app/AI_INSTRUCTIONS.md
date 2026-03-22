@@ -30,6 +30,10 @@ app/                          # Frontend workspace root
 ├── eslint.config.js          # ESLint flat config
 ├── index.html                # Vite entry HTML
 ├── package.json              # pnpm configuration
+├── pnpm-lock.yaml            # pnpm lockfile
+├── README.md                 # Frontend docs
+├── public/                   # Public static assets
+│   └── vite.svg              # Vite logo asset
 ├── tsconfig.json             # TypeScript 5.9 project references
 ├── tsconfig.app.json         # App-level TS config (src/)
 ├── tsconfig.node.json        # Node-level TS config (vite.config.ts)
@@ -39,6 +43,7 @@ app/                          # Frontend workspace root
 │   ├── App.tsx               # Root shell wiring upload + transcription features
 │   ├── index.css             # Tailwind v4 entry + shadcn variables
 │   ├── main.tsx              # React mounting + temporary App shell entry
+│   ├── router.tsx            # TanStack Router tree and validation wiring
 │   ├── test/                 # Shared Vitest setup
 │   │   └── setup.ts          # jest-dom + ResizeObserver polyfill + test log silencing
 │   │
@@ -63,14 +68,19 @@ app/                          # Frontend workspace root
 │   │
 │   ├── components/           # Shared UI components (mostly shadcn generated)
 │   │   ├── common/           # Cross-feature common components barrel
+│   │   │   ├── __tests__/
+│   │   │   │   ├── ErrorBoundary.test.tsx # Fallback and retry tests
+│   │   │   │   └── TaskListPanel.test.tsx # Task list panel behavior tests
 │   │   │   ├── ErrorBoundary.tsx # Render-error catch + i18n fallback + retry
-│   │   │   ├── index.ts      # Common export entry (feature-agnostic)
-│   │   │   └── __tests__/
-│   │   │       └── ErrorBoundary.test.tsx # Fallback and retry tests
+│   │   │   ├── ListToolbar.tsx # Shared search/filter/sort toolbar
+│   │   │   ├── TaskListPanel.tsx # Shared task list panel with actions
+│   │   │   ├── types.ts      # Shared common-component callback contracts
+│   │   │   └── index.ts      # Common export entry (feature-agnostic)
 │   │   └── ui/               # Radix + Tailwind primitives
 │   │       ├── button.tsx    # Button variants
 │   │       ├── card.tsx      # Card container primitives
 │   │       ├── collapsible.tsx # Collapsible primitives
+│   │       ├── dialog.tsx    # Dialog primitives
 │   │       ├── input.tsx     # Input primitive
 │   │       ├── label.tsx     # Label primitive
 │   │       ├── progress.tsx  # Progress bar primitive
@@ -84,35 +94,76 @@ app/                          # Frontend workspace root
 │   │
 │   ├── features/             # Business modules (Domain logic)
 │   │   ├── export/           # Subtitle export & download
-│   │   │   ├── api.ts        # downloadExport, saveExport, batchExport
+│   │   │   ├── api.ts        # downloadExport, saveExport, batchExport, defaults APIs
+│   │   │   ├── components/   # Export dialog UI
+│   │   │   │   ├── ExportDialog.tsx # Shared export option dialog
+│   │   │   │   └── __tests__/
+│   │   │   │       └── ExportDialog.test.tsx # Export dialog behavior tests
+│   │   │   ├── hooks/        # Export defaults state hooks
+│   │   │   │   ├── useExportDefaults.ts # Export defaults load/update/reset hook
+│   │   │   │   └── __tests__/
+│   │   │   │       └── useExportDefaults.test.ts # Export defaults hook tests
+│   │   │   ├── lib/          # Export-private helpers
+│   │   │   │   ├── filename.ts # Single export fallback filename builder
+│   │   │   │   └── __tests__/
+│   │   │   │       └── filename.test.ts # Filename helper tests
 │   │   │   └── index.ts      # Feature public exports
-│   │   ├── history/          # Historical task pagination & search
-│   │   │   └── index.ts      # Placeholder
+│   │   ├── history/          # Historical task pagination & actions
+│   │   │   ├── api.ts        # listHistoryTasks, batch cancel/retry
+│   │   │   ├── components/   # History feature UI components
+│   │   │   │   ├── TaskHistoryPanel.tsx # History list with batch actions/export
+│   │   │   │   └── __tests__/
+│   │   │   │       └── TaskHistoryPanel.test.tsx # History panel behavior tests
+│   │   │   ├── hooks/        # History data/action hooks
+│   │   │   │   ├── useHistoryTasks.ts # Backend-paged history query hook
+│   │   │   │   ├── useHistoryTaskActions.ts # Batch action/export orchestration
+│   │   │   │   └── __tests__/
+│   │   │   │       ├── useHistoryTasks.test.ts # History query hook tests
+│   │   │   │       └── useHistoryTaskActions.test.ts # History action hook tests
+│   │   │   └── index.ts      # Feature public exports
 │   │   ├── realtime/         # WebSocket streaming
 │   │   │   └── index.ts      # Placeholder
 │   │   ├── transcription/    # Task CRUD, options, polling, status tracking
-│   │   │   ├── api.ts        # createTask, listTasks, getTask, cancelTask
+│   │   │   ├── __tests__/    # Feature-level tests
+│   │   │   │   ├── actions.test.ts # Action wrapper behavior tests
+│   │   │   │   └── build-request.test.ts # buildRequest payload tests
+│   │   │   ├── actions.ts    # Action wrappers for cancel/retry/delete behaviors
+│   │   │   ├── api.ts        # createTask, listTasks, getTask, cancelTask, deleteTaskRecord
 │   │   │   ├── components/   # Transcription feature UI components
 │   │   │   │   ├── AdvancedOptions.tsx # Collapsible advanced settings panel
+│   │   │   │   ├── CurrentBatchTasksPanel.tsx # Session task list panel
 │   │   │   │   ├── OptionsBar.tsx     # Language/task selectors + start button
 │   │   │   │   └── __tests__/         # Component tests
 │   │   │   │       ├── AdvancedOptions.test.tsx # Advanced options UI behavior tests
 │   │   │   │       └── OptionsBar.test.tsx # Options bar task-creation tests
 │   │   │   ├── hooks/        # Transcription state hooks
+│   │   │   │   ├── useRecentTaskQuery.ts # Recent tasks query/filter/sort hook
+│   │   │   │   ├── useTaskPolling.ts # Foreground/background polling hook
 │   │   │   │   ├── useTranscriptionOptions.ts # Options state + buildRequest
 │   │   │   │   └── __tests__/
+│   │   │   │       ├── useRecentTaskQuery.test.ts # Recent query hook tests
+│   │   │   │       ├── useTaskPolling.test.ts # Polling hook tests
 │   │   │   │       └── useTranscriptionOptions.test.ts # Hook behavior tests
 │   │   │   ├── lib/          # Transcription-private pure helpers
 │   │   │   │   ├── defaults-patch.ts # Build defaults patch payloads
 │   │   │   │   ├── object-path.ts # Dot-path read/write helpers
 │   │   │   │   ├── schema-adapter.ts # Map schema to top-level UI model
+│   │   │   │   ├── task-refresh.ts # In-memory task refresh broadcaster
+│   │   │   │   ├── task-selectors.ts # Recent/active task selectors
+│   │   │   │   ├── task-status-groups.ts # Shared active/terminal status groups
 │   │   │   │   ├── temperature.ts # Temperature list parse/validate
 │   │   │   │   └── __tests__/
 │   │   │   │       ├── defaults-patch.test.ts # Defaults patch helper tests
 │   │   │   │       ├── schema-adapter.test.ts # Schema adapter behavior tests
+│   │   │   │       ├── task-refresh.test.ts # Task refresh broadcaster tests
+│   │   │   │       ├── task-selectors.test.ts # Task selector tests
 │   │   │   │       └── temperature.test.ts # Temperature validation tests
-│   │   │   ├── __tests__/    # Feature-level tests
-│   │   │   │   └── build-request.test.ts # buildRequest payload tests
+│   │   │   ├── store/        # Transcription stores
+│   │   │   │   ├── session-tasks-store.ts # Session-scoped task store
+│   │   │   │   ├── task-board-store.ts # Polled task-board store
+│   │   │   │   └── __tests__/
+│   │   │   │       ├── session-tasks-store.test.ts # Session store tests
+│   │   │   │       └── task-board-store.test.ts # Task-board store tests
 │   │   │   ├── types.ts      # Transcription domain types + option field definitions
 │   │   │   └── index.ts      # Feature barrel exports
 │   │   └── upload/           # File upload with progress
@@ -164,10 +215,14 @@ app/                          # Frontend workspace root
 │   │       ├── config.ts      # Config response aliases (schema/defaults)
 │   │       ├── file.ts        # FileInfo, FileUploadResponse, etc.
 │   │       ├── task.ts        # TaskSummary, TaskStatus, ExportFormat, etc.
+│   │       ├── task-query.ts  # Shared task query model contracts
 │   │       └── index.ts       # Barrel re-export
 │   │
-│   └── routes/               # Placeholder for future TanStack Router definitions
-│       └── .gitkeep          # Placeholder for feature routes
+│   └── routes/               # Route composition and URL query contracts
+│       ├── .gitkeep          # Directory placeholder
+│       ├── AppShell.tsx      # Shared shell route component
+│       ├── HistoryPage.tsx   # History route composition component
+│       └── history-search.ts # History URL query normalize/build helpers
 ```
 
 ---
@@ -201,11 +256,10 @@ app/                          # Frontend workspace root
 > Do not add new frontend calls to `/api/transcriptions/options/defaults`.
 >
 > [!NOTE]
-> `@tanstack/react-router`, `zustand`, and `next-themes` are installed, but the current
-> implementation does not yet use router/store wiring as the active app shell. `App.tsx`
-> serves as a temporary integration shell wiring upload and transcription features with
-> independent `ErrorBoundary` panels and sonner toast notifications. `next-themes` is
-> only consumed by `components/ui/sonner.tsx`; there is no active theme toggle yet.
+> Use `router.tsx` and `src/routes/*` as the active route composition entry.
+> Keep `AppShell` mounted to share navigation and task polling across routes.
+> Keep page composition in route components (`App.tsx` for `/`, `HistoryPage.tsx` for `/history`).
+> Use `next-themes` only through `components/ui/sonner.tsx`; do not assume a theme toggle UI.
 
 ### API Type Strategy
 
@@ -284,7 +338,14 @@ Business domain logic separated by feature. Each feature has an `api.ts` (API fu
   - `types.ts`: Upload domain contracts (`UploadItem`, `UseFileUploadReturn` including `batchError`/`clearBatchError`).
   - `index.ts`: Public barrel exports (`FileUploader`, `UploadProgress`, `UploadList`, `useFileUpload`, `UploadItem`).
 - **transcription**:
-  - `api.ts`: `createTask` (accept `CreateTaskPayload`, filter undefined), `listTasks` (status filter), `getTask`, `cancelTask`.
+  - `api.ts`: `createTask` (accept `CreateTaskPayload`, filter undefined), `listTasks` (status/search/sort), `getTask`, `cancelTask`, `deleteTaskRecord`.
+  - `actions.ts`: Wrap cancel/retry/delete flows and keep refresh behavior explicit.
+  - `components/CurrentBatchTasksPanel.tsx`: Render session-scoped task list with local filtering, sorting, and pagination.
+  - `hooks/useRecentTaskQuery.ts`: Normalize recent-task query behavior for toolbar + pagination.
+  - `hooks/useTaskPolling.ts`: Poll task board with visibility-aware interval and refresh broadcasts.
+  - `lib/task-refresh.ts`: Broadcast task refresh events without hook coupling.
+  - `lib/task-selectors.ts`, `lib/task-status-groups.ts`: Keep selector logic and status groups centralized.
+  - `store/session-tasks-store.ts`, `store/task-board-store.ts`: Keep task session state and polled board state isolated.
   - `components/OptionsBar.tsx`: Render schema-adapted language/task selectors, initial prompt textarea, defaults save/reset actions, and "Start Transcription" button. Validate selected task values against schema-derived options before state update.
   - `components/AdvancedOptions.tsx`: Render schema-driven advanced groups and keep top-level controls (`language`/`task`/`initial_prompt`) out of the advanced panel.
   - `components/__tests__/OptionsBar.test.tsx`: Component tests covering disabled state, initial prompt edits, task creation results, and fallback error mapping.
@@ -298,10 +359,18 @@ Business domain logic separated by feature. Each feature has an `api.ts` (API fu
   - `lib/__tests__/defaults-patch.test.ts`: Defaults PATCH payload builder tests.
   - `lib/__tests__/schema-adapter.test.ts`: Schema adapter extraction and fallback tests.
   - `lib/__tests__/temperature.test.ts`: Temperature parse/validate unit tests.
-  - `__tests__/build-request.test.ts`: Payload composition tests (defaults, single/multiple options, undefined filtering, full merge).
+  - `__tests__/actions.test.ts`, `__tests__/build-request.test.ts`: Cover action wrappers and payload composition.
   - `types.ts`: Transcription domain types (`AdvancedTranscriptionOptions`, `CreateTaskPayload`, task option state contracts).
-- **export**: `downloadExport` (blob), `saveExport` (server path), `batchExport` (ZIP blob).
-- **history**: Placeholder for paginated viewing of past tasks.
+- **export**:
+  - `api.ts`: `downloadExport` (blob), `saveExport` (server path), `batchExport` (ZIP blob), export-default config APIs.
+  - `components/ExportDialog.tsx`: Share export option UI across single and batch flows.
+  - `hooks/useExportDefaults.ts`: Resolve persisted export defaults with update/reset support.
+  - `lib/filename.ts`: Build frontend fallback filename aligned with backend filename rules.
+- **history**:
+  - `api.ts`: Request backend history list and batch cancel/retry actions.
+  - `hooks/useHistoryTasks.ts`: Drive backend pagination with page-clamp behavior.
+  - `hooks/useHistoryTaskActions.ts`: Handle history actions/export side effects and refresh sequencing.
+  - `components/TaskHistoryPanel.tsx`: Compose history list, selection actions, and export dialog entry.
 - **realtime**: Placeholder for future WebSocket-based live transcription.
 
 ### src/components/common/
@@ -309,7 +378,11 @@ Business domain logic separated by feature. Each feature has an `api.ts` (API fu
 Cross-feature composite components with feature-agnostic behavior.
 
 - **ErrorBoundary.tsx**: Class-based error boundary wrapping child components. Catch render-time exceptions and display i18n-powered fallback UI with retry button. Use `withTranslation` HOC for i18n access in class components.
+- **ListToolbar.tsx**: Share task list search/status/sort/order controls across recent/history panels.
+- **TaskListPanel.tsx**: Share task row rendering, row actions, and pagination shell across recent/history panels.
+- **types.ts**: Keep shared task action callback contracts.
 - **__tests__/ErrorBoundary.test.tsx**: Component tests covering fallback rendering and retry recovery.
+- **__tests__/TaskListPanel.test.tsx**: Component tests covering task row actions and pagination behavior.
 - **index.ts**: Barrel entry for common components. Prefer importing via `@/components/common`.
 
 ### src/shared/
@@ -331,11 +404,16 @@ Cross-feature shared code, split into `lib/` and `types/`.
 - **types/config.ts**: Thin aliases for config contracts (`AppConfig`, `EngineDefaults`, `TranscriptionDefaultsUpdateRequest`).
 - **types/file.ts**: Thin aliases over OpenAPI file schemas (`FileInfo`, `FileUploadResponse`, etc.).
 - **types/task.ts**: Thin aliases over OpenAPI task schemas + derived types (`TaskStatus`, `ExportFormat` from schema enums).
+- **types/task-query.ts**: Shared query model for list toolbar and pagination contracts.
 - **types/index.ts**: Barrel re-export for `import type { ... } from '@/shared/types'`.
 
 ### src/routes/
 
-Reserve this directory for future TanStack Router route definitions. It is currently a placeholder (`.gitkeep`).
+Keep route composition and search-model helpers in this directory.
+
+- **AppShell.tsx**: Keep shared navigation shell and global polling mount.
+- **HistoryPage.tsx**: Compose `/history` page interactions and route callbacks.
+- **history-search.ts**: Normalize route search params and build task query model.
 
 ### src/lib/
 
@@ -354,7 +432,7 @@ i18next bootstrap and locale dictionaries.
 
 Runtime config access and fallback constants.
 
-- **api.ts**: Config endpoints (`fetchAppConfig`, `fetchEngineDefaults`, defaults `PATCH`/`DELETE`).
+- **api.ts**: Config endpoints (`fetchAppConfig`, `fetchEngineDefaults`, transcription defaults `PATCH`/`DELETE`, export defaults `GET/PATCH/DELETE`).
 - **use-app-config.ts**: Shared config singleton store using `useSyncExternalStore`, plus `refreshAppConfig()`. Notify all mounted consumers when the shared snapshot changes.
 - **constants.ts**: Fallback values used when config fetch fails or before first load.
 - **env.ts**: Safely extracts `import.meta.env.VITE_*` using Nullish Coalescing (`??`).
@@ -430,8 +508,8 @@ Frontend (Vite/React) ───[ HTTP Proxy /api/* ]───▶ Backend (FastAP
    Axios (API Client)
    ├── shared/types/   (openapi-typescript → domain aliases/contracts)
    ├── features/*/api.ts (thin typed functions)
-   React Hooks State (Zustand reserved for future shared state)
-   TanStack Router (installed, not wired yet)
+   React Hooks State + Feature Stores (Zustand)
+   TanStack Router (active via router.tsx + src/routes/*)
    Tailwind v4 (Style)
 ```
 
@@ -443,5 +521,5 @@ Frontend (Vite/React) ───[ HTTP Proxy /api/* ]───▶ Backend (FastAP
 | ---------------- | ------------------------------------------------------------ |
 | Allowed Uploads  | mp3, wav, flac, m4a, ogg, webm, aac, mp4, wma                |
 | Max File Size    | 500 MB (Client-side validation required)                     |
-| Polling Interval | 2000 ms (Long-term plan to switch to WS/SSE)                 |
+| Polling Interval | 2000 ms foreground, 6000 ms background (hidden document)     |
 | Theme            | `next-themes` installed; no active theme shell or toggle yet |
