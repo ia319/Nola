@@ -10,6 +10,7 @@ export type {
   BatchExportDownloadResult,
   ExportRequestOptions,
   SingleExportApiOptions,
+  SingleExportDownloadResult,
   SingleExportRequestOptions,
   SingleExportTarget,
 } from './api'

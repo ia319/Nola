@@ -189,17 +189,17 @@ export function useHistoryTaskActions({
           }
         }
 
-        const blob = await downloadExport(task.task_id, {
+        const { blob, filename: serverFilename } = await downloadExport(task.task_id, {
           ...requestOptions,
           filename: customFilename || undefined,
         })
-        const filename = buildSingleExportFilename({
+        const fallbackFilename = buildSingleExportFilename({
           format: options.format,
           taskId: task.task_id,
           taskFilename: task.filename,
           customFilename,
         })
-        downloadBlob(blob, filename)
+        downloadBlob(blob, serverFilename || fallbackFilename)
         toast.success(t('tasks.toast.export.one'))
         return { mode: 'download' }
       } catch (error: unknown) {

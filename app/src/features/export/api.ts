@@ -34,6 +34,11 @@ export interface BatchExportDownloadResult {
   filename: string | null
 }
 
+export interface SingleExportDownloadResult {
+  blob: Blob
+  filename: string | null
+}
+
 function parseFilenameFromContentDisposition(contentDisposition?: string): string | null {
   if (!contentDisposition) {
     return null
@@ -66,13 +71,17 @@ export async function downloadExport(
   taskId: string,
   params: SingleExportApiOptions = {},
   signal?: AbortSignal,
-): Promise<Blob> {
-  const { data } = await apiClient.get<Blob>(`${BASE}/${taskId}/export`, {
+): Promise<SingleExportDownloadResult> {
+  const response = await apiClient.get<Blob>(`${BASE}/${taskId}/export`, {
     params: { ...params, save: false },
     responseType: 'blob',
     signal,
   })
-  return data
+  const filename = parseFilenameFromContentDisposition(response.headers['content-disposition'])
+  return {
+    blob: response.data,
+    filename,
+  }
 }
 
 /** Save export to server-side path. */

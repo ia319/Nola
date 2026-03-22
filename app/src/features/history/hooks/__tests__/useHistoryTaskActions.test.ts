@@ -166,9 +166,12 @@ describe('useHistoryTaskActions', () => {
     expect(onActionSettled).toHaveBeenCalledTimes(1)
   })
 
-  it('exports a single task via single-export API and downloads blob', async () => {
+  it('uses server filename when exporting a single task', async () => {
     const blob = new Blob(['srt-content'], { type: 'application/x-subrip' })
-    downloadExportMock.mockResolvedValue(blob)
+    downloadExportMock.mockResolvedValue({
+      blob,
+      filename: 'server-name.srt',
+    })
 
     const onActionSettled = vi.fn()
 
@@ -197,14 +200,17 @@ describe('useHistoryTaskActions', () => {
       include_timestamps: true,
     })
     expect(downloadBlobMock).toHaveBeenCalledTimes(1)
-    expect(downloadBlobMock.mock.calls[0]?.[1]).toBe('demo.srt')
+    expect(downloadBlobMock.mock.calls[0]?.[1]).toBe('server-name.srt')
     expect(toast.success).toHaveBeenCalledWith('tasks.toast.export.one')
     expect(onActionSettled).not.toHaveBeenCalled()
   })
 
-  it('passes custom filename when exporting a single task', async () => {
+  it('falls back to local filename when single-export response has no filename', async () => {
     const blob = new Blob(['srt-content'], { type: 'application/x-subrip' })
-    downloadExportMock.mockResolvedValue(blob)
+    downloadExportMock.mockResolvedValue({
+      blob,
+      filename: null,
+    })
 
     const { result } = renderHook(() =>
       useHistoryTaskActions({
