@@ -13,11 +13,15 @@ vi.mock('@/features/history/api', () => ({
   batchRetryHistoryTasks: vi.fn(),
 }))
 
-vi.mock('@/features/export', () => ({
-  batchExport: vi.fn(),
-  downloadExport: vi.fn(),
-  saveExport: vi.fn(),
-}))
+vi.mock('@/features/export', async () => {
+  const actual = await vi.importActual('@/features/export')
+  return {
+    ...actual,
+    batchExport: vi.fn(),
+    downloadExport: vi.fn(),
+    saveExport: vi.fn(),
+  }
+})
 
 vi.mock('@/shared/lib/utils', () => ({
   downloadBlob: vi.fn(),
