@@ -327,4 +327,137 @@ describe('TaskHistoryPanel', () => {
       await screen.findByRole('button', { name: 'tasks.exportDialog.actions.confirm' }),
     ).toBeTruthy()
   })
+
+  it('prunes selected task ids when current-page tasks refresh', async () => {
+    const query = {
+      q: '',
+      status: 'all' as const,
+      sort_by: 'created_at' as const,
+      order: 'desc' as const,
+      page: 1,
+      page_size: 20,
+    }
+    const taskA = buildTask('task-a', 'completed')
+    const taskB = buildTask('task-b', 'completed')
+    const onPageChange = vi.fn()
+
+    const { rerender } = render(
+      <TaskHistoryPanel
+        tasks={[taskA, taskB]}
+        query={query}
+        total={2}
+        onSearchChange={vi.fn()}
+        onStatusChange={vi.fn()}
+        onSortByChange={vi.fn()}
+        onOrderChange={vi.fn()}
+        onPageChange={onPageChange}
+      />,
+    )
+
+    fireEvent.click(screen.getByLabelText('tasks.selection.selectTask:taskId=task-a'))
+
+    await screen.findByText('tasks.history.selection.selectedCount:count=1')
+
+    rerender(
+      <TaskHistoryPanel
+        tasks={[taskB]}
+        query={query}
+        total={1}
+        onSearchChange={vi.fn()}
+        onStatusChange={vi.fn()}
+        onSortByChange={vi.fn()}
+        onOrderChange={vi.fn()}
+        onPageChange={onPageChange}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('tasks.history.selection.selectedCount:count=0')).toBeTruthy()
+    })
+  })
+
+  it('guards batch actions against duplicate rapid clicks', async () => {
+    let resolveCancel!: () => void
+    const onBatchCancelTasks = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCancel = () => resolve()
+        }),
+    )
+
+    render(
+      <TaskHistoryPanel
+        tasks={[buildTask('task-processing', 'processing')]}
+        query={{
+          q: '',
+          status: 'all',
+          sort_by: 'created_at',
+          order: 'desc',
+          page: 1,
+          page_size: 20,
+        }}
+        total={1}
+        onSearchChange={vi.fn()}
+        onStatusChange={vi.fn()}
+        onSortByChange={vi.fn()}
+        onOrderChange={vi.fn()}
+        onPageChange={vi.fn()}
+        onBatchCancelTasks={onBatchCancelTasks}
+      />,
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'tasks.history.selection.selectCurrentPage' }),
+    )
+    const cancelButton = screen.getByRole('button', {
+      name: 'tasks.history.batchActions.cancel:count=1',
+    })
+    fireEvent.click(cancelButton)
+    fireEvent.click(cancelButton)
+
+    expect(onBatchCancelTasks).toHaveBeenCalledTimes(1)
+
+    resolveCancel()
+    await waitFor(() => {
+      expect(screen.getByText('tasks.history.selection.selectedCount:count=0')).toBeTruthy()
+    })
+  })
+
+  it('uses resolved filename fallback in single-export default hint', async () => {
+    const onExportTask = vi.fn().mockResolvedValue({ mode: 'download' })
+    const completedTask = {
+      ...buildTask('task-completed', 'completed'),
+      filename: null,
+    }
+
+    render(
+      <TaskHistoryPanel
+        tasks={[completedTask]}
+        query={{
+          q: '',
+          status: 'all',
+          sort_by: 'created_at',
+          order: 'desc',
+          page: 1,
+          page_size: 20,
+        }}
+        total={1}
+        onSearchChange={vi.fn()}
+        onStatusChange={vi.fn()}
+        onSortByChange={vi.fn()}
+        onOrderChange={vi.fn()}
+        onPageChange={vi.fn()}
+        resolveFileName={() => 'resolved-audio.wav'}
+        onExportTask={onExportTask}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'tasks.actions.export' }))
+
+    expect(
+      await screen.findByText(
+        'tasks.exportDialog.fields.defaultFilenameHint:filename=resolved-audio.srt',
+      ),
+    ).toBeTruthy()
+  })
 })

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -111,6 +111,7 @@ export function TaskHistoryPanel({
   const exportDefaults = useExportDefaults()
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
   const [runningBatchAction, setRunningBatchAction] = useState<'cancel' | 'retry' | null>(null)
+  const runningBatchActionRef = useRef(false)
   const [exportDialog, setExportDialog] = useState<ExportDialogState>({
     open: false,
     mode: 'single',
@@ -139,6 +140,15 @@ export function TaskHistoryPanel({
   const currentPageTaskIds = useMemo(() => {
     return tasks.map((task) => task.task_id)
   }, [tasks])
+
+  useEffect(() => {
+    // Keep selection count aligned with visible rows when data refresh removes tasks.
+    const currentPageTaskIdSet = new Set(currentPageTaskIds)
+    setSelectedTaskIds((previous) => {
+      const next = previous.filter((taskId) => currentPageTaskIdSet.has(taskId))
+      return next.length === previous.length ? previous : next
+    })
+  }, [currentPageTaskIds])
 
   const allCurrentPageSelected =
     currentPageTaskIds.length > 0 &&
@@ -188,15 +198,20 @@ export function TaskHistoryPanel({
     taskIds: string[],
     handler?: (taskIds: string[]) => Promise<unknown>,
   ): Promise<void> {
-    if (!handler || taskIds.length === 0 || runningBatchAction) {
+    if (!handler || taskIds.length === 0 || runningBatchActionRef.current) {
       return
     }
 
+    // Block duplicate submissions in the same tick before state-driven disable is rendered.
+    runningBatchActionRef.current = true
     setRunningBatchAction(action)
     try {
       await handler(taskIds)
       setSelectedTaskIds([])
+    } catch {
+      return
     } finally {
+      runningBatchActionRef.current = false
       setRunningBatchAction(null)
     }
   }
@@ -371,7 +386,7 @@ export function TaskHistoryPanel({
       ? buildSingleExportFilename({
           format: exportValue.format,
           taskId: exportDialog.task.task_id,
-          taskFilename: exportDialog.task.filename,
+          taskFilename: exportDialog.task.filename ?? resolveFileName?.(exportDialog.task) ?? null,
         })
       : undefined
 
