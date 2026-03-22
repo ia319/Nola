@@ -45,13 +45,13 @@ describe('ExportDialog', () => {
       />,
     )
 
-    expect(screen.getByRole('dialog')).toBeTruthy()
-    expect(screen.getByLabelText('tasks.exportDialog.fields.target')).toBeTruthy()
-    expect(screen.getByLabelText('tasks.exportDialog.fields.filename')).toBeTruthy()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByLabelText('tasks.exportDialog.fields.target')).toBeInTheDocument()
+    expect(screen.getByLabelText('tasks.exportDialog.fields.filename')).toBeInTheDocument()
     expect(
       screen.getByText('tasks.exportDialog.fields.defaultFilenameHint:filename=meeting.srt'),
-    ).toBeTruthy()
-    expect(screen.queryByLabelText('tasks.exportDialog.fields.zipName')).toBeNull()
+    ).toBeInTheDocument()
+    expect(screen.queryByLabelText('tasks.exportDialog.fields.zipName')).not.toBeInTheDocument()
 
     const input = screen.getByLabelText('tasks.exportDialog.fields.filename')
     fireEvent.change(input, { target: { value: 'custom-name' } })
@@ -77,9 +77,9 @@ describe('ExportDialog', () => {
       />,
     )
 
-    expect(screen.getByLabelText('tasks.exportDialog.fields.zipName')).toBeTruthy()
-    expect(screen.getByText('tasks.exportDialog.fields.zipNameHint')).toBeTruthy()
-    expect(screen.queryByLabelText('tasks.exportDialog.fields.target')).toBeNull()
-    expect(screen.queryByLabelText('tasks.exportDialog.fields.filename')).toBeNull()
+    expect(screen.getByLabelText('tasks.exportDialog.fields.zipName')).toBeInTheDocument()
+    expect(screen.getByText('tasks.exportDialog.fields.zipNameHint')).toBeInTheDocument()
+    expect(screen.queryByLabelText('tasks.exportDialog.fields.target')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('tasks.exportDialog.fields.filename')).not.toBeInTheDocument()
   })
 })

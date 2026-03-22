@@ -125,14 +125,12 @@ describe('useExportDefaults', () => {
       }
     }>()
 
-    fetchExportConfigMock
-      .mockReturnValueOnce(bootstrap.promise)
-      .mockResolvedValueOnce({
-        defaults: {
-          format: 'ass',
-          include_timestamps: false,
-        },
-      })
+    fetchExportConfigMock.mockReturnValueOnce(bootstrap.promise).mockResolvedValueOnce({
+      defaults: {
+        format: 'ass',
+        include_timestamps: false,
+      },
+    })
     deleteExportDefaultsMock.mockResolvedValue(undefined)
 
     const { result } = renderHook(() => useExportDefaults())
@@ -159,6 +157,55 @@ describe('useExportDefaults', () => {
     expect(result.current.defaults).toEqual({
       format: 'ass',
       include_timestamps: false,
+    })
+  })
+
+  it('clears loading state when update defaults fails during bootstrap', async () => {
+    const bootstrap = createDeferred<{
+      defaults: {
+        format: 'srt' | 'vtt' | 'txt' | 'ass'
+        include_timestamps: boolean
+      }
+    }>()
+
+    fetchExportConfigMock.mockReturnValueOnce(bootstrap.promise)
+    patchExportDefaultsMock.mockRejectedValue(new Error('patch-failed'))
+
+    const { result } = renderHook(() => useExportDefaults())
+
+    await act(async () => {
+      await expect(
+        result.current.updateDefaults({
+          format: 'ass',
+          include_timestamps: false,
+        }),
+      ).rejects.toThrow('patch-failed')
+    })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+  })
+
+  it('clears loading state when reset defaults fails during bootstrap', async () => {
+    const bootstrap = createDeferred<{
+      defaults: {
+        format: 'srt' | 'vtt' | 'txt' | 'ass'
+        include_timestamps: boolean
+      }
+    }>()
+
+    fetchExportConfigMock.mockReturnValueOnce(bootstrap.promise)
+    deleteExportDefaultsMock.mockRejectedValue(new Error('delete-failed'))
+
+    const { result } = renderHook(() => useExportDefaults())
+
+    await act(async () => {
+      await expect(result.current.resetDefaults()).rejects.toThrow('delete-failed')
+    })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
     })
   })
 })

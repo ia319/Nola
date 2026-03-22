@@ -36,25 +36,31 @@ export function useExportDefaults(): UseExportDefaultsResult {
   const updateDefaults = useCallback(
     async (payload: ExportDefaultsUpdateRequest): Promise<ExportDefaults> => {
       const requestVersion = ++requestVersionRef.current
-      const response = await patchExportDefaults(payload)
-      if (requestVersion === requestVersionRef.current) {
-        setDefaults(response.defaults)
+      try {
+        const response = await patchExportDefaults(payload)
+        if (requestVersion === requestVersionRef.current) {
+          setDefaults(response.defaults)
+        }
+        return response.defaults
+      } finally {
+        setIsLoading(false)
       }
-      setIsLoading(false)
-      return response.defaults
     },
     [],
   )
 
   const resetDefaults = useCallback(async (): Promise<ExportDefaults> => {
     const requestVersion = ++requestVersionRef.current
-    await deleteExportDefaults()
-    const response = await fetchExportConfig()
-    if (requestVersion === requestVersionRef.current) {
-      setDefaults(response.defaults)
+    try {
+      await deleteExportDefaults()
+      const response = await fetchExportConfig()
+      if (requestVersion === requestVersionRef.current) {
+        setDefaults(response.defaults)
+      }
+      return response.defaults
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
-    return response.defaults
   }, [])
 
   useEffect(() => {
