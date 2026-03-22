@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { CreateTaskPayload } from '@/shared/types'
 
-import { cancelTaskAndRefresh, deleteTaskRecordAndRefresh, retryTaskAndRefresh } from '../actions'
+import { cancelTaskAndRefresh, deleteTaskRecordAction, retryTaskAndRefresh } from '../actions'
 import { cancelTask, createTask, deleteTaskRecord } from '../api'
 import { requestTaskRefresh } from '../lib/task-refresh'
 
@@ -81,23 +81,23 @@ describe('task actions', () => {
     expect(requestTaskRefreshMock).not.toHaveBeenCalled()
   })
 
-  it('requests immediate sync after delete-record succeeds', async () => {
+  it('does not request global sync after delete-record succeeds', async () => {
     deleteTaskRecordMock.mockResolvedValue({
       task_id: 'task-1',
       message: 'Task record deleted successfully',
     })
 
-    const response = await deleteTaskRecordAndRefresh('task-1')
+    const response = await deleteTaskRecordAction('task-1')
 
     expect(deleteTaskRecordMock).toHaveBeenCalledWith('task-1')
-    expect(requestTaskRefreshMock).toHaveBeenCalledTimes(1)
+    expect(requestTaskRefreshMock).not.toHaveBeenCalled()
     expect(response.task_id).toBe('task-1')
   })
 
-  it('requests immediate sync when delete-record fails', async () => {
+  it('does not request global sync when delete-record fails', async () => {
     deleteTaskRecordMock.mockRejectedValue(new Error('delete failed'))
 
-    await expect(deleteTaskRecordAndRefresh('task-1')).rejects.toThrow('delete failed')
-    expect(requestTaskRefreshMock).toHaveBeenCalledTimes(1)
+    await expect(deleteTaskRecordAction('task-1')).rejects.toThrow('delete failed')
+    expect(requestTaskRefreshMock).not.toHaveBeenCalled()
   })
 })

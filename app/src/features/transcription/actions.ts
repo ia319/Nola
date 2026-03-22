@@ -25,13 +25,7 @@ export async function retryTaskAndRefresh(payload: CreateTaskPayload): Promise<C
   return response
 }
 
-/** Keep action-triggered sync consistent for delete-record flow. */
-export async function deleteTaskRecordAndRefresh(
-  taskId: string,
-): Promise<DeleteTaskRecordResponse> {
-  try {
-    return await deleteTaskRecord(taskId)
-  } finally {
-    requestTaskRefresh()
-  }
+/** Execute delete-record request without implicit global refresh side effects. */
+export async function deleteTaskRecordAction(taskId: string): Promise<DeleteTaskRecordResponse> {
+  return deleteTaskRecord(taskId)
 }

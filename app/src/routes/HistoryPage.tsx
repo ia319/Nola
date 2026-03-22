@@ -7,7 +7,7 @@ import { ErrorBoundary } from '@/components/common'
 import type { SingleExportRequestOptions } from '@/features/export'
 import { TaskHistoryPanel, useHistoryTaskActions, useHistoryTasks } from '@/features/history'
 import {
-  deleteTaskRecordAndRefresh,
+  deleteTaskRecordAction,
   requestTaskRefresh,
   useSessionTasksStore,
 } from '@/features/transcription'
@@ -155,7 +155,7 @@ export function HistoryPage() {
 
   async function handleDeleteHistoryTask(task: TaskSummary) {
     try {
-      await deleteTaskRecordAndRefresh(task.task_id)
+      await deleteTaskRecordAction(task.task_id)
       removeSessionTask(task.task_id)
       toast.success(t('tasks.toast.recordDeleted', { taskId: task.task_id }))
     } catch {
