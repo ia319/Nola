@@ -14,9 +14,14 @@ export interface TaskListPanelProps {
   emptyText: string
   tasks: TaskSummary[]
   resolveFileName?: (task: TaskSummary) => string | undefined
+  selection?: {
+    selectedTaskIds: string[]
+    onToggleTask: (taskId: string, checked: boolean) => void
+  }
   onCancelTask?: TaskActionHandler
   onRetryTask?: TaskActionHandler
   onDeleteTaskRecord?: TaskActionHandler
+  onExportTask?: TaskActionHandler
   toolbar?: ReactNode
   pagination?: {
     page: number
@@ -65,7 +70,7 @@ function clampProgress(progress: number): number {
   return progress
 }
 
-type TaskActionType = 'cancel' | 'retry' | 'delete'
+type TaskActionType = 'cancel' | 'retry' | 'delete' | 'export'
 
 function buildActionKey(taskId: string, action: TaskActionType): string {
   return `${taskId}:${action}`
@@ -92,15 +97,20 @@ export function TaskListPanel({
   emptyText,
   tasks,
   resolveFileName,
+  selection,
   onCancelTask,
   onRetryTask,
   onDeleteTaskRecord,
+  onExportTask,
   toolbar,
   pagination,
 }: TaskListPanelProps) {
   const { t } = useTranslation()
   const runningActionsRef = useRef<Set<string>>(new Set())
   const [runningActions, setRunningActions] = useState<Set<string>>(() => new Set())
+  const selectedTaskIdSet = useMemo(() => {
+    return new Set(selection?.selectedTaskIds ?? [])
+  }, [selection?.selectedTaskIds])
 
   function markActionRunning(actionKey: string): boolean {
     if (runningActionsRef.current.has(actionKey)) {
@@ -196,34 +206,64 @@ export function TaskListPanel({
             const retryable = task.status === 'failed' || task.status === 'cancelled'
             const deletable =
               task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
+            const exportable = task.status === 'completed'
             const progress = clampProgress(task.progress)
 
             const cancelBusy = runningActions.has(buildActionKey(task.task_id, 'cancel'))
             const retryBusy = runningActions.has(buildActionKey(task.task_id, 'retry'))
             const deleteBusy = runningActions.has(buildActionKey(task.task_id, 'delete'))
+            const exportBusy = runningActions.has(buildActionKey(task.task_id, 'export'))
 
             return (
               <div key={task.task_id} className="space-y-2 rounded-lg border p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="space-y-1 text-sm">
-                    <p className="font-medium">
-                      {t('tasks.fields.taskId')}: {task.task_id}
-                    </p>
-                    <p className="text-muted-foreground">
-                      {t('tasks.fields.file')}: {fileLabel}
-                    </p>
-                    <p className="text-muted-foreground">
-                      {t('tasks.fields.status')}: {resolveStatusLabel(task.status, t)}
-                    </p>
-                    <p className="text-muted-foreground">
-                      {t('tasks.fields.createdAt')}: {formatDatetime(task.created_at)}
-                    </p>
-                    <p className="text-muted-foreground">
-                      {t('tasks.fields.completedAt')}: {formatDatetime(task.completed_at)}
-                    </p>
+                  <div className="flex gap-2">
+                    {selection ? (
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4"
+                        aria-label={t('tasks.selection.selectTask', { taskId: task.task_id })}
+                        checked={selectedTaskIdSet.has(task.task_id)}
+                        onChange={(event) => {
+                          selection.onToggleTask(task.task_id, event.target.checked)
+                        }}
+                      />
+                    ) : null}
+                    <div className="space-y-1 text-sm">
+                      <p className="font-medium">
+                        {t('tasks.fields.taskId')}: {task.task_id}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {t('tasks.fields.file')}: {fileLabel}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {t('tasks.fields.status')}: {resolveStatusLabel(task.status, t)}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {t('tasks.fields.createdAt')}: {formatDatetime(task.created_at)}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {t('tasks.fields.completedAt')}: {formatDatetime(task.completed_at)}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
+                    {exportable && onExportTask ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        aria-busy={exportBusy}
+                        disabled={exportBusy}
+                        onClick={() => {
+                          void runTaskAction(task, 'export', onExportTask)
+                        }}
+                      >
+                        {exportBusy ? t('tasks.actions.exporting') : t('tasks.actions.export')}
+                      </Button>
+                    ) : null}
+
                     {pendingOrProcessing && onCancelTask ? (
                       <Button
                         type="button"

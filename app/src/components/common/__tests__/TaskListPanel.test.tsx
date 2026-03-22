@@ -192,4 +192,35 @@ describe('TaskListPanel', () => {
     expect(screen.getByText('tasks.pagination.summary:start=1,end=1,total=5')).toBeTruthy()
     expect(screen.getByText('tasks.pagination.page:current=1,total=5')).toBeTruthy()
   })
+
+  it('supports row selection and completed-task export action', async () => {
+    const onToggleTask = vi.fn()
+    const onExportTask = vi.fn().mockResolvedValue(undefined)
+
+    render(
+      <TaskListPanel
+        title="tasks.history.title"
+        emptyText="tasks.history.empty"
+        tasks={[buildTask('task-1', 'completed')]}
+        selection={{
+          selectedTaskIds: [],
+          onToggleTask,
+        }}
+        onExportTask={onExportTask}
+      />,
+    )
+
+    const checkbox = screen.getByRole('checkbox', {
+      name: 'tasks.selection.selectTask:taskId=task-1',
+    })
+    fireEvent.click(checkbox)
+    expect(onToggleTask).toHaveBeenCalledWith('task-1', true)
+
+    const exportButton = screen.getByRole('button', { name: 'tasks.actions.export' })
+    fireEvent.click(exportButton)
+
+    await waitFor(() => {
+      expect(onExportTask).toHaveBeenCalledTimes(1)
+    })
+  })
 })
