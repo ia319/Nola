@@ -132,7 +132,7 @@ class TestConfigAPI:
         self, client: TestClient
     ):
         """Explicit null should remove top-level and nested override keys."""
-        client.patch(
+        precondition = client.patch(
             "/api/config/transcription/defaults",
             json={
                 "beam_size": 3,
@@ -142,6 +142,7 @@ class TestConfigAPI:
                 },
             },
         )
+        assert precondition.status_code == 200
 
         response = client.patch(
             "/api/config/transcription/defaults",
@@ -200,6 +201,7 @@ class TestConfigAPI:
             "/api/config/transcription/defaults",
             json={"beam_size": 3, "vad_filter": True},
         )
+        assert patch_response.status_code == 200
 
         patched = patch_response.json()["defaults"]
         assert patched["beam_size"] == 3
