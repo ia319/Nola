@@ -134,7 +134,10 @@ describe('TaskHistoryPanel', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'tasks.history.batchActions.export:count=1' }),
     )
-    fireEvent.click(screen.getByRole('button', { name: 'tasks.exportDialog.actions.confirm' }))
+    const confirmBatchExportButton = await screen.findByRole('button', {
+      name: 'tasks.exportDialog.actions.confirm',
+    })
+    fireEvent.click(confirmBatchExportButton)
 
     await waitFor(() => {
       expect(onBatchExportTasks).toHaveBeenCalledWith(['task-completed'], {
@@ -171,15 +174,17 @@ describe('TaskHistoryPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'tasks.actions.export' }))
 
-    expect(
-      screen.getByText('tasks.exportDialog.fields.defaultFilenameHint:filename=task-completed.srt'),
-    ).toBeTruthy()
+    await screen.findByText(
+      'tasks.exportDialog.fields.defaultFilenameHint:filename=task-completed.srt',
+    )
 
-    fireEvent.change(screen.getByLabelText('tasks.exportDialog.fields.filename'), {
+    fireEvent.change(await screen.findByLabelText('tasks.exportDialog.fields.filename'), {
       target: { value: 'my-caption' },
     })
-    fireEvent.click(screen.getByLabelText('tasks.exportDialog.actions.saveAsDefault'))
-    fireEvent.click(screen.getByRole('button', { name: 'tasks.exportDialog.actions.confirm' }))
+    fireEvent.click(await screen.findByLabelText('tasks.exportDialog.actions.saveAsDefault'))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'tasks.exportDialog.actions.confirm' }),
+    )
 
     await waitFor(() => {
       expect(onExportTask).toHaveBeenCalledWith(
@@ -227,7 +232,7 @@ describe('TaskHistoryPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'tasks.actions.export' }))
     fireEvent.click(
-      screen.getByRole('button', { name: 'tasks.exportDialog.actions.resetDefaults' }),
+      await screen.findByRole('button', { name: 'tasks.exportDialog.actions.resetDefaults' }),
     )
 
     await waitFor(() => {
@@ -269,7 +274,9 @@ describe('TaskHistoryPanel', () => {
     await waitFor(() => {
       expect(exportDefaultsMocks.refreshMock).toHaveBeenCalledTimes(1)
     })
-    fireEvent.click(screen.getByRole('button', { name: 'tasks.exportDialog.actions.confirm' }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'tasks.exportDialog.actions.confirm' }),
+    )
 
     await waitFor(() => {
       expect(onExportTask).toHaveBeenCalledWith(
@@ -309,11 +316,15 @@ describe('TaskHistoryPanel', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'tasks.actions.export' }))
-    fireEvent.click(screen.getByRole('button', { name: 'tasks.exportDialog.actions.confirm' }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'tasks.exportDialog.actions.confirm' }),
+    )
 
     await waitFor(() => {
       expect(onExportTask).toHaveBeenCalledTimes(1)
     })
-    expect(screen.getByRole('button', { name: 'tasks.exportDialog.actions.confirm' })).toBeTruthy()
+    expect(
+      await screen.findByRole('button', { name: 'tasks.exportDialog.actions.confirm' }),
+    ).toBeTruthy()
   })
 })
