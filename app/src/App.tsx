@@ -150,7 +150,7 @@ function App() {
   }
 
   async function handleExportHistoryTask(task: TaskSummary, options: SingleExportRequestOptions) {
-    await historyTaskActions.exportTask(task, options)
+    return historyTaskActions.exportTask(task, options)
   }
 
   async function handleDeleteHistoryTask(task: TaskSummary) {
