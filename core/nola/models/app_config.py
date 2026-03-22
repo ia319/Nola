@@ -5,9 +5,10 @@ import logging
 import sqlite3
 from contextlib import closing
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 from nola.config import settings
+from nola.config.common.types import ConfigMap, ConfigValue
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ class AppConfigDatabase:
         conn.row_factory = sqlite3.Row
         return conn
 
-    def get_all(self, prefix: str) -> dict[str, Any]:
+    def get_all(self, prefix: str) -> ConfigMap:
         """Get all configuration entries matching a key prefix.
 
         Args:
@@ -50,19 +51,19 @@ class AppConfigDatabase:
                 "SELECT key, value FROM app_config WHERE key LIKE ?",
                 (f"{prefix}%",),
             )
-            result: dict[str, Any] = {}
+            result: ConfigMap = {}
             for row in cursor:
                 raw_key: str = row["key"]
                 unprefixed = raw_key[len(prefix) :]
                 try:
-                    result[unprefixed] = json.loads(row["value"])
+                    result[unprefixed] = cast(ConfigValue, json.loads(row["value"]))
                 except json.JSONDecodeError:
                     logger.warning(
                         "Corrupted config value for key %s, skipping", raw_key
                     )
             return result
 
-    def set_many(self, prefix: str, values: dict[str, Any]) -> list[str]:
+    def set_many(self, prefix: str, values: ConfigMap) -> list[str]:
         """Write multiple configuration entries with a key prefix.
 
         Existing keys are overwritten. Keys not present in *values* are
@@ -88,7 +89,7 @@ class AppConfigDatabase:
                     written_keys.append(full_key)
         return written_keys
 
-    def replace_many(self, prefix: str, values: dict[str, Any]) -> list[str]:
+    def replace_many(self, prefix: str, values: ConfigMap) -> list[str]:
         """Replace all entries under a prefix in one transaction.
 
         Args:

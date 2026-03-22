@@ -3,21 +3,22 @@
 from __future__ import annotations
 
 import copy
-from typing import Any
+
+from nola.common.types import JsonDict
 
 
-def deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+def deep_merge(base: JsonDict, overrides: JsonDict) -> JsonDict:
     """Merge nested config overrides without discarding untouched subkeys.
 
     This is a plain recursive merge. Keys present in *overrides* replace or
     extend matching keys in *base*; keys absent from *overrides* are kept
     as-is. ``None`` values are treated as regular values and written through.
 
-    The returned dict is fully detached from *base* — nested sub-dicts are
+    The returned dict is fully detached from *base* -- nested sub-dicts are
     deep-copied so later mutations never leak back into the original.
 
     For PATCH-style semantics where ``None`` means "remove the key", use the
-    dedicated ``_apply_override_patch`` in the config route module instead.
+    dedicated ``apply_override_patch`` helper in the config common module.
     """
     result = copy.deepcopy(base)
     for key, value in overrides.items():
