@@ -10,7 +10,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from nola.api.deps import get_file_db, get_task_db
+from nola.api.deps import get_app_config_db, get_file_db, get_task_db
 from nola.api.schemas import (
     BatchExportRequest,
     BatchTaskActionRequest,
@@ -22,6 +22,13 @@ from nola.api.schemas import (
     TaskDetailResponse,
     TaskListResponse,
     TranscriptionRequest,
+)
+from nola.config.export import (
+    build_export_filename,
+    resolve_unique_export_path,
+)
+from nola.config.export import (
+    get_effective_defaults as get_effective_export_defaults,
 )
 from nola.models.tasks import (
     CANCELLABLE_TASK_STATUSES,
@@ -77,6 +84,26 @@ def _build_batch_action_response(
         },
         "results": results,
     }
+
+
+def _resolve_export_options(
+    *,
+    requested_format: ExportFormat | None,
+    requested_include_timestamps: bool | None,
+) -> tuple[ExportFormat, bool]:
+    """Resolve effective export options from request values and persisted defaults."""
+    defaults = get_effective_export_defaults(get_app_config_db())
+    default_format = ExportFormat(defaults["format"])
+    default_include_timestamps = defaults["include_timestamps"]
+
+    effective_format = requested_format or default_format
+    effective_include_timestamps = (
+        requested_include_timestamps
+        if requested_include_timestamps is not None
+        else default_include_timestamps
+    )
+
+    return effective_format, effective_include_timestamps
 
 
 @legacy_router.post(
@@ -569,8 +596,24 @@ BATCH_EXPORT_RESPONSES: dict[int | str, dict[str, object]] = {
 )
 async def export_transcription(
     task_id: str,
-    format: ExportFormat = Query(ExportFormat.SRT, description="Output format"),
-    include_timestamps: bool = Query(True, description="Include timestamps (TXT only)"),
+    format: ExportFormat | None = Query(
+        None,
+        description="Output format; omitted values use persisted export defaults",
+    ),
+    include_timestamps: bool | None = Query(
+        None,
+        description=(
+            "Include timestamps (TXT only); omitted values use persisted defaults"
+        ),
+    ),
+    filename: str | None = Query(
+        None,
+        max_length=255,
+        description=(
+            "Optional output filename for single export. Extension is inferred "
+            "from selected format."
+        ),
+    ),
     save: bool = Query(False, description="Save to server instead of download"),
 ) -> Response:
     """Export completed transcription as subtitle file.
@@ -614,24 +657,30 @@ async def export_transcription(
                 detail=f"Invalid segment[{i}] in task {task_id}: {e}. Data: {context}",
             )
 
-    formatter = get_formatter(format, include_timestamps=include_timestamps)
+    effective_format, effective_include_timestamps = _resolve_export_options(
+        requested_format=format,
+        requested_include_timestamps=include_timestamps,
+    )
+    formatter = get_formatter(
+        effective_format, include_timestamps=effective_include_timestamps
+    )
     content = formatter.format(segment_data)
 
     file_info = file_db.get_file(task["file_id"])
-    if file_info:
-        base_name = Path(file_info["filename"]).stem
-    else:
-        base_name = task_id
-
-    export_filename = f"{base_name}.{formatter.file_extension}"
+    fallback_name = file_info["filename"] if file_info else task_id
+    export_filename = build_export_filename(
+        requested_name=filename,
+        fallback_name=fallback_name,
+        extension=formatter.file_extension,
+    )
 
     if save:
         exports_dir = settings.exports_dir
         exports_dir.mkdir(parents=True, exist_ok=True)
-        export_path = exports_dir / export_filename
+        export_path = resolve_unique_export_path(exports_dir, export_filename)
         export_path.write_text(content, encoding="utf-8")
 
-        relative_path = f"exports/{export_filename}"
+        relative_path = f"exports/{export_path.name}"
         return JSONResponse(content={"saved_path": relative_path})
 
     # Sanitize for ASCII-safe header (RFC 6266)
@@ -688,8 +737,12 @@ async def batch_export(
     used_names: set[str] = set()
     success_count = 0
 
+    effective_format, effective_include_timestamps = _resolve_export_options(
+        requested_format=request.format,
+        requested_include_timestamps=request.include_timestamps,
+    )
     formatter = get_formatter(
-        request.format, include_timestamps=request.include_timestamps
+        effective_format, include_timestamps=effective_include_timestamps
     )
 
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:

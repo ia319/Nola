@@ -359,11 +359,19 @@ class BatchExportRequest(BaseModel):
         max_length=MAX_BATCH_TASK_IDS,
         description="List of task IDs to export",
     )
-    format: ExportFormat = Field(
-        ExportFormat.SRT, description="Output format for all files"
+    format: ExportFormat | None = Field(
+        None,
+        description=(
+            "Output format for all files. "
+            "If omitted, resolve from persisted export defaults."
+        ),
     )
-    include_timestamps: bool = Field(
-        True, description="Include timestamps in TXT format"
+    include_timestamps: bool | None = Field(
+        None,
+        description=(
+            "Include timestamps in TXT format. "
+            "If omitted, resolve from persisted export defaults."
+        ),
     )
     zip_name: str | None = Field(
         None, description="Custom ZIP filename (without extension)"
