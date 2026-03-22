@@ -2250,6 +2250,8 @@ export interface operations {
         format?: components['schemas']['ExportFormat'] | null
         /** @description Include timestamps (TXT only); omitted values use persisted defaults */
         include_timestamps?: boolean | null
+        /** @description Optional output filename for single export. Extension is inferred from selected format. */
+        filename?: string | null
         /** @description Save to server instead of download */
         save?: boolean
       }
@@ -2559,6 +2561,8 @@ export interface operations {
         format?: components['schemas']['ExportFormat'] | null
         /** @description Include timestamps (TXT only); omitted values use persisted defaults */
         include_timestamps?: boolean | null
+        /** @description Optional output filename for single export. Extension is inferred from selected format. */
+        filename?: string | null
         /** @description Save to server instead of download */
         save?: boolean
       }
