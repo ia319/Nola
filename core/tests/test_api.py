@@ -1019,6 +1019,208 @@ class TestExportAPI:
                 assert "saved_path" in data
                 assert data["saved_path"].endswith(".srt")
 
+    def test_export_allows_custom_single_filename(self, client: TestClient):
+        """Single export should accept a custom filename and normalize extension."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-custom-name",
+            filename="meeting.mp3",
+            path="/tmp/meeting.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-custom-name",
+            file_id="test-file-custom-name",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-custom-name")
+        task_db.complete(
+            task_id="test-custom-name",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Custom filename"}],
+            duration=1.0,
+        )
+
+        response = client.get(
+            "/api/transcription-tasks/test-custom-name/export",
+            params={"format": "srt", "filename": "Weekly Notes.vtt"},
+        )
+
+        assert response.status_code == 200
+        content_disposition = response.headers["content-disposition"]
+        assert 'filename="Weekly_Notes.srt"' in content_disposition
+        assert "filename*=UTF-8''Weekly%20Notes.srt" in content_disposition
+
+    def test_export_save_avoids_overwriting_existing_file(self, client: TestClient):
+        """save=true should append a suffix when target filename already exists."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-save-unique",
+            filename="unique.mp3",
+            path="/tmp/unique.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-save-unique",
+            file_id="test-file-save-unique",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-save-unique")
+        task_db.complete(
+            task_id="test-save-unique",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Unique save"}],
+            duration=1.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            exports_path = Path(tmpdir) / "exports"
+            with patch.object(
+                Settings,
+                "exports_dir",
+                new_callable=PropertyMock,
+                return_value=exports_path,
+            ):
+                first = client.get(
+                    "/api/transcription-tasks/test-save-unique/export",
+                    params={
+                        "format": "srt",
+                        "save": "true",
+                        "filename": "meeting-notes",
+                    },
+                )
+                second = client.get(
+                    "/api/transcription-tasks/test-save-unique/export",
+                    params={
+                        "format": "srt",
+                        "save": "true",
+                        "filename": "meeting-notes",
+                    },
+                )
+
+                assert first.status_code == 200
+                assert second.status_code == 200
+
+                first_path = first.json()["saved_path"]
+                second_path = second.json()["saved_path"]
+                assert first_path == "exports/meeting-notes.srt"
+                assert second_path == "exports/meeting-notes_1.srt"
+
+                assert (exports_path / "meeting-notes.srt").exists()
+                assert (exports_path / "meeting-notes_1.srt").exists()
+
+    def test_export_uses_persisted_defaults_when_params_omitted(self, client):
+        """Export should apply persisted defaults when query params are omitted."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-default-single",
+            filename="audio.mp3",
+            path="/tmp/audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-default-single",
+            file_id="test-file-default-single",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-default-single")
+        task_db.complete(
+            task_id="test-default-single",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Configured default text"}],
+            duration=1.0,
+        )
+
+        patch_response = client.patch(
+            "/api/config/export/defaults",
+            json={"format": "txt", "include_timestamps": False},
+        )
+        assert patch_response.status_code == 200
+
+        response = client.get("/api/transcription-tasks/test-default-single/export")
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/plain")
+        assert response.text == "Configured default text"
+
+    def test_export_request_params_override_persisted_defaults(self, client):
+        """Explicit request values should override persisted defaults."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-default-override",
+            filename="audio.mp3",
+            path="/tmp/audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-default-override",
+            file_id="test-file-default-override",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-default-override")
+        task_db.complete(
+            task_id="test-default-override",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Override text"}],
+            duration=1.0,
+        )
+
+        patch_response = client.patch(
+            "/api/config/export/defaults",
+            json={"format": "txt", "include_timestamps": False},
+        )
+        assert patch_response.status_code == 200
+
+        response = client.get(
+            "/api/transcription-tasks/test-default-override/export"
+            "?format=txt&include_timestamps=true"
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/plain")
+        assert "[" in response.text
+
+    def test_batch_export_uses_persisted_defaults_when_params_omitted(self, client):
+        """Batch export should apply persisted defaults when payload omits options."""
+        import io
+        import zipfile
+
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-default-batch",
+            filename="batch-audio.mp3",
+            path="/tmp/batch-audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-default-batch",
+            file_id="test-file-default-batch",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-default-batch")
+        task_db.complete(
+            task_id="test-default-batch",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Batch default"}],
+            duration=1.0,
+        )
+
+        patch_response = client.patch(
+            "/api/config/export/defaults",
+            json={"format": "vtt", "include_timestamps": True},
+        )
+        assert patch_response.status_code == 200
+
+        response = client.post(
+            "/api/transcription-tasks/export/batch",
+            json={"task_ids": ["test-default-batch"]},
+        )
+
+        assert response.status_code == 200
+        zip_buffer = io.BytesIO(response.content)
+        with zipfile.ZipFile(zip_buffer, "r") as zf:
+            names = zf.namelist()
+            assert "batch-audio.vtt" in names
+            assert zf.read("batch-audio.vtt").decode().startswith("WEBVTT")
+
     def test_export_openapi_declares_file_and_json_responses(self, client: TestClient):
         """OpenAPI should describe both file download and save=true JSON responses."""
         response = client.get("/openapi.json")
