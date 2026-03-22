@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from nola.api.deps import get_app_config_db, get_file_db, get_task_db
-from nola.config.constants import MAX_BATCH_EXPORT_TASKS
+from nola.config.constants import MAX_BATCH_TASK_IDS
 from nola.config.settings import Settings
 from nola.main import app
 from nola.models import init_db
@@ -95,7 +95,7 @@ class TestTranscriptionsAPI:
 
     def test_list_transcriptions_empty(self, client):
         """Test listing transcriptions when none exist."""
-        response = client.get("/api/transcriptions")
+        response = client.get("/api/transcription-tasks")
         assert response.status_code == 200
         data = response.json()
         assert data["tasks"] == []
@@ -103,18 +103,82 @@ class TestTranscriptionsAPI:
 
     def test_get_nonexistent_task(self, client):
         """Test getting a task that doesn't exist."""
-        response = client.get("/api/transcriptions/nonexistent-id")
+        response = client.get("/api/transcription-tasks/nonexistent-id")
         assert response.status_code == 404
 
     def test_cancel_nonexistent_task(self, client):
         """Test cancelling a task that doesn't exist."""
-        response = client.delete("/api/transcriptions/nonexistent-id")
+        response = client.delete("/api/transcription-tasks/nonexistent-id")
         assert response.status_code == 404
+
+    def test_cancel_pending_task_returns_task_snapshot(self, client: TestClient):
+        """Cancel should return the authoritative task snapshot."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="cancel-file-1",
+            filename="cancel-audio.mp3",
+            path="/tmp/cancel-audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="cancel-task-1", file_id="cancel-file-1", options=None)
+
+        response = client.delete("/api/transcription-tasks/cancel-task-1")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["task_id"] == "cancel-task-1"
+        assert data["status"] == "cancelled"
+        assert data["message"] == "Task cancelled successfully"
+        assert data["task"]["task_id"] == "cancel-task-1"
+        assert data["task"]["status"] == "cancelled"
+        assert data["task"]["filename"] == "cancel-audio.mp3"
+
+    def test_cancel_already_cancelled_task_is_idempotent(self, client: TestClient):
+        """Repeated cancel should be idempotent and still return cancelled task."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="cancel-file-2",
+            filename="already-cancelled.mp3",
+            path="/tmp/already-cancelled.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="cancel-task-2", file_id="cancel-file-2", options=None)
+        task_db.cancel("cancel-task-2")
+
+        response = client.delete("/api/transcription-tasks/cancel-task-2")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "cancelled"
+        assert data["message"] == "Task already cancelled"
+        assert data["task"]["status"] == "cancelled"
+
+    def test_cancel_completed_task_returns_conflict(self, client: TestClient):
+        """Cancel should return conflict when task already reached completed status."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="cancel-file-3",
+            filename="completed.mp3",
+            path="/tmp/completed.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="cancel-task-3", file_id="cancel-file-3", options=None)
+        _claim_pending_task(task_db, "cancel-task-3")
+        task_db.complete(
+            task_id="cancel-task-3",
+            segments=[{"start": 0.0, "end": 1.0, "text": "done"}],
+            duration=1.0,
+        )
+
+        response = client.delete("/api/transcription-tasks/cancel-task-3")
+        assert response.status_code == 409
+        assert "Cannot cancel task with status: completed" in response.json()["detail"]
 
     def test_create_task_with_invalid_file_id(self, client):
         """Test creating task with non-existent file_id."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file"},
         )
         assert response.status_code == 404
@@ -122,7 +186,7 @@ class TestTranscriptionsAPI:
     def test_create_task_with_options(self, client):
         """Test creating task with custom transcription options."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={
                 "file_id": "nonexistent-file",
                 "language": "zh",
@@ -132,6 +196,461 @@ class TestTranscriptionsAPI:
         )
         # Should fail because file doesn't exist, not because of options
         assert response.status_code == 404
+
+
+class TestTranscriptionTasksPhaseA:
+    """Test Phase A additions: alias compatibility and task list/delete features."""
+
+    def test_legacy_list_alias_still_works(self, client: TestClient):
+        """Legacy /api/transcriptions list path should remain available."""
+        response = client.get("/api/transcriptions")
+        assert response.status_code == 200
+        data = response.json()
+        assert "tasks" in data
+
+    def test_list_supports_filename_keyword_search(self, client: TestClient):
+        """List endpoint should filter tasks by filename keyword."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="search-file-1",
+            filename="meeting-alpha.mp3",
+            path="/tmp/meeting-alpha.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="search-file-2",
+            filename="lecture-beta.mp3",
+            path="/tmp/lecture-beta.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="search-task-1", file_id="search-file-1", options=None)
+        task_db.enqueue(task_id="search-task-2", file_id="search-file-2", options=None)
+
+        response = client.get("/api/transcription-tasks?q=meeting")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["tasks"][0]["task_id"] == "search-task-1"
+        assert data["tasks"][0]["filename"] == "meeting-alpha.mp3"
+
+    def test_list_search_escapes_like_wildcards(self, client: TestClient):
+        """List search should treat % and _ as literal characters."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="wildcard-file-1",
+            filename="episode_01.mp3",
+            path="/tmp/episode_01.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="wildcard-file-2",
+            filename="episodeA01.mp3",
+            path="/tmp/episodeA01.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="wildcard-file-3",
+            filename="ratio-100%.mp3",
+            path="/tmp/ratio-100%.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="wildcard-file-4",
+            filename="ratio-100x.mp3",
+            path="/tmp/ratio-100x.mp3",
+            size=1000,
+        )
+
+        task_db.enqueue(
+            task_id="wildcard-task-1", file_id="wildcard-file-1", options=None
+        )
+        task_db.enqueue(
+            task_id="wildcard-task-2", file_id="wildcard-file-2", options=None
+        )
+        task_db.enqueue(
+            task_id="wildcard-task-3", file_id="wildcard-file-3", options=None
+        )
+        task_db.enqueue(
+            task_id="wildcard-task-4", file_id="wildcard-file-4", options=None
+        )
+
+        underscore_response = client.get(
+            "/api/transcription-tasks",
+            params={"q": "episode_01"},
+        )
+        assert underscore_response.status_code == 200
+        underscore_payload = underscore_response.json()
+        assert underscore_payload["total"] == 1
+        assert underscore_payload["tasks"][0]["task_id"] == "wildcard-task-1"
+
+        percent_response = client.get(
+            "/api/transcription-tasks",
+            params={"q": "100%"},
+        )
+        assert percent_response.status_code == 200
+        percent_payload = percent_response.json()
+        assert percent_payload["total"] == 1
+        assert percent_payload["tasks"][0]["task_id"] == "wildcard-task-3"
+
+    def test_get_task_detail_includes_filename(self, client: TestClient):
+        """Task detail endpoint should include filename for display use."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="detail-file-1",
+            filename="detail-audio.mp3",
+            path="/tmp/detail-audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="detail-task-1", file_id="detail-file-1", options=None)
+
+        response = client.get("/api/transcription-tasks/detail-task-1")
+        assert response.status_code == 200
+        assert response.json()["filename"] == "detail-audio.mp3"
+
+    def test_list_supports_sort_order(self, client: TestClient):
+        """List endpoint should apply sort_by and order parameters."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="sort-file-1",
+            filename="sort-a.mp3",
+            path="/tmp/sort-a.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="sort-file-2",
+            filename="sort-b.mp3",
+            path="/tmp/sort-b.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="sort-task-1", file_id="sort-file-1", options=None)
+        task_db.enqueue(task_id="sort-task-2", file_id="sort-file-2", options=None)
+
+        response = client.get(
+            "/api/transcription-tasks?sort_by=created_at&order=asc&limit=2"
+        )
+        assert response.status_code == 200
+        tasks = response.json()["tasks"]
+        assert len(tasks) == 2
+        assert {tasks[0]["task_id"], tasks[1]["task_id"]} == {
+            "sort-task-1",
+            "sort-task-2",
+        }
+
+        first_created_at = tasks[0]["created_at"]
+        second_created_at = tasks[1]["created_at"]
+        assert first_created_at <= second_created_at
+        if first_created_at == second_created_at:
+            # list_tasks() uses task_id DESC as the deterministic tie-breaker.
+            assert tasks[0]["task_id"] > tasks[1]["task_id"]
+
+    def test_list_supports_filename_sort(self, client: TestClient):
+        """List endpoint should support sort_by=filename."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="filename-sort-file-1",
+            filename="zeta.mp3",
+            path="/tmp/zeta.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="filename-sort-file-2",
+            filename="alpha.mp3",
+            path="/tmp/alpha.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="filename-sort-task-1",
+            file_id="filename-sort-file-1",
+            options=None,
+        )
+        task_db.enqueue(
+            task_id="filename-sort-task-2",
+            file_id="filename-sort-file-2",
+            options=None,
+        )
+
+        response = client.get(
+            "/api/transcription-tasks?sort_by=filename&order=asc&limit=2"
+        )
+        assert response.status_code == 200
+        tasks = response.json()["tasks"]
+        assert [task["filename"] for task in tasks] == ["alpha.mp3", "zeta.mp3"]
+
+    def test_batch_cancel_returns_mixed_outcomes(self, client: TestClient):
+        """Batch cancel should return per-item outcomes and summary counts."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="batch-cancel-file-pending",
+            filename="pending.mp3",
+            path="/tmp/pending.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="batch-cancel-file-completed",
+            filename="completed.mp3",
+            path="/tmp/completed.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="batch-cancel-completed",
+            file_id="batch-cancel-file-completed",
+            options=None,
+        )
+        task_db.enqueue(
+            task_id="batch-cancel-pending",
+            file_id="batch-cancel-file-pending",
+            options=None,
+        )
+        _claim_pending_task(task_db, "batch-cancel-completed")
+        task_db.complete(
+            task_id="batch-cancel-completed",
+            segments=[{"start": 0.0, "end": 1.0, "text": "done"}],
+            duration=1.0,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks/batch/cancel",
+            json={
+                "task_ids": [
+                    "batch-cancel-pending",
+                    "batch-cancel-completed",
+                    "batch-cancel-missing",
+                    "batch-cancel-pending",
+                ]
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["action"] == "cancel"
+        assert payload["summary"] == {"requested": 4, "succeeded": 1, "failed": 3}
+
+        results = payload["results"]
+        assert results[0]["task_id"] == "batch-cancel-pending"
+        assert results[0]["ok"] is True
+        assert results[0]["status"] == "cancelled"
+
+        assert results[1]["task_id"] == "batch-cancel-completed"
+        assert results[1]["ok"] is False
+        assert results[1]["error_code"] == "invalid_status"
+
+        assert results[2]["task_id"] == "batch-cancel-missing"
+        assert results[2]["ok"] is False
+        assert results[2]["error_code"] == "not_found"
+
+        assert results[3]["task_id"] == "batch-cancel-pending"
+        assert results[3]["ok"] is False
+        assert results[3]["error_code"] == "duplicate_task_id"
+
+        pending_task = task_db.get_task("batch-cancel-pending")
+        assert pending_task is not None
+        assert pending_task["status"] == "cancelled"
+
+    def test_batch_retry_returns_mixed_outcomes(self, client: TestClient):
+        """Batch retry should create new tasks for retryable statuses."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="batch-retry-file-failed",
+            filename="failed.mp3",
+            path="/tmp/failed.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="batch-retry-file-cancelled",
+            filename="cancelled.mp3",
+            path="/tmp/cancelled.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="batch-retry-file-pending",
+            filename="pending.mp3",
+            path="/tmp/pending.mp3",
+            size=1000,
+        )
+
+        task_db.enqueue(
+            task_id="batch-retry-failed",
+            file_id="batch-retry-file-failed",
+            options={"language": "zh"},
+        )
+        _claim_pending_task(task_db, "batch-retry-failed")
+        task_db.fail(
+            task_id="batch-retry-failed",
+            error="forced failure",
+            should_retry=False,
+        )
+
+        task_db.enqueue(
+            task_id="batch-retry-cancelled",
+            file_id="batch-retry-file-cancelled",
+            options=None,
+        )
+        task_db.cancel("batch-retry-cancelled")
+
+        task_db.enqueue(
+            task_id="batch-retry-pending",
+            file_id="batch-retry-file-pending",
+            options=None,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks/batch/retry",
+            json={
+                "task_ids": [
+                    "batch-retry-failed",
+                    "batch-retry-cancelled",
+                    "batch-retry-pending",
+                    "batch-retry-missing",
+                    "batch-retry-failed",
+                ]
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["action"] == "retry"
+        assert payload["summary"] == {"requested": 5, "succeeded": 2, "failed": 3}
+
+        results = payload["results"]
+        success_results = [item for item in results if item["ok"]]
+        assert len(success_results) == 2
+        for item in success_results:
+            assert item["new_task_id"]
+            created_task = task_db.get_task(item["new_task_id"])
+            assert created_task is not None
+            assert created_task["status"] == "pending"
+
+        pending_result = next(
+            item for item in results if item["task_id"] == "batch-retry-pending"
+        )
+        assert pending_result["ok"] is False
+        assert pending_result["error_code"] == "invalid_status"
+
+        missing_result = next(
+            item for item in results if item["task_id"] == "batch-retry-missing"
+        )
+        assert missing_result["ok"] is False
+        assert missing_result["error_code"] == "not_found"
+
+        duplicate_result = results[-1]
+        assert duplicate_result["task_id"] == "batch-retry-failed"
+        assert duplicate_result["ok"] is False
+        assert duplicate_result["error_code"] == "duplicate_task_id"
+
+    def test_legacy_batch_cancel_alias_still_works(self, client: TestClient):
+        """Legacy batch cancel alias should remain available during transition."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="legacy-batch-cancel-file",
+            filename="legacy.mp3",
+            path="/tmp/legacy.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="legacy-batch-cancel-task",
+            file_id="legacy-batch-cancel-file",
+            options=None,
+        )
+
+        response = client.post(
+            "/api/transcriptions/batch/cancel",
+            json={"task_ids": ["legacy-batch-cancel-task"]},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["summary"] == {"requested": 1, "succeeded": 1, "failed": 0}
+        assert payload["results"][0]["status"] == "cancelled"
+
+    def test_delete_record_rejects_non_terminal_task(self, client: TestClient):
+        """Delete-record endpoint should reject pending/processing tasks."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="delete-pending-file",
+            filename="pending.mp3",
+            path="/tmp/pending.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="delete-pending-task",
+            file_id="delete-pending-file",
+            options=None,
+        )
+
+        response = client.delete("/api/transcription-tasks/delete-pending-task/record")
+        assert response.status_code == 400
+        assert "Only terminal tasks can be deleted" in response.json()["detail"]
+
+    def test_delete_record_removes_terminal_task(self, client: TestClient):
+        """Delete-record endpoint should remove completed tasks."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="delete-completed-file",
+            filename="completed.mp3",
+            path="/tmp/completed.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="delete-completed-task",
+            file_id="delete-completed-file",
+            options=None,
+        )
+        _claim_pending_task(task_db, "delete-completed-task")
+        task_db.complete(
+            task_id="delete-completed-task",
+            segments=[{"start": 0.0, "end": 1.0, "text": "done"}],
+            duration=1.0,
+        )
+
+        response = client.delete(
+            "/api/transcription-tasks/delete-completed-task/record"
+        )
+        assert response.status_code == 200
+        assert response.json()["task_id"] == "delete-completed-task"
+
+        get_response = client.get("/api/transcription-tasks/delete-completed-task")
+        assert get_response.status_code == 404
+
+    def test_legacy_delete_record_alias_still_works(self, client: TestClient):
+        """Legacy delete-record path should remain available during transition."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="delete-legacy-file",
+            filename="legacy.mp3",
+            path="/tmp/legacy.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="delete-legacy-task",
+            file_id="delete-legacy-file",
+            options=None,
+        )
+        _claim_pending_task(task_db, "delete-legacy-task")
+        task_db.fail(
+            task_id="delete-legacy-task",
+            error="intentional",
+            should_retry=False,
+        )
+
+        response = client.delete("/api/transcriptions/delete-legacy-task/record")
+        assert response.status_code == 200
+        assert response.json()["task_id"] == "delete-legacy-task"
 
 
 class TestInputValidation:
@@ -148,7 +667,7 @@ class TestInputValidation:
         )
 
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "uppercase-lang-file", "language": "EN"},
         )
 
@@ -158,7 +677,7 @@ class TestInputValidation:
     def test_language_invalid_code_returns_422(self, client: TestClient):
         """Test unsupported language code returns 422."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file", "language": "chinese"},
         )
 
@@ -170,7 +689,7 @@ class TestInputValidation:
     def test_language_locale_style_returns_422(self, client: TestClient):
         """Test locale-style language code returns 422."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file", "language": "zh-CN"},
         )
 
@@ -182,7 +701,7 @@ class TestInputValidation:
     def test_language_valid_code_passes_schema_validation(self, client: TestClient):
         """Test valid ISO 639-1 code reaches business logic layer."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file", "language": "zh"},
         )
 
@@ -192,7 +711,7 @@ class TestInputValidation:
     def test_language_none_passes_schema_validation(self, client: TestClient):
         """Test null language reaches business logic layer."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file", "language": None},
         )
 
@@ -202,7 +721,7 @@ class TestInputValidation:
     def test_temperature_negative_returns_422(self, client: TestClient):
         """Test negative temperature is rejected."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file", "temperature": -0.1},
         )
 
@@ -214,7 +733,7 @@ class TestInputValidation:
     def test_temperature_list_with_negative_returns_422(self, client: TestClient):
         """Test negative element in temperature list is rejected."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file", "temperature": [0.0, -0.2]},
         )
 
@@ -226,7 +745,7 @@ class TestInputValidation:
     def test_vad_parameters_unknown_key_returns_422(self, client: TestClient):
         """Test unknown nested VAD key is rejected at request validation."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={
                 "file_id": "nonexistent-file",
                 "vad_filter": True,
@@ -242,7 +761,7 @@ class TestInputValidation:
     def test_vad_parameters_out_of_range_value_returns_422(self, client: TestClient):
         """Test out-of-range nested VAD value is rejected at request validation."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={
                 "file_id": "nonexistent-file",
                 "vad_filter": True,
@@ -257,7 +776,7 @@ class TestInputValidation:
     def test_language_detection_segments_zero_returns_422(self, client: TestClient):
         """Test zero language_detection_segments is rejected."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={
                 "file_id": "nonexistent-file",
                 "language_detection_segments": 0,
@@ -271,7 +790,7 @@ class TestInputValidation:
     def test_unknown_top_level_option_key_returns_422(self, client: TestClient):
         """Test unknown top-level options are rejected instead of ignored."""
         response = client.post(
-            "/api/transcriptions",
+            "/api/transcription-tasks",
             json={"file_id": "nonexistent-file", "beam_sizee": 3},
         )
 
@@ -282,7 +801,7 @@ class TestInputValidation:
     def test_batch_export_empty_task_ids_returns_422(self, client: TestClient):
         """Test batch export rejects empty task_ids."""
         response = client.post(
-            "/api/transcriptions/export/batch",
+            "/api/transcription-tasks/export/batch",
             json={"task_ids": [], "format": "srt"},
         )
 
@@ -292,9 +811,9 @@ class TestInputValidation:
 
     def test_batch_export_task_ids_exceed_max_returns_422(self, client: TestClient):
         """Test batch export rejects task_ids longer than max length."""
-        task_ids = [f"task-{i}" for i in range(MAX_BATCH_EXPORT_TASKS + 1)]
+        task_ids = [f"task-{i}" for i in range(MAX_BATCH_TASK_IDS + 1)]
         response = client.post(
-            "/api/transcriptions/export/batch",
+            "/api/transcription-tasks/export/batch",
             json={"task_ids": task_ids, "format": "srt"},
         )
 
@@ -346,7 +865,7 @@ class TestExportAPI:
 
     def test_export_nonexistent_task(self, client):
         """Test exporting a task that doesn't exist."""
-        response = client.get("/api/transcriptions/nonexistent-id/export")
+        response = client.get("/api/transcription-tasks/nonexistent-id/export")
         assert response.status_code == 404
 
     def test_export_uncompleted_task(self, client):
@@ -361,7 +880,7 @@ class TestExportAPI:
         )
         task_db.enqueue(task_id="test-task", file_id="test-file", options=None)
 
-        response = client.get("/api/transcriptions/test-task/export")
+        response = client.get("/api/transcription-tasks/test-task/export")
         assert response.status_code == 400
         assert "not completed" in response.json()["detail"]
 
@@ -386,7 +905,9 @@ class TestExportAPI:
             duration=5.0,
         )
 
-        response = client.get("/api/transcriptions/test-task-srt/export?format=srt")
+        response = client.get(
+            "/api/transcription-tasks/test-task-srt/export?format=srt"
+        )
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("application/x-subrip")
         content = response.text
@@ -411,7 +932,7 @@ class TestExportAPI:
             duration=1.0,
         )
 
-        response = client.get("/api/transcriptions/test-vtt/export?format=vtt")
+        response = client.get("/api/transcription-tasks/test-vtt/export?format=vtt")
         assert response.status_code == 200
         assert "text/vtt" in response.headers["content-type"]
         assert response.text.startswith("WEBVTT")
@@ -435,7 +956,7 @@ class TestExportAPI:
         )
 
         response = client.get(
-            "/api/transcriptions/test-txt/export?format=txt&include_timestamps=false"
+            "/api/transcription-tasks/test-txt/export?format=txt&include_timestamps=false"
         )
         assert response.status_code == 200
         assert response.text == "Plain text"
@@ -459,7 +980,7 @@ class TestExportAPI:
             duration=1.0,
         )
 
-        response = client.get("/api/transcriptions/test-ass/export?format=ass")
+        response = client.get("/api/transcription-tasks/test-ass/export?format=ass")
         assert response.status_code == 200
         assert "[Script Info]" in response.text
         assert "Dialogue:" in response.text
@@ -491,12 +1012,238 @@ class TestExportAPI:
                 return_value=exports_path,
             ):
                 response = client.get(
-                    "/api/transcriptions/test-save/export?format=srt&save=true"
+                    "/api/transcription-tasks/test-save/export?format=srt&save=true"
                 )
                 assert response.status_code == 200
                 data = response.json()
                 assert "saved_path" in data
                 assert data["saved_path"].endswith(".srt")
+
+    def test_export_allows_custom_single_filename(self, client: TestClient):
+        """Single export should accept a custom filename and normalize extension."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-custom-name",
+            filename="meeting.mp3",
+            path="/tmp/meeting.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-custom-name",
+            file_id="test-file-custom-name",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-custom-name")
+        task_db.complete(
+            task_id="test-custom-name",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Custom filename"}],
+            duration=1.0,
+        )
+
+        response = client.get(
+            "/api/transcription-tasks/test-custom-name/export",
+            params={"format": "srt", "filename": "Weekly Notes.vtt"},
+        )
+
+        assert response.status_code == 200
+        content_disposition = response.headers["content-disposition"]
+        assert 'filename="Weekly_Notes.srt"' in content_disposition
+        assert "filename*=UTF-8''Weekly%20Notes.srt" in content_disposition
+
+    def test_export_save_avoids_overwriting_existing_file(self, client: TestClient):
+        """save=true should append a suffix when target filename already exists."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-save-unique",
+            filename="unique.mp3",
+            path="/tmp/unique.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-save-unique",
+            file_id="test-file-save-unique",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-save-unique")
+        task_db.complete(
+            task_id="test-save-unique",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Unique save"}],
+            duration=1.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            exports_path = Path(tmpdir) / "exports"
+            with patch.object(
+                Settings,
+                "exports_dir",
+                new_callable=PropertyMock,
+                return_value=exports_path,
+            ):
+                first = client.get(
+                    "/api/transcription-tasks/test-save-unique/export",
+                    params={
+                        "format": "srt",
+                        "save": "true",
+                        "filename": "meeting-notes",
+                    },
+                )
+                second = client.get(
+                    "/api/transcription-tasks/test-save-unique/export",
+                    params={
+                        "format": "srt",
+                        "save": "true",
+                        "filename": "meeting-notes",
+                    },
+                )
+
+                assert first.status_code == 200
+                assert second.status_code == 200
+
+                first_path = first.json()["saved_path"]
+                second_path = second.json()["saved_path"]
+                assert first_path == "exports/meeting-notes.srt"
+                assert second_path == "exports/meeting-notes_1.srt"
+
+                assert (exports_path / "meeting-notes.srt").exists()
+                assert (exports_path / "meeting-notes_1.srt").exists()
+
+    def test_export_uses_persisted_defaults_when_params_omitted(self, client):
+        """Export should apply persisted defaults when query params are omitted."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-default-single",
+            filename="audio.mp3",
+            path="/tmp/audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-default-single",
+            file_id="test-file-default-single",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-default-single")
+        task_db.complete(
+            task_id="test-default-single",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Configured default text"}],
+            duration=1.0,
+        )
+
+        patch_response = client.patch(
+            "/api/config/export/defaults",
+            json={"format": "txt", "include_timestamps": False},
+        )
+        assert patch_response.status_code == 200
+
+        response = client.get("/api/transcription-tasks/test-default-single/export")
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/plain")
+        assert response.text == "Configured default text"
+
+    def test_export_request_params_override_persisted_defaults(self, client):
+        """Explicit request values should override persisted defaults."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-default-override",
+            filename="audio.mp3",
+            path="/tmp/audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-default-override",
+            file_id="test-file-default-override",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-default-override")
+        task_db.complete(
+            task_id="test-default-override",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Override text"}],
+            duration=1.0,
+        )
+
+        patch_response = client.patch(
+            "/api/config/export/defaults",
+            json={"format": "txt", "include_timestamps": False},
+        )
+        assert patch_response.status_code == 200
+
+        response = client.get(
+            "/api/transcription-tasks/test-default-override/export"
+            "?format=txt&include_timestamps=true"
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/plain")
+        assert "[" in response.text
+
+    def test_batch_export_uses_persisted_defaults_when_params_omitted(self, client):
+        """Batch export should apply persisted defaults when payload omits options."""
+        import io
+        import zipfile
+
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-default-batch",
+            filename="batch-audio.mp3",
+            path="/tmp/batch-audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-default-batch",
+            file_id="test-file-default-batch",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-default-batch")
+        task_db.complete(
+            task_id="test-default-batch",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Batch default"}],
+            duration=1.0,
+        )
+
+        patch_response = client.patch(
+            "/api/config/export/defaults",
+            json={"format": "vtt", "include_timestamps": True},
+        )
+        assert patch_response.status_code == 200
+
+        response = client.post(
+            "/api/transcription-tasks/export/batch",
+            json={"task_ids": ["test-default-batch"]},
+        )
+
+        assert response.status_code == 200
+        zip_buffer = io.BytesIO(response.content)
+        with zipfile.ZipFile(zip_buffer, "r") as zf:
+            names = zf.namelist()
+            assert "batch-audio.vtt" in names
+            assert zf.read("batch-audio.vtt").decode().startswith("WEBVTT")
+
+    def test_export_openapi_declares_file_and_json_responses(self, client: TestClient):
+        """OpenAPI should describe both file download and save=true JSON responses."""
+        response = client.get("/openapi.json")
+        assert response.status_code == 200
+        schema = response.json()
+
+        export_get = schema["paths"]["/api/transcription-tasks/{task_id}/export"]["get"]
+        export_content = export_get["responses"]["200"]["content"]
+        assert "application/json" in export_content
+        assert "application/x-subrip" in export_content
+        assert "text/vtt" in export_content
+        assert "text/plain" in export_content
+        assert "text/x-ssa" in export_content
+
+    def test_batch_export_openapi_declares_zip_response(self, client: TestClient):
+        """OpenAPI should describe ZIP download for batch export."""
+        response = client.get("/openapi.json")
+        assert response.status_code == 200
+        schema = response.json()
+
+        batch_post = schema["paths"]["/api/transcription-tasks/export/batch"]["post"]
+        batch_content = batch_post["responses"]["200"]["content"]
+        assert "application/zip" in batch_content
 
 
 class TestBatchExportAPI:
@@ -529,7 +1276,7 @@ class TestBatchExportAPI:
             )
 
         response = client.post(
-            "/api/transcriptions/export/batch",
+            "/api/transcription-tasks/export/batch",
             json={"task_ids": ["batch-task-0", "batch-task-1"], "format": "srt"},
         )
 
@@ -568,7 +1315,7 @@ class TestBatchExportAPI:
         )
 
         response = client.post(
-            "/api/transcriptions/export/batch",
+            "/api/transcription-tasks/export/batch",
             json={
                 "task_ids": ["partial-task", "nonexistent-task"],
                 "format": "srt",
@@ -588,7 +1335,7 @@ class TestBatchExportAPI:
     def test_batch_export_all_failed(self, client: TestClient):
         """Test batch export when all tasks fail."""
         response = client.post(
-            "/api/transcriptions/export/batch",
+            "/api/transcription-tasks/export/batch",
             json={"task_ids": ["fake-1", "fake-2"], "format": "srt"},
         )
 
@@ -615,7 +1362,7 @@ class TestBatchExportAPI:
         )
 
         response = client.post(
-            "/api/transcriptions/export/batch",
+            "/api/transcription-tasks/export/batch",
             json={
                 "task_ids": ["zip-name-task"],
                 "format": "srt",
@@ -647,7 +1394,7 @@ class TestBatchExportAPI:
         )
 
         response = client.post(
-            "/api/transcriptions/export/batch",
+            "/api/transcription-tasks/export/batch",
             json={
                 "task_ids": ["inject-task"],
                 "format": "srt",

@@ -3,12 +3,15 @@ import type {
   CancelTaskResponse,
   CreateTaskPayload,
   CreateTaskResponse,
+  DeleteTaskRecordResponse,
+  SortOrder,
   TaskDetail,
   TaskListResponse,
+  TaskSortBy,
   TaskStatus,
 } from '@/shared/types'
 
-const BASE = '/api/transcriptions'
+const BASE = '/api/transcription-tasks'
 
 /** Create a transcription task for an uploaded file. */
 export async function createTask(payload: CreateTaskPayload): Promise<CreateTaskResponse> {
@@ -25,6 +28,9 @@ export async function createTask(payload: CreateTaskPayload): Promise<CreateTask
 export async function listTasks(
   params: {
     status?: TaskStatus
+    q?: string
+    sort_by?: TaskSortBy
+    order?: SortOrder
     limit?: number
     offset?: number
   } = {},
@@ -48,5 +54,11 @@ export async function getTask(taskId: string, signal?: AbortSignal): Promise<Tas
 /** Cancel a pending or processing task. */
 export async function cancelTask(taskId: string): Promise<CancelTaskResponse> {
   const { data } = await apiClient.delete<CancelTaskResponse>(`${BASE}/${taskId}`)
+  return data
+}
+
+/** Delete terminal task record while preserving file assets. */
+export async function deleteTaskRecord(taskId: string): Promise<DeleteTaskRecordResponse> {
+  const { data } = await apiClient.delete<DeleteTaskRecordResponse>(`${BASE}/${taskId}/record`)
   return data
 }

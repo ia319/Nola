@@ -9,25 +9,31 @@ export type TaskDetail = Schemas['TaskDetailResponse']
 export type TaskListResponse = Schemas['TaskListResponse']
 export type CreateTaskResponse = Schemas['CreateTaskResponse']
 export type CancelTaskResponse = Schemas['CancelTaskResponse']
+export type DeleteTaskRecordResponse = Schemas['DeleteTaskRecordResponse']
+export type BatchTaskActionRequest = Schemas['BatchTaskActionRequest']
+export type BatchTaskActionResponse = Schemas['BatchTaskActionResponse']
+export type BatchTaskActionResult = Schemas['BatchTaskActionResultResponse']
 export type Segment = Schemas['SegmentResponse']
 
 /** Task status derived from OpenAPI enum constraint. */
 export type TaskStatus = Schemas['TaskSummaryResponse']['status']
+export type TaskSortBy = 'created_at' | 'completed_at' | 'status' | 'progress' | 'filename'
+export type SortOrder = 'asc' | 'desc'
 
 /** GET /{task_id}/export?save=true response. */
 export type SavedExportResponse = Schemas['SavedExportResponse']
 
-/** POST /api/transcriptions/ request body. */
+/** POST /api/transcription-tasks/ request body. */
 export type CreateTaskRequest = Schemas['TranscriptionRequest']
 
 /** Frontend payload for task creation — only file_id required, options use backend defaults. */
 export type CreateTaskPayload = Pick<CreateTaskRequest, 'file_id'> &
   Partial<Omit<CreateTaskRequest, 'file_id'>>
 
-/** POST /api/transcriptions/export/batch request. */
+/** POST /api/transcription-tasks/export/batch request. */
 export type BatchExportRequest = Schemas['BatchExportRequest']
 
 // Derived convenience types for frontend use.
 
-/** Export format derived from OpenAPI BatchExportRequest.format enum. */
-export type ExportFormat = Schemas['BatchExportRequest']['format']
+/** Export format enum defined by backend formatter registry contract. */
+export type ExportFormat = Schemas['ExportFormat']

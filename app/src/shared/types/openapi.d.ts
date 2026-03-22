@@ -68,7 +68,51 @@ export interface paths {
     patch: operations['patch_transcription_defaults_api_config_transcription_defaults_patch']
     trace?: never
   }
-  '/api/transcriptions/': {
+  '/api/config/export': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get effective export defaults
+     * @description Return export defaults after applying persisted overrides on top of the built-in server defaults.
+     */
+    get: operations['get_export_config_api_config_export_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/config/export/defaults': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Reset persisted export defaults
+     * @description Delete persisted export-default overrides and fall back to built-in server defaults.
+     */
+    delete: operations['delete_export_defaults_api_config_export_defaults_delete']
+    options?: never
+    head?: never
+    /**
+     * Update persisted export defaults
+     * @description Apply a partial update to application-level export defaults. Explicit null removes an override key.
+     */
+    patch: operations['patch_export_defaults_api_config_export_defaults_patch']
+    trace?: never
+  }
+  '/api/transcription-tasks/': {
     parameters: {
       query?: never
       header?: never
@@ -83,11 +127,14 @@ export interface paths {
      *         status: Optional status filter (pending, processing, completed, failed)
      *         limit: Maximum number of results
      *         offset: Pagination offset
+     *         q: Optional filename search keyword
+     *         sort_by: Sort field
+     *         order: Sort order (asc or desc)
      *
      *     Returns:
      *         List of tasks with pagination info
      */
-    get: operations['list_transcriptions_api_transcriptions__get']
+    get: operations['list_transcriptions_api_transcription_tasks__get']
     put?: never
     /**
      * Create transcription task
@@ -97,7 +144,196 @@ export interface paths {
      *     1. Upload file via POST /api/files → get file_id
      *     2. Create task via this endpoint with file_id and optional parameters
      *     3. Worker will automatically process the task
-     *     4. Query status via GET /api/transcriptions/{task_id}
+     *     4. Query status via GET /api/transcription-tasks/{task_id}
+     *
+     *     All transcription parameters are optional. If omitted, the effective defaults
+     *     (engine defaults plus persisted application overrides) will be used.
+     *     See GET /api/config for effective defaults and
+     *     GET /api/config/transcription/engine-defaults for raw engine defaults.
+     */
+    post: operations['create_transcription_api_transcription_tasks__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/transcription-tasks/{task_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get Transcription
+     * @description Get transcription task status and result.
+     *
+     *     Args:
+     *         task_id: Task identifier
+     *
+     *     Returns:
+     *         Task status and result
+     */
+    get: operations['get_transcription_api_transcription_tasks__task_id__get']
+    put?: never
+    post?: never
+    /**
+     * Cancel Transcription
+     * @description Cancel a transcription task.
+     *
+     *     Args:
+     *         task_id: Task identifier
+     *
+     *     Returns:
+     *         Cancellation result
+     */
+    delete: operations['cancel_transcription_api_transcription_tasks__task_id__delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/transcription-tasks/batch/cancel': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch cancel transcription tasks
+     * @description Cancel multiple tasks and return per-task outcomes.
+     */
+    post: operations['batch_cancel_transcriptions_api_transcription_tasks_batch_cancel_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/transcription-tasks/batch/retry': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch retry transcription tasks
+     * @description Retry failed/cancelled tasks by creating new pending tasks.
+     */
+    post: operations['batch_retry_transcriptions_api_transcription_tasks_batch_retry_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/transcription-tasks/{task_id}/record': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Delete task record
+     * @description Delete a terminal task record without deleting its file.
+     */
+    delete: operations['delete_task_record_api_transcription_tasks__task_id__record_delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/transcription-tasks/{task_id}/export': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Export transcription result
+     * @description Export completed transcription as subtitle file.
+     *
+     *     Supports SRT, VTT, TXT, and ASS formats.
+     *     Use save=true to store file on server, save=false to download directly.
+     */
+    get: operations['export_transcription_api_transcription_tasks__task_id__export_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/transcription-tasks/export/batch': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch export transcriptions
+     * @description Export multiple transcriptions as a ZIP archive.
+     *
+     *     Failed tasks are skipped and logged in _errors.txt within the archive.
+     */
+    post: operations['batch_export_api_transcription_tasks_export_batch_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/transcriptions/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List Transcriptions
+     * @deprecated
+     * @description List all transcription tasks.
+     *
+     *     Args:
+     *         status: Optional status filter (pending, processing, completed, failed)
+     *         limit: Maximum number of results
+     *         offset: Pagination offset
+     *         q: Optional filename search keyword
+     *         sort_by: Sort field
+     *         order: Sort order (asc or desc)
+     *
+     *     Returns:
+     *         List of tasks with pagination info
+     */
+    get: operations['list_transcriptions_api_transcriptions__get']
+    put?: never
+    /**
+     * Create transcription task
+     * @deprecated
+     * @description Create a transcription task for an uploaded file.
+     *
+     *     Steps:
+     *     1. Upload file via POST /api/files → get file_id
+     *     2. Create task via this endpoint with file_id and optional parameters
+     *     3. Worker will automatically process the task
+     *     4. Query status via GET /api/transcription-tasks/{task_id}
      *
      *     All transcription parameters are optional. If omitted, the effective defaults
      *     (engine defaults plus persisted application overrides) will be used.
@@ -120,6 +356,7 @@ export interface paths {
     }
     /**
      * Get Transcription
+     * @deprecated
      * @description Get transcription task status and result.
      *
      *     Args:
@@ -133,6 +370,7 @@ export interface paths {
     post?: never
     /**
      * Cancel Transcription
+     * @deprecated
      * @description Cancel a transcription task.
      *
      *     Args:
@@ -147,6 +385,69 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/transcriptions/batch/cancel': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch cancel transcription tasks
+     * @deprecated
+     * @description Cancel multiple tasks and return per-task outcomes.
+     */
+    post: operations['batch_cancel_transcriptions_api_transcriptions_batch_cancel_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/transcriptions/batch/retry': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch retry transcription tasks
+     * @deprecated
+     * @description Retry failed/cancelled tasks by creating new pending tasks.
+     */
+    post: operations['batch_retry_transcriptions_api_transcriptions_batch_retry_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/transcriptions/{task_id}/record': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Delete task record
+     * @deprecated
+     * @description Delete a terminal task record without deleting its file.
+     */
+    delete: operations['delete_task_record_api_transcriptions__task_id__record_delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/transcriptions/{task_id}/export': {
     parameters: {
       query?: never
@@ -156,6 +457,7 @@ export interface paths {
     }
     /**
      * Export transcription result
+     * @deprecated
      * @description Export completed transcription as subtitle file.
      *
      *     Supports SRT, VTT, TXT, and ASS formats.
@@ -181,6 +483,7 @@ export interface paths {
     put?: never
     /**
      * Batch export transcriptions
+     * @deprecated
      * @description Export multiple transcriptions as a ZIP archive.
      *
      *     Failed tasks are skipped and logged in _errors.txt within the archive.
@@ -370,24 +673,77 @@ export interface components {
        * @description List of task IDs to export
        */
       task_ids: string[]
-      /**
-       * Format
-       * @description Output format for all files
-       * @default srt
-       * @enum {string}
-       */
-      format: 'srt' | 'vtt' | 'txt' | 'ass'
+      /** @description Output format for all files. If omitted, resolve from persisted export defaults. */
+      format?: components['schemas']['ExportFormat'] | null
       /**
        * Include Timestamps
-       * @description Include timestamps in TXT format
-       * @default true
+       * @description Include timestamps in TXT format. If omitted, resolve from persisted export defaults.
        */
-      include_timestamps: boolean
+      include_timestamps?: boolean | null
       /**
        * Zip Name
        * @description Custom ZIP filename (without extension)
        */
       zip_name?: string | null
+    }
+    /**
+     * BatchTaskActionRequest
+     * @description Batch action request for task-level operations.
+     */
+    BatchTaskActionRequest: {
+      /**
+       * Task Ids
+       * @description List of task IDs to process
+       */
+      task_ids: string[]
+    }
+    /**
+     * BatchTaskActionResponse
+     * @description Response for batch cancel/retry actions.
+     */
+    BatchTaskActionResponse: {
+      /**
+       * Action
+       * @enum {string}
+       */
+      action: 'cancel' | 'retry'
+      summary: components['schemas']['BatchTaskActionSummaryResponse']
+      /** Results */
+      results: components['schemas']['BatchTaskActionResultResponse'][]
+    }
+    /**
+     * BatchTaskActionResultResponse
+     * @description Per-task result for batch task actions.
+     */
+    BatchTaskActionResultResponse: {
+      /** Task Id */
+      task_id: string
+      /** Ok */
+      ok: boolean
+      /** Message */
+      message: string
+      /** Error Code */
+      error_code?: ('not_found' | 'invalid_status' | 'duplicate_task_id' | 'file_missing') | null
+      /** Status */
+      status?: ('pending' | 'processing' | 'completed' | 'failed' | 'cancelled') | null
+      /** New Task Id */
+      new_task_id?: string | null
+      /** File Id */
+      file_id?: string | null
+      /** Filename */
+      filename?: string | null
+    }
+    /**
+     * BatchTaskActionSummaryResponse
+     * @description Batch task action summary counts.
+     */
+    BatchTaskActionSummaryResponse: {
+      /** Requested */
+      requested: number
+      /** Succeeded */
+      succeeded: number
+      /** Failed */
+      failed: number
     }
     /** Body_upload_file_api_files__post */
     Body_upload_file_api_files__post: {
@@ -412,6 +768,7 @@ export interface components {
       status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
       /** Message */
       message: string
+      task: components['schemas']['TaskSummaryResponse']
     }
     /**
      * CleanupResponse
@@ -455,6 +812,16 @@ export interface components {
       message: string
     }
     /**
+     * DeleteTaskRecordResponse
+     * @description Task record deletion response.
+     */
+    DeleteTaskRecordResponse: {
+      /** Task Id */
+      task_id: string
+      /** Message */
+      message: string
+    }
+    /**
      * EngineConfigResponse
      * @description Expose the active engine configuration.
      */
@@ -474,6 +841,52 @@ export interface components {
      */
     EngineDefaultsResponse: {
       defaults: components['schemas']['TranscriptionResolvedDefaultsResponse']
+    }
+    /**
+     * ExportConfigResponse
+     * @description Expose effective export defaults required by frontend clients.
+     */
+    ExportConfigResponse: {
+      defaults: components['schemas']['ExportResolvedDefaultsResponse']
+    }
+    /**
+     * ExportDefaultsPatchResponse
+     * @description Return effective export defaults after a PATCH update.
+     */
+    ExportDefaultsPatchResponse: {
+      defaults: components['schemas']['ExportResolvedDefaultsResponse']
+    }
+    /**
+     * ExportDefaultsUpdateRequest
+     * @description Partial update payload for application-level export defaults.
+     * @example {
+     *       "format": "vtt",
+     *       "include_timestamps": false
+     *     }
+     */
+    ExportDefaultsUpdateRequest: {
+      /** @description Default export format */
+      format?: components['schemas']['ExportFormat'] | null
+      /**
+       * Include Timestamps
+       * @description Whether TXT export includes timestamp prefixes by default
+       */
+      include_timestamps?: boolean | null
+    }
+    /**
+     * ExportFormat
+     * @description Supported export format identifiers.
+     * @enum {string}
+     */
+    ExportFormat: 'srt' | 'vtt' | 'txt' | 'ass'
+    /**
+     * ExportResolvedDefaultsResponse
+     * @description Expose fully resolved export defaults used at runtime.
+     */
+    ExportResolvedDefaultsResponse: {
+      format: components['schemas']['ExportFormat']
+      /** Include Timestamps */
+      include_timestamps: boolean
     }
     /**
      * FileConfigResponse
@@ -746,6 +1159,8 @@ export interface components {
       task_id: string
       /** File Id */
       file_id: string
+      /** Filename */
+      filename?: string | null
       /**
        * Status
        * @enum {string}
@@ -787,6 +1202,8 @@ export interface components {
       task_id: string
       /** File Id */
       file_id: string
+      /** Filename */
+      filename?: string | null
       /**
        * Status
        * @enum {string}
@@ -1521,6 +1938,388 @@ export interface operations {
       }
     }
   }
+  get_export_config_api_config_export_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExportConfigResponse']
+        }
+      }
+    }
+  }
+  delete_export_defaults_api_config_export_defaults_delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  patch_export_defaults_api_config_export_defaults_patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ExportDefaultsUpdateRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExportDefaultsPatchResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_transcriptions_api_transcription_tasks__get: {
+    parameters: {
+      query?: {
+        /** @description Filter by status */
+        status?: ('pending' | 'processing' | 'completed' | 'failed' | 'cancelled') | null
+        /** @description Max results */
+        limit?: number
+        /** @description Offset for pagination */
+        offset?: number
+        /** @description Search keyword for filename */
+        q?: string | null
+        /** @description Sort field */
+        sort_by?: 'created_at' | 'completed_at' | 'status' | 'progress' | 'filename'
+        /** @description Sort order */
+        order?: 'asc' | 'desc'
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TaskListResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_transcription_api_transcription_tasks__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TranscriptionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CreateTaskResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_transcription_api_transcription_tasks__task_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        task_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TaskDetailResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  cancel_transcription_api_transcription_tasks__task_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        task_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CancelTaskResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  batch_cancel_transcriptions_api_transcription_tasks_batch_cancel_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BatchTaskActionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BatchTaskActionResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  batch_retry_transcriptions_api_transcription_tasks_batch_retry_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BatchTaskActionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BatchTaskActionResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  delete_task_record_api_transcription_tasks__task_id__record_delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        task_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeleteTaskRecordResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  export_transcription_api_transcription_tasks__task_id__export_get: {
+    parameters: {
+      query?: {
+        /** @description Output format; omitted values use persisted export defaults */
+        format?: components['schemas']['ExportFormat'] | null
+        /** @description Include timestamps (TXT only); omitted values use persisted defaults */
+        include_timestamps?: boolean | null
+        /** @description Optional output filename for single export. Extension is inferred from selected format. */
+        filename?: string | null
+        /** @description Save to server instead of download */
+        save?: boolean
+      }
+      header?: never
+      path: {
+        task_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description save=false returns subtitle file; save=true returns saved path JSON */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SavedExportResponse']
+          'application/x-subrip': string
+          'text/vtt': string
+          'text/plain': string
+          'text/x-ssa': string
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  batch_export_api_transcription_tasks_export_batch_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BatchExportRequest']
+      }
+    }
+    responses: {
+      /** @description ZIP archive download */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/zip': string
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   list_transcriptions_api_transcriptions__get: {
     parameters: {
       query?: {
@@ -1530,6 +2329,12 @@ export interface operations {
         limit?: number
         /** @description Offset for pagination */
         offset?: number
+        /** @description Search keyword for filename */
+        q?: string | null
+        /** @description Sort field */
+        sort_by?: 'created_at' | 'completed_at' | 'status' | 'progress' | 'filename'
+        /** @description Sort order */
+        order?: 'asc' | 'desc'
       }
       header?: never
       path?: never
@@ -1652,13 +2457,112 @@ export interface operations {
       }
     }
   }
+  batch_cancel_transcriptions_api_transcriptions_batch_cancel_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BatchTaskActionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BatchTaskActionResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  batch_retry_transcriptions_api_transcriptions_batch_retry_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BatchTaskActionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BatchTaskActionResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  delete_task_record_api_transcriptions__task_id__record_delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        task_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeleteTaskRecordResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   export_transcription_api_transcriptions__task_id__export_get: {
     parameters: {
       query?: {
-        /** @description Output format */
-        format?: 'srt' | 'vtt' | 'txt' | 'ass'
-        /** @description Include timestamps (TXT only) */
-        include_timestamps?: boolean
+        /** @description Output format; omitted values use persisted export defaults */
+        format?: components['schemas']['ExportFormat'] | null
+        /** @description Include timestamps (TXT only); omitted values use persisted defaults */
+        include_timestamps?: boolean | null
+        /** @description Optional output filename for single export. Extension is inferred from selected format. */
+        filename?: string | null
         /** @description Save to server instead of download */
         save?: boolean
       }
@@ -1670,13 +2574,17 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description When save=true */
+      /** @description save=false returns subtitle file; save=true returns saved path JSON */
       200: {
         headers: {
           [name: string]: unknown
         }
         content: {
           'application/json': components['schemas']['SavedExportResponse']
+          'application/x-subrip': string
+          'text/vtt': string
+          'text/plain': string
+          'text/x-ssa': string
         }
       }
       /** @description Validation Error */
@@ -1703,13 +2611,13 @@ export interface operations {
       }
     }
     responses: {
-      /** @description Successful Response */
+      /** @description ZIP archive download */
       200: {
         headers: {
           [name: string]: unknown
         }
         content: {
-          'application/json': unknown
+          'application/zip': string
         }
       }
       /** @description Validation Error */

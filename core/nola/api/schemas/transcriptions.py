@@ -11,8 +11,9 @@ from nola.api.schemas.validators import (
     validate_temperature,
     validate_vad_parameter_keys,
 )
-from nola.config.constants import MAX_BATCH_EXPORT_TASKS
+from nola.config.constants import MAX_BATCH_TASK_IDS
 from nola.engines.base import TranscribeOptions
+from nola.services.formatters import ExportFormat
 
 _ENGINE_DEFAULTS = TranscribeOptions()
 
@@ -338,20 +339,39 @@ class TranscriptionDefaultsUpdateRequest(TranscriptionOptionsPayload):
         return self.model_dump(exclude_unset=True)
 
 
+class BatchTaskActionRequest(BaseModel):
+    """Batch action request for task-level operations."""
+
+    task_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_BATCH_TASK_IDS,
+        description="List of task IDs to process",
+    )
+
+
 class BatchExportRequest(BaseModel):
     """Batch export request for multiple transcriptions."""
 
     task_ids: list[str] = Field(
         ...,
         min_length=1,
-        max_length=MAX_BATCH_EXPORT_TASKS,
+        max_length=MAX_BATCH_TASK_IDS,
         description="List of task IDs to export",
     )
-    format: Literal["srt", "vtt", "txt", "ass"] = Field(
-        "srt", description="Output format for all files"
+    format: ExportFormat | None = Field(
+        None,
+        description=(
+            "Output format for all files. "
+            "If omitted, resolve from persisted export defaults."
+        ),
     )
-    include_timestamps: bool = Field(
-        True, description="Include timestamps in TXT format"
+    include_timestamps: bool | None = Field(
+        None,
+        description=(
+            "Include timestamps in TXT format. "
+            "If omitted, resolve from persisted export defaults."
+        ),
     )
     zip_name: str | None = Field(
         None, description="Custom ZIP filename (without extension)"

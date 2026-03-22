@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from math import isinf
-from typing import Any, Protocol, TypeAlias, cast
+from typing import Protocol, TypeAlias, cast
 
 from faster_whisper.vad import VadOptions
 
 from nola.common.merge import deep_merge
+from nola.config.common.types import ConfigMap
 from nola.engines.base import TranscribeOptions
 
 SerializedDefaultValue: TypeAlias = (
@@ -25,7 +26,7 @@ SerializedDefaultValue: TypeAlias = (
 class SupportsConfigRead(Protocol):
     """Represent the config-store contract used by defaults merging."""
 
-    def get_all(self, prefix: str) -> dict[str, Any]:
+    def get_all(self, prefix: str) -> ConfigMap:
         """Return all config values matching the provided prefix."""
 
 
@@ -42,10 +43,10 @@ def _serialize_special_values(value: object) -> SerializedDefaultValue:
     return cast(SerializedDefaultValue, value)
 
 
-def _build_engine_defaults() -> dict[str, Any]:
+def _build_engine_defaults() -> ConfigMap:
     """Build raw non-batched WhisperModel defaults with expanded VAD options."""
-    defaults = asdict(TranscribeOptions())
-    defaults["vad_parameters"] = asdict(VadOptions())
+    defaults = cast(ConfigMap, asdict(TranscribeOptions()))
+    defaults["vad_parameters"] = cast(ConfigMap, asdict(VadOptions()))
     return defaults
 
 

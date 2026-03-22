@@ -212,6 +212,154 @@
       "languageDetectionSegments": "语言检测片段数"
     }
   },
+  "tasks": {
+    "currentBatch": {
+      "title": "本次任务",
+      "description": "当前应用会话内创建的任务",
+      "empty": "本次会话暂无任务",
+      "newTasksNotice_one": "有 {{count}} 个新任务",
+      "newTasksNotice_other": "有 {{count}} 个新任务",
+      "backToFirstPage": "返回第一页"
+    },
+    "history": {
+      "title": "任务历史",
+      "description": "所有转写任务",
+      "empty": "暂无历史任务",
+      "selection": {
+        "selectCurrentPage": "选择当前页",
+        "clearCurrentPage": "清空当前页",
+        "selectedCount_one": "已选择 {{count}} 项",
+        "selectedCount_other": "已选择 {{count}} 项"
+      },
+      "batchActions": {
+        "cancel_one": "取消所选 ({{count}})",
+        "cancel_other": "取消所选 ({{count}})",
+        "retry_one": "重试所选 ({{count}})",
+        "retry_other": "重试所选 ({{count}})",
+        "export_one": "导出所选 ({{count}})",
+        "export_other": "导出所选 ({{count}})"
+      }
+    },
+    "exportDialog": {
+      "titleSingle": "导出任务",
+      "titleBatch_one": "导出 {{count}} 个任务",
+      "titleBatch_other": "导出 {{count}} 个任务",
+      "descriptionSingle": "设置导出格式和参数",
+      "descriptionBatch": "批量导出将生成一个 ZIP 文件",
+      "loadingDefaults": "正在加载导出默认值...",
+      "fields": {
+        "format": "导出格式",
+        "target": "导出方式",
+        "filename": "输出文件名（可选）",
+        "filenamePlaceholder": "默认使用任务文件名",
+        "defaultFilenameHint": "默认文件名：{{filename}}",
+        "includeTimestamps": "TXT 包含时间戳",
+        "includeHint": "该开关仅对 TXT 格式生效",
+        "zipName": "ZIP 文件名（可选）",
+        "zipNamePlaceholder": "例如：my-subtitles",
+        "zipNameHint": "默认文件名：export_YYYYMMDD_HHMMSS.zip"
+      },
+      "target": {
+        "download": "下载文件",
+        "save": "保存到服务器"
+      },
+      "savedPathLabel": "最近保存路径: {{path}}",
+      "actions": {
+        "saveAsDefault": "保存本次格式为默认值",
+        "resetDefaults": "重置导出默认值",
+        "resettingDefaults": "重置中...",
+        "copyPath": "复制路径",
+        "cancel": "取消",
+        "confirm": "开始导出",
+        "confirming": "导出中..."
+      },
+      "toast": {
+        "defaultsSaved": "导出默认值已更新",
+        "defaultsReset": "导出默认值已重置",
+        "pathCopied": "保存路径已复制"
+      }
+    },
+    "fields": {
+      "taskId": "任务 ID",
+      "file": "文件",
+      "fileId": "文件 ID",
+      "status": "状态",
+      "progress": "进度",
+      "createdAt": "创建时间",
+      "completedAt": "完成时间"
+    },
+    "status": {
+      "pending": "等待中",
+      "processing": "处理中",
+      "completed": "已完成",
+      "failed": "失败",
+      "cancelled": "已取消"
+    },
+    "actions": {
+      "cancel": "取消",
+      "cancelling": "取消中...",
+      "retry": "重试",
+      "retrying": "重试中...",
+      "export": "导出",
+      "exporting": "导出中...",
+      "deleteRecord": "删除记录",
+      "deleting": "删除中..."
+    },
+    "selection": {
+      "selectTask": "选择任务 {{taskId}}"
+    },
+    "filters": {
+      "searchPlaceholder": "按任务 ID、文件 ID 或文件名搜索",
+      "statusAll": "全部状态",
+      "sortBy": {
+        "created_at": "创建时间",
+        "completed_at": "完成时间",
+        "status": "状态",
+        "progress": "进度",
+        "filename": "文件名"
+      },
+      "order": {
+        "desc": "降序",
+        "asc": "升序"
+      }
+    },
+    "pagination": {
+      "summary": "显示 {{start}}-{{end}} / 共 {{total}} 条",
+      "previous": "上一页",
+      "next": "下一页",
+      "page": "第 {{current}} / {{total}} 页"
+    },
+    "toast": {
+      "cancelled": "任务已取消: {{taskId}}",
+      "retried": "已创建重试任务: {{taskId}}",
+      "recordDeleted": "任务记录已删除: {{taskId}}",
+      "actionFailed": "任务操作失败，请重试",
+      "batch": {
+        "cancel": {
+          "success_one": "已取消 {{count}} 个任务",
+          "success_other": "已取消 {{count}} 个任务",
+          "partial": "已取消 {{succeeded}} 个任务，{{failed}} 个失败",
+          "failed_one": "{{count}} 个任务取消失败",
+          "failed_other": "{{count}} 个任务取消失败"
+        },
+        "retry": {
+          "success_one": "已重试 {{count}} 个任务",
+          "success_other": "已重试 {{count}} 个任务",
+          "partial": "已重试 {{succeeded}} 个任务，{{failed}} 个失败",
+          "failed_one": "{{count}} 个任务重试失败",
+          "failed_other": "{{count}} 个任务重试失败"
+        },
+        "export": {
+          "success_one": "已导出 {{count}} 个任务",
+          "success_other": "已导出 {{count}} 个任务"
+        }
+      },
+      "export": {
+        "one": "已开始导出",
+        "saved": "已保存到服务器: {{path}}"
+      }
+    }
+  },
   "error": {
     "generic": "发生错误",
     "api": {

@@ -1,5 +1,6 @@
 """API schemas package."""
 
+from nola.api.schemas.config import ExportDefaultsUpdateRequest
 from nola.api.schemas.files import (
     CleanupResponse,
     DeleteResponse,
@@ -11,8 +12,12 @@ from nola.api.schemas.files import (
     MissingFileInfo,
 )
 from nola.api.schemas.responses import (
+    BatchTaskActionResponse,
+    BatchTaskActionResultResponse,
+    BatchTaskActionSummaryResponse,
     CancelTaskResponse,
     CreateTaskResponse,
+    DeleteTaskRecordResponse,
     SavedExportResponse,
     SegmentResponse,
     TaskDetailResponse,
@@ -21,16 +26,23 @@ from nola.api.schemas.responses import (
 )
 from nola.api.schemas.transcriptions import (
     BatchExportRequest,
+    BatchTaskActionRequest,
     TranscriptionDefaultsUpdateRequest,
     TranscriptionRequest,
 )
 
 __all__ = [
+    "BatchTaskActionRequest",
+    "BatchTaskActionResponse",
+    "BatchTaskActionResultResponse",
+    "BatchTaskActionSummaryResponse",
     "BatchExportRequest",
     "CancelTaskResponse",
     "CleanupResponse",
     "CreateTaskResponse",
+    "DeleteTaskRecordResponse",
     "DeleteResponse",
+    "ExportDefaultsUpdateRequest",
     "FileDetailResponse",
     "FileListResponse",
     "FileResponse",

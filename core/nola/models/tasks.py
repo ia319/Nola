@@ -7,7 +7,9 @@ from contextlib import closing
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import Any, Literal, TypedDict, cast
+
+from typing_extensions import NotRequired
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +19,7 @@ class TaskRowRaw(TypedDict):
 
     id: str
     file_id: str
+    filename: NotRequired[str | None]
     status: str
     priority: int
     retry_count: int
@@ -39,6 +42,7 @@ class TaskRow(TypedDict):
 
     id: str
     file_id: str
+    filename: NotRequired[str | None]
     status: str
     priority: int
     retry_count: int
@@ -64,6 +68,37 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
+
+TaskSortField = Literal["created_at", "completed_at", "status", "progress", "filename"]
+TaskSortOrder = Literal["asc", "desc"]
+DEFAULT_TASK_SORT_BY: TaskSortField = "created_at"
+DEFAULT_TASK_SORT_ORDER: TaskSortOrder = "desc"
+TASK_SORT_COLUMNS: dict[TaskSortField, str] = {
+    "created_at": "t.created_at",
+    "completed_at": "t.completed_at",
+    "status": "t.status",
+    "progress": "t.progress",
+    "filename": "LOWER(COALESCE(f.filename, ''))",
+}
+TERMINAL_TASK_STATUSES = (
+    TaskStatus.COMPLETED.value,
+    TaskStatus.FAILED.value,
+    TaskStatus.CANCELLED.value,
+)
+CANCELLABLE_TASK_STATUSES = (
+    TaskStatus.PENDING.value,
+    TaskStatus.PROCESSING.value,
+)
+RETRYABLE_TASK_STATUSES = (
+    TaskStatus.FAILED.value,
+    TaskStatus.CANCELLED.value,
+)
+
+
+def _escape_like_fragment(fragment: str) -> str:
+    """Escape LIKE wildcards so filename search keeps literal contains semantics."""
+    return fragment.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 class TaskDatabase:
@@ -286,6 +321,17 @@ class TaskDatabase:
         Returns:
             True if cancelled, False if not found or already completed
         """
+        return self.cancel_with_snapshot(task_id) is not None
+
+    def cancel_with_snapshot(self, task_id: str) -> TaskRowRaw | None:
+        """Cancel a pending/processing task and return the updated row snapshot.
+
+        Args:
+            task_id: Task identifier
+
+        Returns:
+            Updated task row when cancellation succeeds, otherwise None
+        """
         with closing(self._connect()) as conn:
             with conn:
                 cursor = conn.execute(
@@ -293,19 +339,19 @@ class TaskDatabase:
                     UPDATE transcription_tasks
                     SET status = ?, completed_at = ?
                     WHERE id = ? AND status IN (?, ?)
+                    RETURNING *
                     """,
                     (
                         TaskStatus.CANCELLED.value,
                         datetime.now().isoformat(),
                         task_id,
-                        TaskStatus.PENDING.value,
-                        TaskStatus.PROCESSING.value,
+                        *CANCELLABLE_TASK_STATUSES,
                     ),
                 )
-
-                cancelled = cursor.rowcount > 0
-
-                return cancelled
+                row = cursor.fetchone()
+                if row is None:
+                    return None
+                return cast(TaskRowRaw, dict(row))
 
     # === Maintenance Operations ===
 
@@ -453,6 +499,28 @@ class TaskDatabase:
                 task["options"] = None
         return cast(TaskRow, task)
 
+    def delete_task_record(self, task_id: str) -> bool:
+        """Delete a task record by ID.
+
+        Args:
+            task_id: Task identifier
+
+        Returns:
+            True if deleted, False if task is missing or non-terminal
+        """
+        with closing(self._connect()) as conn:
+            with conn:
+                # Enforce terminal-only deletion at the data layer so direct model
+                # callers cannot bypass route-level status checks.
+                cursor = conn.execute(
+                    """
+                    DELETE FROM transcription_tasks
+                    WHERE id = ? AND status IN (?, ?, ?)
+                    """,
+                    (task_id, *TERMINAL_TASK_STATUSES),
+                )
+                return cursor.rowcount > 0
+
     # Legacy method for compatibility
     def create_task(self, task_id: str, file_id: str) -> None:
         """Legacy: Create task (use enqueue instead)."""
@@ -542,32 +610,64 @@ class TaskDatabase:
         status: str | None = None,
         limit: int = 50,
         offset: int = 0,
+        q: str | None = None,
+        sort_by: TaskSortField = DEFAULT_TASK_SORT_BY,
+        order: TaskSortOrder = DEFAULT_TASK_SORT_ORDER,
     ) -> list[TaskRowRaw]:
-        """List tasks with optional filtering."""
+        """List tasks with optional status/search filters and sorting."""
+        sort_column = TASK_SORT_COLUMNS[sort_by]
+        sort_order = "ASC" if order == "asc" else "DESC"
+
+        from_sql = "FROM transcription_tasks t LEFT JOIN files f ON f.id = t.file_id"
+        where_clauses: list[str] = []
+        params: list[str | int] = []
+
+        if q:
+            # Keep contains search semantics (%keyword%) for UX consistency.
+            # This may full-scan on SQLite; move to FTS when data volume grows.
+            escaped_q = _escape_like_fragment(q.lower())
+            where_clauses.append("LOWER(f.filename) LIKE ? ESCAPE '\\'")
+            params.append(f"%{escaped_q}%")
+
+        if status:
+            where_clauses.append("t.status = ?")
+            params.append(status)
+
+        where_sql = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+        query = (
+            "SELECT t.*, f.filename AS filename "
+            f"{from_sql}{where_sql} "
+            f"ORDER BY {sort_column} {sort_order}, t.id DESC "
+            "LIMIT ? OFFSET ?"
+        )
+        params.extend([limit, offset])
+
         with closing(self._connect()) as conn:
             conn.row_factory = sqlite3.Row
-            if status:
-                cursor = conn.execute(
-                    "SELECT * FROM transcription_tasks WHERE status = ? "
-                    "ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                    (status, limit, offset),
-                )
-            else:
-                cursor = conn.execute(
-                    "SELECT * FROM transcription_tasks "
-                    "ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                    (limit, offset),
-                )
+            cursor = conn.execute(query, tuple(params))
             return [cast(TaskRowRaw, dict(row)) for row in cursor.fetchall()]
 
-    def count_tasks(self, status: str | None = None) -> int:
-        """Count tasks with optional filtering."""
+    def count_tasks(self, status: str | None = None, q: str | None = None) -> int:
+        """Count tasks with optional status/search filters."""
+        from_sql = "FROM transcription_tasks t"
+        where_clauses: list[str] = []
+        params: list[str] = []
+
+        if q:
+            from_sql += " JOIN files f ON f.id = t.file_id"
+            # Keep contains search semantics (%keyword%) for UX consistency.
+            # This may full-scan on SQLite; move to FTS when data volume grows.
+            escaped_q = _escape_like_fragment(q.lower())
+            where_clauses.append("LOWER(f.filename) LIKE ? ESCAPE '\\'")
+            params.append(f"%{escaped_q}%")
+
+        if status:
+            where_clauses.append("t.status = ?")
+            params.append(status)
+
+        where_sql = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+        query = f"SELECT COUNT(*) {from_sql}{where_sql}"
+
         with closing(self._connect()) as conn:
-            if status:
-                cursor = conn.execute(
-                    "SELECT COUNT(*) FROM transcription_tasks WHERE status = ?",
-                    (status,),
-                )
-            else:
-                cursor = conn.execute("SELECT COUNT(*) FROM transcription_tasks")
+            cursor = conn.execute(query, tuple(params))
             return int(cursor.fetchone()[0])

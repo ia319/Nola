@@ -213,6 +213,154 @@
       "languageDetectionSegments": "Language Detection Segments"
     }
   },
+  "tasks": {
+    "currentBatch": {
+      "title": "Current Session Tasks",
+      "description": "Tasks created since this app session started",
+      "empty": "No tasks in the current session",
+      "newTasksNotice_one": "{{count}} new task available",
+      "newTasksNotice_other": "{{count}} new tasks available",
+      "backToFirstPage": "Back to first page"
+    },
+    "history": {
+      "title": "Task History",
+      "description": "All transcription tasks",
+      "empty": "No history tasks",
+      "selection": {
+        "selectCurrentPage": "Select current page",
+        "clearCurrentPage": "Clear current page",
+        "selectedCount_one": "{{count}} selected",
+        "selectedCount_other": "{{count}} selected"
+      },
+      "batchActions": {
+        "cancel_one": "Cancel selected ({{count}})",
+        "cancel_other": "Cancel selected ({{count}})",
+        "retry_one": "Retry selected ({{count}})",
+        "retry_other": "Retry selected ({{count}})",
+        "export_one": "Export selected ({{count}})",
+        "export_other": "Export selected ({{count}})"
+      }
+    },
+    "exportDialog": {
+      "titleSingle": "Export Task",
+      "titleBatch_one": "Export {{count}} Task",
+      "titleBatch_other": "Export {{count}} Tasks",
+      "descriptionSingle": "Choose format and export options",
+      "descriptionBatch": "Batch export generates a ZIP archive",
+      "loadingDefaults": "Loading export defaults...",
+      "fields": {
+        "format": "Export format",
+        "target": "Export destination",
+        "filename": "Output filename (optional)",
+        "filenamePlaceholder": "Use task filename by default",
+        "defaultFilenameHint": "Default filename: {{filename}}",
+        "includeTimestamps": "Include timestamps for TXT",
+        "includeHint": "This toggle only applies to TXT format",
+        "zipName": "ZIP file name (optional)",
+        "zipNamePlaceholder": "e.g. my-subtitles",
+        "zipNameHint": "Default filename: export_YYYYMMDD_HHMMSS.zip"
+      },
+      "target": {
+        "download": "Download file",
+        "save": "Save to server"
+      },
+      "savedPathLabel": "Last saved path: {{path}}",
+      "actions": {
+        "saveAsDefault": "Save current options as defaults",
+        "resetDefaults": "Reset export defaults",
+        "resettingDefaults": "Resetting...",
+        "copyPath": "Copy path",
+        "cancel": "Cancel",
+        "confirm": "Start export",
+        "confirming": "Exporting..."
+      },
+      "toast": {
+        "defaultsSaved": "Export defaults updated",
+        "defaultsReset": "Export defaults reset",
+        "pathCopied": "Saved path copied"
+      }
+    },
+    "fields": {
+      "taskId": "Task ID",
+      "file": "File",
+      "fileId": "File ID",
+      "status": "Status",
+      "progress": "Progress",
+      "createdAt": "Created",
+      "completedAt": "Completed"
+    },
+    "status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "cancelling": "Cancelling...",
+      "retry": "Retry",
+      "retrying": "Retrying...",
+      "export": "Export",
+      "exporting": "Exporting...",
+      "deleteRecord": "Delete Record",
+      "deleting": "Deleting..."
+    },
+    "selection": {
+      "selectTask": "Select task {{taskId}}"
+    },
+    "filters": {
+      "searchPlaceholder": "Search by task ID, file ID, or filename",
+      "statusAll": "All Statuses",
+      "sortBy": {
+        "created_at": "Created Time",
+        "completed_at": "Completed Time",
+        "status": "Status",
+        "progress": "Progress",
+        "filename": "Filename"
+      },
+      "order": {
+        "desc": "Desc",
+        "asc": "Asc"
+      }
+    },
+    "pagination": {
+      "summary": "Showing {{start}}-{{end}} of {{total}}",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {{current}} / {{total}}"
+    },
+    "toast": {
+      "cancelled": "Task cancelled: {{taskId}}",
+      "retried": "Retry created: {{taskId}}",
+      "recordDeleted": "Task record deleted: {{taskId}}",
+      "actionFailed": "Task action failed, please retry",
+      "batch": {
+        "cancel": {
+          "success_one": "Cancelled {{count}} task",
+          "success_other": "Cancelled {{count}} tasks",
+          "partial": "Cancelled {{succeeded}} tasks, {{failed}} failed",
+          "failed_one": "Cancel failed for {{count}} task",
+          "failed_other": "Cancel failed for {{count}} tasks"
+        },
+        "retry": {
+          "success_one": "Retried {{count}} task",
+          "success_other": "Retried {{count}} tasks",
+          "partial": "Retried {{succeeded}} tasks, {{failed}} failed",
+          "failed_one": "Retry failed for {{count}} task",
+          "failed_other": "Retry failed for {{count}} tasks"
+        },
+        "export": {
+          "success_one": "Exported {{count}} task",
+          "success_other": "Exported {{count}} tasks"
+        }
+      },
+      "export": {
+        "one": "Export started",
+        "saved": "Saved to server: {{path}}"
+      }
+    }
+  },
   "error": {
     "generic": "An error occurred",
     "api": {

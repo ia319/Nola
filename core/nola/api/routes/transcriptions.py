@@ -8,27 +8,110 @@ from typing import Any, Literal
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from nola.api.deps import get_file_db, get_task_db
+from nola.api.deps import get_app_config_db, get_file_db, get_task_db
 from nola.api.schemas import (
     BatchExportRequest,
+    BatchTaskActionRequest,
+    BatchTaskActionResponse,
     CancelTaskResponse,
     CreateTaskResponse,
+    DeleteTaskRecordResponse,
     SavedExportResponse,
     TaskDetailResponse,
     TaskListResponse,
     TranscriptionRequest,
 )
+from nola.config.export import (
+    build_export_filename,
+    write_unique_export_text,
+)
+from nola.config.export import (
+    get_effective_defaults as get_effective_export_defaults,
+)
+from nola.models.tasks import (
+    CANCELLABLE_TASK_STATUSES,
+    DEFAULT_TASK_SORT_BY,
+    DEFAULT_TASK_SORT_ORDER,
+    RETRYABLE_TASK_STATUSES,
+    TERMINAL_TASK_STATUSES,
+    TaskRow,
+    TaskRowRaw,
+    TaskSortField,
+    TaskSortOrder,
+)
+from nola.services.formatters import ExportFormat, list_export_content_types
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/transcriptions", tags=["transcriptions"])
+router = APIRouter(prefix="/api/transcription-tasks", tags=["transcription-tasks"])
+legacy_router = APIRouter(prefix="/api/transcriptions", tags=["transcriptions"])
 
 # Valid status values for filtering
 StatusFilter = Literal["pending", "processing", "completed", "failed", "cancelled"]
 
 
+def _to_task_summary_payload(
+    task: TaskRow | TaskRowRaw,
+    *,
+    filename: str | None = None,
+) -> dict[str, Any]:
+    """Normalize task row payload into TaskSummaryResponse shape."""
+    return {
+        "task_id": task["id"],
+        "file_id": task["file_id"],
+        "filename": filename,
+        "status": task["status"],
+        "progress": task["progress"],
+        "created_at": task["created_at"],
+        "completed_at": task["completed_at"],
+    }
+
+
+def _build_batch_action_response(
+    action: Literal["cancel", "retry"], results: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Build a stable batch action payload with summary counts."""
+    succeeded = sum(1 for item in results if item["ok"])
+    failed = len(results) - succeeded
+    return {
+        "action": action,
+        "summary": {
+            "requested": len(results),
+            "succeeded": succeeded,
+            "failed": failed,
+        },
+        "results": results,
+    }
+
+
+def _resolve_export_options(
+    *,
+    requested_format: ExportFormat | None,
+    requested_include_timestamps: bool | None,
+) -> tuple[ExportFormat, bool]:
+    """Resolve effective export options from request values and persisted defaults."""
+    defaults = get_effective_export_defaults(get_app_config_db())
+    default_format = ExportFormat(defaults["format"])
+    default_include_timestamps = defaults["include_timestamps"]
+
+    effective_format = requested_format or default_format
+    effective_include_timestamps = (
+        requested_include_timestamps
+        if requested_include_timestamps is not None
+        else default_include_timestamps
+    )
+
+    return effective_format, effective_include_timestamps
+
+
+@legacy_router.post(
+    "/",
+    summary="Create transcription task",
+    response_model=CreateTaskResponse,
+    deprecated=True,
+)
 @router.post(
     "/", summary="Create transcription task", response_model=CreateTaskResponse
 )
@@ -39,7 +122,7 @@ async def create_transcription(request: TranscriptionRequest) -> dict[str, Any]:
     1. Upload file via POST /api/files → get file_id
     2. Create task via this endpoint with file_id and optional parameters
     3. Worker will automatically process the task
-    4. Query status via GET /api/transcriptions/{task_id}
+    4. Query status via GET /api/transcription-tasks/{task_id}
 
     All transcription parameters are optional. If omitted, the effective defaults
     (engine defaults plus persisted application overrides) will be used.
@@ -73,11 +156,15 @@ async def create_transcription(request: TranscriptionRequest) -> dict[str, Any]:
     }
 
 
+@legacy_router.get("/", response_model=TaskListResponse, deprecated=True)
 @router.get("/", response_model=TaskListResponse)
 async def list_transcriptions(
     status: StatusFilter | None = Query(None, description="Filter by status"),
     limit: int = Query(50, ge=1, le=100, description="Max results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
+    q: str | None = Query(None, description="Search keyword for filename"),
+    sort_by: TaskSortField = Query(DEFAULT_TASK_SORT_BY, description="Sort field"),
+    order: TaskSortOrder = Query(DEFAULT_TASK_SORT_ORDER, description="Sort order"),
 ) -> dict[str, Any]:
     """List all transcription tasks.
 
@@ -85,26 +172,28 @@ async def list_transcriptions(
         status: Optional status filter (pending, processing, completed, failed)
         limit: Maximum number of results
         offset: Pagination offset
+        q: Optional filename search keyword
+        sort_by: Sort field
+        order: Sort order (asc or desc)
 
     Returns:
         List of tasks with pagination info
     """
     task_db = get_task_db()
 
-    tasks = task_db.list_tasks(status=status, limit=limit, offset=offset)
-    total = task_db.count_tasks(status=status)
+    tasks = task_db.list_tasks(
+        status=status,
+        limit=limit,
+        offset=offset,
+        q=q,
+        sort_by=sort_by,
+        order=order,
+    )
+    total = task_db.count_tasks(status=status, q=q)
 
     return {
         "tasks": [
-            {
-                "task_id": t["id"],
-                "file_id": t["file_id"],
-                "status": t["status"],
-                "progress": t["progress"],
-                "created_at": t["created_at"],
-                "completed_at": t["completed_at"],
-            }
-            for t in tasks
+            _to_task_summary_payload(t, filename=t.get("filename")) for t in tasks
         ],
         "total": total,
         "limit": limit,
@@ -112,6 +201,7 @@ async def list_transcriptions(
     }
 
 
+@legacy_router.get("/{task_id}", response_model=TaskDetailResponse, deprecated=True)
 @router.get("/{task_id}", response_model=TaskDetailResponse)
 async def get_transcription(task_id: str) -> dict[str, Any]:
     """Get transcription task status and result.
@@ -123,24 +213,23 @@ async def get_transcription(task_id: str) -> dict[str, Any]:
         Task status and result
     """
     task_db = get_task_db()
+    file_db = get_file_db()
     task = task_db.get_task(task_id)
 
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    file = file_db.get_file(task["file_id"])
+
     return {
-        "task_id": task["id"],
-        "file_id": task["file_id"],
-        "status": task["status"],
-        "progress": task["progress"],
+        **_to_task_summary_payload(task, filename=file["filename"] if file else None),
         "duration": task["duration"],
         "segments": task["segments"],
         "error": task["error"],
-        "created_at": task["created_at"],
-        "completed_at": task["completed_at"],
     }
 
 
+@legacy_router.delete("/{task_id}", response_model=CancelTaskResponse, deprecated=True)
 @router.delete("/{task_id}", response_model=CancelTaskResponse)
 async def cancel_transcription(task_id: str) -> dict[str, Any]:
     """Cancel a transcription task.
@@ -152,42 +241,379 @@ async def cancel_transcription(task_id: str) -> dict[str, Any]:
         Cancellation result
     """
     task_db = get_task_db()
+    file_db = get_file_db()
 
-    # Attempt to cancel - returns False if not found or not cancellable
-    cancelled = task_db.cancel(task_id)
+    task = task_db.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
 
-    if not cancelled:
-        # Check if task exists to provide appropriate error
-        task = task_db.get_task(task_id)
-        if task is None:
-            raise HTTPException(status_code=404, detail="Task not found")
+    message = "Task cancelled successfully"
+    status = task["status"]
+    cancelled_task: TaskRow | TaskRowRaw
+
+    if status == "cancelled":
+        cancelled_task = task
+        message = "Task already cancelled"
+    elif status not in CANCELLABLE_TASK_STATUSES:
         raise HTTPException(
-            status_code=400,
-            detail=f"Cannot cancel task with status: {task['status']}",
+            status_code=409,
+            detail=f"Cannot cancel task with status: {status}",
         )
+    else:
+        cancelled_snapshot = task_db.cancel_with_snapshot(task_id)
+        if cancelled_snapshot is None:
+            latest_task = task_db.get_task(task_id)
+            if latest_task is None:
+                raise HTTPException(status_code=404, detail="Task not found")
+            latest_status = latest_task["status"]
+            if latest_status == "cancelled":
+                cancelled_task = latest_task
+                message = "Task already cancelled"
+            else:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Cannot cancel task with status: {latest_status}",
+                )
+        else:
+            cancelled_task = cancelled_snapshot
 
+    file = file_db.get_file(cancelled_task["file_id"])
+    task_summary = _to_task_summary_payload(
+        cancelled_task, filename=file["filename"] if file else None
+    )
     return {
-        "task_id": task_id,
-        "status": "cancelled",
-        "message": "Task cancelled successfully",
+        "task_id": task_summary["task_id"],
+        "status": task_summary["status"],
+        "message": message,
+        "task": task_summary,
     }
 
 
-ExportFormat = Literal["srt", "vtt", "txt", "ass"]
+@legacy_router.post(
+    "/batch/cancel",
+    summary="Batch cancel transcription tasks",
+    response_model=BatchTaskActionResponse,
+    deprecated=True,
+)
+@router.post(
+    "/batch/cancel",
+    summary="Batch cancel transcription tasks",
+    response_model=BatchTaskActionResponse,
+)
+async def batch_cancel_transcriptions(
+    request: BatchTaskActionRequest,
+) -> dict[str, Any]:
+    """Cancel multiple tasks and return per-task outcomes."""
+    task_db = get_task_db()
+    file_db = get_file_db()
+    seen_task_ids: set[str] = set()
+    results: list[dict[str, Any]] = []
+
+    for task_id in request.task_ids:
+        if task_id in seen_task_ids:
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": False,
+                    "message": "Duplicate task_id in request",
+                    "error_code": "duplicate_task_id",
+                }
+            )
+            continue
+        seen_task_ids.add(task_id)
+
+        task = task_db.get_task(task_id)
+        if task is None:
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": False,
+                    "message": "Task not found",
+                    "error_code": "not_found",
+                }
+            )
+            continue
+
+        file = file_db.get_file(task["file_id"])
+        filename = file["filename"] if file else None
+        status = task["status"]
+
+        if status == "cancelled":
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": True,
+                    "message": "Task already cancelled",
+                    "status": status,
+                    "file_id": task["file_id"],
+                    "filename": filename,
+                }
+            )
+            continue
+
+        if status not in CANCELLABLE_TASK_STATUSES:
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": False,
+                    "message": f"Cannot cancel task with status: {status}",
+                    "error_code": "invalid_status",
+                    "status": status,
+                    "file_id": task["file_id"],
+                    "filename": filename,
+                }
+            )
+            continue
+
+        cancelled_snapshot = task_db.cancel_with_snapshot(task_id)
+        if cancelled_snapshot is None:
+            latest_task = task_db.get_task(task_id)
+            if latest_task is None:
+                results.append(
+                    {
+                        "task_id": task_id,
+                        "ok": False,
+                        "message": "Task not found",
+                        "error_code": "not_found",
+                    }
+                )
+                continue
+
+            latest_file = file_db.get_file(latest_task["file_id"])
+            latest_filename = latest_file["filename"] if latest_file else None
+            latest_status = latest_task["status"]
+            if latest_status == "cancelled":
+                results.append(
+                    {
+                        "task_id": task_id,
+                        "ok": True,
+                        "message": "Task already cancelled",
+                        "status": latest_status,
+                        "file_id": latest_task["file_id"],
+                        "filename": latest_filename,
+                    }
+                )
+            else:
+                results.append(
+                    {
+                        "task_id": task_id,
+                        "ok": False,
+                        "message": f"Cannot cancel task with status: {latest_status}",
+                        "error_code": "invalid_status",
+                        "status": latest_status,
+                        "file_id": latest_task["file_id"],
+                        "filename": latest_filename,
+                    }
+                )
+            continue
+
+        cancelled_file = file_db.get_file(cancelled_snapshot["file_id"])
+        cancelled_filename = cancelled_file["filename"] if cancelled_file else None
+        results.append(
+            {
+                "task_id": task_id,
+                "ok": True,
+                "message": "Task cancelled successfully",
+                "status": cancelled_snapshot["status"],
+                "file_id": cancelled_snapshot["file_id"],
+                "filename": cancelled_filename,
+            }
+        )
+
+    return _build_batch_action_response("cancel", results)
 
 
-# NOTE: OpenAPI only models the save=true JSON response.
-# Default (save=false) returns binary file content.
-# FE: downloadExport -> blob; saveExport -> JSON.
+@legacy_router.post(
+    "/batch/retry",
+    summary="Batch retry transcription tasks",
+    response_model=BatchTaskActionResponse,
+    deprecated=True,
+)
+@router.post(
+    "/batch/retry",
+    summary="Batch retry transcription tasks",
+    response_model=BatchTaskActionResponse,
+)
+async def batch_retry_transcriptions(request: BatchTaskActionRequest) -> dict[str, Any]:
+    """Retry failed/cancelled tasks by creating new pending tasks."""
+    task_db = get_task_db()
+    file_db = get_file_db()
+    seen_task_ids: set[str] = set()
+    results: list[dict[str, Any]] = []
+
+    for task_id in request.task_ids:
+        if task_id in seen_task_ids:
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": False,
+                    "message": "Duplicate task_id in request",
+                    "error_code": "duplicate_task_id",
+                }
+            )
+            continue
+        seen_task_ids.add(task_id)
+
+        task = task_db.get_task(task_id)
+        if task is None:
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": False,
+                    "message": "Task not found",
+                    "error_code": "not_found",
+                }
+            )
+            continue
+
+        file = file_db.get_file(task["file_id"])
+        filename = file["filename"] if file else None
+        status = task["status"]
+
+        if status not in RETRYABLE_TASK_STATUSES:
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": False,
+                    "message": f"Cannot retry task with status: {status}",
+                    "error_code": "invalid_status",
+                    "status": status,
+                    "file_id": task["file_id"],
+                    "filename": filename,
+                }
+            )
+            continue
+
+        if file is None:
+            results.append(
+                {
+                    "task_id": task_id,
+                    "ok": False,
+                    "message": f"File not found: {task['file_id']}",
+                    "error_code": "file_missing",
+                    "status": status,
+                    "file_id": task["file_id"],
+                }
+            )
+            continue
+
+        new_task_id = str(uuid.uuid4())
+        task_db.enqueue(
+            task_id=new_task_id,
+            file_id=task["file_id"],
+            options=task.get("options"),
+        )
+        results.append(
+            {
+                "task_id": task_id,
+                "ok": True,
+                "message": "Retry task created successfully",
+                "status": status,
+                "new_task_id": new_task_id,
+                "file_id": task["file_id"],
+                "filename": filename,
+            }
+        )
+
+    return _build_batch_action_response("retry", results)
+
+
+@legacy_router.delete(
+    "/{task_id}/record",
+    summary="Delete task record",
+    response_model=DeleteTaskRecordResponse,
+    deprecated=True,
+)
+@router.delete(
+    "/{task_id}/record",
+    summary="Delete task record",
+    response_model=DeleteTaskRecordResponse,
+)
+async def delete_task_record(task_id: str) -> dict[str, str]:
+    """Delete a terminal task record without deleting its file."""
+    task_db = get_task_db()
+    task = task_db.get_task(task_id)
+
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task["status"] not in TERMINAL_TASK_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=("Only terminal tasks can be deleted (completed/failed/cancelled)"),
+        )
+
+    deleted = task_db.delete_task_record(task_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return {"task_id": task_id, "message": "Task record deleted successfully"}
+
+
+EXPORT_FILE_RESPONSE_CONTENT: dict[str, dict[str, dict[str, str]]] = {
+    media_type: {"schema": {"type": "string", "format": "binary"}}
+    for media_type in list_export_content_types()
+}
+
+# Keep OpenAPI aligned with runtime behavior:
+# save=false downloads subtitle content, save=true returns JSON metadata.
+EXPORT_TRANSCRIPTION_RESPONSES: dict[int | str, dict[str, object]] = {
+    200: {
+        "description": (
+            "save=false returns subtitle file; save=true returns saved path JSON"
+        ),
+        "content": {
+            "application/json": {
+                "schema": {"$ref": "#/components/schemas/SavedExportResponse"}
+            },
+            **EXPORT_FILE_RESPONSE_CONTENT,
+        },
+    }
+}
+
+BATCH_EXPORT_RESPONSES: dict[int | str, dict[str, object]] = {
+    200: {
+        "description": "ZIP archive download",
+        "content": {
+            "application/zip": {"schema": {"type": "string", "format": "binary"}}
+        },
+    }
+}
+
+
+@legacy_router.get(
+    "/{task_id}/export",
+    summary="Export transcription result",
+    response_model=SavedExportResponse,
+    responses=EXPORT_TRANSCRIPTION_RESPONSES,
+    deprecated=True,
+)
 @router.get(
     "/{task_id}/export",
     summary="Export transcription result",
-    responses={200: {"model": SavedExportResponse, "description": "When save=true"}},
+    response_model=SavedExportResponse,
+    responses=EXPORT_TRANSCRIPTION_RESPONSES,
 )
 async def export_transcription(
     task_id: str,
-    format: ExportFormat = Query("srt", description="Output format"),
-    include_timestamps: bool = Query(True, description="Include timestamps (TXT only)"),
+    format: ExportFormat | None = Query(
+        None,
+        description="Output format; omitted values use persisted export defaults",
+    ),
+    include_timestamps: bool | None = Query(
+        None,
+        description=(
+            "Include timestamps (TXT only); omitted values use persisted defaults"
+        ),
+    ),
+    filename: str | None = Query(
+        None,
+        max_length=255,
+        description=(
+            "Optional output filename for single export. Extension is inferred "
+            "from selected format."
+        ),
+    ),
     save: bool = Query(False, description="Save to server instead of download"),
 ) -> Response:
     """Export completed transcription as subtitle file.
@@ -231,24 +657,29 @@ async def export_transcription(
                 detail=f"Invalid segment[{i}] in task {task_id}: {e}. Data: {context}",
             )
 
-    formatter = get_formatter(format, include_timestamps=include_timestamps)
+    effective_format, effective_include_timestamps = _resolve_export_options(
+        requested_format=format,
+        requested_include_timestamps=include_timestamps,
+    )
+    formatter = get_formatter(
+        effective_format, include_timestamps=effective_include_timestamps
+    )
     content = formatter.format(segment_data)
 
     file_info = file_db.get_file(task["file_id"])
-    if file_info:
-        base_name = Path(file_info["filename"]).stem
-    else:
-        base_name = task_id
-
-    export_filename = f"{base_name}.{formatter.file_extension}"
+    fallback_name = file_info["filename"] if file_info else task_id
+    export_filename = build_export_filename(
+        requested_name=filename,
+        fallback_name=fallback_name,
+        extension=formatter.file_extension,
+    )
 
     if save:
         exports_dir = settings.exports_dir
         exports_dir.mkdir(parents=True, exist_ok=True)
-        export_path = exports_dir / export_filename
-        export_path.write_text(content, encoding="utf-8")
+        export_path = write_unique_export_text(exports_dir, export_filename, content)
 
-        relative_path = f"exports/{export_filename}"
+        relative_path = f"exports/{export_path.name}"
         return JSONResponse(content={"saved_path": relative_path})
 
     # Sanitize for ASCII-safe header (RFC 6266)
@@ -269,7 +700,19 @@ async def export_transcription(
     )
 
 
-@router.post("/export/batch", summary="Batch export transcriptions")
+@legacy_router.post(
+    "/export/batch",
+    summary="Batch export transcriptions",
+    response_class=StreamingResponse,
+    responses=BATCH_EXPORT_RESPONSES,
+    deprecated=True,
+)
+@router.post(
+    "/export/batch",
+    summary="Batch export transcriptions",
+    response_class=StreamingResponse,
+    responses=BATCH_EXPORT_RESPONSES,
+)
 async def batch_export(
     request: "BatchExportRequest",
 ) -> Response:
@@ -280,8 +723,6 @@ async def batch_export(
     import io
     import zipfile
     from datetime import datetime
-
-    from fastapi.responses import StreamingResponse
 
     from nola.models.tasks import TaskStatus
     from nola.services.formatters import get_formatter
@@ -295,8 +736,12 @@ async def batch_export(
     used_names: set[str] = set()
     success_count = 0
 
+    effective_format, effective_include_timestamps = _resolve_export_options(
+        requested_format=request.format,
+        requested_include_timestamps=request.include_timestamps,
+    )
     formatter = get_formatter(
-        request.format, include_timestamps=request.include_timestamps
+        effective_format, include_timestamps=effective_include_timestamps
     )
 
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:

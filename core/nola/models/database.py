@@ -33,6 +33,9 @@ def init_db(db_path: str | Path | None = None) -> None:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_files_created ON files(created_at DESC)"
             )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_files_filename ON files(filename)"
+            )
 
             # Transcription tasks table with production-grade features
             conn.execute("""
