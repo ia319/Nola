@@ -32,6 +32,16 @@ describe('buildSingleExportFilename', () => {
       taskFilename: null,
     })
 
-    expect(filename).toBe('task-task-3.txt')
+    expect(filename).toBe('task-3.txt')
+  })
+
+  it('replaces each invalid or control character with underscore', () => {
+    const filename = buildSingleExportFilename({
+      format: 'srt',
+      taskId: 'task-4',
+      customFilename: String.raw`a<>b` + String.fromCharCode(1) + 'c.srt',
+    })
+
+    expect(filename).toBe('a__b_c.srt')
   })
 })

@@ -1,25 +1,30 @@
 import type { ExportFormat } from '@/shared/types'
 
-const INVALID_FILENAME_CHARS = /[\\/:*?"<>|]+/g
-
-function removeControlChars(value: string): string {
-  return Array.from(value)
-    .filter((char) => {
-      const code = char.charCodeAt(0)
-      return code >= 32 && code !== 127
-    })
-    .join('')
-}
+const INVALID_FILENAME_CHARS = /[<>:"/\\|?*]/g
 
 function sanitizeStem(value: string): string {
-  return removeControlChars(value)
+  const normalized = Array.from(value)
+    .map((char) => {
+      const code = char.charCodeAt(0)
+      if (code >= 0 && code <= 31) {
+        return '_'
+      }
+      return char
+    })
+    .join('')
+
+  return normalized
     .replace(INVALID_FILENAME_CHARS, '_')
     .trim()
     .replace(/^\.+|\.+$/g, '')
 }
 
 function extractStem(value: string): string {
-  const leaf = value.replace(/\\/g, '/').split('/').pop() ?? ''
+  const stripped = value.trim()
+  if (!stripped) {
+    return ''
+  }
+  const leaf = stripped.replace(/\\/g, '/').split('/').pop() ?? ''
   const dotIndex = leaf.lastIndexOf('.')
   const stem = dotIndex > 0 ? leaf.slice(0, dotIndex) : leaf
   return sanitizeStem(stem)
@@ -41,7 +46,7 @@ export function buildSingleExportFilename({
 }: BuildSingleExportFilenameParams): string {
   const customStem = customFilename ? extractStem(customFilename) : ''
   const taskStem = taskFilename ? extractStem(taskFilename) : ''
-  const fallbackStem = sanitizeStem(`task-${taskId}`) || 'task-export'
+  const fallbackStem = sanitizeStem(taskId) || 'export'
   const stem = customStem || taskStem || fallbackStem
   return `${stem}.${format}`
 }
