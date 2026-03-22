@@ -2,13 +2,25 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { batchExport, downloadExport, saveExport } from '@/features/export'
 import { batchCancelHistoryTasks, batchRetryHistoryTasks } from '@/features/history/api'
 import { useHistoryTaskActions } from '@/features/history/hooks/useHistoryTaskActions'
+import { downloadBlob } from '@/shared/lib/utils'
 import { toast } from 'sonner'
 
 vi.mock('@/features/history/api', () => ({
   batchCancelHistoryTasks: vi.fn(),
   batchRetryHistoryTasks: vi.fn(),
+}))
+
+vi.mock('@/features/export', () => ({
+  batchExport: vi.fn(),
+  downloadExport: vi.fn(),
+  saveExport: vi.fn(),
+}))
+
+vi.mock('@/shared/lib/utils', () => ({
+  downloadBlob: vi.fn(),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -27,6 +39,10 @@ vi.mock('sonner', () => ({
 
 const batchCancelMock = vi.mocked(batchCancelHistoryTasks)
 const batchRetryMock = vi.mocked(batchRetryHistoryTasks)
+const batchExportMock = vi.mocked(batchExport)
+const downloadExportMock = vi.mocked(downloadExport)
+const saveExportMock = vi.mocked(saveExport)
+const downloadBlobMock = vi.mocked(downloadBlob)
 
 afterEach(() => {
   vi.clearAllMocks()
@@ -148,5 +164,165 @@ describe('useHistoryTaskActions', () => {
     expect(toast.error).toHaveBeenCalledWith('tasks.toast.actionFailed')
     expect(refresh).toHaveBeenCalledTimes(1)
     expect(onActionSettled).toHaveBeenCalledTimes(1)
+  })
+
+  it('exports a single task via single-export API and downloads blob', async () => {
+    const blob = new Blob(['srt-content'], { type: 'application/x-subrip' })
+    downloadExportMock.mockResolvedValue(blob)
+
+    const onActionSettled = vi.fn()
+
+    const { result } = renderHook(() =>
+      useHistoryTaskActions({
+        refresh: vi.fn().mockResolvedValue(undefined),
+        onActionSettled,
+      }),
+    )
+
+    await act(async () => {
+      await result.current.exportTask(
+        {
+          task_id: 'task-1',
+          filename: 'demo.mp3',
+        },
+        {
+          format: 'srt',
+          include_timestamps: true,
+        },
+      )
+    })
+
+    expect(downloadExportMock).toHaveBeenCalledWith('task-1', {
+      format: 'srt',
+      include_timestamps: true,
+    })
+    expect(downloadBlobMock).toHaveBeenCalledTimes(1)
+    expect(downloadBlobMock.mock.calls[0]?.[1]).toBe('demo.srt')
+    expect(toast.success).toHaveBeenCalledWith('tasks.toast.export.one')
+    expect(onActionSettled).not.toHaveBeenCalled()
+  })
+
+  it('passes custom filename when exporting a single task', async () => {
+    const blob = new Blob(['srt-content'], { type: 'application/x-subrip' })
+    downloadExportMock.mockResolvedValue(blob)
+
+    const { result } = renderHook(() =>
+      useHistoryTaskActions({
+        refresh: vi.fn().mockResolvedValue(undefined),
+      }),
+    )
+
+    await act(async () => {
+      await result.current.exportTask(
+        {
+          task_id: 'task-custom',
+          filename: 'source.mp3',
+        },
+        {
+          format: 'srt',
+          include_timestamps: true,
+          filename: 'meeting-notes',
+        },
+      )
+    })
+
+    expect(downloadExportMock).toHaveBeenCalledWith('task-custom', {
+      format: 'srt',
+      include_timestamps: true,
+      filename: 'meeting-notes',
+    })
+    expect(downloadBlobMock.mock.calls[0]?.[1]).toBe('meeting-notes.srt')
+  })
+
+  it('exports selected tasks via batch-export API and downloads zip', async () => {
+    const blob = new Blob(['zip-content'], { type: 'application/zip' })
+    batchExportMock.mockResolvedValue({
+      blob,
+      filename: 'export_20260322_091455.zip',
+    })
+
+    const onActionSettled = vi.fn()
+
+    const { result } = renderHook(() =>
+      useHistoryTaskActions({
+        refresh: vi.fn().mockResolvedValue(undefined),
+        onActionSettled,
+      }),
+    )
+
+    await act(async () => {
+      await result.current.exportTasks(['task-a', 'task-b', 'task-a'], {
+        format: 'srt',
+        include_timestamps: true,
+        zip_name: '  tasks-archive  ',
+      })
+    })
+
+    expect(batchExportMock).toHaveBeenCalledWith({
+      task_ids: ['task-a', 'task-b'],
+      format: 'srt',
+      include_timestamps: true,
+      zip_name: 'tasks-archive',
+    })
+    expect(downloadBlobMock).toHaveBeenCalledTimes(1)
+    expect(downloadBlobMock.mock.calls[0]?.[1]).toBe('export_20260322_091455.zip')
+    expect(toast.success).toHaveBeenCalledWith('tasks.toast.batch.export.success')
+    expect(onActionSettled).not.toHaveBeenCalled()
+  })
+
+  it('falls back to generic zip filename when response header has no filename', async () => {
+    const blob = new Blob(['zip-content'], { type: 'application/zip' })
+    batchExportMock.mockResolvedValue({
+      blob,
+      filename: null,
+    })
+
+    const { result } = renderHook(() =>
+      useHistoryTaskActions({
+        refresh: vi.fn().mockResolvedValue(undefined),
+      }),
+    )
+
+    await act(async () => {
+      await result.current.exportTasks(['task-a'], {
+        format: 'srt',
+        include_timestamps: true,
+      })
+    })
+
+    expect(downloadBlobMock.mock.calls[0]?.[1]).toBe('export.zip')
+  })
+
+  it('exports a single task to server and surfaces saved path', async () => {
+    saveExportMock.mockResolvedValue({
+      saved_path: 'exports/demo.srt',
+    })
+
+    const { result } = renderHook(() =>
+      useHistoryTaskActions({
+        refresh: vi.fn().mockResolvedValue(undefined),
+      }),
+    )
+
+    await act(async () => {
+      await result.current.exportTask(
+        {
+          task_id: 'task-2',
+          filename: 'demo.mp3',
+        },
+        {
+          format: 'srt',
+          include_timestamps: true,
+          target: 'save',
+        },
+      )
+    })
+
+    expect(saveExportMock).toHaveBeenCalledWith('task-2', {
+      format: 'srt',
+      include_timestamps: true,
+    })
+    expect(downloadBlobMock).not.toHaveBeenCalled()
+    expect(toast.success).toHaveBeenCalledWith('tasks.toast.export.saved')
   })
 })
