@@ -15,6 +15,16 @@ const fetchExportConfigMock = vi.mocked(fetchExportConfig)
 const patchExportDefaultsMock = vi.mocked(patchExportDefaults)
 const deleteExportDefaultsMock = vi.mocked(deleteExportDefaults)
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
 afterEach(() => {
   vi.clearAllMocks()
 })
@@ -104,6 +114,51 @@ describe('useExportDefaults', () => {
     expect(result.current.defaults).toEqual({
       format: 'srt',
       include_timestamps: true,
+    })
+  })
+
+  it('ignores stale bootstrap response when reset resolves newer defaults', async () => {
+    const bootstrap = createDeferred<{
+      defaults: {
+        format: 'srt' | 'vtt' | 'txt' | 'ass'
+        include_timestamps: boolean
+      }
+    }>()
+
+    fetchExportConfigMock
+      .mockReturnValueOnce(bootstrap.promise)
+      .mockResolvedValueOnce({
+        defaults: {
+          format: 'ass',
+          include_timestamps: false,
+        },
+      })
+    deleteExportDefaultsMock.mockResolvedValue(undefined)
+
+    const { result } = renderHook(() => useExportDefaults())
+
+    await act(async () => {
+      await result.current.resetDefaults()
+    })
+
+    expect(result.current.defaults).toEqual({
+      format: 'ass',
+      include_timestamps: false,
+    })
+
+    await act(async () => {
+      bootstrap.resolve({
+        defaults: {
+          format: 'vtt',
+          include_timestamps: true,
+        },
+      })
+      await Promise.resolve()
+    })
+
+    expect(result.current.defaults).toEqual({
+      format: 'ass',
+      include_timestamps: false,
     })
   })
 })

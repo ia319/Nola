@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { deleteExportDefaults, fetchExportConfig, patchExportDefaults } from '@/features/export/api'
 import type { ExportDefaults, ExportDefaultsUpdateRequest } from '@/shared/types'
@@ -22,40 +22,55 @@ export interface UseExportDefaultsResult {
 export function useExportDefaults(): UseExportDefaultsResult {
   const [defaults, setDefaults] = useState<ExportDefaults>(FALLBACK_EXPORT_DEFAULTS)
   const [isLoading, setIsLoading] = useState(true)
+  const requestVersionRef = useRef(0)
 
   const refresh = useCallback(async (): Promise<ExportDefaults> => {
+    const requestVersion = ++requestVersionRef.current
     const response = await fetchExportConfig()
-    setDefaults(response.defaults)
+    if (requestVersion === requestVersionRef.current) {
+      setDefaults(response.defaults)
+    }
     return response.defaults
   }, [])
 
   const updateDefaults = useCallback(
     async (payload: ExportDefaultsUpdateRequest): Promise<ExportDefaults> => {
+      const requestVersion = ++requestVersionRef.current
       const response = await patchExportDefaults(payload)
-      setDefaults(response.defaults)
+      if (requestVersion === requestVersionRef.current) {
+        setDefaults(response.defaults)
+      }
+      setIsLoading(false)
       return response.defaults
     },
     [],
   )
 
   const resetDefaults = useCallback(async (): Promise<ExportDefaults> => {
+    const requestVersion = ++requestVersionRef.current
     await deleteExportDefaults()
-    return refresh()
-  }, [refresh])
+    const response = await fetchExportConfig()
+    if (requestVersion === requestVersionRef.current) {
+      setDefaults(response.defaults)
+    }
+    setIsLoading(false)
+    return response.defaults
+  }, [])
 
   useEffect(() => {
     let active = true
+    const requestVersion = ++requestVersionRef.current
 
     void (async () => {
       try {
         const response = await fetchExportConfig()
-        if (active) {
+        if (active && requestVersion === requestVersionRef.current) {
           setDefaults(response.defaults)
         }
       } catch {
         // Keep fallback defaults when bootstrap fetch fails.
       } finally {
-        if (active) {
+        if (active && requestVersion === requestVersionRef.current) {
           setIsLoading(false)
         }
       }
