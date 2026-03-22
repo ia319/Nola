@@ -173,18 +173,19 @@ export function TaskListPanel({
     if (!pagination) return null
 
     const { page, pageSize, total } = pagination
+    const normalizedTotal = Math.max(total, 0)
     const normalizedPageSize = Math.max(pageSize, 1)
-    const totalPages = Math.max(1, Math.ceil(Math.max(total, 0) / normalizedPageSize))
+    const totalPages = Math.max(1, Math.ceil(normalizedTotal / normalizedPageSize))
     const currentPage = Math.min(Math.max(page, 1), totalPages)
-    const start = total === 0 ? 0 : (currentPage - 1) * normalizedPageSize + 1
-    const end = total === 0 ? 0 : Math.min(total, currentPage * normalizedPageSize)
+    const start = normalizedTotal === 0 ? 0 : (currentPage - 1) * normalizedPageSize + 1
+    const end = normalizedTotal === 0 ? 0 : Math.min(normalizedTotal, currentPage * normalizedPageSize)
 
     return {
       currentPage,
       totalPages,
       start,
       end,
-      total,
+      total: normalizedTotal,
     }
   }, [pagination])
 
@@ -201,7 +202,8 @@ export function TaskListPanel({
           <p className="text-muted-foreground text-sm">{emptyText}</p>
         ) : (
           tasks.map((task) => {
-            const fileLabel = task.filename ?? resolveFileName?.(task) ?? task.file_id
+            const fileLabel =
+              task.filename?.trim() || resolveFileName?.(task)?.trim() || task.file_id
             const pendingOrProcessing = task.status === 'pending' || task.status === 'processing'
             const retryable = task.status === 'failed' || task.status === 'cancelled'
             const deletable =

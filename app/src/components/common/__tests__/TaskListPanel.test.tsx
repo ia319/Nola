@@ -193,6 +193,40 @@ describe('TaskListPanel', () => {
     expect(screen.getByText('tasks.pagination.page:current=1,total=5')).toBeTruthy()
   })
 
+  it('clamps negative total when computing pagination summary', () => {
+    render(
+      <TaskListPanel
+        title="tasks.history.title"
+        emptyText="tasks.history.empty"
+        tasks={[buildTask('task-1', 'completed')]}
+        pagination={{
+          page: 1,
+          pageSize: 10,
+          total: -3,
+          onPageChange: vi.fn(),
+        }}
+      />,
+    )
+
+    expect(screen.getByText('tasks.pagination.summary:start=0,end=0,total=0')).toBeTruthy()
+    expect(screen.getByText('tasks.pagination.page:current=1,total=1')).toBeTruthy()
+  })
+
+  it('falls back to file_id when filename is empty', () => {
+    const task = buildTask('task-1', 'completed')
+    task.filename = ''
+
+    render(
+      <TaskListPanel
+        title="tasks.history.title"
+        emptyText="tasks.history.empty"
+        tasks={[task]}
+      />,
+    )
+
+    expect(screen.getByText('tasks.fields.file: file-task-1')).toBeTruthy()
+  })
+
   it('supports row selection and completed-task export action', async () => {
     const onToggleTask = vi.fn()
     const onExportTask = vi.fn().mockResolvedValue(undefined)
