@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import prettierConfig from 'eslint-config-prettier'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
-const featureNames = ['upload', 'transcription', 'export', 'history', 'realtime']
+const featureNames = ['upload', 'transcription-options', 'tasks', 'export', 'realtime']
 
 const crossFeatureDeepImportRules = featureNames.map((feature) => ({
   files: [`src/features/${feature}/**/*.{ts,tsx}`],
@@ -96,5 +96,17 @@ export default defineConfig([
     },
   },
   ...crossFeatureDeepImportRules,
+  // Keep option domain independent from task runtime domain.
+  {
+    files: ['src/features/transcription-options/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['@/features/tasks', '@/features/tasks/*', '@/features/tasks/**'],
+        },
+      ],
+    },
+  },
   prettierConfig,
 ])
