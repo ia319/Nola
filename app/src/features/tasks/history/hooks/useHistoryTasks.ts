@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { listHistoryTasks } from '@/features/tasks/history/api'
 import { isAppError } from '@/shared/lib/error-factory'

@@ -1,4 +1,4 @@
-﻿import { useCallback, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { CreateTaskPayload, TranscriptionDefaults } from '@/shared/types'
 import type {
   AdvancedOptionValue,

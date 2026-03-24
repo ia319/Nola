@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { buildTranscriptionSchemaUiModel } from '../schema-adapter'
 import type { LanguageOption, TranscriptionOptionGroup } from '@/shared/types'

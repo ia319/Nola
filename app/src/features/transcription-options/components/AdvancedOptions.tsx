@@ -1,4 +1,4 @@
-﻿import { memo, useState } from 'react'
+import { memo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDownIcon } from 'lucide-react'
 

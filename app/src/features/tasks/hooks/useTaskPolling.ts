@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { POLL_INTERVAL_MS } from '@/config/constants'
 import { listTasks } from '@/features/tasks/api'

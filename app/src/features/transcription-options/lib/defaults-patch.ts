@@ -1,4 +1,4 @@
-﻿import type { TranscriptionDefaults } from '@/shared/types'
+import type { TranscriptionDefaults } from '@/shared/types'
 import type { TranscriptionDefaultsUpdateRequest } from '@/shared/types/config'
 import type {
   AdvancedTranscriptionOptions,
