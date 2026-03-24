@@ -1,4 +1,4 @@
-﻿import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ListToolbar, TaskListPanel } from '@/components/common'
@@ -93,28 +93,31 @@ export function CurrentBatchTasksPanel({
       return
     }
 
+    const batchHandler = action === 'cancel' ? onBatchCancelTasks : onBatchRetryTasks
+    const perTaskHandler = action === 'cancel' ? onCancelTask : onRetryTask
+    if (!batchHandler && !perTaskHandler) {
+      return
+    }
+
     runningBatchActionRef.current = true
     setRunningBatchAction(action)
     try {
-      if (action === 'cancel') {
-        if (onBatchCancelTasks) {
-          await onBatchCancelTasks(taskIds)
-        } else {
-          await runPerTaskAction(taskIds, onCancelTask)
-        }
+      if (batchHandler) {
+        await batchHandler(taskIds)
       } else {
-        if (onBatchRetryTasks) {
-          await onBatchRetryTasks(taskIds)
-        } else {
-          await runPerTaskAction(taskIds, onRetryTask)
-        }
+        await runPerTaskAction(taskIds, perTaskHandler)
       }
       clearSelection()
+    } catch {
+      return
     } finally {
       runningBatchActionRef.current = false
       setRunningBatchAction(null)
     }
   }
+
+  const hasBatchCancelHandler = Boolean(onBatchCancelTasks || onCancelTask)
+  const hasBatchRetryHandler = Boolean(onBatchRetryTasks || onRetryTask)
 
   return (
     <TaskListPanel
@@ -150,12 +153,20 @@ export function CurrentBatchTasksPanel({
             cancellableCount={cancellableTaskIds.length}
             retryableCount={retryableTaskIds.length}
             onToggleCurrentPage={toggleCurrentPage}
-            onBatchCancel={() => {
-              void runBatchAction('cancel', cancellableTaskIds)
-            }}
-            onBatchRetry={() => {
-              void runBatchAction('retry', retryableTaskIds)
-            }}
+            onBatchCancel={
+              hasBatchCancelHandler
+                ? () => {
+                    void runBatchAction('cancel', cancellableTaskIds)
+                  }
+                : undefined
+            }
+            onBatchRetry={
+              hasBatchRetryHandler
+                ? () => {
+                    void runBatchAction('retry', retryableTaskIds)
+                  }
+                : undefined
+            }
           />
           <ListToolbar
             searchValue={query.q}

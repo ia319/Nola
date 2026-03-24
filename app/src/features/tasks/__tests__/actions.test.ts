@@ -1,4 +1,4 @@
-﻿import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { CreateTaskPayload } from '@/shared/types'
 
@@ -73,12 +73,12 @@ describe('task actions', () => {
     expect(response.task_id).toBe('task-2')
   })
 
-  it('does not request sync when retry fails', async () => {
+  it('requests sync even when retry fails', async () => {
     const payload: CreateTaskPayload = { file_id: 'file-1' }
     createTaskMock.mockRejectedValue(new Error('retry failed'))
 
     await expect(retryTaskAndRefresh(payload)).rejects.toThrow('retry failed')
-    expect(requestTaskRefreshMock).not.toHaveBeenCalled()
+    expect(requestTaskRefreshMock).toHaveBeenCalledTimes(1)
   })
 
   it('does not request global sync after delete-record succeeds', async () => {

@@ -1,4 +1,4 @@
-﻿import { cancelTask, createTask, deleteTaskRecord } from '@/features/tasks/api'
+import { cancelTask, createTask, deleteTaskRecord } from '@/features/tasks/api'
 import { requestTaskRefresh } from '@/features/tasks/lib/task-refresh'
 import type {
   CancelTaskResponse,
@@ -18,9 +18,12 @@ export async function cancelTaskAndRefresh(taskId: string): Promise<CancelTaskRe
 }
 
 export async function retryTaskAndRefresh(payload: CreateTaskPayload): Promise<CreateTaskResponse> {
-  const response = await createTask(payload)
-  requestTaskRefresh()
-  return response
+  try {
+    const response = await createTask(payload)
+    return response
+  } finally {
+    requestTaskRefresh()
+  }
 }
 
 export async function deleteTaskRecordAction(taskId: string): Promise<DeleteTaskRecordResponse> {
