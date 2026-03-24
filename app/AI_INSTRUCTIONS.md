@@ -40,9 +40,9 @@ app/                          # Frontend workspace root
 ├── vite.config.ts            # Vite 7 + proxy to backend + Vitest config (default node env)
 ├── src/                      # Frontend source code
 │   ├── App.css               # App-level styles
-│   ├── App.tsx               # Root shell wiring upload + transcription features
+│   ├── App.tsx               # Compose home page with upload, options, and current-batch tasks
 │   ├── index.css             # Tailwind v4 entry + shadcn variables
-│   ├── main.tsx              # React mounting + temporary App shell entry
+│   ├── main.tsx              # Mount React root and router provider
 │   ├── router.tsx            # TanStack Router tree and validation wiring
 │   ├── test/                 # Shared Vitest setup
 │   │   └── setup.ts          # jest-dom + ResizeObserver polyfill + test log silencing
@@ -108,64 +108,83 @@ app/                          # Frontend workspace root
 │   │   │   │   └── __tests__/
 │   │   │   │       └── filename.test.ts # Filename helper tests
 │   │   │   └── index.ts      # Feature public exports
-│   │   ├── history/          # Historical task pagination & actions
-│   │   │   ├── api.ts        # listHistoryTasks, batch cancel/retry
-│   │   │   ├── components/   # History feature UI components
-│   │   │   │   ├── TaskHistoryPanel.tsx # History list with batch actions/export
+│   │   ├── tasks/            # Keep task lifecycle, polling, and history subdomain
+│   │   │   ├── api.ts        # Use create/list/get/cancel/delete and batch endpoints
+│   │   │   ├── actions.ts    # Wrap write actions and guarantee refresh signals
+│   │   │   ├── __tests__/    # Keep task API/action tests
+│   │   │   │   ├── actions.test.ts # Verify action wrapper behavior
+│   │   │   │   └── api.test.ts # Verify API request wiring
+│   │   │   ├── components/   # Keep current-batch task panel and action bar
+│   │   │   │   ├── CurrentBatchTasksPanel.tsx # Compose session task list with batch actions
+│   │   │   │   ├── TaskBatchActionBar.tsx # Reuse batch-action controls
 │   │   │   │   └── __tests__/
-│   │   │   │       └── TaskHistoryPanel.test.tsx # History panel behavior tests
-│   │   │   ├── hooks/        # History data/action hooks
-│   │   │   │   ├── useHistoryTasks.ts # Backend-paged history query hook
-│   │   │   │   ├── useHistoryTaskActions.ts # Batch action/export orchestration
+│   │   │   │       └── TaskBatchActionBar.test.tsx # Verify batch-action controls
+│   │   │   ├── hooks/        # Keep task query/polling/selection hooks
+│   │   │   │   ├── useRecentTaskQuery.ts # Normalize recent-task query and paging
+│   │   │   │   ├── useTaskPolling.ts # Poll with foreground/background intervals
+│   │   │   │   ├── useTaskSelection.ts # Manage reusable selection state
 │   │   │   │   └── __tests__/
-│   │   │   │       ├── useHistoryTasks.test.ts # History query hook tests
-│   │   │   │       └── useHistoryTaskActions.test.ts # History action hook tests
-│   │   │   └── index.ts      # Feature public exports
-│   │   ├── realtime/         # WebSocket streaming
-│   │   │   └── index.ts      # Placeholder
-│   │   ├── transcription/    # Task CRUD, options, polling, status tracking
-│   │   │   ├── __tests__/    # Feature-level tests
-│   │   │   │   ├── actions.test.ts # Action wrapper behavior tests
-│   │   │   │   └── build-request.test.ts # buildRequest payload tests
-│   │   │   ├── actions.ts    # Action wrappers for cancel/retry/delete behaviors
-│   │   │   ├── api.ts        # createTask, listTasks, getTask, cancelTask, deleteTaskRecord
-│   │   │   ├── components/   # Transcription feature UI components
-│   │   │   │   ├── AdvancedOptions.tsx # Collapsible advanced settings panel
-│   │   │   │   ├── CurrentBatchTasksPanel.tsx # Session task list panel
-│   │   │   │   ├── OptionsBar.tsx     # Language/task selectors + start button
-│   │   │   │   └── __tests__/         # Component tests
-│   │   │   │       ├── AdvancedOptions.test.tsx # Advanced options UI behavior tests
-│   │   │   │       └── OptionsBar.test.tsx # Options bar task-creation tests
-│   │   │   ├── hooks/        # Transcription state hooks
-│   │   │   │   ├── useRecentTaskQuery.ts # Recent tasks query/filter/sort hook
-│   │   │   │   ├── useTaskPolling.ts # Foreground/background polling hook
-│   │   │   │   ├── useTranscriptionOptions.ts # Options state + buildRequest
+│   │   │   │       ├── useRecentTaskQuery.test.ts # Verify recent query hook
+│   │   │   │       ├── useTaskPolling.test.ts # Verify polling hook
+│   │   │   │       └── useTaskSelection.test.ts # Verify selection hook
+│   │   │   ├── lib/          # Keep task-private pure helpers
+│   │   │   │   ├── task-refresh.ts # Broadcast task refresh events
+│   │   │   │   ├── task-selectors.ts # Select active/recent terminal tasks
+│   │   │   │   ├── task-status-groups.ts # Group active and terminal statuses
 │   │   │   │   └── __tests__/
-│   │   │   │       ├── useRecentTaskQuery.test.ts # Recent query hook tests
-│   │   │   │       ├── useTaskPolling.test.ts # Polling hook tests
-│   │   │   │       └── useTranscriptionOptions.test.ts # Hook behavior tests
-│   │   │   ├── lib/          # Transcription-private pure helpers
-│   │   │   │   ├── defaults-patch.ts # Build defaults patch payloads
-│   │   │   │   ├── object-path.ts # Dot-path read/write helpers
-│   │   │   │   ├── schema-adapter.ts # Map schema to top-level UI model
-│   │   │   │   ├── task-refresh.ts # In-memory task refresh broadcaster
-│   │   │   │   ├── task-selectors.ts # Recent/active task selectors
-│   │   │   │   ├── task-status-groups.ts # Shared active/terminal status groups
-│   │   │   │   ├── temperature.ts # Temperature list parse/validate
+│   │   │   │       ├── task-refresh.test.ts # Verify refresh broadcaster
+│   │   │   │       ├── task-selectors.test.ts # Verify task selectors
+│   │   │   │       └── task-status-groups.test.ts # Verify status grouping
+│   │   │   ├── store/        # Keep session and board stores
+│   │   │   │   ├── session-tasks-store.ts # Store session-scoped tasks
+│   │   │   │   ├── task-board-store.ts # Store polled task board state
 │   │   │   │   └── __tests__/
-│   │   │   │       ├── defaults-patch.test.ts # Defaults patch helper tests
-│   │   │   │       ├── schema-adapter.test.ts # Schema adapter behavior tests
-│   │   │   │       ├── task-refresh.test.ts # Task refresh broadcaster tests
-│   │   │   │       ├── task-selectors.test.ts # Task selector tests
-│   │   │   │       └── temperature.test.ts # Temperature validation tests
-│   │   │   ├── store/        # Transcription stores
-│   │   │   │   ├── session-tasks-store.ts # Session-scoped task store
-│   │   │   │   ├── task-board-store.ts # Polled task-board store
+│   │   │   │       ├── session-tasks-store.test.ts # Verify session store
+│   │   │   │       └── task-board-store.test.ts # Verify board store
+│   │   │   ├── history/      # Keep history subdomain on top of tasks APIs
+│   │   │   │   ├── api.ts    # Wrap listHistoryTasks and batch actions
+│   │   │   │   ├── index.ts  # Expose history subdomain exports
+│   │   │   │   ├── __tests__/
+│   │   │   │   │   └── api.test.ts # Verify history API wrappers
+│   │   │   │   ├── hooks/
+│   │   │   │   │   ├── useHistoryTasks.ts # Query history with backend paging
+│   │   │   │   │   ├── useHistoryTaskActions.ts # Orchestrate history actions and export
+│   │   │   │   │   └── __tests__/
+│   │   │   │   │       ├── useHistoryTasks.test.ts # Verify history query hook
+│   │   │   │   │       └── useHistoryTaskActions.test.ts # Verify history action hook
+│   │   │   │   └── components/
+│   │   │   │       ├── TaskHistoryPanel.tsx # Compose history list with batch actions/export
+│   │   │   │       └── __tests__/
+│   │   │   │           └── TaskHistoryPanel.test.tsx # Verify history panel behavior
+│   │   │   └── index.ts      # Expose feature public exports
+│   │   │
+│   │   ├── realtime/         # Reserve WebSocket streaming extension point
+│   │   │   └── index.ts      # Keep placeholder export
+│   │   ├── transcription-options/ # Keep task option composition and defaults patch logic
+│   │   │   ├── index.ts      # Expose feature public exports
+│   │   │   ├── types.ts      # Keep option domain types and contracts
+│   │   │   ├── __tests__/
+│   │   │   │   └── build-request.test.ts # Verify request payload composition
+│   │   │   ├── components/   # Keep option panel components
+│   │   │   │   ├── OptionsBar.tsx # Compose language/task selectors and start action
+│   │   │   │   ├── AdvancedOptions.tsx # Render schema-driven advanced options
 │   │   │   │   └── __tests__/
-│   │   │   │       ├── session-tasks-store.test.ts # Session store tests
-│   │   │   │       └── task-board-store.test.ts # Task-board store tests
-│   │   │   ├── types.ts      # Transcription domain types + option field definitions
-│   │   │   └── index.ts      # Feature barrel exports
+│   │   │   │       ├── OptionsBar.test.tsx # Verify options bar behavior
+│   │   │   │       └── AdvancedOptions.test.tsx # Verify advanced options behavior
+│   │   │   ├── hooks/
+│   │   │   │   ├── useTranscriptionOptions.ts # Manage option overrides and payload build
+│   │   │   │   └── __tests__/
+│   │   │   │       └── useTranscriptionOptions.test.ts # Verify option hook behavior
+│   │   │   └── lib/
+│   │   │       ├── defaults-patch.ts # Build defaults PATCH payload
+│   │   │       ├── object-path.ts # Read/write nested payload fields by dot path
+│   │   │       ├── schema-adapter.ts # Adapt backend schema to option models
+│   │   │       ├── temperature.ts # Parse/validate temperature lists
+│   │   │       └── __tests__/
+│   │   │           ├── defaults-patch.test.ts # Verify defaults patch builder
+│   │   │           ├── object-path.test.ts # Verify object-path helpers
+│   │   │           ├── schema-adapter.test.ts # Verify schema adapter
+│   │   │           └── temperature.test.ts # Verify temperature validator
 │   │   └── upload/           # File upload with progress
 │   │       ├── api.ts        # uploadFile, listFiles, getFile, deleteFile
 │   │       ├── components/   # Upload feature UI components
@@ -219,7 +238,6 @@ app/                          # Frontend workspace root
 │   │       └── index.ts       # Barrel re-export
 │   │
 │   └── routes/               # Route composition and URL query contracts
-│       ├── .gitkeep          # Directory placeholder
 │       ├── AppShell.tsx      # Shared shell route component
 │       ├── HistoryPage.tsx   # History route composition component
 │       └── history-search.ts # History URL query normalize/build helpers
@@ -250,6 +268,10 @@ app/                          # Frontend workspace root
 >     - Outside `src/features/*`, import features only from `@/features/<name>`; do not deep import `@/features/<name>/**`.
 >     - `src/components/common/*` must not import from `@/features/*`.
 >     - Inside `src/features/<name>/*`, do not deep import from other features; import only via feature public entry.
+> 13. **Feature Naming Boundary**:
+>     - Use `src/features/tasks` for task lifecycle and history flows.
+>     - Use `src/features/transcription-options` for option composition and defaults-patch logic.
+>     - Do not create or restore `src/features/history` or `src/features/transcription`.
 >
 > [!IMPORTANT]
 > Use `GET /api/config` and `GET /api/config/transcription/engine-defaults` as the only defaults source.
@@ -317,61 +339,77 @@ Backend (Pydantic) ──► openapi.json ──► openapi.d.ts ──► domai
 
 ### src/features/
 
-Business domain logic separated by feature. Each feature has an `api.ts` (API functions) and `index.ts` (barrel export).
+Separate business domain logic by feature. Expose every feature public surface through `index.ts`.
 
 - **upload**:
-  - `api.ts`: `uploadFile` (FormData + progress + AbortSignal), `listFiles`, `getFile`, `deleteFile`, `checkIntegrity`.
-  - `components/FileUploader.tsx`: Select files via drag/drop or click and pass raw `File[]` upward.
-  - `components/UploadProgress.tsx`: Render per-file status/progress/actions.
-  - `components/UploadList.tsx`: Map `UploadItem[]` into progress rows.
-  - `components/__tests__/FileUploader.test.tsx`: Dropzone tests covering drag-and-drop, keyboard activation, and disabled blocking.
-  - `components/__tests__/UploadProgress.test.tsx`: Row rendering tests covering uploading, error, success, and cancelled states.
-  - `hooks/useFileUpload.ts`: Upload queue orchestration (validate/add/start/cancel/retry/remove/reset). Expose `batchError` and `clearBatchError` for batch-level admission errors.
-  - `hooks/__tests__/useFileUpload.test.ts`: Hook behavior tests (queue, dedup, batchError lifecycle, concurrency, cancel/retry, remove/reset cleanup).
-  - `lib/admission.ts`: Pure admission gate — deduplicate files by `name+size+lastModified` fingerprint against existing queue plus incoming batch, validate each file, and return accepted `UploadItem[]` plus optional `batchError`.
-  - `lib/__tests__/admission.test.ts`: Admission tests covering per-file validation preservation and duplicate skipping.
-  - `lib/timeout.ts`: Per-file timeout strategy.
-  - `lib/error.ts`: Axios cancellation classification helper.
-  - `lib/state.ts`: Pure list update/select helpers to keep hook orchestration-focused.
-  - `lib/__tests__/state.test.ts`: Pure helper tests for patch/remove/select behavior.
-  - `lib/__tests__/timeout.test.ts`: Timeout clamp and scaling tests.
-  - `types.ts`: Upload domain contracts (`UploadItem`, `UseFileUploadReturn` including `batchError`/`clearBatchError`).
-  - `index.ts`: Public barrel exports (`FileUploader`, `UploadProgress`, `UploadList`, `useFileUpload`, `UploadItem`).
-- **transcription**:
-  - `api.ts`: `createTask` (accept `CreateTaskPayload`, filter undefined), `listTasks` (status/search/sort), `getTask`, `cancelTask`, `deleteTaskRecord`.
-  - `actions.ts`: Wrap cancel/retry/delete flows and keep refresh behavior explicit.
-  - `components/CurrentBatchTasksPanel.tsx`: Render session-scoped task list with local filtering, sorting, and pagination.
-  - `hooks/useRecentTaskQuery.ts`: Normalize recent-task query behavior for toolbar + pagination.
-  - `hooks/useTaskPolling.ts`: Poll task board with visibility-aware interval and refresh broadcasts.
-  - `lib/task-refresh.ts`: Broadcast task refresh events without hook coupling.
-  - `lib/task-selectors.ts`, `lib/task-status-groups.ts`: Keep selector logic and status groups centralized.
-  - `store/session-tasks-store.ts`, `store/task-board-store.ts`: Keep task session state and polled board state isolated.
-  - `components/OptionsBar.tsx`: Render schema-adapted language/task selectors, initial prompt textarea, defaults save/reset actions, and "Start Transcription" button. Validate selected task values against schema-derived options before state update.
-  - `components/AdvancedOptions.tsx`: Render schema-driven advanced groups and keep top-level controls (`language`/`task`/`initial_prompt`) out of the advanced panel.
-  - `components/__tests__/OptionsBar.test.tsx`: Component tests covering disabled state, initial prompt edits, task creation results, and fallback error mapping.
-  - `components/__tests__/AdvancedOptions.test.tsx`: Component tests covering slider default display, temperature commit, and reset behavior.
-  - `hooks/useTranscriptionOptions.ts`: Manage language, task, initialPrompt, and advancedOptions state from shared config defaults. Expose `buildRequest(fileId)` to compose `CreateTaskPayload`. Enforce mutual exclusion between `word_timestamps` and `without_timestamps`. Keep persisted defaults hydration aligned with shared app-config state.
-  - `hooks/__tests__/useTranscriptionOptions.test.ts`: Hook behavior tests (initial state, setters, bidirectional mutual exclusion, reset isolation, buildRequest payload).
-  - `lib/defaults-patch.ts`: Build PATCH payloads against engine defaults and effective defaults. Keep three-state semantics (`undefined` unchanged, `null` clear, concrete value override) and preserve primitive replacements in nested transitions.
-  - `lib/object-path.ts`: Resolve dot-path reads/writes for nested request payloads.
-  - `lib/schema-adapter.ts`: Adapt backend schema into top-level controls and advanced groups.
-  - `lib/temperature.ts`: Parse and validate comma-separated temperature lists. Return structured errors with i18n keys.
-  - `lib/__tests__/defaults-patch.test.ts`: Defaults PATCH payload builder tests.
-  - `lib/__tests__/schema-adapter.test.ts`: Schema adapter extraction and fallback tests.
-  - `lib/__tests__/temperature.test.ts`: Temperature parse/validate unit tests.
-  - `__tests__/actions.test.ts`, `__tests__/build-request.test.ts`: Cover action wrappers and payload composition.
-  - `types.ts`: Transcription domain types (`AdvancedTranscriptionOptions`, `CreateTaskPayload`, task option state contracts).
+  - `api.ts`: Use `uploadFile` (FormData + progress + AbortSignal), `listFiles`, `getFile`, `deleteFile`, and `checkIntegrity`.
+  - `components/FileUploader.tsx`: Accept drag/drop and click file selection, then pass raw `File[]` upward.
+  - `components/UploadProgress.tsx`: Render each upload row status, progress, and action entry.
+  - `components/UploadList.tsx`: Render upload rows from `UploadItem[]`.
+  - `components/__tests__/FileUploader.test.tsx`: Verify drag/drop, keyboard trigger, and disabled blocking.
+  - `components/__tests__/UploadProgress.test.tsx`: Verify uploading/error/success/cancelled row states.
+  - `hooks/useFileUpload.ts`: Orchestrate validate/add/start/cancel/retry/remove/reset and expose `batchError` + `clearBatchError`.
+  - `hooks/__tests__/useFileUpload.test.ts`: Verify queue flow, dedup, error lifecycle, concurrency, and cleanup.
+  - `lib/admission.ts`: Deduplicate by file fingerprint and return admitted uploads plus optional batch-level error.
+  - `lib/state.ts`: Keep upload list update/select helpers pure.
+  - `lib/timeout.ts`: Apply upload timeout policy.
+  - `lib/error.ts`: Classify cancellation and upload error cases.
+  - `lib/__tests__/admission.test.ts`, `lib/__tests__/state.test.ts`, `lib/__tests__/timeout.test.ts`: Verify helper behavior.
+  - `types.ts`: Keep upload contracts (`UploadItem`, `UseFileUploadReturn`) stable.
+  - `index.ts`: Expose upload feature public exports.
+- **tasks**:
+  - `api.ts`: Use `createTask`, `listTasks`, `getTask`, `cancelTask`, `deleteTaskRecord`, `batchCancelTasks`, and `batchRetryTasks`.
+  - `__tests__/api.test.ts`: Verify task endpoint path and request body wiring.
+  - `actions.ts`: Use refresh-safe wrappers (`cancelTaskAndRefresh`, `retryTaskAndRefresh`, `deleteTaskRecordAction`).
+  - `__tests__/actions.test.ts`: Verify wrapper refresh behavior and failure handling.
+  - `components/CurrentBatchTasksPanel.tsx`: Compose current-batch list, per-task actions, and batch action flow.
+  - `components/TaskBatchActionBar.tsx`: Reuse batch cancel/retry selection controls.
+  - `components/__tests__/TaskBatchActionBar.test.tsx`: Verify batch action bar interaction and disabled states.
+  - `hooks/useRecentTaskQuery.ts`: Normalize query/filter/sort/pagination state for recent tasks.
+  - `hooks/useTaskPolling.ts`: Poll board data with visibility-aware cadence.
+  - `hooks/useTaskSelection.ts`: Isolate current-page selection toggle logic.
+  - `hooks/__tests__/useRecentTaskQuery.test.ts`, `hooks/__tests__/useTaskPolling.test.ts`, `hooks/__tests__/useTaskSelection.test.ts`: Verify hook behavior.
+  - `lib/task-refresh.ts`: Broadcast refresh events without hook coupling.
+  - `lib/task-selectors.ts`: Select active and recent terminal tasks.
+  - `lib/task-status-groups.ts`: Keep status-group constants centralized.
+  - `lib/__tests__/task-refresh.test.ts`, `lib/__tests__/task-selectors.test.ts`, `lib/__tests__/task-status-groups.test.ts`: Verify task helper behavior.
+  - `store/session-tasks-store.ts`: Keep session-scoped task map and mutations.
+  - `store/task-board-store.ts`: Keep board-scope polled task list and hydration.
+  - `store/__tests__/session-tasks-store.test.ts`, `store/__tests__/task-board-store.test.ts`: Verify store contracts.
+  - `history/api.ts`: Wrap `listTasks` as `listHistoryTasks` and expose history batch wrappers.
+  - `history/__tests__/api.test.ts`: Verify history API wrappers.
+  - `history/hooks/useHistoryTasks.ts`: Query backend history with page clamp behavior.
+  - `history/hooks/useHistoryTaskActions.ts`: Orchestrate history cancel/retry/export and refresh sequencing.
+  - `history/hooks/__tests__/useHistoryTasks.test.ts`, `history/hooks/__tests__/useHistoryTaskActions.test.ts`: Verify history hooks.
+  - `history/components/TaskHistoryPanel.tsx`: Compose history list panel, selection, and export entry.
+  - `history/components/__tests__/TaskHistoryPanel.test.tsx`: Verify history panel interactions.
+  - `history/index.ts`: Expose history subdomain public exports.
+  - `index.ts`: Expose tasks feature public exports.
+- **transcription-options**:
+  - `components/OptionsBar.tsx`: Compose file selector, language/task selector, prompt input, defaults actions, and task creation trigger.
+  - `components/AdvancedOptions.tsx`: Render backend-schema-driven advanced controls.
+  - `components/__tests__/OptionsBar.test.tsx`, `components/__tests__/AdvancedOptions.test.tsx`: Verify option UI behavior.
+  - `hooks/useTranscriptionOptions.ts`: Manage override state and build typed `CreateTaskPayload`.
+  - `hooks/__tests__/useTranscriptionOptions.test.ts`: Verify state reset, mutual exclusion, and payload composition.
+  - `lib/defaults-patch.ts`: Build transcription defaults PATCH payload with `undefined/null/value` semantics.
+  - `lib/object-path.ts`: Read/write nested fields by dot-path.
+  - `lib/schema-adapter.ts`: Adapt backend schema to top-level and advanced option models.
+  - `lib/temperature.ts`: Parse and validate temperature list input.
+  - `lib/__tests__/defaults-patch.test.ts`, `lib/__tests__/object-path.test.ts`, `lib/__tests__/schema-adapter.test.ts`, `lib/__tests__/temperature.test.ts`: Verify option helper behavior.
+  - `__tests__/build-request.test.ts`: Verify task payload build output.
+  - `types.ts`: Keep option domain contracts stable.
+  - `index.ts`: Expose transcription-options feature public exports.
 - **export**:
-  - `api.ts`: `downloadExport` (blob), `saveExport` (server path), `batchExport` (ZIP blob), export-default config APIs.
-  - `components/ExportDialog.tsx`: Share export option UI across single and batch flows.
-  - `hooks/useExportDefaults.ts`: Resolve persisted export defaults with update/reset support.
-  - `lib/filename.ts`: Build frontend fallback filename aligned with backend filename rules.
-- **history**:
-  - `api.ts`: Request backend history list and batch cancel/retry actions.
-  - `hooks/useHistoryTasks.ts`: Drive backend pagination with page-clamp behavior.
-  - `hooks/useHistoryTaskActions.ts`: Handle history actions/export side effects and refresh sequencing.
-  - `components/TaskHistoryPanel.tsx`: Compose history list, selection actions, and export dialog entry.
-- **realtime**: Placeholder for future WebSocket-based live transcription.
+  - `api.ts`: Use `downloadExport`, `saveExport`, `batchExport`, and export-default config APIs.
+  - `components/ExportDialog.tsx`: Reuse export option UI for single-task and batch-task flows.
+  - `components/__tests__/ExportDialog.test.tsx`: Verify export dialog behavior.
+  - `hooks/useExportDefaults.ts`: Manage persisted export defaults with update/reset.
+  - `hooks/__tests__/useExportDefaults.test.ts`: Verify export-default hook behavior.
+  - `lib/filename.ts`: Build frontend fallback filename aligned with backend rules.
+  - `lib/__tests__/filename.test.ts`: Verify filename helper behavior.
+  - `index.ts`: Expose export feature public exports.
+- **realtime**:
+  - `index.ts`: Reserve placeholder exports for future WebSocket live updates.
 
 ### src/components/common/
 

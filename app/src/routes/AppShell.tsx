@@ -3,13 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { Toaster } from 'sonner'
 
 import { buttonVariants } from '@/components/ui/button'
-import { useTaskPolling } from '@/features/transcription'
+import { useTaskPolling } from '@/features/tasks'
 
-/**
- * Shared route shell for Phase F pages.
- *
- * Keep polling alive across route switches so task status stays synchronized.
- */
 export function AppShell() {
   const { t } = useTranslation()
   useTaskPolling()

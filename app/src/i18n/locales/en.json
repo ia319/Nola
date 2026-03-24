@@ -220,6 +220,20 @@
       "empty": "No tasks in the current session",
       "newTasksNotice_one": "{{count}} new task available",
       "newTasksNotice_other": "{{count}} new tasks available",
+      "selection": {
+        "selectCurrentPage": "Select current page",
+        "clearCurrentPage": "Clear current page",
+        "selectedCount_one": "{{count}} selected",
+        "selectedCount_other": "{{count}} selected"
+      },
+      "batchActions": {
+        "cancel_one": "Cancel selected ({{count}})",
+        "cancel_other": "Cancel selected ({{count}})",
+        "retry_one": "Retry selected ({{count}})",
+        "retry_other": "Retry selected ({{count}})",
+        "export_one": "Export selected ({{count}})",
+        "export_other": "Export selected ({{count}})"
+      },
       "backToFirstPage": "Back to first page"
     },
     "history": {

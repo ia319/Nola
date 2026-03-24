@@ -219,6 +219,20 @@
       "empty": "本次会话暂无任务",
       "newTasksNotice_one": "有 {{count}} 个新任务",
       "newTasksNotice_other": "有 {{count}} 个新任务",
+      "selection": {
+        "selectCurrentPage": "选择当前页",
+        "clearCurrentPage": "清空当前页",
+        "selectedCount_one": "已选择 {{count}} 项",
+        "selectedCount_other": "已选择 {{count}} 项"
+      },
+      "batchActions": {
+        "cancel_one": "取消所选 ({{count}})",
+        "cancel_other": "取消所选 ({{count}})",
+        "retry_one": "重试所选 ({{count}})",
+        "retry_other": "重试所选 ({{count}})",
+        "export_one": "导出所选 ({{count}})",
+        "export_other": "导出所选 ({{count}})"
+      },
       "backToFirstPage": "返回第一页"
     },
     "history": {
