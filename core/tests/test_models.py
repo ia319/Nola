@@ -350,7 +350,11 @@ class TestTaskDatabase:
         task_db.complete("task-001", [{"text": "done"}], 5.0)
 
         # Try to update status to processing - should fail
-        result = task_db.update_status("task-001", TaskStatus.PROCESSING)
+        with pytest.warns(
+            DeprecationWarning,
+            match=r"TaskDatabase\.update_status\(\) is deprecated",
+        ):
+            result = task_db.update_status("task-001", TaskStatus.PROCESSING)
 
         assert result is False
         task = task_db.get_task("task-001")
@@ -365,7 +369,11 @@ class TestTaskDatabase:
         task_db.cancel("task-001")
 
         # Try to update status - should fail
-        result = task_db.update_status("task-001", TaskStatus.FAILED, "error")
+        with pytest.warns(
+            DeprecationWarning,
+            match=r"TaskDatabase\.update_status\(\) is deprecated",
+        ):
+            result = task_db.update_status("task-001", TaskStatus.FAILED, "error")
 
         assert result is False
         task = task_db.get_task("task-001")
