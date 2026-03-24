@@ -5,21 +5,19 @@ import { toast } from 'sonner'
 import { ErrorBoundary } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { useAppConfig } from '@/config/use-app-config'
+import { OptionsBar } from '@/features/transcription-options'
+import type { TaskCreateResult } from '@/features/transcription-options'
+import { createTask } from '@/features/tasks'
 import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
 import {
   cancelTaskAndRefresh,
   CurrentBatchTasksPanel,
-  OptionsBar,
   requestTaskRefresh,
   retryTaskAndRefresh,
   useSessionTasksStore,
-} from '@/features/transcription'
-import type { TaskCreateResult } from '@/features/transcription'
+} from '@/features/tasks'
 import type { TaskSummary } from '@/shared/types'
 
-/**
- * Home page composition layer for upload, options, and recent session tasks.
- */
 function App() {
   const { t } = useTranslation()
   const { fileValidationConfig } = useAppConfig()
@@ -43,12 +41,10 @@ function App() {
 
   const hasPending = uploads.some((u) => u.status === 'pending')
 
-  /** Forward selected files to the upload queue for admission and validation. */
   function handleFilesSelected(files: File[]) {
     addFiles(files)
   }
 
-  /** Mark successful task creations and notify via toast. */
   function handleTasksCreated(results: TaskCreateResult[]) {
     let hasNewTask = false
 
@@ -78,7 +74,6 @@ function App() {
     }
   }
 
-  /** Reset all upload state with orphan cleanup. */
   async function handleReset() {
     await reset()
   }
@@ -144,6 +139,7 @@ function App() {
       <ErrorBoundary>
         <OptionsBar
           fileIds={availableFileIds}
+          onCreateTask={createTask}
           onTasksCreated={handleTasksCreated}
           disabled={isUploading}
         />

@@ -5,12 +5,14 @@ import { toast } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
 import type { SingleExportRequestOptions } from '@/features/export'
-import { TaskHistoryPanel, useHistoryTaskActions, useHistoryTasks } from '@/features/history'
 import {
+  TaskHistoryPanel,
   deleteTaskRecordAction,
   requestTaskRefresh,
+  useHistoryTaskActions,
+  useHistoryTasks,
   useSessionTasksStore,
-} from '@/features/transcription'
+} from '@/features/tasks'
 import type {
   SortOrder,
   TaskFilterStatus,
@@ -25,11 +27,6 @@ import {
   type HistoryRouteSearch,
 } from '@/routes/history-search'
 
-/**
- * History route composition layer.
- *
- * Drive query state from URL while reusing session task store updates.
- */
 export function HistoryPage() {
   const { t } = useTranslation()
   const navigate = useNavigate({ from: '/history' })
