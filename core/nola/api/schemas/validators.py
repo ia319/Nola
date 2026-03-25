@@ -14,7 +14,10 @@ from __future__ import annotations
 from functools import lru_cache
 
 from nola.config.constants import SUPPORTED_LANGUAGES
-from nola.config.transcription import get_transcription_param_schema
+from nola.config.transcription.contracts import (
+    get_allowed_task_values,
+    get_allowed_vad_parameter_keys,
+)
 
 
 def validate_language_code(code: str | None) -> str | None:
@@ -72,16 +75,8 @@ def validate_temperature(
 
 @lru_cache(maxsize=1)
 def _allowed_task_values() -> frozenset[str]:
-    """Read supported task values from shared transcription metadata."""
-    values: set[str] = set()
-    for group in get_transcription_param_schema():
-        for field in group.fields:
-            if field.type == "select" and field.key == "task":
-                if field.options:
-                    values |= {option.value.lower() for option in field.options}
-    if values:
-        return frozenset(values)
-    return frozenset({"transcribe", "translate"})
+    """Read supported task values from shared transcription contracts."""
+    return get_allowed_task_values()
 
 
 def validate_task_value(value: str | None) -> str | None:
@@ -100,14 +95,8 @@ def validate_task_value(value: str | None) -> str | None:
 
 @lru_cache(maxsize=1)
 def _allowed_vad_parameter_keys() -> frozenset[str]:
-    """Read the supported nested VAD keys from shared transcription metadata."""
-    keys = {
-        field.key.split(".", maxsplit=1)[1]
-        for group in get_transcription_param_schema()
-        for field in group.fields
-        if field.key.startswith("vad_parameters.")
-    }
-    return frozenset(keys)
+    """Read supported nested VAD keys from shared transcription contracts."""
+    return get_allowed_vad_parameter_keys()
 
 
 def validate_vad_parameter_keys(

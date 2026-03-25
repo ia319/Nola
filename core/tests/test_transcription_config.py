@@ -15,7 +15,7 @@ from nola.config.transcription.languages import (
     get_effective_languages,
     is_multilingual,
 )
-from nola.config.transcription.metadata import OptionFieldSchema
+from nola.config.transcription.schema.models import OptionFieldSchema
 from nola.engines.base import TranscribeOptions
 
 

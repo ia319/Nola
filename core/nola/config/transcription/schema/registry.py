@@ -1,0 +1,381 @@
+"""Transcription parameter schema registry and filtering helpers."""
+
+from __future__ import annotations
+
+from dataclasses import fields as dataclass_fields
+
+from faster_whisper.vad import VadOptions
+
+from nola.config.transcription.schema.models import (
+    NumberFieldSchema,
+    NumberListFieldSchema,
+    OptionFieldSchema,
+    OptionGroupSchema,
+    SelectFieldSchema,
+    SelectOptionSchema,
+    SliderFieldSchema,
+    SwitchFieldSchema,
+    TextFieldSchema,
+)
+
+_TRANSCRIPTION_PARAM_SCHEMA: list[OptionGroupSchema] = [
+    OptionGroupSchema(
+        group="general",
+        group_label_key="options.group.general",
+        fields=[
+            SelectFieldSchema(
+                key="language",
+                label_key="options.language.label",
+                type="select",
+                options_source="effective_languages",
+            ),
+            SelectFieldSchema(
+                key="task",
+                label_key="options.task.label",
+                type="select",
+                options=[
+                    SelectOptionSchema(
+                        value="transcribe",
+                        label_key="options.task.transcribe",
+                    ),
+                    SelectOptionSchema(
+                        value="translate",
+                        label_key="options.task.translate",
+                    ),
+                ],
+            ),
+            TextFieldSchema(
+                key="initial_prompt",
+                label_key="options.field.initialPrompt",
+                type="text",
+            ),
+        ],
+    ),
+    OptionGroupSchema(
+        group="decoding",
+        group_label_key="options.group.decoding",
+        fields=[
+            SliderFieldSchema(
+                key="beam_size",
+                label_key="options.field.beamSize",
+                type="slider",
+                min=1,
+                max=10,
+                step=1,
+            ),
+            NumberFieldSchema(
+                key="best_of",
+                label_key="options.field.bestOf",
+                type="number",
+                min=1,
+                step=1,
+            ),
+            NumberFieldSchema(
+                key="patience",
+                label_key="options.field.patience",
+                type="number",
+                min=0,
+                step=0.1,
+            ),
+            NumberFieldSchema(
+                key="length_penalty",
+                label_key="options.field.lengthPenalty",
+                type="number",
+                step=0.1,
+            ),
+            NumberFieldSchema(
+                key="repetition_penalty",
+                label_key="options.field.repetitionPenalty",
+                type="number",
+                min=1,
+                step=0.1,
+            ),
+            NumberFieldSchema(
+                key="no_repeat_ngram_size",
+                label_key="options.field.noRepeatNgramSize",
+                type="number",
+                min=0,
+                step=1,
+            ),
+            NumberListFieldSchema(
+                key="temperature",
+                label_key="options.field.temperature",
+                type="number_list",
+                collapse_single_value=True,
+            ),
+        ],
+    ),
+    OptionGroupSchema(
+        group="quality",
+        group_label_key="options.group.quality",
+        fields=[
+            NumberFieldSchema(
+                key="compression_ratio_threshold",
+                label_key="options.field.compressionRatioThreshold",
+                type="number",
+                step=0.1,
+            ),
+            NumberFieldSchema(
+                key="log_prob_threshold",
+                label_key="options.field.logProbThreshold",
+                type="number",
+                step=0.1,
+            ),
+            SliderFieldSchema(
+                key="no_speech_threshold",
+                label_key="options.field.noSpeechThreshold",
+                type="slider",
+                min=0,
+                max=1,
+                step=0.05,
+            ),
+        ],
+    ),
+    OptionGroupSchema(
+        group="context",
+        group_label_key="options.group.context",
+        fields=[
+            SwitchFieldSchema(
+                key="condition_on_previous_text",
+                label_key="options.field.conditionOnPreviousText",
+                type="switch",
+            ),
+            SliderFieldSchema(
+                key="prompt_reset_on_temperature",
+                label_key="options.field.promptResetOnTemperature",
+                type="slider",
+                min=0,
+                max=1,
+                step=0.05,
+            ),
+            TextFieldSchema(
+                key="prefix",
+                label_key="options.field.prefix",
+                type="text",
+            ),
+            TextFieldSchema(
+                key="hotwords",
+                label_key="options.field.hotwords",
+                type="text",
+            ),
+        ],
+    ),
+    OptionGroupSchema(
+        group="token_control",
+        group_label_key="options.group.tokenControl",
+        fields=[
+            SwitchFieldSchema(
+                key="suppress_blank",
+                label_key="options.field.suppressBlank",
+                type="switch",
+            ),
+            NumberListFieldSchema(
+                key="suppress_tokens",
+                label_key="options.field.suppressTokens",
+                type="number_list",
+                allow_negative=True,
+                integer_only=True,
+            ),
+            NumberFieldSchema(
+                key="max_new_tokens",
+                label_key="options.field.maxNewTokens",
+                type="number",
+                min=1,
+                step=1,
+            ),
+        ],
+    ),
+    OptionGroupSchema(
+        group="timestamps",
+        group_label_key="options.group.timestamps",
+        fields=[
+            SwitchFieldSchema(
+                key="without_timestamps",
+                label_key="options.field.withoutTimestamps",
+                type="switch",
+            ),
+            NumberFieldSchema(
+                key="max_initial_timestamp",
+                label_key="options.field.maxInitialTimestamp",
+                type="number",
+                min=0,
+                step=0.1,
+            ),
+            SwitchFieldSchema(
+                key="word_timestamps",
+                label_key="options.field.wordTimestamps",
+                type="switch",
+            ),
+            TextFieldSchema(
+                key="prepend_punctuations",
+                label_key="options.field.prependPunctuations",
+                type="text",
+            ),
+            TextFieldSchema(
+                key="append_punctuations",
+                label_key="options.field.appendPunctuations",
+                type="text",
+            ),
+            TextFieldSchema(
+                key="clip_timestamps",
+                label_key="options.field.clipTimestamps",
+                type="text",
+            ),
+        ],
+    ),
+    OptionGroupSchema(
+        group="vad",
+        group_label_key="options.group.vad",
+        fields=[
+            SwitchFieldSchema(
+                key="vad_filter",
+                label_key="options.field.vadFilter",
+                type="switch",
+            ),
+            SliderFieldSchema(
+                key="vad_parameters.threshold",
+                label_key="options.field.vadThreshold",
+                type="slider",
+                min=0,
+                max=1,
+                step=0.05,
+                depends_on="vad_filter",
+            ),
+            SliderFieldSchema(
+                key="vad_parameters.min_silence_duration_ms",
+                label_key="options.field.vadMinSilenceDurationMs",
+                type="slider",
+                min=0,
+                max=5000,
+                step=100,
+                depends_on="vad_filter",
+            ),
+            SliderFieldSchema(
+                key="vad_parameters.speech_pad_ms",
+                label_key="options.field.vadSpeechPadMs",
+                type="slider",
+                min=0,
+                max=1000,
+                step=50,
+                depends_on="vad_filter",
+            ),
+        ],
+    ),
+    OptionGroupSchema(
+        group="vad_advanced",
+        group_label_key="options.group.vadAdvanced",
+        fields=[
+            SliderFieldSchema(
+                key="vad_parameters.neg_threshold",
+                label_key="options.field.vadNegThreshold",
+                type="slider",
+                min=0,
+                max=1,
+                step=0.05,
+                depends_on="vad_filter",
+            ),
+            NumberFieldSchema(
+                key="vad_parameters.min_speech_duration_ms",
+                label_key="options.field.vadMinSpeechDurationMs",
+                type="number",
+                min=0,
+                max=10000,
+                step=1,
+                depends_on="vad_filter",
+            ),
+            NumberFieldSchema(
+                key="vad_parameters.max_speech_duration_s",
+                label_key="options.field.vadMaxSpeechDurationS",
+                type="number",
+                min=0,
+                step=1,
+                depends_on="vad_filter",
+                special_values=["inf"],
+            ),
+            NumberFieldSchema(
+                key="vad_parameters.min_silence_at_max_speech",
+                label_key="options.field.vadMinSilenceAtMaxSpeech",
+                type="number",
+                min=0,
+                max=10000,
+                step=1,
+                depends_on="vad_filter",
+            ),
+            SwitchFieldSchema(
+                key="vad_parameters.use_max_poss_sil_at_max_speech",
+                label_key="options.field.vadUseMaxPossibleSilenceAtMaxSpeech",
+                type="switch",
+                depends_on="vad_filter",
+            ),
+        ],
+    ),
+    OptionGroupSchema(
+        group="advanced",
+        group_label_key="options.group.advanced",
+        fields=[
+            SwitchFieldSchema(
+                key="multilingual",
+                label_key="options.field.multilingual",
+                type="switch",
+            ),
+            NumberFieldSchema(
+                key="chunk_length",
+                label_key="options.field.chunkLength",
+                type="number",
+                min=1,
+                step=1,
+            ),
+            NumberFieldSchema(
+                key="hallucination_silence_threshold",
+                label_key="options.field.hallucinationSilenceThreshold",
+                type="number",
+                min=0,
+                step=0.1,
+            ),
+            SliderFieldSchema(
+                key="language_detection_threshold",
+                label_key="options.field.languageDetectionThreshold",
+                type="slider",
+                min=0,
+                max=1,
+                step=0.05,
+            ),
+            NumberFieldSchema(
+                key="language_detection_segments",
+                label_key="options.field.languageDetectionSegments",
+                type="number",
+                min=1,
+                step=1,
+            ),
+        ],
+    ),
+]
+
+
+_SUPPORTED_VAD_PARAMETER_KEYS = frozenset(
+    field.name for field in dataclass_fields(VadOptions)
+)
+
+
+def _field_is_supported(field: OptionFieldSchema) -> bool:
+    """Keep schema fields aligned with the installed faster-whisper contract."""
+    if not field.key.startswith("vad_parameters."):
+        return True
+    nested_key = field.key.split(".", maxsplit=1)[1]
+    return nested_key in _SUPPORTED_VAD_PARAMETER_KEYS
+
+
+def get_transcription_param_schema() -> list[OptionGroupSchema]:
+    """Return a defensive copy of the transcription field metadata."""
+    copied = [group.model_copy(deep=True) for group in _TRANSCRIPTION_PARAM_SCHEMA]
+    filtered: list[OptionGroupSchema] = []
+    for group in copied:
+        group.fields = [field for field in group.fields if _field_is_supported(field)]
+        if group.fields:
+            filtered.append(group)
+    return filtered
+
+
+__all__ = [
+    "get_transcription_param_schema",
+]
