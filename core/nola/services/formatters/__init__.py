@@ -1,22 +1,11 @@
 """Output formatters for exporting transcription results."""
 
-from enum import Enum
-
+from nola.config.export.types import ExportFormat
 from nola.services.formatters.ass import ASSFormatter
 from nola.services.formatters.base import OutputFormatter, SegmentData
 from nola.services.formatters.srt import SRTFormatter
 from nola.services.formatters.txt import TXTFormatter
 from nola.services.formatters.vtt import VTTFormatter
-
-
-class ExportFormat(str, Enum):
-    """Supported export format identifiers."""
-
-    SRT = "srt"
-    VTT = "vtt"
-    TXT = "txt"
-    ASS = "ass"
-
 
 # Static registry - extend by adding new formatter classes here.
 FORMATTERS: dict[ExportFormat, type[OutputFormatter]] = {

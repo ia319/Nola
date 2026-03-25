@@ -8,7 +8,8 @@ from nola.api.routes.tasks._errors import raise_http_error
 from nola.api.schemas import BatchExportRequest, SavedExportResponse
 from nola.application.tasks.errors import TaskUseCaseError
 from nola.application.tasks.exports import batch_export_tasks, export_task
-from nola.services.formatters import ExportFormat, list_export_content_types
+from nola.config.export import ExportFormat
+from nola.services.formatters import list_export_content_types
 
 router = APIRouter()
 

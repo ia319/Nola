@@ -12,9 +12,10 @@ from fastapi.responses import Response, StreamingResponse
 from nola.application.tasks.contracts import SupportsFileQueries, SupportsTaskQueries
 from nola.application.tasks.errors import TaskUseCaseError
 from nola.application.tasks.exports.export_common import resolve_export_options
+from nola.config.export import ExportFormat
 from nola.models import AppConfigDatabase
 from nola.models.tasks import TaskStatus
-from nola.services.formatters import ExportFormat, get_formatter
+from nola.services.formatters import get_formatter
 from nola.services.formatters.base import SegmentData
 
 logger = logging.getLogger(__name__)

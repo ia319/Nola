@@ -1,8 +1,8 @@
 """Shared helpers for task export use-cases."""
 
+from nola.config.export import ExportFormat
 from nola.config.export import get_effective_defaults as get_effective_export_defaults
 from nola.models import AppConfigDatabase
-from nola.services.formatters import ExportFormat
 
 
 def resolve_export_options(

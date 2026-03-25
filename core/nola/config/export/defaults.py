@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Protocol, TypedDict
 
 from nola.config.common.types import ConfigMap
-from nola.services.formatters import ExportFormat
+from nola.config.export.types import ExportFormat
 
 EXPORT_CONFIG_PREFIX = "export."
 

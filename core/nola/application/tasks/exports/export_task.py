@@ -9,10 +9,14 @@ from nola.application.tasks.contracts import SupportsFileQueries, SupportsTaskQu
 from nola.application.tasks.errors import TaskUseCaseError
 from nola.application.tasks.exports.export_common import resolve_export_options
 from nola.config import settings
-from nola.config.export import build_export_filename, write_unique_export_text
+from nola.config.export import (
+    ExportFormat,
+    build_export_filename,
+    write_unique_export_text,
+)
 from nola.models import AppConfigDatabase
 from nola.models.tasks import TaskStatus
-from nola.services.formatters import ExportFormat, SegmentData, get_formatter
+from nola.services.formatters import SegmentData, get_formatter
 
 
 def export_task(

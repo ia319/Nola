@@ -12,8 +12,8 @@ from nola.api.schemas.validators import (
     validate_vad_parameter_keys,
 )
 from nola.config.constants import MAX_BATCH_TASK_IDS
+from nola.config.export import ExportFormat
 from nola.engines.base import TranscribeOptions
-from nola.services.formatters import ExportFormat
 
 _ENGINE_DEFAULTS = TranscribeOptions()
 

@@ -15,11 +15,13 @@ from nola.config.export.metadata import (
     ExportDefaultsPatchResponse,
     ExportResolvedDefaultsResponse,
 )
+from nola.config.export.types import ExportFormat
 
 __all__ = [
     "EXPORT_CONFIG_PREFIX",
     "ExportConfigResponse",
     "ExportDefaultsPatchResponse",
+    "ExportFormat",
     "ExportResolvedDefaultsResponse",
     "build_export_filename",
     "get_effective_defaults",
