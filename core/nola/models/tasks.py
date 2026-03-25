@@ -1,7 +1,6 @@
-"""Facade over split task repositories for compatibility."""
+"""Facade over split task repositories."""
 
 import sqlite3
-import warnings
 from pathlib import Path
 from typing import Any
 
@@ -40,7 +39,7 @@ class TaskDatabase:
         return self._queue.db_path
 
     def _connect(self) -> sqlite3.Connection:
-        """Expose the historical private connection helper for compatibility."""
+        """Expose the shared SQLite connection helper."""
         return self._queue._connect()
 
     def enqueue(
@@ -213,57 +212,6 @@ class TaskDatabase:
     def count_tasks(self, status: str | None = None, q: str | None = None) -> int:
         """Count tasks with optional status/search filters."""
         return self._store.count_tasks(status=status, q=q)
-
-    def _warn_deprecated(self, method_name: str, replacement: str) -> None:
-        """Emit a deprecation warning for legacy TaskDatabase methods."""
-        warnings.warn(
-            f"TaskDatabase.{method_name}() is deprecated; use {replacement}().",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    # Legacy methods kept for compatibility; remove at M5 cleanup.
-    def create_task(self, task_id: str, file_id: str) -> None:
-        """Legacy: Create task (use enqueue instead)."""
-        self._warn_deprecated("create_task", "enqueue")
-        self.enqueue(task_id, file_id)
-
-    def get_next_pending_task(self) -> TaskRowRaw | None:
-        """Legacy: Get next pending task (use dequeue instead)."""
-        self._warn_deprecated("get_next_pending_task", "dequeue")
-        return self._store.get_next_pending_task()
-
-    def update_status(
-        self,
-        task_id: str,
-        status: TaskStatus,
-        error: str | None = None,
-    ) -> bool:
-        """Legacy: Update task status (use specific methods instead).
-
-        Warning:
-            This method is deprecated. Use complete(), fail(), or cancel() instead.
-
-        Returns:
-            True if updated, False if task is in terminal state
-        """
-        self._warn_deprecated("update_status", "complete/fail/cancel")
-        return self._store.update_status(task_id, status, error)
-
-    def update_progress(self, task_id: str, progress: float) -> None:
-        """Legacy: Update progress (use heartbeat instead)."""
-        self._warn_deprecated("update_progress", "heartbeat")
-        self.heartbeat(task_id, progress)
-
-    def update_result(
-        self,
-        task_id: str,
-        segments: list[dict[str, Any]],
-        duration: float,
-    ) -> None:
-        """Legacy: Update result (use complete instead)."""
-        self._warn_deprecated("update_result", "complete")
-        self.complete(task_id, segments, duration)
 
 
 __all__ = [

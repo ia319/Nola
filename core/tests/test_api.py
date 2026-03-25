@@ -199,14 +199,12 @@ class TestTranscriptionsAPI:
 
 
 class TestTranscriptionTasksPhaseA:
-    """Test Phase A additions: alias compatibility and task list/delete features."""
+    """Test task list, batch action, and delete-record endpoints."""
 
-    def test_legacy_list_alias_still_works(self, client: TestClient):
-        """Legacy /api/transcriptions list path should remain available."""
+    def test_legacy_list_alias_is_removed(self, client: TestClient):
+        """Legacy /api/transcriptions list path should not be exposed."""
         response = client.get("/api/transcriptions")
-        assert response.status_code == 200
-        data = response.json()
-        assert "tasks" in data
+        assert response.status_code == 404
 
     def test_list_supports_filename_keyword_search(self, client: TestClient):
         """List endpoint should filter tasks by filename keyword."""
@@ -549,31 +547,13 @@ class TestTranscriptionTasksPhaseA:
         assert duplicate_result["ok"] is False
         assert duplicate_result["error_code"] == "duplicate_task_id"
 
-    def test_legacy_batch_cancel_alias_still_works(self, client: TestClient):
-        """Legacy batch cancel alias should remain available during transition."""
-        file_db = get_file_db()
-        task_db = get_task_db()
-
-        file_db.create_file(
-            file_id="legacy-batch-cancel-file",
-            filename="legacy.mp3",
-            path="/tmp/legacy.mp3",
-            size=1000,
-        )
-        task_db.enqueue(
-            task_id="legacy-batch-cancel-task",
-            file_id="legacy-batch-cancel-file",
-            options=None,
-        )
-
+    def test_legacy_batch_cancel_alias_is_removed(self, client: TestClient):
+        """Legacy batch-cancel path should not be exposed."""
         response = client.post(
             "/api/transcriptions/batch/cancel",
-            json={"task_ids": ["legacy-batch-cancel-task"]},
+            json={"task_ids": ["some-task-id"]},
         )
-        assert response.status_code == 200
-        payload = response.json()
-        assert payload["summary"] == {"requested": 1, "succeeded": 1, "failed": 0}
-        assert payload["results"][0]["status"] == "cancelled"
+        assert response.status_code == 404
 
     def test_delete_record_rejects_non_terminal_task(self, client: TestClient):
         """Delete-record endpoint should reject pending/processing tasks."""
@@ -626,31 +606,10 @@ class TestTranscriptionTasksPhaseA:
         get_response = client.get("/api/transcription-tasks/delete-completed-task")
         assert get_response.status_code == 404
 
-    def test_legacy_delete_record_alias_still_works(self, client: TestClient):
-        """Legacy delete-record path should remain available during transition."""
-        file_db = get_file_db()
-        task_db = get_task_db()
-        file_db.create_file(
-            file_id="delete-legacy-file",
-            filename="legacy.mp3",
-            path="/tmp/legacy.mp3",
-            size=1000,
-        )
-        task_db.enqueue(
-            task_id="delete-legacy-task",
-            file_id="delete-legacy-file",
-            options=None,
-        )
-        _claim_pending_task(task_db, "delete-legacy-task")
-        task_db.fail(
-            task_id="delete-legacy-task",
-            error="intentional",
-            should_retry=False,
-        )
-
-        response = client.delete("/api/transcriptions/delete-legacy-task/record")
-        assert response.status_code == 200
-        assert response.json()["task_id"] == "delete-legacy-task"
+    def test_legacy_delete_record_alias_is_removed(self, client: TestClient):
+        """Legacy delete-record path should not be exposed."""
+        response = client.delete("/api/transcriptions/some-task-id/record")
+        assert response.status_code == 404
 
 
 class TestInputValidation:

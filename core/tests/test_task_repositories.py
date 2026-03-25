@@ -74,20 +74,3 @@ def test_task_store_delete_task_record_only_deletes_terminal_tasks(task_reposito
 
     assert store_repo.delete_task_record("task-001") is True
     assert store_repo.get_task("task-001") is None
-
-
-def test_task_store_update_status_keeps_terminal_state(task_repositories):
-    """update_status() should not overwrite completed tasks."""
-    file_db, queue_repo, store_repo = task_repositories
-
-    file_db.create_file("file-001", "audio.wav", "/tmp/audio.wav", 1024)
-    queue_repo.enqueue("task-001", "file-001")
-    queue_repo.dequeue("worker-001")
-    queue_repo.complete("task-001", [{"text": "done"}], duration=1.0)
-
-    updated = store_repo.update_status("task-001", TaskStatus.PROCESSING)
-
-    assert updated is False
-    task = store_repo.get_task("task-001")
-    assert task is not None
-    assert task["status"] == TaskStatus.COMPLETED.value
