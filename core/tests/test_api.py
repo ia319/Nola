@@ -1291,6 +1291,94 @@ class TestBatchExportAPI:
             errors = zf.read("_errors.txt").decode()
             assert "nonexistent-task" in errors
 
+    def test_batch_export_skips_task_with_empty_segments(self, client: TestClient):
+        """Skip completed tasks with empty segments and record them as failures."""
+        import io
+        import zipfile
+
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="empty-ok-file",
+            filename="ok.mp3",
+            path="/tmp/ok.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="empty-ok-task", file_id="empty-ok-file", options=None)
+        _claim_pending_task(task_db, "empty-ok-task")
+        task_db.complete(
+            task_id="empty-ok-task",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Valid export"}],
+            duration=1.0,
+        )
+
+        file_db.create_file(
+            file_id="empty-segments-file",
+            filename="empty.mp3",
+            path="/tmp/empty.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="empty-segments-task",
+            file_id="empty-segments-file",
+            options=None,
+        )
+        _claim_pending_task(task_db, "empty-segments-task")
+        task_db.complete(
+            task_id="empty-segments-task",
+            segments=[],
+            duration=0.0,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks/export/batch",
+            json={
+                "task_ids": ["empty-ok-task", "empty-segments-task"],
+                "format": "srt",
+            },
+        )
+
+        assert response.status_code == 200
+
+        zip_buffer = io.BytesIO(response.content)
+        with zipfile.ZipFile(zip_buffer, "r") as zf:
+            names = zf.namelist()
+            assert "ok.srt" in names
+            assert "empty.srt" not in names
+            assert "_errors.txt" in names
+            errors = zf.read("_errors.txt").decode()
+            assert "empty-segments-task: no_segments" in errors
+
+    def test_batch_export_all_empty_segments_returns_400(self, client: TestClient):
+        """Return 400 when all batch-export tasks have empty segments."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="all-empty-file",
+            filename="all-empty.mp3",
+            path="/tmp/all-empty.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="all-empty-task", file_id="all-empty-file", options=None
+        )
+        _claim_pending_task(task_db, "all-empty-task")
+        task_db.complete(
+            task_id="all-empty-task",
+            segments=[],
+            duration=0.0,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks/export/batch",
+            json={"task_ids": ["all-empty-task"], "format": "srt"},
+        )
+
+        assert response.status_code == 400
+        assert "All 1 exports failed" in response.json()["detail"]
+
     def test_batch_export_all_failed(self, client: TestClient):
         """Test batch export when all tasks fail."""
         response = client.post(

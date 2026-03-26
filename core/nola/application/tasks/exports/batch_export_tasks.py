@@ -62,6 +62,10 @@ def batch_export_tasks(
                     continue
 
                 segments = task.get("segments") or []
+                if not segments:
+                    errors.append({"task_id": task_id, "reason": "no_segments"})
+                    continue
+
                 segment_data = [
                     SegmentData(start=s["start"], end=s["end"], text=s["text"])
                     for s in segments
