@@ -45,7 +45,7 @@ def _get_api_range_constraints() -> dict[str, tuple[float | None, float | None]]
         if ge_value is not None or le_value is not None:
             bounds[f"vad_parameters.{key}"] = (ge_value, le_value)
 
-    # VadParametersRequest enforces non-negative values in a field validator
+    # VadParametersRequest.check_max_speech_duration_s enforces non-negative values
     # while still allowing the "inf" sentinel.
     bounds["vad_parameters.max_speech_duration_s"] = (0.0, None)
     return bounds
@@ -85,12 +85,16 @@ def test_task_contract_values_match_ui_metadata_options() -> None:
     """Shared task-value contract should match UI task select options."""
     schema = get_transcription_param_schema()
     task_field = next(
-        field
-        for group in schema
-        for field in group.fields
-        if field.type == "select" and field.key == "task"
+        (
+            field
+            for group in schema
+            for field in group.fields
+            if field.type == "select" and field.key == "task"
+        ),
+        None,
     )
 
+    assert task_field is not None, "UI schema missing 'task' select field"
     assert task_field.options is not None
     metadata_values = {option.value.lower() for option in task_field.options}
     assert metadata_values == get_allowed_task_values()
