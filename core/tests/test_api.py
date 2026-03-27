@@ -973,6 +973,39 @@ class TestExportAPI:
         detail = response.json()["detail"]
         assert detail == "No segments available"
 
+    def test_export_formatter_error_returns_controlled_500(self, client: TestClient):
+        """Map formatter resolution errors to TaskUseCaseError-based responses."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-export-formatter-error",
+            filename="error.mp3",
+            path="/tmp/error.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-export-formatter-error",
+            file_id="test-file-export-formatter-error",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-export-formatter-error")
+        task_db.complete(
+            task_id="test-export-formatter-error",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Formatter error"}],
+            duration=1.0,
+        )
+
+        with patch(
+            "nola.application.tasks.exports.export_task.get_formatter",
+            side_effect=ValueError("boom"),
+        ):
+            response = client.get(
+                "/api/transcription-tasks/test-export-formatter-error/export?format=srt"
+            )
+
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Invalid export formatter configuration"
+
     def test_export_save_to_disk(self, client):
         """Test exporting with save=true returns JSON with file path."""
         file_db = get_file_db()
@@ -1278,6 +1311,22 @@ class TestBatchExportAPI:
             assert len(names) == 2
             assert "audio_0.srt" in names
             assert "audio_1.srt" in names
+
+    def test_batch_export_formatter_error_returns_controlled_500(
+        self, client: TestClient
+    ):
+        """Map batch formatter resolution errors to controlled API failures."""
+        with patch(
+            "nola.application.tasks.exports.batch_export_tasks.get_formatter",
+            side_effect=ValueError("boom"),
+        ):
+            response = client.post(
+                "/api/transcription-tasks/export/batch",
+                json={"task_ids": ["formatter-error-task"], "format": "srt"},
+            )
+
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Invalid export formatter configuration"
 
     def test_batch_export_partial_failure(self, client: TestClient):
         """Test batch export with mix of valid and invalid tasks."""

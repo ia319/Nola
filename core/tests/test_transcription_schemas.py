@@ -278,6 +278,23 @@ class TestTranscriptionSchemaMetadataModels:
                 options_source="effective_languages",
             )
 
+        with pytest.raises(ValidationError, match="exactly one"):
+            SelectFieldSchema(
+                key="task",
+                label_key="options.task.label",
+                type="select",
+                options=[],
+                options_source="effective_languages",
+            )
+
+        with pytest.raises(ValidationError, match="must not be empty"):
+            SelectFieldSchema(
+                key="task",
+                label_key="options.task.label",
+                type="select",
+                options=[],
+            )
+
     def test_select_accepts_single_option_source(self):
         """Accept select definitions with exactly one option source."""
         inline = SelectFieldSchema(
