@@ -199,14 +199,12 @@ class TestTranscriptionsAPI:
 
 
 class TestTranscriptionTasksPhaseA:
-    """Test Phase A additions: alias compatibility and task list/delete features."""
+    """Test task list, batch action, and delete-record endpoints."""
 
-    def test_legacy_list_alias_still_works(self, client: TestClient):
-        """Legacy /api/transcriptions list path should remain available."""
+    def test_legacy_list_alias_is_removed(self, client: TestClient):
+        """Legacy /api/transcriptions list path should not be exposed."""
         response = client.get("/api/transcriptions")
-        assert response.status_code == 200
-        data = response.json()
-        assert "tasks" in data
+        assert response.status_code == 404
 
     def test_list_supports_filename_keyword_search(self, client: TestClient):
         """List endpoint should filter tasks by filename keyword."""
@@ -549,31 +547,13 @@ class TestTranscriptionTasksPhaseA:
         assert duplicate_result["ok"] is False
         assert duplicate_result["error_code"] == "duplicate_task_id"
 
-    def test_legacy_batch_cancel_alias_still_works(self, client: TestClient):
-        """Legacy batch cancel alias should remain available during transition."""
-        file_db = get_file_db()
-        task_db = get_task_db()
-
-        file_db.create_file(
-            file_id="legacy-batch-cancel-file",
-            filename="legacy.mp3",
-            path="/tmp/legacy.mp3",
-            size=1000,
-        )
-        task_db.enqueue(
-            task_id="legacy-batch-cancel-task",
-            file_id="legacy-batch-cancel-file",
-            options=None,
-        )
-
+    def test_legacy_batch_cancel_alias_is_removed(self, client: TestClient):
+        """Legacy batch-cancel path should not be exposed."""
         response = client.post(
             "/api/transcriptions/batch/cancel",
-            json={"task_ids": ["legacy-batch-cancel-task"]},
+            json={"task_ids": ["some-task-id"]},
         )
-        assert response.status_code == 200
-        payload = response.json()
-        assert payload["summary"] == {"requested": 1, "succeeded": 1, "failed": 0}
-        assert payload["results"][0]["status"] == "cancelled"
+        assert response.status_code == 404
 
     def test_delete_record_rejects_non_terminal_task(self, client: TestClient):
         """Delete-record endpoint should reject pending/processing tasks."""
@@ -626,31 +606,10 @@ class TestTranscriptionTasksPhaseA:
         get_response = client.get("/api/transcription-tasks/delete-completed-task")
         assert get_response.status_code == 404
 
-    def test_legacy_delete_record_alias_still_works(self, client: TestClient):
-        """Legacy delete-record path should remain available during transition."""
-        file_db = get_file_db()
-        task_db = get_task_db()
-        file_db.create_file(
-            file_id="delete-legacy-file",
-            filename="legacy.mp3",
-            path="/tmp/legacy.mp3",
-            size=1000,
-        )
-        task_db.enqueue(
-            task_id="delete-legacy-task",
-            file_id="delete-legacy-file",
-            options=None,
-        )
-        _claim_pending_task(task_db, "delete-legacy-task")
-        task_db.fail(
-            task_id="delete-legacy-task",
-            error="intentional",
-            should_retry=False,
-        )
-
-        response = client.delete("/api/transcriptions/delete-legacy-task/record")
-        assert response.status_code == 200
-        assert response.json()["task_id"] == "delete-legacy-task"
+    def test_legacy_delete_record_alias_is_removed(self, client: TestClient):
+        """Legacy delete-record path should not be exposed."""
+        response = client.delete("/api/transcriptions/some-task-id/record")
+        assert response.status_code == 404
 
 
 class TestInputValidation:
@@ -985,6 +944,68 @@ class TestExportAPI:
         assert "[Script Info]" in response.text
         assert "Dialogue:" in response.text
 
+    def test_export_invalid_segment_shape_returns_400(self, client):
+        """Treat malformed persisted segment shape as no segments available."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-invalid-segment",
+            filename="invalid.mp3",
+            path="/tmp/invalid.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-invalid-segment",
+            file_id="test-file-invalid-segment",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-invalid-segment")
+        task_db.complete(
+            task_id="test-invalid-segment",
+            segments=[None],
+            duration=1.0,
+        )
+
+        response = client.get(
+            "/api/transcription-tasks/test-invalid-segment/export?format=srt"
+        )
+        assert response.status_code == 400
+        detail = response.json()["detail"]
+        assert detail == "No segments available"
+
+    def test_export_formatter_error_returns_controlled_500(self, client: TestClient):
+        """Map formatter resolution errors to TaskUseCaseError-based responses."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-export-formatter-error",
+            filename="error.mp3",
+            path="/tmp/error.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-export-formatter-error",
+            file_id="test-file-export-formatter-error",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-export-formatter-error")
+        task_db.complete(
+            task_id="test-export-formatter-error",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Formatter error"}],
+            duration=1.0,
+        )
+
+        with patch(
+            "nola.application.tasks.exports.export_task.get_formatter",
+            side_effect=ValueError("boom"),
+        ):
+            response = client.get(
+                "/api/transcription-tasks/test-export-formatter-error/export?format=srt"
+            )
+
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Invalid export formatter configuration"
+
     def test_export_save_to_disk(self, client):
         """Test exporting with save=true returns JSON with file path."""
         file_db = get_file_db()
@@ -1018,6 +1039,50 @@ class TestExportAPI:
                 data = response.json()
                 assert "saved_path" in data
                 assert data["saved_path"].endswith(".srt")
+
+    def test_export_save_io_failure_returns_controlled_500(self, client: TestClient):
+        """Map save-path I/O failures to controlled API responses."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-save-io-failure",
+            filename="audio.mp3",
+            path="/tmp/audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-save-io-failure",
+            file_id="test-file-save-io-failure",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-save-io-failure")
+        task_db.complete(
+            task_id="test-save-io-failure",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Save failure"}],
+            duration=1.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            exports_path = Path(tmpdir) / "exports"
+            with (
+                patch.object(
+                    Settings,
+                    "exports_dir",
+                    new_callable=PropertyMock,
+                    return_value=exports_path,
+                ),
+                patch(
+                    "nola.application.tasks.exports.export_task.write_unique_export_text",
+                    side_effect=OSError("disk full"),
+                ),
+            ):
+                response = client.get(
+                    "/api/transcription-tasks/test-save-io-failure/export"
+                    "?format=srt&save=true"
+                )
+
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to save export file"
 
     def test_export_allows_custom_single_filename(self, client: TestClient):
         """Single export should accept a custom filename and normalize extension."""
@@ -1291,6 +1356,22 @@ class TestBatchExportAPI:
             assert "audio_0.srt" in names
             assert "audio_1.srt" in names
 
+    def test_batch_export_formatter_error_returns_controlled_500(
+        self, client: TestClient
+    ):
+        """Map batch formatter resolution errors to controlled API failures."""
+        with patch(
+            "nola.application.tasks.exports.batch_export_tasks.get_formatter",
+            side_effect=ValueError("boom"),
+        ):
+            response = client.post(
+                "/api/transcription-tasks/export/batch",
+                json={"task_ids": ["formatter-error-task"], "format": "srt"},
+            )
+
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Invalid export formatter configuration"
+
     def test_batch_export_partial_failure(self, client: TestClient):
         """Test batch export with mix of valid and invalid tasks."""
         import io
@@ -1331,6 +1412,197 @@ class TestBatchExportAPI:
             assert "_errors.txt" in names
             errors = zf.read("_errors.txt").decode()
             assert "nonexistent-task" in errors
+
+    def test_batch_export_hides_internal_exception_details(self, client: TestClient):
+        """Batch error report should avoid exposing raw exception details."""
+        import io
+        import zipfile
+
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="internal-ok-file",
+            filename="internal-ok.mp3",
+            path="/tmp/internal-ok.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="internal-ok-task",
+            file_id="internal-ok-file",
+            options=None,
+        )
+        _claim_pending_task(task_db, "internal-ok-task")
+        task_db.complete(
+            task_id="internal-ok-task",
+            segments=[{"start": 0.0, "end": 1.0, "text": "ok"}],
+            duration=1.0,
+        )
+
+        file_db.create_file(
+            file_id="internal-bad-file",
+            filename="internal-bad.mp3",
+            path="/tmp/internal-bad.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="internal-bad-task",
+            file_id="internal-bad-file",
+            options=None,
+        )
+        _claim_pending_task(task_db, "internal-bad-task")
+        task_db.complete(
+            task_id="internal-bad-task",
+            segments=[{"start": 0.0, "end": 1.0}],
+            duration=1.0,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks/export/batch",
+            json={
+                "task_ids": ["internal-ok-task", "internal-bad-task"],
+                "format": "srt",
+            },
+        )
+
+        assert response.status_code == 200
+
+        zip_buffer = io.BytesIO(response.content)
+        with zipfile.ZipFile(zip_buffer, "r") as zf:
+            errors = zf.read("_errors.txt").decode()
+            assert "internal-bad-task: internal_error" in errors
+            assert "KeyError" not in errors
+            assert "text" not in errors
+
+    def test_batch_export_avoids_errors_filename_collision(self, client: TestClient):
+        """Batch export should avoid duplicate _errors.txt member names in zip."""
+        import io
+        import zipfile
+
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="collision-file",
+            filename="_errors.mp3",
+            path="/tmp/_errors.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="collision-task",
+            file_id="collision-file",
+            options=None,
+        )
+        _claim_pending_task(task_db, "collision-task")
+        task_db.complete(
+            task_id="collision-task",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Collision"}],
+            duration=1.0,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks/export/batch",
+            json={
+                "task_ids": ["collision-task", "missing-task"],
+                "format": "txt",
+            },
+        )
+
+        assert response.status_code == 200
+
+        zip_buffer = io.BytesIO(response.content)
+        with zipfile.ZipFile(zip_buffer, "r") as zf:
+            names = zf.namelist()
+            assert "_errors.txt" in names
+            assert "_errors_1.txt" in names
+
+    def test_batch_export_skips_task_with_empty_segments(self, client: TestClient):
+        """Skip completed tasks with empty segments and record them as failures."""
+        import io
+        import zipfile
+
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="empty-ok-file",
+            filename="ok.mp3",
+            path="/tmp/ok.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="empty-ok-task", file_id="empty-ok-file", options=None)
+        _claim_pending_task(task_db, "empty-ok-task")
+        task_db.complete(
+            task_id="empty-ok-task",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Valid export"}],
+            duration=1.0,
+        )
+
+        file_db.create_file(
+            file_id="empty-segments-file",
+            filename="empty.mp3",
+            path="/tmp/empty.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="empty-segments-task",
+            file_id="empty-segments-file",
+            options=None,
+        )
+        _claim_pending_task(task_db, "empty-segments-task")
+        task_db.complete(
+            task_id="empty-segments-task",
+            segments=[],
+            duration=0.0,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks/export/batch",
+            json={
+                "task_ids": ["empty-ok-task", "empty-segments-task"],
+                "format": "srt",
+            },
+        )
+
+        assert response.status_code == 200
+
+        zip_buffer = io.BytesIO(response.content)
+        with zipfile.ZipFile(zip_buffer, "r") as zf:
+            names = zf.namelist()
+            assert "ok.srt" in names
+            assert "empty.srt" not in names
+            assert "_errors.txt" in names
+            errors = zf.read("_errors.txt").decode()
+            assert "empty-segments-task: no_segments" in errors
+
+    def test_batch_export_all_empty_segments_returns_400(self, client: TestClient):
+        """Return 400 when all batch-export tasks have empty segments."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="all-empty-file",
+            filename="all-empty.mp3",
+            path="/tmp/all-empty.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="all-empty-task", file_id="all-empty-file", options=None
+        )
+        _claim_pending_task(task_db, "all-empty-task")
+        task_db.complete(
+            task_id="all-empty-task",
+            segments=[],
+            duration=0.0,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks/export/batch",
+            json={"task_ids": ["all-empty-task"], "format": "srt"},
+        )
+
+        assert response.status_code == 400
+        assert "All 1 exports failed" in response.json()["detail"]
 
     def test_batch_export_all_failed(self, client: TestClient):
         """Test batch export when all tasks fail."""

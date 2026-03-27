@@ -1,104 +1,24 @@
-"""Production-grade transcription task queue management."""
+"""Facade over split task repositories."""
 
-import json
-import logging
 import sqlite3
-from contextlib import closing
-from datetime import datetime, timedelta
-from enum import Enum
 from pathlib import Path
-from typing import Any, Literal, TypedDict, cast
+from typing import Any
 
-from typing_extensions import NotRequired
-
-logger = logging.getLogger(__name__)
-
-
-class TaskRowRaw(TypedDict):
-    """Raw row from SQLite, segments/options are JSON strings."""
-
-    id: str
-    file_id: str
-    filename: NotRequired[str | None]
-    status: str
-    priority: int
-    retry_count: int
-    max_retries: int
-    worker_id: str | None
-    started_at: str | None
-    last_heartbeat: str | None
-    timeout_seconds: int
-    options: str | None
-    progress: float
-    duration: float | None
-    segments: str | None
-    error: str | None
-    created_at: str
-    completed_at: str | None
-
-
-class TaskRow(TypedDict):
-    """Parsed task row, segments/options already deserialized."""
-
-    id: str
-    file_id: str
-    filename: NotRequired[str | None]
-    status: str
-    priority: int
-    retry_count: int
-    max_retries: int
-    worker_id: str | None
-    started_at: str | None
-    last_heartbeat: str | None
-    timeout_seconds: int
-    options: dict[str, Any] | None
-    progress: float
-    duration: float | None
-    segments: list[dict[str, Any]] | None
-    error: str | None
-    created_at: str
-    completed_at: str | None
-
-
-class TaskStatus(str, Enum):
-    """Transcription task status."""
-
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-TaskSortField = Literal["created_at", "completed_at", "status", "progress", "filename"]
-TaskSortOrder = Literal["asc", "desc"]
-DEFAULT_TASK_SORT_BY: TaskSortField = "created_at"
-DEFAULT_TASK_SORT_ORDER: TaskSortOrder = "desc"
-TASK_SORT_COLUMNS: dict[TaskSortField, str] = {
-    "created_at": "t.created_at",
-    "completed_at": "t.completed_at",
-    "status": "t.status",
-    "progress": "t.progress",
-    "filename": "LOWER(COALESCE(f.filename, ''))",
-}
-TERMINAL_TASK_STATUSES = (
-    TaskStatus.COMPLETED.value,
-    TaskStatus.FAILED.value,
-    TaskStatus.CANCELLED.value,
+from nola.models.taskdb import (
+    CANCELLABLE_TASK_STATUSES,
+    DEFAULT_TASK_SORT_BY,
+    DEFAULT_TASK_SORT_ORDER,
+    RETRYABLE_TASK_STATUSES,
+    TASK_SORT_COLUMNS,
+    TERMINAL_TASK_STATUSES,
+    TaskQueueRepository,
+    TaskRow,
+    TaskRowRaw,
+    TaskSortField,
+    TaskSortOrder,
+    TaskStatus,
+    TaskStoreRepository,
 )
-CANCELLABLE_TASK_STATUSES = (
-    TaskStatus.PENDING.value,
-    TaskStatus.PROCESSING.value,
-)
-RETRYABLE_TASK_STATUSES = (
-    TaskStatus.FAILED.value,
-    TaskStatus.CANCELLED.value,
-)
-
-
-def _escape_like_fragment(fragment: str) -> str:
-    """Escape LIKE wildcards so filename search keeps literal contains semantics."""
-    return fragment.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 class TaskDatabase:
@@ -110,16 +30,17 @@ class TaskDatabase:
         Args:
             db_path: Path to SQLite database file
         """
-        self.db_path = Path(db_path)
+        self._queue = TaskQueueRepository(db_path)
+        self._store = TaskStoreRepository(db_path)
+
+    @property
+    def db_path(self) -> Path:
+        """Return SQLite database path used by both repositories."""
+        return self._queue.db_path
 
     def _connect(self) -> sqlite3.Connection:
-        """Create connection with foreign key enforcement."""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
-        return conn
-
-    # === Queue Operations ===
+        """Expose the shared SQLite connection helper."""
+        return self._queue._connect()
 
     def enqueue(
         self,
@@ -138,24 +59,13 @@ class TaskDatabase:
             max_retries: Maximum retry attempts
             options: Transcription options (non-None values only)
         """
-        with closing(self._connect()) as conn:
-            with conn:
-                conn.execute(
-                    """
-                    INSERT INTO transcription_tasks 
-                    (id, file_id, status, priority, max_retries, options, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        task_id,
-                        file_id,
-                        TaskStatus.PENDING.value,
-                        priority,
-                        max_retries,
-                        json.dumps(options) if options else None,
-                        datetime.now().isoformat(),
-                    ),
-                )
+        self._queue.enqueue(
+            task_id=task_id,
+            file_id=file_id,
+            priority=priority,
+            max_retries=max_retries,
+            options=options,
+        )
 
     def dequeue(self, worker_id: str) -> TaskRowRaw | None:
         """Atomically get and lock next pending task.
@@ -166,37 +76,7 @@ class TaskDatabase:
         Returns:
             Task dict or None if queue is empty
         """
-        with closing(self._connect()) as conn:
-            with conn:
-                cursor = conn.execute(
-                    """
-                    UPDATE transcription_tasks
-                    SET status = ?, worker_id = ?, started_at = ?, last_heartbeat = ?
-                    WHERE id IN (
-                        SELECT id FROM transcription_tasks
-                        WHERE status = ?
-                        ORDER BY priority DESC, created_at ASC
-                        LIMIT 1
-                    )
-                    RETURNING *
-                    """,
-                    (
-                        TaskStatus.PROCESSING.value,
-                        worker_id,
-                        datetime.now().isoformat(),
-                        datetime.now().isoformat(),
-                        TaskStatus.PENDING.value,
-                    ),
-                )
-
-                row = cursor.fetchone()
-
-        if row is None:
-            return None
-
-        return cast(TaskRowRaw, dict(row))
-
-    # === State Management ===
+        return self._queue.dequeue(worker_id)
 
     def heartbeat(self, task_id: str, progress: float = 0.0) -> None:
         """Update worker heartbeat and progress.
@@ -205,24 +85,13 @@ class TaskDatabase:
             task_id: Task identifier
             progress: Current progress (0-100)
         """
-        with closing(self._connect()) as conn:
-            with conn:
-                conn.execute(
-                    """
-                    UPDATE transcription_tasks
-                    SET last_heartbeat = ?, progress = ?
-                    WHERE id = ? AND status = ?
-                    """,
-                    (
-                        datetime.now().isoformat(),
-                        progress,
-                        task_id,
-                        TaskStatus.PROCESSING.value,
-                    ),
-                )
+        self._queue.heartbeat(task_id, progress)
 
     def complete(
-        self, task_id: str, segments: list[dict[str, Any]], duration: float
+        self,
+        task_id: str,
+        segments: list[dict[str, Any]],
+        duration: float,
     ) -> bool:
         """Mark task as completed with results.
 
@@ -234,25 +103,7 @@ class TaskDatabase:
         Returns:
             True if updated, False if task was cancelled or not found
         """
-        with closing(self._connect()) as conn:
-            with conn:
-                cursor = conn.execute(
-                    """
-                    UPDATE transcription_tasks
-                    SET status = ?, segments = ?, duration = ?, 
-                        progress = 100.0, completed_at = ?
-                    WHERE id = ? AND status = ?
-                    """,
-                    (
-                        TaskStatus.COMPLETED.value,
-                        json.dumps(segments),
-                        duration,
-                        datetime.now().isoformat(),
-                        task_id,
-                        TaskStatus.PROCESSING.value,
-                    ),
-                )
-                return cursor.rowcount > 0
+        return self._queue.complete(task_id, segments, duration)
 
     def fail(self, task_id: str, error: str, should_retry: bool = True) -> bool:
         """Mark task as failed with optional retry.
@@ -265,52 +116,7 @@ class TaskDatabase:
         Returns:
             True if task was updated, False if task not found
         """
-        with closing(self._connect()) as conn:
-            with conn:
-                # Atomic conditional update:
-                # 1. Try to requeue if retries available
-                if should_retry:
-                    cursor = conn.execute(
-                        """
-                        UPDATE transcription_tasks
-                        SET status = ?, retry_count = retry_count + 1, 
-                            error = ?, worker_id = NULL, started_at = NULL
-                        WHERE id = ? AND retry_count < max_retries AND status = ?
-                        """,
-                        (
-                            TaskStatus.PENDING.value,
-                            error,
-                            task_id,
-                            TaskStatus.PROCESSING.value,
-                        ),
-                    )
-
-                    if cursor.rowcount > 0:
-                        return True
-
-                # 2. If we reached here, either:
-                #    - should_retry is False
-                #    - OR retry_count >= max_retries (atomic check failed)
-                # So mark as permanently failed
-                cursor = conn.execute(
-                    """
-                    UPDATE transcription_tasks
-                    SET status = ?, error = ?, completed_at = ?
-                    WHERE id = ? AND status = ?
-                    """,
-                    (
-                        TaskStatus.FAILED.value,
-                        error,
-                        datetime.now().isoformat(),
-                        task_id,
-                        TaskStatus.PROCESSING.value,
-                    ),
-                )
-
-                if cursor.rowcount == 0:
-                    logger.warning(f"Attempted to fail non-existent task: {task_id}")
-                    return False
-                return True
+        return self._queue.fail(task_id, error, should_retry)
 
     def cancel(self, task_id: str) -> bool:
         """Cancel a task.
@@ -332,28 +138,7 @@ class TaskDatabase:
         Returns:
             Updated task row when cancellation succeeds, otherwise None
         """
-        with closing(self._connect()) as conn:
-            with conn:
-                cursor = conn.execute(
-                    """
-                    UPDATE transcription_tasks
-                    SET status = ?, completed_at = ?
-                    WHERE id = ? AND status IN (?, ?)
-                    RETURNING *
-                    """,
-                    (
-                        TaskStatus.CANCELLED.value,
-                        datetime.now().isoformat(),
-                        task_id,
-                        *CANCELLABLE_TASK_STATUSES,
-                    ),
-                )
-                row = cursor.fetchone()
-                if row is None:
-                    return None
-                return cast(TaskRowRaw, dict(row))
-
-    # === Maintenance Operations ===
+        return self._store.cancel_with_snapshot(task_id)
 
     def requeue_timeout_tasks(self, timeout_seconds: int = 3600) -> int:
         """Requeue tasks that exceeded timeout.
@@ -367,47 +152,7 @@ class TaskDatabase:
         Returns:
             Number of tasks requeued (not including failed ones)
         """
-        with closing(self._connect()) as conn:
-            with conn:
-                timeout_at = datetime.now() - timedelta(seconds=timeout_seconds)
-
-                cursor = conn.execute(
-                    """
-                    UPDATE transcription_tasks
-                    SET status = ?, worker_id = NULL, started_at = NULL,
-                        retry_count = retry_count + 1,
-                        error = 'Task timeout - requeued'
-                    WHERE status = ? 
-                      AND started_at < ?
-                      AND retry_count < max_retries
-                    """,
-                    (
-                        TaskStatus.PENDING.value,
-                        TaskStatus.PROCESSING.value,
-                        timeout_at.isoformat(),
-                    ),
-                )
-                requeued_count = cursor.rowcount
-
-                conn.execute(
-                    """
-                    UPDATE transcription_tasks
-                    SET status = ?, 
-                        error = 'Task timeout - max retries exceeded',
-                        completed_at = ?
-                    WHERE status = ?
-                      AND started_at < ?
-                      AND retry_count >= max_retries
-                    """,
-                    (
-                        TaskStatus.FAILED.value,
-                        datetime.now().isoformat(),
-                        TaskStatus.PROCESSING.value,
-                        timeout_at.isoformat(),
-                    ),
-                )
-
-                return requeued_count
+        return self._queue.requeue_timeout_tasks(timeout_seconds)
 
     def requeue_dead_workers(self, heartbeat_timeout: int = 300) -> int:
         """Requeue tasks from workers with stale heartbeat.
@@ -421,49 +166,7 @@ class TaskDatabase:
         Returns:
             Number of tasks requeued (not including failed ones)
         """
-        with closing(self._connect()) as conn:
-            with conn:
-                timeout_at = datetime.now() - timedelta(seconds=heartbeat_timeout)
-
-                cursor = conn.execute(
-                    """
-                    UPDATE transcription_tasks
-                    SET status = ?, worker_id = NULL, started_at = NULL,
-                        retry_count = retry_count + 1,
-                        error = 'Worker heartbeat timeout - requeued'
-                    WHERE status = ?
-                      AND last_heartbeat < ?
-                      AND retry_count < max_retries
-                    """,
-                    (
-                        TaskStatus.PENDING.value,
-                        TaskStatus.PROCESSING.value,
-                        timeout_at.isoformat(),
-                    ),
-                )
-                requeued_count = cursor.rowcount
-
-                conn.execute(
-                    """
-                    UPDATE transcription_tasks
-                    SET status = ?, 
-                        error = 'Worker heartbeat timeout - max retries exceeded',
-                        completed_at = ?
-                    WHERE status = ?
-                      AND last_heartbeat < ?
-                      AND retry_count >= max_retries
-                    """,
-                    (
-                        TaskStatus.FAILED.value,
-                        datetime.now().isoformat(),
-                        TaskStatus.PROCESSING.value,
-                        timeout_at.isoformat(),
-                    ),
-                )
-
-                return requeued_count
-
-    # === Query Operations ===
+        return self._queue.requeue_dead_workers(heartbeat_timeout)
 
     def get_task(self, task_id: str) -> TaskRow | None:
         """Get task details by ID.
@@ -474,30 +177,7 @@ class TaskDatabase:
         Returns:
             Task dictionary or None if not found
         """
-        with closing(self._connect()) as conn:
-            cursor = conn.execute(
-                "SELECT * FROM transcription_tasks WHERE id = ?", (task_id,)
-            )
-            row = cursor.fetchone()
-
-        if row is None:
-            return None
-
-        task = dict(row)
-        # Parse JSON fields
-        if task["segments"]:
-            try:
-                task["segments"] = json.loads(task["segments"])
-            except json.JSONDecodeError:
-                logger.warning("Corrupted segments JSON for task %s", task_id)
-                task["segments"] = None
-        if task["options"]:
-            try:
-                task["options"] = json.loads(task["options"])
-            except json.JSONDecodeError:
-                logger.warning("Corrupted options JSON for task %s", task_id)
-                task["options"] = None
-        return cast(TaskRow, task)
+        return self._store.get_task(task_id)
 
     def delete_task_record(self, task_id: str) -> bool:
         """Delete a task record by ID.
@@ -508,102 +188,7 @@ class TaskDatabase:
         Returns:
             True if deleted, False if task is missing or non-terminal
         """
-        with closing(self._connect()) as conn:
-            with conn:
-                # Enforce terminal-only deletion at the data layer so direct model
-                # callers cannot bypass route-level status checks.
-                cursor = conn.execute(
-                    """
-                    DELETE FROM transcription_tasks
-                    WHERE id = ? AND status IN (?, ?, ?)
-                    """,
-                    (task_id, *TERMINAL_TASK_STATUSES),
-                )
-                return cursor.rowcount > 0
-
-    # Legacy method for compatibility
-    def create_task(self, task_id: str, file_id: str) -> None:
-        """Legacy: Create task (use enqueue instead)."""
-        self.enqueue(task_id, file_id)
-
-    def get_next_pending_task(self) -> TaskRowRaw | None:
-        """Legacy: Get next pending task (use dequeue instead)."""
-        # Note: This doesn't lock the task, for testing only
-        with closing(self._connect()) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute(
-                """
-                SELECT * FROM transcription_tasks
-                WHERE status = ?
-                ORDER BY priority DESC, created_at ASC
-                LIMIT 1
-                """,
-                (TaskStatus.PENDING.value,),
-            )
-            row = cursor.fetchone()
-
-        return cast(TaskRowRaw, dict(row)) if row else None
-
-    def update_status(
-        self, task_id: str, status: TaskStatus, error: str | None = None
-    ) -> bool:
-        """Legacy: Update task status (use specific methods instead).
-
-        Warning:
-            This method is deprecated. Use complete(), fail(), or cancel() instead.
-
-        Returns:
-            True if updated, False if task is in terminal state
-        """
-        terminal_states = (
-            TaskStatus.COMPLETED.value,
-            TaskStatus.FAILED.value,
-            TaskStatus.CANCELLED.value,
-        )
-
-        with closing(self._connect()) as conn:
-            with conn:
-                # Check current status to avoid overwriting terminal states
-                if status in (
-                    TaskStatus.COMPLETED,
-                    TaskStatus.FAILED,
-                    TaskStatus.CANCELLED,
-                ):
-                    cursor = conn.execute(
-                        """
-                        UPDATE transcription_tasks
-                        SET status = ?, error = ?, completed_at = ?
-                        WHERE id = ? AND status NOT IN (?, ?, ?)
-                        """,
-                        (
-                            status.value,
-                            error,
-                            datetime.now().isoformat(),
-                            task_id,
-                            *terminal_states,
-                        ),
-                    )
-                else:
-                    cursor = conn.execute(
-                        """
-                        UPDATE transcription_tasks
-                        SET status = ?, error = ?
-                        WHERE id = ? AND status NOT IN (?, ?, ?)
-                        """,
-                        (status.value, error, task_id, *terminal_states),
-                    )
-
-                return cursor.rowcount > 0
-
-    def update_progress(self, task_id: str, progress: float) -> None:
-        """Legacy: Update progress (use heartbeat instead)."""
-        self.heartbeat(task_id, progress)
-
-    def update_result(
-        self, task_id: str, segments: list[dict[str, Any]], duration: float
-    ) -> None:
-        """Legacy: Update result (use complete instead)."""
-        self.complete(task_id, segments, duration)
+        return self._store.delete_task_record(task_id)
 
     def list_tasks(
         self,
@@ -615,59 +200,31 @@ class TaskDatabase:
         order: TaskSortOrder = DEFAULT_TASK_SORT_ORDER,
     ) -> list[TaskRowRaw]:
         """List tasks with optional status/search filters and sorting."""
-        sort_column = TASK_SORT_COLUMNS[sort_by]
-        sort_order = "ASC" if order == "asc" else "DESC"
-
-        from_sql = "FROM transcription_tasks t LEFT JOIN files f ON f.id = t.file_id"
-        where_clauses: list[str] = []
-        params: list[str | int] = []
-
-        if q:
-            # Keep contains search semantics (%keyword%) for UX consistency.
-            # This may full-scan on SQLite; move to FTS when data volume grows.
-            escaped_q = _escape_like_fragment(q.lower())
-            where_clauses.append("LOWER(f.filename) LIKE ? ESCAPE '\\'")
-            params.append(f"%{escaped_q}%")
-
-        if status:
-            where_clauses.append("t.status = ?")
-            params.append(status)
-
-        where_sql = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
-        query = (
-            "SELECT t.*, f.filename AS filename "
-            f"{from_sql}{where_sql} "
-            f"ORDER BY {sort_column} {sort_order}, t.id DESC "
-            "LIMIT ? OFFSET ?"
+        return self._store.list_tasks(
+            status=status,
+            limit=limit,
+            offset=offset,
+            q=q,
+            sort_by=sort_by,
+            order=order,
         )
-        params.extend([limit, offset])
-
-        with closing(self._connect()) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute(query, tuple(params))
-            return [cast(TaskRowRaw, dict(row)) for row in cursor.fetchall()]
 
     def count_tasks(self, status: str | None = None, q: str | None = None) -> int:
         """Count tasks with optional status/search filters."""
-        from_sql = "FROM transcription_tasks t"
-        where_clauses: list[str] = []
-        params: list[str] = []
+        return self._store.count_tasks(status=status, q=q)
 
-        if q:
-            from_sql += " JOIN files f ON f.id = t.file_id"
-            # Keep contains search semantics (%keyword%) for UX consistency.
-            # This may full-scan on SQLite; move to FTS when data volume grows.
-            escaped_q = _escape_like_fragment(q.lower())
-            where_clauses.append("LOWER(f.filename) LIKE ? ESCAPE '\\'")
-            params.append(f"%{escaped_q}%")
 
-        if status:
-            where_clauses.append("t.status = ?")
-            params.append(status)
-
-        where_sql = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
-        query = f"SELECT COUNT(*) {from_sql}{where_sql}"
-
-        with closing(self._connect()) as conn:
-            cursor = conn.execute(query, tuple(params))
-            return int(cursor.fetchone()[0])
+__all__ = [
+    "CANCELLABLE_TASK_STATUSES",
+    "DEFAULT_TASK_SORT_BY",
+    "DEFAULT_TASK_SORT_ORDER",
+    "RETRYABLE_TASK_STATUSES",
+    "TERMINAL_TASK_STATUSES",
+    "TASK_SORT_COLUMNS",
+    "TaskDatabase",
+    "TaskRow",
+    "TaskRowRaw",
+    "TaskSortField",
+    "TaskSortOrder",
+    "TaskStatus",
+]

@@ -272,6 +272,13 @@ app/                          # Frontend workspace root
 >     - Use `src/features/tasks` for task lifecycle and history flows.
 >     - Use `src/features/transcription-options` for option composition and defaults-patch logic.
 >     - Do not create or restore `src/features/history` or `src/features/transcription`.
+> 14. **Subdomain Composition Boundary**:
+>     - Keep `transcription-options` independent from `tasks`.
+>     - Compose `transcription-options` with `tasks` only in route/page containers (`App.tsx`, `HistoryPage.tsx`, `AppShell.tsx`).
+>     - Do not reintroduce compatibility re-export modules for removed legacy feature roots.
+> 15. **Task API Path Boundary**:
+>     - Use `/api/transcription-tasks/*` as runtime task endpoints.
+>     - Do not add new frontend runtime clients for `/api/transcriptions/*` aliases.
 >
 > [!IMPORTANT]
 > Use `GET /api/config` and `GET /api/config/transcription/engine-defaults` as the only defaults source.
@@ -305,7 +312,7 @@ Backend (Pydantic) ──► openapi.json ──► openapi.d.ts ──► domai
 - Runtime helpers such as `formatApiError` and AppError factories live in `shared/lib/*`, not in `shared/types/*`.
 - Feature `api.ts` functions return unwrapped `data` (not `AxiosResponse`), keeping callers free from Axios internals.
 
-**Update flow:** Backend changes schema → run `pnpm gen:types` → `openapi.d.ts` regenerates → domain aliases/contracts usually unchanged → feature API unchanged.
+**Apply update flow:** Backend changes schema → run `pnpm gen:types` → commit regenerated `openapi.d.ts` → update dependent aliases/contracts only when needed → verify schema drift with `pnpm gen:types:check`.
 
 ---
 
@@ -360,9 +367,9 @@ Separate business domain logic by feature. Expose every feature public surface t
 - **tasks**:
   - `api.ts`: Use `createTask`, `listTasks`, `getTask`, `cancelTask`, `deleteTaskRecord`, `batchCancelTasks`, and `batchRetryTasks`.
   - `__tests__/api.test.ts`: Verify task endpoint path and request body wiring.
-  - `actions.ts`: Use refresh-safe wrappers (`cancelTaskAndRefresh`, `retryTaskAndRefresh`, `deleteTaskRecordAction`).
+  - `actions.ts`: Use refresh-safe wrappers (`cancelTaskAndRefresh`, `retryTaskAndRefresh`, `deleteTaskRecordAction`); call `requestTaskRefresh()` in `finally` for cancel/retry attempts.
   - `__tests__/actions.test.ts`: Verify wrapper refresh behavior and failure handling.
-  - `components/CurrentBatchTasksPanel.tsx`: Compose current-batch list, per-task actions, and batch action flow.
+  - `components/CurrentBatchTasksPanel.tsx`: Compose current-batch list, per-task actions, and batch action flow; guard batch actions with real handlers and prevent unhandled rejections from `void` click chains.
   - `components/TaskBatchActionBar.tsx`: Reuse batch cancel/retry selection controls.
   - `components/__tests__/TaskBatchActionBar.test.tsx`: Verify batch action bar interaction and disabled states.
   - `hooks/useRecentTaskQuery.ts`: Normalize query/filter/sort/pagination state for recent tasks.

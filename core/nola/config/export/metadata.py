@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel
 
-from nola.services.formatters import ExportFormat
+from nola.config.export.types import ExportFormat
 
 
 class ExportResolvedDefaultsResponse(BaseModel):

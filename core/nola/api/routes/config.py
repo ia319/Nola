@@ -28,6 +28,7 @@ from nola.config.transcription import (
     EngineDefaultsResponse,
     TranscriptionConfigResponse,
     TranscriptionDefaultsPatchResponse,
+    TranscriptionResolvedDefaultsResponse,
     build_file_config,
     get_effective_languages,
     get_engine_defaults,
@@ -37,7 +38,6 @@ from nola.config.transcription import (
 from nola.config.transcription import (
     get_effective_defaults as get_effective_transcription_defaults,
 )
-from nola.config.transcription.metadata import TranscriptionResolvedDefaultsResponse
 from nola.models import AppConfigDatabase
 
 router = APIRouter(prefix="/api/config", tags=["config"])

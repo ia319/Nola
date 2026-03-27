@@ -5,7 +5,7 @@ from typing import cast
 from pydantic import BaseModel, ConfigDict, Field
 
 from nola.config.common import ConfigMap
-from nola.services.formatters import ExportFormat
+from nola.config.export import ExportFormat
 
 
 class ExportDefaultsUpdateRequest(BaseModel):
