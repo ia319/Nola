@@ -74,6 +74,36 @@ class FakeTaskStore:
         return True
 
 
+class FailingEnqueueTaskStore(FakeTaskStore):
+    """In-memory task store that can fail selected enqueue calls."""
+
+    def __init__(
+        self,
+        tasks: dict[str, dict[str, object]],
+        fail_enqueue_task_ids: set[str],
+    ) -> None:
+        super().__init__(tasks)
+        self.fail_enqueue_task_ids = fail_enqueue_task_ids
+
+    def enqueue(
+        self,
+        task_id: str,
+        file_id: str,
+        priority: int = 0,
+        max_retries: int = 3,
+        options: dict[str, object] | None = None,
+    ) -> None:
+        if task_id in self.fail_enqueue_task_ids:
+            raise RuntimeError("sqlite busy")
+        super().enqueue(
+            task_id=task_id,
+            file_id=file_id,
+            priority=priority,
+            max_retries=max_retries,
+            options=options,
+        )
+
+
 def _base_task(*, task_id: str, file_id: str, status: str) -> dict[str, object]:
     return {
         "id": task_id,
@@ -163,6 +193,43 @@ def test_batch_retry_tasks_returns_mixed_outcomes() -> None:
     assert results[3]["error_code"] == "not_found"
     assert results[4]["error_code"] == "duplicate_task_id"
     assert task_store.get_task("retry-1") is not None
+
+
+def test_batch_retry_tasks_continues_when_enqueue_fails() -> None:
+    file_store = FakeFileStore(
+        files={
+            "f1": {"id": "f1", "filename": "failed-1.mp3"},
+            "f2": {"id": "f2", "filename": "failed-2.mp3"},
+        }
+    )
+    task_store = FailingEnqueueTaskStore(
+        tasks={
+            "failed-1": _base_task(task_id="failed-1", file_id="f1", status="failed"),
+            "failed-2": _base_task(task_id="failed-2", file_id="f2", status="failed"),
+        },
+        fail_enqueue_task_ids={"retry-fail"},
+    )
+
+    generated_ids = deque(["retry-fail", "retry-ok"])
+    payload = batch_retry_tasks(
+        task_store=task_store,
+        file_store=file_store,
+        task_ids=["failed-1", "failed-2"],
+        task_id_factory=generated_ids.popleft,
+    )
+
+    assert payload["action"] == "retry"
+    assert payload["summary"] == {"requested": 2, "succeeded": 1, "failed": 1}
+    results = payload["results"]
+    assert results[0]["task_id"] == "failed-1"
+    assert results[0]["ok"] is False
+    assert "Failed to create retry task" in results[0]["message"]
+    assert "new_task_id" not in results[0]
+    assert results[1]["task_id"] == "failed-2"
+    assert results[1]["ok"] is True
+    assert results[1]["new_task_id"] == "retry-ok"
+    assert task_store.get_task("retry-fail") is None
+    assert task_store.get_task("retry-ok") is not None
 
 
 def test_create_task_raises_when_file_missing() -> None:

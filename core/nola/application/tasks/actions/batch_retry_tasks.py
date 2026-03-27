@@ -50,11 +50,22 @@ def batch_retry_tasks(
             }
 
         next_task_id = task_id_factory() if task_id_factory else str(uuid.uuid4())
-        task_store.enqueue(
-            task_id=next_task_id,
-            file_id=task["file_id"],
-            options=task.get("options"),
-        )
+        try:
+            task_store.enqueue(
+                task_id=next_task_id,
+                file_id=task["file_id"],
+                options=task.get("options"),
+            )
+        except Exception as error:
+            return {
+                "task_id": task_id,
+                "ok": False,
+                "message": f"Failed to create retry task: {error}",
+                "status": status,
+                "file_id": task["file_id"],
+                "filename": filename,
+            }
+
         return {
             "task_id": task_id,
             "ok": True,
