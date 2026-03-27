@@ -944,8 +944,8 @@ class TestExportAPI:
         assert "[Script Info]" in response.text
         assert "Dialogue:" in response.text
 
-    def test_export_invalid_segment_shape_returns_500(self, client):
-        """Return use-case error details when a segment entry is malformed."""
+    def test_export_invalid_segment_shape_returns_400(self, client):
+        """Treat malformed persisted segment shape as no segments available."""
         file_db = get_file_db()
         task_db = get_task_db()
         file_db.create_file(
@@ -969,10 +969,9 @@ class TestExportAPI:
         response = client.get(
             "/api/transcription-tasks/test-invalid-segment/export?format=srt"
         )
-        assert response.status_code == 500
+        assert response.status_code == 400
         detail = response.json()["detail"]
-        assert "Invalid segment[0]" in detail
-        assert "raw=None" in detail
+        assert detail == "No segments available"
 
     def test_export_save_to_disk(self, client):
         """Test exporting with save=true returns JSON with file path."""

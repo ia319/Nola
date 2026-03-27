@@ -1,6 +1,8 @@
 """Repository-level tests for split task storage modules."""
 
 import gc
+import json
+import sqlite3
 import tempfile
 from pathlib import Path
 
@@ -74,3 +76,31 @@ def test_task_store_delete_task_record_only_deletes_terminal_tasks(task_reposito
 
     assert store_repo.delete_task_record("task-001") is True
     assert store_repo.get_task("task-001") is None
+
+
+def test_task_store_get_task_drops_invalid_json_shapes(task_repositories):
+    """get_task() should coerce non-conforming JSON payload shapes to None."""
+    file_db, queue_repo, store_repo = task_repositories
+
+    file_db.create_file("file-001", "audio.wav", "/tmp/audio.wav", 1024)
+    queue_repo.enqueue("task-001", "file-001")
+
+    with sqlite3.connect(queue_repo.db_path) as conn:
+        conn.execute(
+            """
+            UPDATE transcription_tasks
+            SET segments = ?, options = ?
+            WHERE id = ?
+            """,
+            (
+                json.dumps({"start": 0.0, "end": 1.0, "text": "bad-shape"}),
+                json.dumps(["bad-shape"]),
+                "task-001",
+            ),
+        )
+
+    task = store_repo.get_task("task-001")
+
+    assert task is not None
+    assert task["segments"] is None
+    assert task["options"] is None
