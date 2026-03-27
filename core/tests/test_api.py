@@ -1320,6 +1320,109 @@ class TestBatchExportAPI:
             errors = zf.read("_errors.txt").decode()
             assert "nonexistent-task" in errors
 
+    def test_batch_export_hides_internal_exception_details(self, client: TestClient):
+        """Batch error report should avoid exposing raw exception details."""
+        import io
+        import zipfile
+
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="internal-ok-file",
+            filename="internal-ok.mp3",
+            path="/tmp/internal-ok.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="internal-ok-task",
+            file_id="internal-ok-file",
+            options=None,
+        )
+        _claim_pending_task(task_db, "internal-ok-task")
+        task_db.complete(
+            task_id="internal-ok-task",
+            segments=[{"start": 0.0, "end": 1.0, "text": "ok"}],
+            duration=1.0,
+        )
+
+        file_db.create_file(
+            file_id="internal-bad-file",
+            filename="internal-bad.mp3",
+            path="/tmp/internal-bad.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="internal-bad-task",
+            file_id="internal-bad-file",
+            options=None,
+        )
+        _claim_pending_task(task_db, "internal-bad-task")
+        task_db.complete(
+            task_id="internal-bad-task",
+            segments=[{"start": 0.0, "end": 1.0}],
+            duration=1.0,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks/export/batch",
+            json={
+                "task_ids": ["internal-ok-task", "internal-bad-task"],
+                "format": "srt",
+            },
+        )
+
+        assert response.status_code == 200
+
+        zip_buffer = io.BytesIO(response.content)
+        with zipfile.ZipFile(zip_buffer, "r") as zf:
+            errors = zf.read("_errors.txt").decode()
+            assert "internal-bad-task: internal_error" in errors
+            assert "KeyError" not in errors
+            assert "text" not in errors
+
+    def test_batch_export_avoids_errors_filename_collision(self, client: TestClient):
+        """Batch export should avoid duplicate _errors.txt member names in zip."""
+        import io
+        import zipfile
+
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="collision-file",
+            filename="_errors.mp3",
+            path="/tmp/_errors.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="collision-task",
+            file_id="collision-file",
+            options=None,
+        )
+        _claim_pending_task(task_db, "collision-task")
+        task_db.complete(
+            task_id="collision-task",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Collision"}],
+            duration=1.0,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks/export/batch",
+            json={
+                "task_ids": ["collision-task", "missing-task"],
+                "format": "txt",
+            },
+        )
+
+        assert response.status_code == 200
+
+        zip_buffer = io.BytesIO(response.content)
+        with zipfile.ZipFile(zip_buffer, "r") as zf:
+            names = zf.namelist()
+            assert "_errors.txt" in names
+            assert "_errors_1.txt" in names
+
     def test_batch_export_skips_task_with_empty_segments(self, client: TestClient):
         """Skip completed tasks with empty segments and record them as failures."""
         import io
