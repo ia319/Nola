@@ -32,6 +32,17 @@ core/
 ├── nola/                      # Main package
 │   ├── __init__.py            # Version info (v0.1.0)
 │   ├── main.py                # FastAPI entry point
+│   ├── application/           # Application-layer use-cases
+│   │   ├── __init__.py        # Application package exports
+│   │   └── tasks/             # Task use-cases and shared payload contracts
+│   │       ├── __init__.py    # Task use-case exports
+│   │       ├── contracts.py   # Task/file gateway protocols
+│   │       ├── errors.py      # Application-layer error model
+│   │       ├── payloads.py    # Shared task response payload builders
+│   │       ├── types.py       # TypedDict payload contracts
+│   │       ├── actions/       # Write-side use-cases (create/cancel/batch/delete)
+│   │       ├── queries/       # Read-side use-cases (list/detail)
+│   │       └── exports/       # Export use-cases (single/batch)
 │   ├── config/                # Settings, constants, and config modules
 │   │   ├── __init__.py        # Config exports
 │   │   ├── settings.py        # Pydantic Settings (paths, limits, model)
@@ -44,12 +55,18 @@ core/
 │   │   │   ├── __init__.py    # Export config package exports
 │   │   │   ├── defaults.py    # Export defaults resolution helpers
 │   │   │   ├── filenames.py   # Export filename sanitize/unique-write helpers
-│   │   │   └── metadata.py    # Export config response models
-│   │   └── transcription/     # Transcription config metadata/defaults/languages
+│   │   │   ├── metadata.py    # Export config response models
+│   │   │   └── types.py       # Shared export format enum/contracts
+│   │   └── transcription/     # Transcription contracts/defaults/languages/schema
 │   │       ├── __init__.py    # Transcription config package exports
-│   │       ├── metadata.py    # Option schema models and grouped field metadata
+│   │       ├── contracts.py   # Shared transcription option contracts
 │   │       ├── defaults.py    # Engine/effective defaults and sentinel conversion
-│   │       └── languages.py   # Language capability mapping for effective options
+│   │       ├── languages.py   # Language capability mapping for effective options
+│   │       └── schema/        # Schema models/registry/response assembly
+│   │           ├── __init__.py
+│   │           ├── models.py
+│   │           ├── registry.py
+│   │           └── responses.py
 │   ├── common/                # Shared backend helpers
 │   │   ├── __init__.py        # Common helper package exports
 │   │   ├── merge.py           # Recursive deep-merge helper
@@ -64,7 +81,13 @@ core/
 │   │   │   ├── __init__.py    # Route package exports
 │   │   │   ├── config.py      # Config aggregation and defaults endpoints
 │   │   │   ├── files.py       # File upload/management
-│   │   │   └── transcriptions.py  # Task + export endpoints
+│   │   │   ├── transcriptions.py  # Canonical task route composition entry
+│   │   │   └── tasks/         # Task route modules grouped by responsibility
+│   │   │       ├── __init__.py  # Task route package exports
+│   │   │       ├── read.py    # Task list/detail endpoints
+│   │   │       ├── actions.py # Task mutation endpoints
+│   │   │       ├── export.py  # Task export endpoints
+│   │   │       └── _errors.py # Task use-case error mapping helper
 │   │   └── schemas/           # Pydantic request/response models
 │   │       ├── __init__.py    # Schema package exports
 │   │       ├── config.py      # Export defaults update request schema
@@ -81,7 +104,14 @@ core/
 │   │   ├── app_config.py      # AppConfigDatabase for persisted defaults
 │   │   ├── database.py        # Schema & init
 │   │   ├── files.py           # FileDatabase class
-│   │   ├── tasks.py           # TaskDatabase (job queue)
+│   │   ├── tasks.py           # TaskDatabase facade over taskdb repositories
+│   │   ├── taskdb/            # Split repositories and task row contracts
+│   │   │   ├── __init__.py    # taskdb package exports
+│   │   │   ├── base.py        # Shared repository base + connection helper
+│   │   │   ├── query_helpers.py # Search query helper functions
+│   │   │   ├── task_queue.py  # Queue state transitions and worker coordination
+│   │   │   ├── task_store.py  # Query/list/count/cancel/delete data access
+│   │   │   └── types.py       # Task TypedDict/types/constants
 │   │   └── utils/             # SQLite utility module
 │   │       ├── __init__.py    # Utility exports
 │   │       └── db.py          # sqlite version and connection checks
@@ -104,8 +134,11 @@ core/
     ├── test_engines.py        # Engine tests
     ├── test_export_filenames.py # Export filename helper tests
     ├── test_models.py         # Database tests
-    ├── test_transcription_config.py # Transcription metadata/defaults tests
+    ├── test_task_repositories.py # taskdb repository tests
+    ├── test_transcription_config.py # Transcription schema/defaults tests
+    ├── test_transcription_contracts.py # Transcription contract consistency tests
     ├── test_transcription_schemas.py # Request schema validation tests
+    ├── test_task_use_cases.py # Application-layer task use-case tests
     ├── test_worker.py         # Worker tests
     └── test_formatters.py     # Formatter tests
 ```
@@ -151,7 +184,11 @@ Data persistence layer (SQLite):
 - `database.py`: Schema initialization, connection management, and foreign key enforcement.
 - `app_config.py`: `AppConfigDatabase` for persisted application defaults under `app_config`.
 - `files.py`: `FileDatabase` for managing audio file metadata. Uses `FileRow` TypedDict.
-- `tasks.py`: `TaskDatabase` implementing the production-grade job queue. Uses `TaskRowRaw`/`TaskRow` TypedDicts.
+- `tasks.py`: Keep `TaskDatabase` as facade and delegate to split repositories.
+- `taskdb/task_queue.py`: Handle enqueue/dequeue/heartbeat/complete/fail/requeue flows; clear stale `error` on successful completion; reset `progress` when requeueing failed/timeout/dead-worker tasks.
+- `taskdb/task_store.py`: Handle get/list/count/cancel/delete persistence queries.
+- `taskdb/query_helpers.py`: Keep query helper functions isolated from repository classes; validate decoded JSON shapes for `segments` and `options` before casting task rows.
+- `taskdb/types.py`: Keep shared task statuses, sort fields, and TypedDict contracts.
 - `utils/db.py`: Database utilities (e.g., `ensure_sqlite_version`).
 
 ### nola/common/
@@ -172,12 +209,26 @@ REST API layer:
 - `deps.py`: Dependency injection for database instances (singletons)
 - `routes/config.py`: Aggregated config endpoints, transcription defaults management, and export defaults management.
 - `routes/files.py`: File upload/list/delete with validation. All endpoints use `response_model`.
-- `routes/transcriptions.py`: Task CRUD + export endpoints. Expose `/api/transcription-tasks/*` as canonical routes and keep `/api/transcriptions/*` as legacy compatibility routes.
+- `routes/transcriptions.py`: Canonical task router composition entry. Mount read/actions/export task route modules under `/api/transcription-tasks`.
+- `routes/tasks/read.py`: Read endpoints for task list/detail; keep sync handlers for sync DB dependencies.
+- `routes/tasks/actions.py`: Mutation endpoints for create/cancel/batch/retry/delete-record.
+- `routes/tasks/export.py`: Single/batch export endpoints and OpenAPI response metadata; map use-case output to FastAPI `Response`/`StreamingResponse`.
+- `routes/tasks/_errors.py`: Convert task use-case errors into HTTP exceptions.
 - `schemas/config.py`: Export defaults update request schema.
 - `schemas/files.py`: 8 Pydantic response models (`FileResponse`, `FileListResponse`, etc.)
 - `schemas/responses.py`: 7 Pydantic response models (`TaskDetailResponse`, `CreateTaskResponse`, etc.)
 - `schemas/transcriptions.py`: Request models (`TranscriptionRequest`, `BatchTaskActionRequest`, `BatchExportRequest`, `TranscriptionDefaultsUpdateRequest`) with typed `VadParametersRequest` and `extra=forbid`
 - `schemas/validators.py`: Reusable validation functions for language, task options, temperature, and nested `vad_parameters` keys
+
+### nola/application/
+Application-layer orchestration:
+- `tasks/contracts.py`: Protocol contracts for task/file gateways used by use-cases.
+- `tasks/types.py`: TypedDict payload contracts for task use-case outputs.
+- `tasks/payloads.py`: Shared task payload builders (`to_task_summary_payload`, batch summary builder).
+- `tasks/actions/`: Write-side use-cases (`create_task`, `cancel_task`, `batch_cancel_tasks`, `batch_retry_tasks`, `delete_task_record`).
+- `tasks/actions/_batch_action.py`: Reuse batch execution skeleton; keep per-task result semantics; return item-level failures instead of aborting whole batch.
+- `tasks/queries/`: Read-side use-cases (`list_tasks`, `get_task`).
+- `tasks/exports/`: Keep export use-cases (`export_task`, `batch_export_tasks`) and export option resolver; return framework-agnostic `BatchExportArchive` from batch use-case; map `save=true` write-path I/O failures to stable `TaskUseCaseError` details.
 
 ### nola/services/
 Background services:
@@ -215,15 +266,19 @@ FastAPI entry point with lifespan management:
 - `DELETE /api/transcription-tasks/{task_id}/record` - Delete terminal task record
 - `GET /api/transcription-tasks/{task_id}/export` - Export as subtitle (SRT/VTT/TXT/ASS)
 - `POST /api/transcription-tasks/export/batch` - Batch export as ZIP
-- Keep `/api/transcriptions/*` routes as deprecated compatibility aliases.
 
 ### nola/config/
 Configuration and constants:
 - `settings.py`: Pydantic Settings (data_dir, exports_dir, max_file_size, model defaults, host/port)
 - `constants.py`: Validation constants (MIME/extension allowlists, language set, batch limits via `MAX_BATCH_TASK_IDS`)
 - `common/`: Shared config patch helper and config value types
-- `transcription/`: Backend source of truth for transcription metadata, defaults, and language options
-- `export/`: Backend source of truth for export defaults and export filename handling
+- `transcription/contracts.py`: Keep shared option keys/contracts for API validators and schema assembly.
+- `transcription/schema/models.py`: Keep field/group schema models; enforce numeric invariants (`min <= max`, `step > 0`) and select option-source one-of rules.
+- `transcription/schema/registry.py`: Build transcription schema registry and grouped response view.
+- `transcription/schema/responses.py`: Assemble config response models and defaults response payloads.
+- `transcription/defaults.py` + `transcription/languages.py`: Resolve effective defaults and effective language list.
+- `export/types.py`: Keep shared `ExportFormat` enum for config and formatter layers.
+- `export/`: Keep export defaults and filename handling without introducing `config -> services` reverse dependency.
 
 ### Transcription Rules
 Apply config-driven schema as the only source for frontend option metadata and task option values.
@@ -231,10 +286,16 @@ Apply defaults precedence as `engine defaults < persisted app defaults < task ov
 Treat explicit `null` in `PATCH /api/config/transcription/defaults` as remove-override semantics.
 Merge nested defaults objects in PATCH flows without replacing untouched subkeys.
 Reject unknown top-level options and unknown `vad_parameters` keys at request validation with `422`.
-Apply the same schema-level range validation in `POST /api/transcription-tasks` and `PATCH /api/config/transcription/defaults`, and return `422` for out-of-range values.
+Keep `engines/base.py` as pass-through for option values; do not add engine-side strict range enforcement.
+Keep `api/schemas/*` as coarse guard; block clearly invalid payloads and return `422`.
+Keep `config/transcription/schema/*` as UI constraint source; ensure UI ranges remain a subset of API acceptance.
+Keep API coarse guards and UI schema constraints independent; do not force exact numeric-range equality across both layers.
 Serialize infinity as `"inf"` at API boundaries and deserialize it back before engine invocation.
-Use `/api/transcription-tasks/*` as canonical task API paths and keep `/api/transcriptions/*` for compatibility.
+Use only `/api/transcription-tasks/*` for task APIs; do not add `/api/transcriptions/*` runtime aliases.
 Apply export defaults precedence as `built-in export defaults < persisted export defaults < request overrides`.
+Map export write-path `OSError` and `UnicodeError` failures to stable API error details; do not widen this mapping to catch-all exceptions.
+Keep batch export error output sanitized; write stable task-level reasons to `_errors.txt` and do not write raw exception text into archives.
+Record `no_segments` as task-level batch export failure; return `400` only when every selected task fails.
 
 ### nola/utils/
 Utility functions:
@@ -294,12 +355,12 @@ poetry run python -m nola.services.worker
 ## Architecture
 
 ```
-Client ──▶ FastAPI Server ──▶ SQLite DB ◀── Worker Process
-                                  │              │
-                                  │       FasterWhisperEngine
-                                  ▼
-                            data/nola.db
-                            data/uploads/
+Client ──▶ FastAPI routes ──▶ application use-cases ──▶ SQLite DB ◀── Worker Process
+                                   │                          │              │
+                                   │                          │       FasterWhisperEngine
+                                   ▼                          ▼
+                              API schemas               data/nola.db
+                                                        data/uploads/
 ```
 
 ---
@@ -342,9 +403,6 @@ Client ──▶ FastAPI Server ──▶ SQLite DB ◀── Worker Process
 | `/api/transcription-tasks/{task_id}/record` | DELETE | - | `DeleteTaskRecordResponse` |
 | `/api/transcription-tasks/{task_id}/export` | GET | `?format=&include_timestamps=&filename=&save=` | Binary or `SavedExportResponse` |
 | `/api/transcription-tasks/export/batch` | POST | `BatchExportRequest` | ZIP binary |
-
-Legacy compatibility:
-- Keep `/api/transcriptions/*` with the same semantics and mark those routes deprecated.
 
 ---
 
