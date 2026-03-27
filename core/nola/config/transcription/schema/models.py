@@ -100,12 +100,14 @@ class SelectFieldSchema(BaseModel):
     @model_validator(mode="after")
     def validate_option_source(self) -> SelectFieldSchema:
         """Require exactly one source for selectable options."""
-        has_inline_options = bool(self.options)
+        has_inline_options = self.options is not None
         has_dynamic_source = self.options_source is not None
         if has_inline_options == has_dynamic_source:
             raise ValueError(
                 "select field must define exactly one of options or options_source"
             )
+        if has_inline_options and self.options == []:
+            raise ValueError("select field options must not be empty")
         return self
 
 
