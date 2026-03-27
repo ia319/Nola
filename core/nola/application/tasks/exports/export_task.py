@@ -70,15 +70,21 @@ def export_task(
                 ),
             ) from error
 
-    effective_format, effective_include_timestamps = resolve_export_options(
-        config_store=config_store,
-        requested_format=requested_format,
-        requested_include_timestamps=requested_include_timestamps,
-    )
-    formatter = get_formatter(
-        effective_format,
-        include_timestamps=effective_include_timestamps,
-    )
+    try:
+        effective_format, effective_include_timestamps = resolve_export_options(
+            config_store=config_store,
+            requested_format=requested_format,
+            requested_include_timestamps=requested_include_timestamps,
+        )
+        formatter = get_formatter(
+            effective_format,
+            include_timestamps=effective_include_timestamps,
+        )
+    except (ValueError, KeyError) as error:
+        raise TaskUseCaseError(
+            status_code=500,
+            detail="Invalid export formatter configuration",
+        ) from error
     content = formatter.format(segment_data)
 
     file_row = file_store.get_file(task["file_id"])

@@ -58,15 +58,21 @@ def batch_export_tasks(
     used_names: set[str] = set()
     success_count = 0
 
-    effective_format, effective_include_timestamps = resolve_export_options(
-        config_store=config_store,
-        requested_format=requested_format,
-        requested_include_timestamps=requested_include_timestamps,
-    )
-    formatter = get_formatter(
-        effective_format,
-        include_timestamps=effective_include_timestamps,
-    )
+    try:
+        effective_format, effective_include_timestamps = resolve_export_options(
+            config_store=config_store,
+            requested_format=requested_format,
+            requested_include_timestamps=requested_include_timestamps,
+        )
+        formatter = get_formatter(
+            effective_format,
+            include_timestamps=effective_include_timestamps,
+        )
+    except (ValueError, KeyError) as error:
+        raise TaskUseCaseError(
+            status_code=500,
+            detail="Invalid export formatter configuration",
+        ) from error
 
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         for task_id in task_ids:
