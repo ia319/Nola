@@ -7,6 +7,12 @@ from pydantic import ValidationError
 
 from nola.api.schemas import TranscriptionDefaultsUpdateRequest, TranscriptionRequest
 from nola.config.transcription import get_transcription_param_schema
+from nola.config.transcription.schema.models import (
+    NumberFieldSchema,
+    SelectFieldSchema,
+    SelectOptionSchema,
+    SliderFieldSchema,
+)
 from nola.engines.base import TranscribeOptions
 
 
@@ -201,3 +207,96 @@ class TestTranscriptionSchemas:
 
         with pytest.raises(ValidationError):
             TranscriptionDefaultsUpdateRequest(language_detection_segments=0)
+
+
+class TestTranscriptionSchemaMetadataModels:
+    """Validate static metadata model invariants."""
+
+    def test_slider_rejects_inverted_bounds(self):
+        """Reject slider definitions where min exceeds max."""
+        with pytest.raises(ValidationError, match="slider field min"):
+            SliderFieldSchema(
+                key="beam_size",
+                label_key="options.field.beamSize",
+                type="slider",
+                min=10,
+                max=1,
+                step=1,
+            )
+
+    def test_slider_rejects_non_positive_step(self):
+        """Reject slider definitions where step is zero or negative."""
+        with pytest.raises(ValidationError, match="slider field step"):
+            SliderFieldSchema(
+                key="beam_size",
+                label_key="options.field.beamSize",
+                type="slider",
+                min=1,
+                max=10,
+                step=0,
+            )
+
+    def test_number_rejects_invalid_bounds_and_step(self):
+        """Reject number definitions with invalid bounds or step."""
+        with pytest.raises(ValidationError, match="number field min"):
+            NumberFieldSchema(
+                key="chunk_length",
+                label_key="options.field.chunkLength",
+                type="number",
+                min=5,
+                max=1,
+            )
+
+        with pytest.raises(ValidationError, match="number field step"):
+            NumberFieldSchema(
+                key="chunk_length",
+                label_key="options.field.chunkLength",
+                type="number",
+                step=0,
+            )
+
+    def test_select_requires_exactly_one_option_source(self):
+        """Reject select definitions that provide zero or multiple option sources."""
+        with pytest.raises(ValidationError, match="exactly one"):
+            SelectFieldSchema(
+                key="task",
+                label_key="options.task.label",
+                type="select",
+            )
+
+        with pytest.raises(ValidationError, match="exactly one"):
+            SelectFieldSchema(
+                key="task",
+                label_key="options.task.label",
+                type="select",
+                options=[
+                    SelectOptionSchema(
+                        value="transcribe",
+                        label_key="options.task.transcribe",
+                    )
+                ],
+                options_source="effective_languages",
+            )
+
+    def test_select_accepts_single_option_source(self):
+        """Accept select definitions with exactly one option source."""
+        inline = SelectFieldSchema(
+            key="task",
+            label_key="options.task.label",
+            type="select",
+            options=[
+                SelectOptionSchema(
+                    value="transcribe",
+                    label_key="options.task.transcribe",
+                )
+            ],
+        )
+        dynamic = SelectFieldSchema(
+            key="language",
+            label_key="options.language.label",
+            type="select",
+            options_source="effective_languages",
+        )
+
+        assert inline.options is not None
+        assert dynamic.options_source == "effective_languages"
