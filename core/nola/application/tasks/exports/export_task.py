@@ -101,12 +101,18 @@ def export_task(
     )
 
     if save:
-        settings.exports_dir.mkdir(parents=True, exist_ok=True)
-        export_path = write_unique_export_text(
-            settings.exports_dir,
-            export_filename,
-            content,
-        )
+        try:
+            settings.exports_dir.mkdir(parents=True, exist_ok=True)
+            export_path = write_unique_export_text(
+                settings.exports_dir,
+                export_filename,
+                content,
+            )
+        except (OSError, UnicodeError) as error:
+            raise TaskUseCaseError(
+                status_code=500,
+                detail="Failed to save export file",
+            ) from error
         return JSONResponse(content={"saved_path": f"exports/{export_path.name}"})
 
     # Sanitize for ASCII-safe header value (RFC 6266).

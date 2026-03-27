@@ -1040,6 +1040,50 @@ class TestExportAPI:
                 assert "saved_path" in data
                 assert data["saved_path"].endswith(".srt")
 
+    def test_export_save_io_failure_returns_controlled_500(self, client: TestClient):
+        """Map save-path I/O failures to controlled API responses."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-save-io-failure",
+            filename="audio.mp3",
+            path="/tmp/audio.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-save-io-failure",
+            file_id="test-file-save-io-failure",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-save-io-failure")
+        task_db.complete(
+            task_id="test-save-io-failure",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Save failure"}],
+            duration=1.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            exports_path = Path(tmpdir) / "exports"
+            with (
+                patch.object(
+                    Settings,
+                    "exports_dir",
+                    new_callable=PropertyMock,
+                    return_value=exports_path,
+                ),
+                patch(
+                    "nola.application.tasks.exports.export_task.write_unique_export_text",
+                    side_effect=OSError("disk full"),
+                ),
+            ):
+                response = client.get(
+                    "/api/transcription-tasks/test-save-io-failure/export"
+                    "?format=srt&save=true"
+                )
+
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to save export file"
+
     def test_export_allows_custom_single_filename(self, client: TestClient):
         """Single export should accept a custom filename and normalize extension."""
         file_db = get_file_db()
