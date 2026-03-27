@@ -24,7 +24,7 @@ StatusFilter = Literal["pending", "processing", "completed", "failed", "cancelle
 
 
 @router.get("/", response_model=TaskListResponse)
-async def list_transcriptions(
+def list_transcriptions(
     status: StatusFilter | None = Query(None, description="Filter by status"),
     limit: int = Query(50, ge=1, le=100, description="Max results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
@@ -61,7 +61,7 @@ async def list_transcriptions(
 
 
 @router.get("/{task_id}", response_model=TaskDetailResponse)
-async def get_transcription(task_id: str) -> TaskDetailPayload:
+def get_transcription(task_id: str) -> TaskDetailPayload:
     """Get transcription task status and result.
 
     Args:

@@ -1,5 +1,7 @@
 """Task export endpoints."""
 
+import io
+
 from fastapi import APIRouter, Query
 from fastapi.responses import Response, StreamingResponse
 
@@ -8,6 +10,7 @@ from nola.api.routes.tasks._errors import raise_http_error
 from nola.api.schemas import BatchExportRequest, SavedExportResponse
 from nola.application.tasks.errors import TaskUseCaseError
 from nola.application.tasks.exports import batch_export_tasks, export_task
+from nola.application.tasks.exports.batch_export_tasks import BatchExportArchive
 from nola.config.export import ExportFormat
 from nola.services.formatters import list_export_content_types
 
@@ -104,7 +107,7 @@ async def batch_export(request: BatchExportRequest) -> Response:
     Failed tasks are skipped and logged in _errors.txt within the archive.
     """
     try:
-        return batch_export_tasks(
+        result: BatchExportArchive = batch_export_tasks(
             task_store=get_task_db(),
             file_store=get_file_db(),
             config_store=get_app_config_db(),
@@ -112,6 +115,13 @@ async def batch_export(request: BatchExportRequest) -> Response:
             requested_format=request.format,
             requested_include_timestamps=request.include_timestamps,
             zip_name=request.zip_name,
+        )
+        return StreamingResponse(
+            io.BytesIO(result.data),
+            media_type=result.media_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{result.filename}"'
+            },
         )
     except TaskUseCaseError as error:
         raise_http_error(error)
