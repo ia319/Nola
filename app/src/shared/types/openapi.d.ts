@@ -124,7 +124,8 @@ export interface paths {
      * @description List all transcription tasks.
      *
      *     Args:
-     *         status: Optional status filter (pending, processing, completed, failed)
+     *         status: Optional status filter
+     *             (pending, processing, completed, failed, cancelled)
      *         limit: Maximum number of results
      *         offset: Pagination offset
      *         q: Optional filename search keyword
