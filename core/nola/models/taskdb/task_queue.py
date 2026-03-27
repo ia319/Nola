@@ -131,7 +131,7 @@ class TaskQueueRepository(TaskRepositoryBase):
                     """
                     UPDATE transcription_tasks
                     SET status = ?, segments = ?, duration = ?,
-                        progress = 100.0, completed_at = ?
+                        progress = 100.0, error = NULL, completed_at = ?
                     WHERE id = ? AND status = ?
                     """,
                     (
@@ -165,7 +165,8 @@ class TaskQueueRepository(TaskRepositoryBase):
                         """
                         UPDATE transcription_tasks
                         SET status = ?, retry_count = retry_count + 1,
-                            error = ?, worker_id = NULL, started_at = NULL
+                            error = ?, worker_id = NULL, started_at = NULL,
+                            last_heartbeat = NULL, progress = 0.0
                         WHERE id = ? AND retry_count < max_retries AND status = ?
                         """,
                         (
@@ -222,7 +223,8 @@ class TaskQueueRepository(TaskRepositoryBase):
                     UPDATE transcription_tasks
                     SET status = ?, worker_id = NULL, started_at = NULL,
                         retry_count = retry_count + 1,
-                        error = 'Task timeout - requeued'
+                        error = 'Task timeout - requeued',
+                        last_heartbeat = NULL, progress = 0.0
                     WHERE status = ?
                       AND started_at < ?
                       AND retry_count < max_retries
@@ -275,7 +277,8 @@ class TaskQueueRepository(TaskRepositoryBase):
                     UPDATE transcription_tasks
                     SET status = ?, worker_id = NULL, started_at = NULL,
                         retry_count = retry_count + 1,
-                        error = 'Worker heartbeat timeout - requeued'
+                        error = 'Worker heartbeat timeout - requeued',
+                        last_heartbeat = NULL, progress = 0.0
                     WHERE status = ?
                       AND last_heartbeat < ?
                       AND retry_count < max_retries

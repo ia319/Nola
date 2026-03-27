@@ -114,6 +114,22 @@ class TestTaskDatabase:
         assert len(task["segments"]) == 1
         assert task["completed_at"] is not None
 
+    def test_complete_task_clears_stale_error_after_retry(self, test_db):
+        """complete() should clear previous failure error after retry succeeds."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+        task_db.enqueue("task-001", "file-001", max_retries=3)
+        task_db.dequeue("worker-001")
+        task_db.fail("task-001", "Temporary failure", should_retry=True)
+
+        task_db.dequeue("worker-002")
+        task_db.complete("task-001", [{"start": 0.0, "end": 1.0, "text": "ok"}], 1.0)
+
+        task = task_db.get_task("task-001")
+        assert task["status"] == TaskStatus.COMPLETED.value
+        assert task["error"] is None
+
     def test_fail_with_retry(self, test_db):
         """Test task failure with retry."""
         file_db, task_db = test_db
@@ -129,6 +145,23 @@ class TestTaskDatabase:
         assert task["status"] == TaskStatus.PENDING.value  # Requeued
         assert task["retry_count"] == 1
         assert task["error"] == "Test error"
+
+    def test_fail_with_retry_resets_progress_and_heartbeat(self, test_db):
+        """Retry requeue from fail() should clear stale processing runtime fields."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+        task_db.enqueue("task-001", "file-001", max_retries=3)
+        task_db.dequeue("worker-001")
+        task_db.heartbeat("task-001", progress=82.0)
+
+        result = task_db.fail("task-001", "Test error", should_retry=True)
+        task = task_db.get_task("task-001")
+
+        assert result is True
+        assert task["status"] == TaskStatus.PENDING.value
+        assert task["progress"] == 0.0
+        assert task["last_heartbeat"] is None
 
     def test_fail_max_retries_reached(self, test_db):
         """Test task failure when max retries are reached."""
@@ -189,6 +222,7 @@ class TestTaskDatabase:
         file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
         task_db.enqueue("task-001", "file-001")
         task_db.dequeue("worker-001")
+        task_db.heartbeat("task-001", progress=73.0)
 
         # Requeue with zero timeout (immediate)
         count = task_db.requeue_timeout_tasks(timeout_seconds=0)
@@ -198,6 +232,27 @@ class TestTaskDatabase:
         assert task["status"] == TaskStatus.PENDING.value
         assert "timeout" in task["error"].lower()
         assert task["retry_count"] == 1  # Verify retry count incremented
+        assert task["progress"] == 0.0
+        assert task["last_heartbeat"] is None
+
+    def test_requeue_dead_workers_resets_progress_and_heartbeat(self, test_db):
+        """Dead-worker requeue should clear stale processing runtime fields."""
+        file_db, task_db = test_db
+
+        file_db.create_file("file-001", "test.mp3", "/tmp/test.mp3", 1024)
+        task_db.enqueue("task-001", "file-001")
+        task_db.dequeue("worker-001")
+        task_db.heartbeat("task-001", progress=91.0)
+
+        count = task_db.requeue_dead_workers(heartbeat_timeout=0)
+        assert count == 1
+
+        task = task_db.get_task("task-001")
+        assert task["status"] == TaskStatus.PENDING.value
+        assert "heartbeat timeout" in task["error"].lower()
+        assert task["retry_count"] == 1
+        assert task["progress"] == 0.0
+        assert task["last_heartbeat"] is None
 
     def test_requeue_poison_pill(self, test_db):
         """Test that poison pill tasks are marked FAILED after max retries."""
