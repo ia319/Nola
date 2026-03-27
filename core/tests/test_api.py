@@ -944,6 +944,36 @@ class TestExportAPI:
         assert "[Script Info]" in response.text
         assert "Dialogue:" in response.text
 
+    def test_export_invalid_segment_shape_returns_500(self, client):
+        """Return use-case error details when a segment entry is malformed."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="test-file-invalid-segment",
+            filename="invalid.mp3",
+            path="/tmp/invalid.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="test-invalid-segment",
+            file_id="test-file-invalid-segment",
+            options=None,
+        )
+        _claim_pending_task(task_db, "test-invalid-segment")
+        task_db.complete(
+            task_id="test-invalid-segment",
+            segments=[None],
+            duration=1.0,
+        )
+
+        response = client.get(
+            "/api/transcription-tasks/test-invalid-segment/export?format=srt"
+        )
+        assert response.status_code == 500
+        detail = response.json()["detail"]
+        assert "Invalid segment[0]" in detail
+        assert "raw=None" in detail
+
     def test_export_save_to_disk(self, client):
         """Test exporting with save=true returns JSON with file path."""
         file_db = get_file_db()

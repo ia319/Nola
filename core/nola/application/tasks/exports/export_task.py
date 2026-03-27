@@ -58,7 +58,10 @@ def export_task(
                 )
             )
         except (KeyError, TypeError, ValueError) as error:
-            context = f"start={segment.get('start')}, end={segment.get('end')}"
+            if isinstance(segment, dict):
+                context = f"start={segment.get('start')}, end={segment.get('end')}"
+            else:
+                context = f"raw={segment!r}"
             raise TaskUseCaseError(
                 status_code=500,
                 detail=(
