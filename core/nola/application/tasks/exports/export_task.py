@@ -82,7 +82,12 @@ def export_task(
     content = formatter.format(segment_data)
 
     file_row = file_store.get_file(task["file_id"])
-    fallback_name = file_row["filename"] if file_row else task_id
+    raw_filename = file_row.get("filename") if file_row else None
+    fallback_name = (
+        raw_filename
+        if isinstance(raw_filename, str) and raw_filename.strip()
+        else task_id
+    )
     export_filename = build_export_filename(
         requested_name=requested_filename,
         fallback_name=fallback_name,
