@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class SliderFieldSchema(BaseModel):
@@ -17,6 +17,15 @@ class SliderFieldSchema(BaseModel):
     max: float
     step: float
     depends_on: str | None = None
+
+    @model_validator(mode="after")
+    def validate_numeric_bounds(self) -> SliderFieldSchema:
+        """Keep slider range and step definitions valid."""
+        if self.min > self.max:
+            raise ValueError("slider field min must be less than or equal to max")
+        if self.step <= 0:
+            raise ValueError("slider field step must be greater than zero")
+        return self
 
 
 class SwitchFieldSchema(BaseModel):
@@ -39,6 +48,15 @@ class NumberFieldSchema(BaseModel):
     step: float | None = None
     depends_on: str | None = None
     special_values: list[str] | None = None
+
+    @model_validator(mode="after")
+    def validate_numeric_bounds(self) -> NumberFieldSchema:
+        """Keep numeric range and step definitions valid when provided."""
+        if self.min is not None and self.max is not None and self.min > self.max:
+            raise ValueError("number field min must be less than or equal to max")
+        if self.step is not None and self.step <= 0:
+            raise ValueError("number field step must be greater than zero")
+        return self
 
 
 class NumberListFieldSchema(BaseModel):
@@ -78,6 +96,17 @@ class SelectFieldSchema(BaseModel):
     options: list[SelectOptionSchema] | None = None
     options_source: Literal["effective_languages"] | None = None
     depends_on: str | None = None
+
+    @model_validator(mode="after")
+    def validate_option_source(self) -> SelectFieldSchema:
+        """Require exactly one source for selectable options."""
+        has_inline_options = bool(self.options)
+        has_dynamic_source = self.options_source is not None
+        if has_inline_options == has_dynamic_source:
+            raise ValueError(
+                "select field must define exactly one of options or options_source"
+            )
+        return self
 
 
 OptionFieldSchema = Annotated[
