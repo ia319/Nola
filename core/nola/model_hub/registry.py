@@ -197,12 +197,38 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
     ),
 )
 
-_MODEL_BY_ID: dict[str, ModelInfo] = {}
-_MODEL_BY_REPO_ID = {model.repo_id: model for model in _REGISTERED_MODELS}
 
-for _model in _REGISTERED_MODELS:
-    for _lookup_id in (_model.model_id, *_model.aliases):
-        _MODEL_BY_ID[_lookup_id] = _model
+def _build_model_indexes(
+    models: tuple[ModelInfo, ...],
+) -> tuple[dict[str, ModelInfo], dict[str, ModelInfo]]:
+    """Build stable lookup indexes and reject duplicate curated entries."""
+    model_by_id: dict[str, ModelInfo] = {}
+    model_by_repo_id: dict[str, ModelInfo] = {}
+
+    for model in models:
+        existing_repo_model = model_by_repo_id.get(model.repo_id)
+        if existing_repo_model is not None:
+            raise ValueError(
+                "Duplicate model repo_id "
+                f"{model.repo_id!r} for {existing_repo_model.model_id!r} "
+                f"and {model.model_id!r}"
+            )
+        model_by_repo_id[model.repo_id] = model
+
+        for lookup_id in (model.model_id, *model.aliases):
+            existing_lookup_model = model_by_id.get(lookup_id)
+            if existing_lookup_model is not None:
+                raise ValueError(
+                    "Duplicate model lookup id "
+                    f"{lookup_id!r} for {existing_lookup_model.model_id!r} "
+                    f"and {model.model_id!r}"
+                )
+            model_by_id[lookup_id] = model
+
+    return model_by_id, model_by_repo_id
+
+
+_MODEL_BY_ID, _MODEL_BY_REPO_ID = _build_model_indexes(_REGISTERED_MODELS)
 
 
 def list_models() -> list[ModelInfo]:

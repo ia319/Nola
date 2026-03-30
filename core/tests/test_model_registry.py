@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from nola.model_hub import (
     get_model,
     get_model_by_repo_id,
@@ -10,7 +12,30 @@ from nola.model_hub import (
     list_models,
     require_model,
 )
+from nola.model_hub.contracts import ModelInfo
 from nola.model_hub.errors import UnknownModelError
+from nola.model_hub.registry import _build_model_indexes
+
+
+def _make_model(
+    model_id: str,
+    repo_id: str,
+    *,
+    aliases: tuple[str, ...] = (),
+) -> ModelInfo:
+    """Create one minimal model entry for registry validation tests."""
+    return ModelInfo(
+        model_id=model_id,
+        name=model_id,
+        repo_id=repo_id,
+        runtime="faster-whisper",
+        languages="multilingual",
+        size_bytes=1,
+        speed_rank=1,
+        accuracy_rank=1,
+        description="test entry",
+        aliases=aliases,
+    )
 
 
 def test_list_models_returns_canonical_ids_without_aliases() -> None:
@@ -57,6 +82,28 @@ def test_registry_marks_distilled_large_models_as_english_only() -> None:
     assert require_model("distil-large-v2").languages == "english-only"
     assert require_model("distil-large-v3").languages == "english-only"
     assert require_model("distil-large-v3.5").languages == "english-only"
+
+
+def test_build_model_indexes_rejects_duplicate_lookup_ids() -> None:
+    """Fail fast when two curated entries resolve to the same lookup id."""
+    models = (
+        _make_model("tiny", "repo/tiny"),
+        _make_model("small", "repo/small", aliases=("tiny",)),
+    )
+
+    with pytest.raises(ValueError, match="Duplicate model lookup id"):
+        _build_model_indexes(models)
+
+
+def test_build_model_indexes_rejects_duplicate_repo_ids() -> None:
+    """Fail fast when two curated entries share one repository id."""
+    models = (
+        _make_model("tiny", "repo/shared"),
+        _make_model("small", "repo/shared"),
+    )
+
+    with pytest.raises(ValueError, match="Duplicate model repo_id"):
+        _build_model_indexes(models)
 
 
 def test_require_model_raises_stable_domain_error_for_unknown_id() -> None:
