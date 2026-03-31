@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
 
 from fastapi import APIRouter, Response, status
 
@@ -11,8 +12,10 @@ from nola.api.schemas import (
     ExportDefaultsUpdateRequest,
     TranscriptionDefaultsUpdateRequest,
 )
+from nola.api.schemas.models import ModelConfigResponse
 from nola.config import settings
 from nola.config.common import apply_override_patch
+from nola.config.common.types import ConfigMap
 from nola.config.export import (
     EXPORT_CONFIG_PREFIX,
     ExportConfigResponse,
@@ -38,18 +41,63 @@ from nola.config.transcription import (
 from nola.config.transcription import (
     get_effective_defaults as get_effective_transcription_defaults,
 )
+from nola.model_hub import get_model, resolve_model_dir
 from nola.models import AppConfigDatabase
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
 
-def _build_engine_config() -> EngineConfigResponse:
+def _canonicalize(raw_model_id: str) -> str:
+    """Resolve an alias to its canonical model_id, pass-through if unknown."""
+    model = get_model(raw_model_id)
+    return model.model_id if model is not None else raw_model_id
+
+
+def _resolve_runtime_model_id(config_db: AppConfigDatabase) -> str:
+    """Return the canonical model id reflected by runtime config APIs."""
+    worker_state = config_db.get_all("worker.")
+    last_loaded = worker_state.get("last_loaded_model_id")
+    if isinstance(last_loaded, str):
+        model = get_model(last_loaded)
+        if model is not None:
+            return model.model_id
+    return _canonicalize(settings.model_size)
+
+
+def _resolve_configured_model_id(config_db: AppConfigDatabase) -> str:
+    """Return the canonical user-configured model id for next startup."""
+    model_config = config_db.get_all("model.")
+    configured = model_config.get("configured_model_id")
+    if isinstance(configured, str):
+        model = get_model(configured)
+        if model is not None:
+            return model.model_id
+    return _canonicalize(settings.model_size)
+
+
+def _compute_restart_required(
+    configured_model_id: str,
+    effective_model_dir: Path,
+    worker_state: ConfigMap,
+) -> bool:
+    """Determine whether the Worker needs a restart to apply config changes."""
+    last_loaded_raw = worker_state.get("last_loaded_model_id")
+    last_loaded_dir = worker_state.get("last_loaded_model_dir")
+    if not isinstance(last_loaded_raw, str) or not isinstance(last_loaded_dir, str):
+        return False
+    return (
+        configured_model_id != _canonicalize(last_loaded_raw)
+        or str(effective_model_dir) != last_loaded_dir
+    )
+
+
+def _build_engine_config(runtime_model_id: str) -> EngineConfigResponse:
     """Project settings into the public engine-config response."""
     return EngineConfigResponse(
-        model_size=settings.model_size,
+        model_size=runtime_model_id,
         device=settings.device,
         compute_type=settings.compute_type,
-        is_multilingual=is_multilingual(settings.model_size),
+        is_multilingual=is_multilingual(runtime_model_id),
     )
 
 
@@ -67,10 +115,37 @@ def _to_export_resolved_defaults(
     return ExportResolvedDefaultsResponse.model_validate(dict(defaults))
 
 
+def _build_model_config(config_db: AppConfigDatabase) -> ModelConfigResponse:
+    """Assemble the model sub-field for the aggregated config response."""
+    configured_model_id = _resolve_configured_model_id(config_db)
+    worker_state = config_db.get_all("worker.")
+    last_loaded = worker_state.get("last_loaded_model_id")
+    last_loaded_model_id = (
+        _canonicalize(last_loaded) if isinstance(last_loaded, str) else None
+    )
+
+    model_config = config_db.get_all("model.")
+    db_model_dir = model_config.get("configured_model_dir")
+    effective_model_dir, _ = resolve_model_dir(
+        settings.model_dir,
+        db_model_dir if isinstance(db_model_dir, str) else None,
+        settings.default_model_dir,
+    )
+
+    return ModelConfigResponse(
+        configured_model_id=configured_model_id,
+        last_loaded_model_id=last_loaded_model_id,
+        restart_required=_compute_restart_required(
+            configured_model_id, effective_model_dir, worker_state
+        ),
+    )
+
+
 def _build_app_config_response(config_db: AppConfigDatabase) -> AppConfigResponse:
     """Assemble the aggregated configuration payload used by the frontend."""
+    runtime_model_id = _resolve_runtime_model_id(config_db)
     return AppConfigResponse(
-        engine=_build_engine_config(),
+        engine=_build_engine_config(runtime_model_id),
         transcription=TranscriptionConfigResponse(
             defaults=_to_resolved_defaults(
                 get_effective_transcription_defaults(config_db)
@@ -78,7 +153,8 @@ def _build_app_config_response(config_db: AppConfigDatabase) -> AppConfigRespons
             schema=get_transcription_param_schema(),
         ),
         file=build_file_config(),
-        effective_languages=get_effective_languages(settings.model_size),
+        effective_languages=get_effective_languages(runtime_model_id),
+        model=_build_model_config(config_db),
     )
 
 

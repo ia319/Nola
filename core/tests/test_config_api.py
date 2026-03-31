@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from nola.api.deps import get_app_config_db, get_file_db, get_task_db
-from nola.config.settings import Settings
+from nola.config.settings import Settings, settings
 from nola.main import app
 from nola.models import init_db
 
@@ -25,9 +25,11 @@ def client() -> TestClient:
         tmp_path = Path(tmpdir)
         db_path = tmp_path / "nola.db"
         upload_dir = tmp_path / "uploads"
+        model_dir = tmp_path / "models"
 
         init_db(db_path)
         upload_dir.mkdir(parents=True, exist_ok=True)
+        model_dir.mkdir(parents=True, exist_ok=True)
 
         with (
             patch.object(
@@ -38,6 +40,12 @@ def client() -> TestClient:
                 "upload_dir",
                 new_callable=PropertyMock,
                 return_value=upload_dir,
+            ),
+            patch.object(
+                Settings,
+                "default_model_dir",
+                new_callable=PropertyMock,
+                return_value=model_dir,
             ),
             patch("nola.main.init_db", lambda: None),
         ):
@@ -82,6 +90,93 @@ class TestConfigAPI:
         assert {"language", "task", "initial_prompt"} <= general_keys
         assert data["file"]["max_file_size"] == 500 * 1024 * 1024
         assert any(option["code"] == "en" for option in data["effective_languages"])
+        assert data["model"] == {
+            "configured_model_id": "small",
+            "last_loaded_model_id": None,
+            "restart_required": False,
+        }
+
+    def test_get_config_uses_runtime_model_for_engine_and_languages(
+        self, client: TestClient
+    ) -> None:
+        """Runtime config should follow the worker-loaded model."""
+        config_db = get_app_config_db()
+        config_db.set_many(
+            "worker.",
+            {
+                "last_loaded_model_id": "small.en",
+                "last_loaded_model_dir": str(settings.default_model_dir.resolve()),
+            },
+        )
+        config_db.set_many("model.", {"configured_model_id": "small.en"})
+
+        response = client.get("/api/config")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["engine"]["model_size"] == "small.en"
+        assert data["engine"]["is_multilingual"] is False
+        assert data["effective_languages"] == [
+            {"code": "en", "label_key": "options.language.en"}
+        ]
+        assert data["model"] == {
+            "configured_model_id": "small.en",
+            "last_loaded_model_id": "small.en",
+            "restart_required": False,
+        }
+
+    def test_get_config_canonicalizes_model_aliases(self, client: TestClient) -> None:
+        """Alias inputs should not leak into the aggregated model config response."""
+        config_db = get_app_config_db()
+        config_db.set_many(
+            "worker.",
+            {
+                "last_loaded_model_id": "turbo",
+                "last_loaded_model_dir": str(settings.default_model_dir.resolve()),
+            },
+        )
+        config_db.set_many("model.", {"configured_model_id": "large-v3-turbo"})
+
+        response = client.get("/api/config")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["engine"]["model_size"] == "large-v3-turbo"
+        assert data["model"] == {
+            "configured_model_id": "large-v3-turbo",
+            "last_loaded_model_id": "large-v3-turbo",
+            "restart_required": False,
+        }
+
+    def test_get_config_marks_restart_required_for_model_dir_change(
+        self, client: TestClient
+    ) -> None:
+        """Changing only the effective model cache directory should require restart."""
+        config_db = get_app_config_db()
+        next_model_dir = settings.default_model_dir.parent / "alternate-models"
+        config_db.set_many(
+            "worker.",
+            {
+                "last_loaded_model_id": "small",
+                "last_loaded_model_dir": str(settings.default_model_dir.resolve()),
+            },
+        )
+        config_db.set_many(
+            "model.",
+            {
+                "configured_model_id": "small",
+                "configured_model_dir": str(next_model_dir.resolve()),
+            },
+        )
+
+        response = client.get("/api/config")
+
+        assert response.status_code == 200
+        assert response.json()["model"] == {
+            "configured_model_id": "small",
+            "last_loaded_model_id": "small",
+            "restart_required": True,
+        }
 
     def test_get_engine_defaults_returns_expanded_vad_defaults(
         self, client: TestClient
