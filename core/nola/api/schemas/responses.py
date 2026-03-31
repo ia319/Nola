@@ -59,6 +59,7 @@ class CreateTaskResponse(BaseModel):
     filename: str
     status: TaskStatusLiteral
     options: dict[str, Any] | None
+    model_id: str | None = None
 
 
 class CancelTaskResponse(BaseModel):

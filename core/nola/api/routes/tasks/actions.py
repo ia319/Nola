@@ -51,6 +51,7 @@ async def create_transcription(request: TranscriptionRequest) -> CreateTaskPaylo
             task_store=get_task_db(),
             file_id=request.file_id,
             options=request.get_options_dict(),
+            model_id=request.model_id,
         )
     except TaskUseCaseError as error:
         raise_http_error(error)

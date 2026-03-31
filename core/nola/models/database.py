@@ -58,6 +58,9 @@ def init_db(db_path: str | Path | None = None) -> None:
                     -- Transcription options (JSON)
                     options TEXT,
 
+                    -- Model override (reserved for hot-reload)
+                    model_id TEXT,
+
                     -- Result fields
                     progress REAL DEFAULT 0.0,
                     duration REAL,
@@ -93,3 +96,9 @@ def init_db(db_path: str | Path | None = None) -> None:
                     value TEXT NOT NULL
                 )
             """)
+
+            # Schema migrations for model_id column
+            cursor = conn.execute("PRAGMA table_info(transcription_tasks)")
+            existing_columns = {row[1] for row in cursor.fetchall()}
+            if "model_id" not in existing_columns:
+                conn.execute("ALTER TABLE transcription_tasks ADD COLUMN model_id TEXT")
