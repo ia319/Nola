@@ -18,17 +18,15 @@ class FasterWhisperEngine(TranscriptionEngine):
     """Faster Whisper implementation of TranscriptionEngine."""
 
     def __init__(self, config: EngineConfig | None = None) -> None:
-        """Initialize engine with configuration.
-
-        Args:
-            config: Engine configuration. Uses defaults if None.
-        """
+        """Initialize engine with optional configuration."""
         cfg = config or EngineConfig()
-        self.model = WhisperModel(
-            cfg.model_size,
-            device=cfg.device,
-            compute_type=cfg.compute_type,
-        )
+        init_kwargs: dict[str, object] = {
+            "device": cfg.device,
+            "compute_type": cfg.compute_type,
+        }
+        if cfg.download_root is not None:
+            init_kwargs["download_root"] = str(cfg.download_root)
+        self.model = WhisperModel(cfg.model_size, **init_kwargs)
         self._config = cfg
 
     def transcribe(
