@@ -9,6 +9,7 @@ from nola import __version__
 from nola.api.routes import (
     config_router,
     files_router,
+    models_router,
     transcriptions_router,
 )
 from nola.config import settings
@@ -32,6 +33,7 @@ app = FastAPI(
 
 # Register routers
 app.include_router(config_router)
+app.include_router(models_router)
 app.include_router(transcriptions_router)
 app.include_router(files_router)
 

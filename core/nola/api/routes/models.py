@@ -1,0 +1,536 @@
+"""Model management API endpoints."""
+
+from __future__ import annotations
+
+import json
+import logging
+from collections.abc import AsyncGenerator
+from pathlib import Path
+
+from fastapi import APIRouter, Response, status
+from fastapi.responses import StreamingResponse
+
+from nola.api.deps import (
+    get_app_config_db,
+    get_event_bus,
+    get_model_downloader,
+    get_model_storage,
+    invalidate_model_dir_caches,
+)
+from nola.api.schemas.models import (
+    DownloadProgressResponse,
+    ModelCancelResponse,
+    ModelDeleteResponse,
+    ModelDetailResponse,
+    ModelDownloadStartedResponse,
+    ModelListResponse,
+    ModelResponse,
+    ModelSelectResponse,
+    ModelSettingsResponse,
+    ModelSettingsUpdateRequest,
+    ModelStatusLiteral,
+)
+from nola.config import settings
+from nola.config.common.types import ConfigMap
+from nola.model_hub import (
+    ModelAlreadyDownloadingError,
+    ModelDirSource,
+    ModelDownloadNotFoundError,
+    ModelNotDownloadedError,
+    UnknownModelError,
+    get_model,
+    list_models,
+    normalize_configured_model_dir,
+    require_model,
+    resolve_model_dir,
+)
+from nola.model_hub.errors import InvalidModelDirectoryError
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/models", tags=["models"])
+
+
+def _canonicalize(raw_model_id: str) -> str:
+    """Resolve an alias to its canonical model_id."""
+    model = get_model(raw_model_id)
+    return model.model_id if model is not None else raw_model_id
+
+
+def _read_model_config() -> ConfigMap:
+    """Read model.* config from database."""
+    return get_app_config_db().get_all("model.")
+
+
+def _read_worker_state() -> ConfigMap:
+    """Read worker.* state from database."""
+    return get_app_config_db().get_all("worker.")
+
+
+def _resolve_effective_dir(
+    model_config: ConfigMap,
+) -> tuple[Path, ModelDirSource]:
+    """Return the effective model dir and its override source."""
+    db_model_dir = model_config.get("configured_model_dir")
+    effective_dir, source = resolve_model_dir(
+        settings.model_dir,
+        db_model_dir if isinstance(db_model_dir, str) else None,
+        settings.default_model_dir,
+    )
+    return effective_dir, source
+
+
+def _build_model_response(
+    model_config: ConfigMap,
+    worker_state: ConfigMap,
+) -> list[ModelResponse]:
+    """Assemble response items for all registered models."""
+    configured_raw = model_config.get("configured_model_id")
+    configured_id = (
+        _canonicalize(configured_raw) if isinstance(configured_raw, str) else None
+    )
+    last_loaded_raw = worker_state.get("last_loaded_model_id")
+    last_loaded_id = (
+        _canonicalize(last_loaded_raw) if isinstance(last_loaded_raw, str) else None
+    )
+
+    storage = get_model_storage()
+    downloader = get_model_downloader()
+    items: list[ModelResponse] = []
+
+    for info in list_models():
+        download = downloader.get_download(info.model_id)
+        model_status: ModelStatusLiteral
+        if download is not None:
+            model_status = "downloading"
+        elif storage.is_downloaded(info.repo_id):
+            model_status = "downloaded"
+        else:
+            model_status = "not_downloaded"
+
+        progress_resp = None
+        if download is not None:
+            progress_resp = DownloadProgressResponse(
+                percent=download.percent,
+                downloaded_bytes=download.downloaded_bytes,
+                total_bytes=download.total_bytes,
+                speed_bps=int(download.speed_bps),
+            )
+
+        items.append(
+            ModelResponse(
+                model_id=info.model_id,
+                name=info.name,
+                size_bytes=info.size_bytes,
+                repo_id=info.repo_id,
+                languages=info.languages,
+                speed_rank=info.speed_rank,
+                accuracy_rank=info.accuracy_rank,
+                description=info.description,
+                status=model_status,
+                disk_usage=storage.get_disk_usage(info.repo_id),
+                is_configured=(info.model_id == configured_id),
+                is_last_loaded=(info.model_id == last_loaded_id),
+                download_progress=progress_resp,
+            )
+        )
+
+    return items
+
+
+def _compute_restart_required(
+    configured_model_id: str,
+    effective_model_dir: Path,
+    worker_state: ConfigMap,
+) -> bool:
+    """Compare target config against Worker last-loaded state."""
+    last_loaded_raw = worker_state.get("last_loaded_model_id")
+    last_loaded_dir = worker_state.get("last_loaded_model_dir")
+    if not isinstance(last_loaded_raw, str) or not isinstance(last_loaded_dir, str):
+        return False
+    return (
+        configured_model_id != _canonicalize(last_loaded_raw)
+        or str(effective_model_dir) != last_loaded_dir
+    )
+
+
+# --- Endpoints ---
+
+
+@router.get(
+    "",
+    summary="List all models",
+    response_model=ModelListResponse,
+    status_code=status.HTTP_200_OK,
+)
+def list_all_models() -> ModelListResponse:
+    """Return all registered models with local state and download progress."""
+    model_config = _read_model_config()
+    worker_state = _read_worker_state()
+    effective_dir, _ = _resolve_effective_dir(model_config)
+
+    configured_raw = model_config.get("configured_model_id")
+    configured_id = (
+        _canonicalize(configured_raw) if isinstance(configured_raw, str) else None
+    )
+    last_loaded_raw = worker_state.get("last_loaded_model_id")
+    last_loaded_id = (
+        _canonicalize(last_loaded_raw) if isinstance(last_loaded_raw, str) else None
+    )
+
+    return ModelListResponse(
+        models=_build_model_response(model_config, worker_state),
+        configured_model_id=configured_id,
+        last_loaded_model_id=last_loaded_id,
+        effective_model_dir=str(effective_dir),
+    )
+
+
+@router.get(
+    "/{model_id}",
+    summary="Get model detail",
+    response_model=ModelDetailResponse,
+    status_code=status.HTTP_200_OK,
+    responses={404: {"description": "Unknown model id"}},
+)
+def get_model_detail(model_id: str) -> ModelDetailResponse:
+    """Return one model with full detail."""
+    try:
+        info = require_model(model_id)
+    except UnknownModelError:
+        return Response(  # type: ignore[return-value]
+            content=json.dumps({"detail": f"Unknown model id: {model_id}"}),
+            status_code=status.HTTP_404_NOT_FOUND,
+            media_type="application/json",
+        )
+
+    model_config = _read_model_config()
+    worker_state = _read_worker_state()
+    configured_raw = model_config.get("configured_model_id")
+    configured_id = (
+        _canonicalize(configured_raw) if isinstance(configured_raw, str) else None
+    )
+    last_loaded_raw = worker_state.get("last_loaded_model_id")
+    last_loaded_id = (
+        _canonicalize(last_loaded_raw) if isinstance(last_loaded_raw, str) else None
+    )
+
+    storage = get_model_storage()
+    downloader = get_model_downloader()
+    download = downloader.get_download(info.model_id)
+
+    model_status: ModelStatusLiteral
+    if download is not None:
+        model_status = "downloading"
+    elif storage.is_downloaded(info.repo_id):
+        model_status = "downloaded"
+    else:
+        model_status = "not_downloaded"
+
+    progress_resp = None
+    if download is not None:
+        progress_resp = DownloadProgressResponse(
+            percent=download.percent,
+            downloaded_bytes=download.downloaded_bytes,
+            total_bytes=download.total_bytes,
+            speed_bps=int(download.speed_bps),
+        )
+
+    return ModelDetailResponse(
+        model_id=info.model_id,
+        name=info.name,
+        size_bytes=info.size_bytes,
+        repo_id=info.repo_id,
+        languages=info.languages,
+        speed_rank=info.speed_rank,
+        accuracy_rank=info.accuracy_rank,
+        description=info.description,
+        status=model_status,
+        disk_usage=storage.get_disk_usage(info.repo_id),
+        is_configured=(info.model_id == configured_id),
+        is_last_loaded=(info.model_id == last_loaded_id),
+        download_progress=progress_resp,
+    )
+
+
+@router.post(
+    "/{model_id}/download",
+    summary="Start model download",
+    response_model=ModelDownloadStartedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        404: {"description": "Unknown model id"},
+        409: {"description": "Download already in progress"},
+    },
+)
+def start_download(model_id: str) -> ModelDownloadStartedResponse | Response:
+    """Accept a download request and start background download."""
+    try:
+        info = require_model(model_id)
+    except UnknownModelError:
+        return Response(
+            content=json.dumps({"detail": f"Unknown model id: {model_id}"}),
+            status_code=status.HTTP_404_NOT_FOUND,
+            media_type="application/json",
+        )
+
+    downloader = get_model_downloader()
+    try:
+        downloader.start_download(info)
+    except ModelAlreadyDownloadingError:
+        return Response(
+            content=json.dumps({"detail": f"Download already in progress: {model_id}"}),
+            status_code=status.HTTP_409_CONFLICT,
+            media_type="application/json",
+        )
+
+    return ModelDownloadStartedResponse(
+        model_id=info.model_id,
+        message=f"Download started for {info.name}",
+    )
+
+
+@router.post(
+    "/{model_id}/cancel",
+    summary="Cancel model download",
+    response_model=ModelCancelResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        404: {"description": "No active download for this model"},
+    },
+)
+def cancel_download(model_id: str) -> ModelCancelResponse | Response:
+    """Cancel one active download."""
+    canonical_id = _canonicalize(model_id)
+    downloader = get_model_downloader()
+    try:
+        downloader.cancel_download(canonical_id)
+    except ModelDownloadNotFoundError:
+        return Response(
+            content=json.dumps({"detail": f"No active download: {model_id}"}),
+            status_code=status.HTTP_404_NOT_FOUND,
+            media_type="application/json",
+        )
+
+    return ModelCancelResponse(
+        model_id=canonical_id,
+        message=f"Download cancelled for {model_id}",
+    )
+
+
+@router.delete(
+    "/{model_id}",
+    summary="Delete model cache",
+    response_model=ModelDeleteResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        404: {"description": "Unknown model id or not downloaded"},
+        409: {"description": "Model is downloading or is configured model"},
+    },
+)
+def delete_model(model_id: str) -> ModelDeleteResponse | Response:
+    """Delete local model cache (full or partial)."""
+    try:
+        info = require_model(model_id)
+    except UnknownModelError:
+        return Response(
+            content=json.dumps({"detail": f"Unknown model id: {model_id}"}),
+            status_code=status.HTTP_404_NOT_FOUND,
+            media_type="application/json",
+        )
+
+    downloader = get_model_downloader()
+    if downloader.is_downloading(info.model_id):
+        return Response(
+            content=json.dumps(
+                {
+                    "detail": (
+                        f"Model is currently downloading: {model_id}. Cancel first."
+                    ),
+                }
+            ),
+            status_code=status.HTTP_409_CONFLICT,
+            media_type="application/json",
+        )
+
+    model_config = _read_model_config()
+    configured_raw = model_config.get("configured_model_id")
+    if (
+        isinstance(configured_raw, str)
+        and _canonicalize(configured_raw) == info.model_id
+    ):
+        return Response(
+            content=json.dumps(
+                {
+                    "detail": f"Cannot delete configured model: {model_id}",
+                }
+            ),
+            status_code=status.HTTP_409_CONFLICT,
+            media_type="application/json",
+        )
+
+    storage = get_model_storage()
+    try:
+        storage.delete_model(info.repo_id)
+    except ModelNotDownloadedError:
+        return Response(
+            content=json.dumps({"detail": f"Model not downloaded: {model_id}"}),
+            status_code=status.HTTP_404_NOT_FOUND,
+            media_type="application/json",
+        )
+
+    return ModelDeleteResponse(
+        model_id=info.model_id,
+        message=f"Model cache deleted for {info.name}",
+    )
+
+
+@router.post(
+    "/{model_id}/select",
+    summary="Select configured model",
+    response_model=ModelSelectResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        404: {"description": "Unknown model id"},
+        409: {"description": "Model not downloaded"},
+    },
+)
+def select_model(model_id: str) -> ModelSelectResponse | Response:
+    """Set the configured model for next Worker startup."""
+    try:
+        info = require_model(model_id)
+    except UnknownModelError:
+        return Response(
+            content=json.dumps({"detail": f"Unknown model id: {model_id}"}),
+            status_code=status.HTTP_404_NOT_FOUND,
+            media_type="application/json",
+        )
+
+    storage = get_model_storage()
+    if not storage.is_downloaded(info.repo_id):
+        return Response(
+            content=json.dumps({"detail": f"Model not downloaded: {model_id}"}),
+            status_code=status.HTTP_409_CONFLICT,
+            media_type="application/json",
+        )
+
+    config_db = get_app_config_db()
+    config_db.set_many("model.", {"configured_model_id": info.model_id})
+
+    model_config = _read_model_config()
+    worker_state = _read_worker_state()
+    effective_dir, _ = _resolve_effective_dir(model_config)
+    restart = _compute_restart_required(info.model_id, effective_dir, worker_state)
+
+    return ModelSelectResponse(
+        configured_model_id=info.model_id,
+        restart_required=restart,
+        message=f"Configured model set to {info.name}",
+    )
+
+
+@router.get(
+    "/settings",
+    summary="Get model settings",
+    response_model=ModelSettingsResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_model_settings() -> ModelSettingsResponse:
+    """Return model directory configuration and override state."""
+    config_db = get_app_config_db()
+    model_config = config_db.get_all("model.")
+    worker_state = _read_worker_state()
+    effective_dir, source = _resolve_effective_dir(model_config)
+
+    configured_raw = model_config.get("configured_model_id")
+    configured_id = (
+        _canonicalize(configured_raw) if isinstance(configured_raw, str) else None
+    )
+    last_loaded_raw = worker_state.get("last_loaded_model_id")
+    last_loaded_id = (
+        _canonicalize(last_loaded_raw) if isinstance(last_loaded_raw, str) else None
+    )
+
+    db_model_dir = model_config.get("configured_model_dir")
+
+    return ModelSettingsResponse(
+        configured_model_id=configured_id,
+        last_loaded_model_id=last_loaded_id,
+        configured_model_dir=db_model_dir if isinstance(db_model_dir, str) else None,
+        effective_model_dir=str(effective_dir),
+        override_source=source,
+        restart_required=_compute_restart_required(
+            configured_id or _canonicalize(settings.model_size),
+            effective_dir,
+            worker_state,
+        ),
+    )
+
+
+@router.patch(
+    "/settings",
+    summary="Update model settings",
+    response_model=ModelSettingsResponse,
+    status_code=status.HTTP_200_OK,
+    responses={422: {"description": "Invalid model directory"}},
+)
+def patch_model_settings(
+    request: ModelSettingsUpdateRequest,
+) -> ModelSettingsResponse | Response:
+    """Persist model directory configuration."""
+    config_db = get_app_config_db()
+
+    if request.configured_model_dir is not None:
+        # Reject dir change while downloads are running to avoid orphaning
+        # subprocesses tracked by the current ModelDownloader singleton.
+        downloader = get_model_downloader()
+        if downloader.list_downloads():
+            return Response(
+                content=json.dumps(
+                    {
+                        "detail": (
+                            "Cannot change model directory while downloads are "
+                            "active. Cancel all downloads first."
+                        ),
+                    }
+                ),
+                status_code=status.HTTP_409_CONFLICT,
+                media_type="application/json",
+            )
+
+        try:
+            normalized = normalize_configured_model_dir(request.configured_model_dir)
+        except InvalidModelDirectoryError as exc:
+            return Response(
+                content=json.dumps({"detail": str(exc)}),
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                media_type="application/json",
+            )
+        config_db.set_many("model.", {"configured_model_dir": str(normalized)})
+        invalidate_model_dir_caches()
+
+    return get_model_settings()
+
+
+@router.get(
+    "/events",
+    summary="Model download SSE stream",
+    status_code=status.HTTP_200_OK,
+    responses={200: {"content": {"text/event-stream": {}}}},
+)
+async def model_events() -> StreamingResponse:
+    """Stream model download progress events via SSE."""
+    bus = get_event_bus()
+
+    async def event_generator() -> AsyncGenerator[str]:
+        async for payload in bus.subscribe("model_downloads"):
+            yield f"event: progress\ndata: {json.dumps(payload)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
