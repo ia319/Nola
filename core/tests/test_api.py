@@ -197,6 +197,63 @@ class TestTranscriptionsAPI:
         # Should fail because file doesn't exist, not because of options
         assert response.status_code == 404
 
+    def test_create_task_persists_reserved_model_id(self, client: TestClient):
+        """Task creation should store one reserved task-level model id."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="task-model-file",
+            filename="task-model.mp3",
+            path="/tmp/task-model.mp3",
+            size=1000,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks",
+            json={"file_id": "task-model-file", "model_id": "small"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["model_id"] == "small"
+
+        stored = task_db.get_task(data["task_id"])
+        assert stored is not None
+        assert stored["model_id"] == "small"
+
+
+class TestModelsAPI:
+    """Test model-management endpoints."""
+
+    def test_patch_model_settings_rejects_dir_change_while_downloading(
+        self, client: TestClient
+    ) -> None:
+        """Changing the cache root should fail while downloads are active."""
+
+        class _FakeDownloader:
+            def list_downloads(self) -> list[object]:
+                return [object()]
+
+        with patch(
+            "nola.api.routes.models.get_model_downloader",
+            return_value=_FakeDownloader(),
+        ):
+            response = client.patch(
+                "/api/models/settings",
+                json={
+                    "configured_model_dir": str(
+                        Path(tempfile.gettempdir()).resolve() / "nola-alt-models"
+                    )
+                },
+            )
+
+        assert response.status_code == 409
+        assert (
+            response.json()["detail"]
+            == "Cannot change model directory while downloads are active. "
+            "Cancel all downloads first."
+        )
+
 
 class TestTranscriptionTasksPhaseA:
     """Test task list, batch action, and delete-record endpoints."""

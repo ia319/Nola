@@ -46,10 +46,12 @@ class FakeTaskStore:
         priority: int = 0,
         max_retries: int = 3,
         options: dict[str, object] | None = None,
+        model_id: str | None = None,
     ) -> None:
         task = {
             "id": task_id,
             "file_id": file_id,
+            "model_id": model_id,
             "status": "pending",
             "progress": 0.0,
             "created_at": "2026-01-01T00:00:00",
@@ -64,6 +66,7 @@ class FakeTaskStore:
                 "priority": priority,
                 "max_retries": max_retries,
                 "options": options,
+                "model_id": model_id,
             }
         )
 
@@ -92,6 +95,7 @@ class FailingEnqueueTaskStore(FakeTaskStore):
         priority: int = 0,
         max_retries: int = 3,
         options: dict[str, object] | None = None,
+        model_id: str | None = None,
     ) -> None:
         if task_id in self.fail_enqueue_task_ids:
             raise RuntimeError("sqlite busy")
@@ -101,6 +105,7 @@ class FailingEnqueueTaskStore(FakeTaskStore):
             priority=priority,
             max_retries=max_retries,
             options=options,
+            model_id=model_id,
         )
 
 
@@ -108,6 +113,7 @@ def _base_task(*, task_id: str, file_id: str, status: str) -> dict[str, object]:
     return {
         "id": task_id,
         "file_id": file_id,
+        "model_id": None,
         "status": status,
         "progress": 0.0,
         "created_at": "2026-01-01T00:00:00",
@@ -145,6 +151,33 @@ def test_batch_cancel_tasks_returns_mixed_outcomes() -> None:
     assert results[1]["error_code"] == "invalid_status"
     assert results[2]["error_code"] == "not_found"
     assert results[3]["error_code"] == "duplicate_task_id"
+
+
+def test_create_task_persists_reserved_model_id() -> None:
+    file_store = FakeFileStore(files={"f1": {"id": "f1", "filename": "audio.mp3"}})
+    task_store = FakeTaskStore(tasks={})
+
+    payload = create_task(
+        file_store=file_store,
+        task_store=task_store,
+        file_id="f1",
+        options={"language": "en"},
+        model_id="small",
+        task_id_factory=lambda: "task-001",
+    )
+
+    assert payload["task_id"] == "task-001"
+    assert payload["model_id"] == "small"
+    assert task_store.enqueued == [
+        {
+            "task_id": "task-001",
+            "file_id": "f1",
+            "priority": 0,
+            "max_retries": 3,
+            "options": {"language": "en"},
+            "model_id": "small",
+        }
+    ]
 
 
 def test_batch_retry_tasks_returns_mixed_outcomes() -> None:
