@@ -14,8 +14,9 @@ from pathlib import Path
 from typing import Any
 
 from nola.common.merge import deep_merge
-from nola.engines.base import TranscribeOptions
+from nola.engines.base import EngineConfig, TranscribeOptions
 from nola.engines.faster_whisper import FasterWhisperEngine
+from nola.model_hub import get_model, resolve_model_dir
 from nola.models import AppConfigDatabase, FileDatabase, TaskDatabase, init_db
 from nola.models.tasks import TaskRowRaw
 
@@ -199,11 +200,7 @@ def run_transcription(
 
 
 def worker_loop(db_path: str | Path | None = None) -> None:
-    """Main worker loop.
-
-    Args:
-        db_path: Path to database file (defaults to settings.db_path)
-    """
+    """Run the main worker loop."""
     from nola.config import settings
 
     db_path = db_path or settings.db_path
@@ -216,10 +213,54 @@ def worker_loop(db_path: str | Path | None = None) -> None:
     task_db = TaskDatabase(db_path)
     app_config_db = AppConfigDatabase(db_path)
 
-    # Load engine once for all tasks
-    logger.info("Loading Whisper model...")
-    engine = FasterWhisperEngine()
+    # Resolve configured model and cache directory
+    model_config = app_config_db.get_all("model.")
+    configured_raw = model_config.get("configured_model_id")
+    configured_model = settings.model_size
+    if isinstance(configured_raw, str):
+        resolved = get_model(configured_raw)
+        if resolved is not None:
+            configured_model = resolved.model_id
+
+    db_model_dir = model_config.get("configured_model_dir")
+    model_dir, _ = resolve_model_dir(
+        settings.model_dir,
+        db_model_dir if isinstance(db_model_dir, str) else None,
+        settings.default_model_dir,
+    )
+
+    logger.info(f"Loading model '{configured_model}' from {model_dir}")
+
+    # Verify the model is cached locally before loading.
+    # WhisperModel would silently download from HF if missing; the plan
+    # requires users to download via the model management page first.
+    from nola.model_hub import ModelStorage
+    from nola.model_hub import require_model as _require_model
+
+    model_info = _require_model(configured_model)
+    storage = ModelStorage(model_dir)
+    if not storage.is_downloaded(model_info.repo_id):
+        logger.error(
+            f"Model '{configured_model}' is not downloaded in {model_dir}. "
+            "Download it via the model management page before starting the Worker."
+        )
+        return
+
+    engine_config = EngineConfig(
+        model_size=configured_model,
+        download_root=model_dir,
+    )
+    engine = FasterWhisperEngine(config=engine_config)
     logger.info("Model loaded successfully")
+
+    # Report loaded state for restart_required calculation
+    app_config_db.set_many(
+        "worker.",
+        {
+            "last_loaded_model_id": configured_model,
+            "last_loaded_model_dir": str(model_dir),
+        },
+    )
 
     while _running:
         try:
