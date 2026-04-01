@@ -98,6 +98,15 @@ def scan_cache_dir(cache_dir: str | Path | None = None) -> CacheInfo:
     return cast(CacheInfo, module.scan_cache_dir(cache_dir))
 
 
+def serialize_repo_folder_name(repo_id: str, *, repo_type: str = "model") -> str:
+    """Return the cache folder name that huggingface_hub uses for one repo."""
+    try:
+        module = import_module("huggingface_hub.file_download")
+    except ModuleNotFoundError as exc:
+        raise ModelHubDependencyError("huggingface_hub") from exc
+    return cast(str, module.repo_folder_name(repo_id=repo_id, repo_type=repo_type))
+
+
 def load_base_tqdm() -> type[Any]:
     """Load the tqdm base class used by huggingface_hub."""
     try:

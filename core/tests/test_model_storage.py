@@ -132,6 +132,36 @@ def test_model_storage_deletes_revisions_via_cache_metadata(
     assert cache_info.delete_strategy.executed is True
 
 
+def test_model_storage_deletes_partial_cache_and_lock_dirs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Interrupted downloads should be removable even without tracked revisions."""
+    cache_info = _FakeCacheInfo(
+        repos=(
+            _FakeRepo(
+                repo_id="org/repo-a",
+                size_on_disk=10,
+                revisions=(),
+            ),
+        )
+    )
+    storage = ModelStorage(tmp_path / "model-cache")
+    monkeypatch.setattr(storage, "_scan_cache_info", lambda: cache_info)
+
+    repo_dir = storage.cache_dir / "models--org--repo-a"
+    lock_dir = storage.cache_dir / ".locks" / "models--org--repo-a"
+    (repo_dir / "blobs").mkdir(parents=True)
+    (repo_dir / "blobs" / "etag.incomplete").write_text("partial", encoding="utf-8")
+    lock_dir.mkdir(parents=True)
+    (lock_dir / "etag.lock").write_text("", encoding="utf-8")
+
+    assert storage.delete_model("org/repo-a") is True
+    assert not repo_dir.exists()
+    assert not lock_dir.exists()
+    assert cache_info.deleted_revisions == ()
+
+
 def test_model_storage_rejects_deletion_when_repo_is_missing(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

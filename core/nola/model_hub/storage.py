@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
-from nola.model_hub._hf_api import CacheInfo, CacheRepoInfo, scan_cache_dir
+from nola.model_hub._hf_api import (
+    CacheInfo,
+    CacheRepoInfo,
+    scan_cache_dir,
+    serialize_repo_folder_name,
+)
 from nola.model_hub.contracts import ModelDirSource
 from nola.model_hub.errors import InvalidModelDirectoryError, ModelNotDownloadedError
 
@@ -63,24 +69,28 @@ class ModelStorage:
     def delete_model(self, repo_id: str) -> bool:
         """Delete one cached repository through Hugging Face cache metadata."""
         cache_info = self._scan_cache_info()
-        if cache_info is None:
-            raise ModelNotDownloadedError(repo_id)
+        deleted = False
 
-        repo = self._find_repo(cache_info, repo_id)
-        if repo is None:
-            raise ModelNotDownloadedError(repo_id)
+        if cache_info is not None:
+            repo = self._find_repo(cache_info, repo_id)
+            if repo is not None:
+                revision_hashes = [
+                    revision.commit_hash
+                    for revision in repo.revisions
+                    if isinstance(revision.commit_hash, str)
+                ]
+                if revision_hashes:
+                    delete_strategy = cache_info.delete_revisions(*revision_hashes)
+                    delete_strategy.execute()
+                    deleted = True
 
-        revision_hashes = [
-            revision.commit_hash
-            for revision in repo.revisions
-            if isinstance(revision.commit_hash, str)
-        ]
-        if not revision_hashes:
-            raise ModelNotDownloadedError(repo_id)
+        # Metadata-driven deletion does not clean repo-local .incomplete files or
+        # stale lock directories left behind by interrupted downloads.
+        deleted_partial = self._delete_repo_artifacts(repo_id)
+        if deleted or deleted_partial:
+            return True
 
-        delete_strategy = cache_info.delete_revisions(*revision_hashes)
-        delete_strategy.execute()
-        return True
+        raise ModelNotDownloadedError(repo_id)
 
     def _get_repo(self, repo_id: str) -> CacheRepoInfo | None:
         """Return one cached repo entry when present."""
@@ -94,6 +104,41 @@ class ModelStorage:
         if not self.cache_dir.exists():
             return None
         return scan_cache_dir(self.cache_dir)
+
+    def _delete_repo_artifacts(self, repo_id: str) -> bool:
+        """Delete repo-local leftovers that cache metadata does not track."""
+        removed_cache = self._delete_tree_if_present(self._repo_cache_dir(repo_id))
+        removed_locks = self._delete_tree_if_present(self._repo_lock_dir(repo_id))
+        return removed_cache or removed_locks
+
+    def _repo_cache_dir(self, repo_id: str) -> Path:
+        """Return the on-disk cache directory for one model repo."""
+        folder_name = serialize_repo_folder_name(repo_id, repo_type="model")
+        return (self.cache_dir / folder_name).resolve(strict=False)
+
+    def _repo_lock_dir(self, repo_id: str) -> Path:
+        """Return the lock directory for one model repo download."""
+        folder_name = serialize_repo_folder_name(repo_id, repo_type="model")
+        return (self.cache_dir / ".locks" / folder_name).resolve(strict=False)
+
+    def _delete_tree_if_present(self, path: Path) -> bool:
+        """Recursively delete one repo-scoped directory inside the cache root."""
+        resolved_path = path.resolve(strict=False)
+        self._assert_within_cache_dir(resolved_path)
+        if not resolved_path.exists():
+            return False
+        shutil.rmtree(resolved_path)
+        return True
+
+    def _assert_within_cache_dir(self, path: Path) -> None:
+        """Reject cache deletions that escape the configured cache root."""
+        cache_root = self.cache_dir.resolve(strict=False)
+        try:
+            path.relative_to(cache_root)
+        except ValueError as exc:
+            raise InvalidModelDirectoryError(
+                "resolved model cache path escaped cache root"
+            ) from exc
 
     @staticmethod
     def _find_repo(cache_info: CacheInfo, repo_id: str) -> CacheRepoInfo | None:
