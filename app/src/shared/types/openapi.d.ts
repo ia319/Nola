@@ -112,6 +112,154 @@ export interface paths {
     patch: operations['patch_export_defaults_api_config_export_defaults_patch']
     trace?: never
   }
+  '/api/models': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List all models
+     * @description Return all registered models with local state and download progress.
+     */
+    get: operations['list_all_models_api_models_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/models/{model_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get model detail
+     * @description Return one model with full detail.
+     */
+    get: operations['get_model_detail_api_models__model_id__get']
+    put?: never
+    post?: never
+    /**
+     * Delete model cache
+     * @description Delete local model cache (full or partial).
+     */
+    delete: operations['delete_model_api_models__model_id__delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/models/{model_id}/download': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Start model download
+     * @description Accept a download request and start background download.
+     */
+    post: operations['start_download_api_models__model_id__download_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/models/{model_id}/cancel': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Cancel model download
+     * @description Cancel one active download.
+     */
+    post: operations['cancel_download_api_models__model_id__cancel_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/models/{model_id}/select': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Select configured model
+     * @description Set the configured model for next Worker startup.
+     */
+    post: operations['select_model_api_models__model_id__select_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/models/settings': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get model settings
+     * @description Return model directory configuration and override state.
+     */
+    get: operations['get_model_settings_api_models_settings_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /**
+     * Update model settings
+     * @description Persist model directory configuration.
+     */
+    patch: operations['patch_model_settings_api_models_settings_patch']
+    trace?: never
+  }
+  '/api/models/events': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Model download SSE stream
+     * @description Stream model download progress events via SSE.
+     */
+    get: operations['model_events_api_models_events_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/transcription-tasks/': {
     parameters: {
       query?: never
@@ -465,6 +613,7 @@ export interface components {
       file: components['schemas']['FileConfigResponse']
       /** Effective Languages */
       effective_languages: components['schemas']['LanguageOptionSchema'][]
+      model?: components['schemas']['ModelConfigResponse'] | null
     }
     /**
      * BatchExportRequest
@@ -605,6 +754,8 @@ export interface components {
       options: {
         [key: string]: unknown
       } | null
+      /** Model Id */
+      model_id?: string | null
     }
     /**
      * DeleteResponse
@@ -623,6 +774,22 @@ export interface components {
       task_id: string
       /** Message */
       message: string
+    }
+    /**
+     * DownloadProgressResponse
+     * @description Expose one active download snapshot.
+     */
+    DownloadProgressResponse: {
+      /** Percent */
+      percent: number
+      /** Downloaded Bytes */
+      downloaded_bytes: number
+      /** Total Bytes */
+      total_bytes: number
+      /** Speed Bps */
+      speed_bps: number
+      /** Error */
+      error?: string | null
     }
     /**
      * EngineConfigResponse
@@ -785,6 +952,198 @@ export interface components {
       filename: string
       /** Path */
       path: string
+    }
+    /**
+     * ModelCancelResponse
+     * @description Confirm a download cancellation.
+     */
+    ModelCancelResponse: {
+      /** Model Id */
+      model_id: string
+      /** Message */
+      message: string
+    }
+    /**
+     * ModelConfigResponse
+     * @description Expose model state inside the aggregated /api/config response.
+     */
+    ModelConfigResponse: {
+      /** Configured Model Id */
+      configured_model_id?: string | null
+      /** Last Loaded Model Id */
+      last_loaded_model_id?: string | null
+      /**
+       * Restart Required
+       * @default false
+       */
+      restart_required: boolean
+    }
+    /**
+     * ModelDeleteResponse
+     * @description Confirm a model cache deletion.
+     */
+    ModelDeleteResponse: {
+      /** Model Id */
+      model_id: string
+      /** Message */
+      message: string
+    }
+    /**
+     * ModelDetailResponse
+     * @description Return one model with full detail.
+     */
+    ModelDetailResponse: {
+      /** Model Id */
+      model_id: string
+      /** Name */
+      name: string
+      /** Size Bytes */
+      size_bytes: number
+      /** Repo Id */
+      repo_id: string
+      /** Languages */
+      languages: string
+      /** Speed Rank */
+      speed_rank: number
+      /** Accuracy Rank */
+      accuracy_rank: number
+      /** Description */
+      description: string
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'not_downloaded' | 'downloading' | 'downloaded'
+      /** Disk Usage */
+      disk_usage?: number | null
+      /**
+       * Is Configured
+       * @default false
+       */
+      is_configured: boolean
+      /**
+       * Is Last Loaded
+       * @default false
+       */
+      is_last_loaded: boolean
+      download_progress?: components['schemas']['DownloadProgressResponse'] | null
+    }
+    /**
+     * ModelDownloadStartedResponse
+     * @description Confirm a download was accepted.
+     */
+    ModelDownloadStartedResponse: {
+      /** Model Id */
+      model_id: string
+      /**
+       * Status
+       * @default downloading
+       * @enum {string}
+       */
+      status: 'not_downloaded' | 'downloading' | 'downloaded'
+      /** Message */
+      message: string
+    }
+    /**
+     * ModelListResponse
+     * @description Return all models with global config state.
+     */
+    ModelListResponse: {
+      /** Models */
+      models: components['schemas']['ModelResponse'][]
+      /** Configured Model Id */
+      configured_model_id?: string | null
+      /** Last Loaded Model Id */
+      last_loaded_model_id?: string | null
+      /** Effective Model Dir */
+      effective_model_dir: string
+    }
+    /**
+     * ModelResponse
+     * @description Expose one model with registry info, local state, and config flags.
+     */
+    ModelResponse: {
+      /** Model Id */
+      model_id: string
+      /** Name */
+      name: string
+      /** Size Bytes */
+      size_bytes: number
+      /** Repo Id */
+      repo_id: string
+      /** Languages */
+      languages: string
+      /** Speed Rank */
+      speed_rank: number
+      /** Accuracy Rank */
+      accuracy_rank: number
+      /** Description */
+      description: string
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'not_downloaded' | 'downloading' | 'downloaded'
+      /** Disk Usage */
+      disk_usage?: number | null
+      /**
+       * Is Configured
+       * @default false
+       */
+      is_configured: boolean
+      /**
+       * Is Last Loaded
+       * @default false
+       */
+      is_last_loaded: boolean
+      download_progress?: components['schemas']['DownloadProgressResponse'] | null
+    }
+    /**
+     * ModelSelectResponse
+     * @description Confirm a configured-model switch.
+     */
+    ModelSelectResponse: {
+      /** Configured Model Id */
+      configured_model_id: string
+      /** Restart Required */
+      restart_required: boolean
+      /** Message */
+      message: string
+    }
+    /**
+     * ModelSettingsResponse
+     * @description Expose model directory configuration and override state.
+     */
+    ModelSettingsResponse: {
+      /** Configured Model Id */
+      configured_model_id?: string | null
+      /** Last Loaded Model Id */
+      last_loaded_model_id?: string | null
+      /** Configured Model Dir */
+      configured_model_dir?: string | null
+      /** Effective Model Dir */
+      effective_model_dir: string
+      /**
+       * Override Source
+       * @enum {string}
+       */
+      override_source: 'environment' | 'database' | 'default'
+      /**
+       * Restart Required
+       * @default false
+       */
+      restart_required: boolean
+    }
+    /**
+     * ModelSettingsUpdateRequest
+     * @description Accept a partial model-settings update.
+     */
+    ModelSettingsUpdateRequest: {
+      /**
+       * Configured Model Dir
+       * @description Absolute path for the model cache root directory.
+       */
+      configured_model_dir?: string | null
     }
     /**
      * NumberFieldSchema
@@ -1516,6 +1875,11 @@ export interface components {
        * @description File ID from upload API
        */
       file_id: string
+      /**
+       * Model Id
+       * @description Target model id (reserved, not used in execution yet).
+       */
+      model_id?: string | null
     }
     /**
      * TranscriptionResolvedDefaultsResponse
@@ -1808,6 +2172,309 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_all_models_api_models_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ModelListResponse']
+        }
+      }
+    }
+  }
+  get_model_detail_api_models__model_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        model_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ModelDetailResponse']
+        }
+      }
+      /** @description Unknown model id */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  delete_model_api_models__model_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        model_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ModelDeleteResponse']
+        }
+      }
+      /** @description Unknown model id or not downloaded */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Model is downloading or is configured model */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  start_download_api_models__model_id__download_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        model_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ModelDownloadStartedResponse']
+        }
+      }
+      /** @description Unknown model id */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Download already in progress */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  cancel_download_api_models__model_id__cancel_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        model_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ModelCancelResponse']
+        }
+      }
+      /** @description No active download for this model */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  select_model_api_models__model_id__select_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        model_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ModelSelectResponse']
+        }
+      }
+      /** @description Unknown model id */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Model not downloaded */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_model_settings_api_models_settings_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ModelSettingsResponse']
+        }
+      }
+    }
+  }
+  patch_model_settings_api_models_settings_patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ModelSettingsUpdateRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ModelSettingsResponse']
+        }
+      }
+      /** @description Invalid model directory */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  model_events_api_models_events_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+          'text/event-stream': unknown
         }
       }
     }
