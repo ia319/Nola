@@ -13,14 +13,14 @@ class FakeEventSource {
 
   url: string
   closed = false
-  private listeners = new Map<string, Array<(event: Event | MessageEvent<string>) => void>>()
+  private listeners = new Map<string, Array<(event: Event) => void>>()
 
   constructor(url: string) {
     this.url = url
     FakeEventSource.lastInstance = this
   }
 
-  addEventListener(name: string, handler: (event: Event | MessageEvent<string>) => void): void {
+  addEventListener(name: string, handler: (event: Event) => void): void {
     const current = this.listeners.get(name) ?? []
     current.push(handler)
     this.listeners.set(name, current)
@@ -30,7 +30,7 @@ class FakeEventSource {
     this.closed = true
   }
 
-  emit(name: string, event: Event | MessageEvent<string>): void {
+  emit(name: string, event: Event): void {
     for (const handler of this.listeners.get(name) ?? []) {
       handler(event)
     }
@@ -59,14 +59,13 @@ describe('createSSEConnection', () => {
     const source = FakeEventSource.lastInstance
     expect(source?.url).toBe('http://127.0.0.1:8000/api/models/events')
 
-    source?.emit('progress', {
-      type: 'progress',
-      data: JSON.stringify({ model_id: 'small', percent: 50 }),
-    })
-    source?.emit('progress', {
-      type: 'progress',
-      data: '{bad json',
-    })
+    source?.emit(
+      'progress',
+      new MessageEvent('progress', {
+        data: JSON.stringify({ model_id: 'small', percent: 50 }),
+      }),
+    )
+    source?.emit('progress', new MessageEvent('progress', { data: '{bad json' }))
     source?.emit('open', new Event('open'))
     source?.emit('error', new Event('error'))
 
@@ -89,10 +88,7 @@ describe('createSSEConnection', () => {
     createSSEConnection('/api/models/events', { onMessage })
 
     const source = FakeEventSource.lastInstance
-    source?.emit('message', {
-      type: 'message',
-      data: JSON.stringify({ ok: true }),
-    })
+    source?.emit('message', new MessageEvent('message', { data: JSON.stringify({ ok: true }) }))
 
     expect(onMessage).toHaveBeenCalledWith({
       event: 'message',

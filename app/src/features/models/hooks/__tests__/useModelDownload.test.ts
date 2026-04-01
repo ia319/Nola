@@ -2,7 +2,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createSSEConnection, type SSEOptions } from '@/shared/lib/sse-client'
+import { createSSEConnection, type SSEOptions, type SSEvent } from '@/shared/lib/sse-client'
 
 import { cancelDownload, startDownload } from '../../api'
 import type { ModelDownloadSSEPayload } from '../../types'
@@ -22,14 +22,14 @@ const cancelDownloadMock = vi.mocked(cancelDownload)
 const createSSEConnectionMock = vi.mocked(createSSEConnection)
 
 let cleanupMock: ReturnType<typeof vi.fn>
-let sseOptions: SSEOptions<ModelDownloadSSEPayload> | null
+let onProgressMessage: ((event: SSEvent<ModelDownloadSSEPayload>) => void) | null
 
 beforeEach(() => {
   vi.clearAllMocks()
   cleanupMock = vi.fn()
-  sseOptions = null
+  onProgressMessage = null
   createSSEConnectionMock.mockImplementation(((_path, options) => {
-    sseOptions = options
+    onProgressMessage = options.onMessage as SSEOptions<ModelDownloadSSEPayload>['onMessage']
     return cleanupMock
   }) as typeof createSSEConnection)
 })
@@ -61,7 +61,7 @@ describe('useModelDownload', () => {
     expect(result.current.downloads.get('small')?.percent).toBe(25)
 
     act(() => {
-      sseOptions?.onMessage({
+      onProgressMessage?.({
         event: 'progress',
         data: {
           model_id: 'small',
@@ -106,7 +106,7 @@ describe('useModelDownload', () => {
     expect(result.current.downloads.get('large-v3')?.percent).toBe(10)
 
     act(() => {
-      sseOptions?.onMessage({
+      onProgressMessage?.({
         event: 'progress',
         data: {
           model_id: 'small',
