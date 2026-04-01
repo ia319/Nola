@@ -389,5 +389,55 @@
       "description": "此区域发生了意外错误。",
       "retry": "重试"
     }
+  },
+  "models": {
+    "title": "模型管理",
+    "description": "管理 Whisper 模型",
+    "empty": "暂无可用模型",
+    "loading": "加载模型中...",
+    "configured": "默认",
+    "lastLoaded": "运行中",
+    "restartRequired": "需要重启以应用模型更改",
+    "status": {
+      "not_downloaded": "未下载",
+      "downloading": "下载中",
+      "downloaded": "已下载"
+    },
+    "fields": {
+      "size": "大小",
+      "diskUsage": "占用空间",
+      "languages": "语言",
+      "speed": "速度",
+      "accuracy": "精度"
+    },
+    "actions": {
+      "download": "下载",
+      "cancel": "取消",
+      "delete": "删除",
+      "select": "设为默认",
+      "downloading": "下载中..."
+    },
+    "toast": {
+      "downloadStarted": "开始下载: {{modelId}}",
+      "downloadCancelled": "已取消下载: {{modelId}}",
+      "downloadCompleted": "下载完成: {{modelId}}",
+      "deleted": "模型已删除: {{modelId}}",
+      "selected": "默认模型已设为 {{modelId}}",
+      "actionFailed": "模型操作失败，请重试"
+    },
+    "rank": {
+      "1": "极快",
+      "2": "快速",
+      "3": "中等",
+      "4": "较慢",
+      "5": "很慢"
+    },
+    "accuracyRank": {
+      "1": "低",
+      "2": "一般",
+      "3": "良好",
+      "4": "高",
+      "5": "极高"
+    }
   }
 }
