@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from pathlib import Path
 
 from fastapi import APIRouter, Response, status
 
 from nola.api.deps import get_app_config_db
+from nola.api.routes._model_helpers import (
+    canonicalize_model_id,
+    canonicalize_optional_model_id,
+    compute_restart_required,
+)
 from nola.api.schemas import (
     ExportDefaultsUpdateRequest,
     TranscriptionDefaultsUpdateRequest,
@@ -15,7 +19,6 @@ from nola.api.schemas import (
 from nola.api.schemas.models import ModelConfigResponse
 from nola.config import settings
 from nola.config.common import apply_override_patch
-from nola.config.common.types import ConfigMap
 from nola.config.export import (
     EXPORT_CONFIG_PREFIX,
     ExportConfigResponse,
@@ -47,12 +50,6 @@ from nola.models import AppConfigDatabase
 router = APIRouter(prefix="/api/config", tags=["config"])
 
 
-def _canonicalize(raw_model_id: str) -> str:
-    """Resolve an alias to its canonical model_id, pass-through if unknown."""
-    model = get_model(raw_model_id)
-    return model.model_id if model is not None else raw_model_id
-
-
 def _resolve_runtime_model_id(config_db: AppConfigDatabase) -> str:
     """Return the canonical model id reflected by runtime config APIs."""
     worker_state = config_db.get_all("worker.")
@@ -61,7 +58,7 @@ def _resolve_runtime_model_id(config_db: AppConfigDatabase) -> str:
         model = get_model(last_loaded)
         if model is not None:
             return model.model_id
-    return _canonicalize(settings.model_size)
+    return canonicalize_model_id(settings.model_size)
 
 
 def _resolve_configured_model_id(config_db: AppConfigDatabase) -> str:
@@ -72,23 +69,7 @@ def _resolve_configured_model_id(config_db: AppConfigDatabase) -> str:
         model = get_model(configured)
         if model is not None:
             return model.model_id
-    return _canonicalize(settings.model_size)
-
-
-def _compute_restart_required(
-    configured_model_id: str,
-    effective_model_dir: Path,
-    worker_state: ConfigMap,
-) -> bool:
-    """Determine whether the Worker needs a restart to apply config changes."""
-    last_loaded_raw = worker_state.get("last_loaded_model_id")
-    last_loaded_dir = worker_state.get("last_loaded_model_dir")
-    if not isinstance(last_loaded_raw, str) or not isinstance(last_loaded_dir, str):
-        return False
-    return (
-        configured_model_id != _canonicalize(last_loaded_raw)
-        or str(effective_model_dir) != last_loaded_dir
-    )
+    return canonicalize_model_id(settings.model_size)
 
 
 def _build_engine_config(runtime_model_id: str) -> EngineConfigResponse:
@@ -120,9 +101,7 @@ def _build_model_config(config_db: AppConfigDatabase) -> ModelConfigResponse:
     configured_model_id = _resolve_configured_model_id(config_db)
     worker_state = config_db.get_all("worker.")
     last_loaded = worker_state.get("last_loaded_model_id")
-    last_loaded_model_id = (
-        _canonicalize(last_loaded) if isinstance(last_loaded, str) else None
-    )
+    last_loaded_model_id = canonicalize_optional_model_id(last_loaded)
 
     model_config = config_db.get_all("model.")
     db_model_dir = model_config.get("configured_model_dir")
@@ -135,7 +114,7 @@ def _build_model_config(config_db: AppConfigDatabase) -> ModelConfigResponse:
     return ModelConfigResponse(
         configured_model_id=configured_model_id,
         last_loaded_model_id=last_loaded_model_id,
-        restart_required=_compute_restart_required(
+        restart_required=compute_restart_required(
             configured_model_id, effective_model_dir, worker_state
         ),
     )
