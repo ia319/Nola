@@ -132,6 +132,50 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/models/settings': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get model settings
+     * @description Return model directory configuration and override state.
+     */
+    get: operations['get_model_settings_api_models_settings_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /**
+     * Update model settings
+     * @description Persist model directory configuration.
+     */
+    patch: operations['patch_model_settings_api_models_settings_patch']
+    trace?: never
+  }
+  '/api/models/events': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Model download SSE stream
+     * @description Stream model download progress events via SSE.
+     */
+    get: operations['model_events_api_models_events_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/models/{model_id}': {
     parameters: {
       query?: never
@@ -210,50 +254,6 @@ export interface paths {
      * @description Set the configured model for next Worker startup.
      */
     post: operations['select_model_api_models__model_id__select_post']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/models/settings': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Get model settings
-     * @description Return model directory configuration and override state.
-     */
-    get: operations['get_model_settings_api_models_settings_get']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    /**
-     * Update model settings
-     * @description Persist model directory configuration.
-     */
-    patch: operations['patch_model_settings_api_models_settings_patch']
-    trace?: never
-  }
-  '/api/models/events': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Model download SSE stream
-     * @description Stream model download progress events via SSE.
-     */
-    get: operations['model_events_api_models_events_get']
-    put?: never
-    post?: never
     delete?: never
     options?: never
     head?: never
@@ -2196,6 +2196,77 @@ export interface operations {
       }
     }
   }
+  get_model_settings_api_models_settings_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ModelSettingsResponse']
+        }
+      }
+    }
+  }
+  patch_model_settings_api_models_settings_patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ModelSettingsUpdateRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ModelSettingsResponse']
+        }
+      }
+      /** @description Invalid model directory */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  model_events_api_models_events_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'text/event-stream': unknown
+        }
+      }
+    }
+  }
   get_model_detail_api_models__model_id__get: {
     parameters: {
       query?: never
@@ -2403,78 +2474,6 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['HTTPValidationError']
-        }
-      }
-    }
-  }
-  get_model_settings_api_models_settings_get: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ModelSettingsResponse']
-        }
-      }
-    }
-  }
-  patch_model_settings_api_models_settings_patch: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ModelSettingsUpdateRequest']
-      }
-    }
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ModelSettingsResponse']
-        }
-      }
-      /** @description Invalid model directory */
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-    }
-  }
-  model_events_api_models_events_get: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': unknown
-          'text/event-stream': unknown
         }
       }
     }

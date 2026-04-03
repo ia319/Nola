@@ -309,6 +309,18 @@ class TestModelsAPI:
             "Cancel all downloads first."
         )
 
+    def test_model_events_openapi_declares_only_sse_success(
+        self, client: TestClient
+    ) -> None:
+        """OpenAPI should expose only the SSE success content type for model events."""
+        response = client.get("/openapi.json")
+        assert response.status_code == 200
+        schema = response.json()
+
+        events_get = schema["paths"]["/api/models/events"]["get"]
+        events_content = events_get["responses"]["200"]["content"]
+        assert events_content == {"text/event-stream": {}}
+
 
 class TestTranscriptionTasksPhaseA:
     """Test task list, batch action, and delete-record endpoints."""

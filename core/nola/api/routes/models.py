@@ -202,6 +202,8 @@ def get_model_settings() -> ModelSettingsResponse:
 @router.get(
     "/events",
     summary="Model download SSE stream",
+    response_class=StreamingResponse,
+    response_model=None,
     status_code=status.HTTP_200_OK,
     responses={200: {"content": {"text/event-stream": {}}}},
 )
