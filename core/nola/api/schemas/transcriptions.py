@@ -14,7 +14,7 @@ from nola.api.schemas.validators import (
 from nola.config.constants import MAX_BATCH_TASK_IDS
 from nola.config.export import ExportFormat
 from nola.engines.base import TranscribeOptions
-from nola.model_hub import is_supported_model
+from nola.model_hub import get_model
 
 _ENGINE_DEFAULTS = TranscribeOptions()
 
@@ -332,10 +332,14 @@ class TranscriptionRequest(TranscriptionOptionsPayload):
     @field_validator("model_id")
     @classmethod
     def check_model_id(cls, v: str | None) -> str | None:
-        """Reject model ids not in the registry."""
-        if v is not None and not is_supported_model(v):
+        """Reject unknown model ids and normalize aliases to canonical ids."""
+        if v is None:
+            return None
+
+        model = get_model(v)
+        if model is None:
             raise ValueError(f"Unknown model id: {v}")
-        return v
+        return model.model_id
 
     def get_options_dict(self) -> dict[str, Any]:
         """Return non-None transcription options without file_id and model_id."""

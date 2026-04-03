@@ -81,6 +81,12 @@ class TestTranscriptionSchemas:
 
         assert request.get_options_dict() == {"chunk_length": 30}
 
+    def test_transcription_request_canonicalizes_model_id_aliases(self):
+        """Accepted model aliases should normalize to one canonical model id."""
+        request = TranscriptionRequest(file_id="file-001", model_id="large")
+
+        assert request.model_id == "large-v3"
+
     def test_transcription_defaults_update_request_has_no_file_id(self):
         """Defaults update schema should expose only transcription option fields."""
         schema = TranscriptionDefaultsUpdateRequest.model_json_schema()

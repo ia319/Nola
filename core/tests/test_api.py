@@ -199,8 +199,8 @@ class TestTranscriptionsAPI:
         # Should fail because file doesn't exist, not because of options
         assert response.status_code == 404
 
-    def test_create_task_persists_reserved_model_id(self, client: TestClient):
-        """Task creation should store one reserved task-level model id."""
+    def test_create_task_persists_canonical_reserved_model_id(self, client: TestClient):
+        """Task creation should store one canonical task-level model id."""
         file_db = get_file_db()
         task_db = get_task_db()
         file_db.create_file(
@@ -212,16 +212,16 @@ class TestTranscriptionsAPI:
 
         response = client.post(
             "/api/transcription-tasks",
-            json={"file_id": "task-model-file", "model_id": "small"},
+            json={"file_id": "task-model-file", "model_id": "large"},
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert data["model_id"] == "small"
+        assert data["model_id"] == "large-v3"
 
         stored = task_db.get_task(data["task_id"])
         assert stored is not None
-        assert stored["model_id"] == "small"
+        assert stored["model_id"] == "large-v3"
 
 
 class TestModelsAPI:
