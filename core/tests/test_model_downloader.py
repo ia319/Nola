@@ -149,6 +149,22 @@ class _FakeProcess:
         """Match the multiprocessing API without extra behavior."""
 
 
+class _ExitDrainQueue:
+    """Script queue reads to simulate a terminal message racing with exit."""
+
+    def __init__(self) -> None:
+        self._reads = 0
+
+    def get(self, block: bool = True, timeout: float | None = None) -> object:
+        """Raise once, then expose the terminal message during drain."""
+        self._reads += 1
+        if self._reads == 1:
+            raise queue.Empty()
+        if self._reads == 2:
+            return DownloadWorkerMessage(kind="completed")
+        raise queue.Empty()
+
+
 def test_model_downloader_emits_progress_and_completion(tmp_path: Path) -> None:
     """Aggregate subprocess byte deltas into stable progress snapshots."""
     progress_updates: list[DownloadProgress] = []
@@ -217,6 +233,35 @@ def test_model_downloader_emits_progress_and_completion(tmp_path: Path) -> None:
     assert downloader.get_download("small") is None
     assert any(channel == "model_downloads" for channel, _ in event_bus.published)
     assert any(channel == "model_downloads.small" for channel, _ in event_bus.published)
+
+
+def test_model_downloader_drains_terminal_message_after_process_exit(
+    tmp_path: Path,
+) -> None:
+    """Handle a trailing terminal IPC message that arrives after exit is observed."""
+    progress_updates: list[DownloadProgress] = []
+    cache_dir = tmp_path / "model-cache"
+
+    downloader = ModelDownloader(
+        cache_dir,
+        queue_factory=_ExitDrainQueue,
+        process_factory=lambda *_args: _FakeProcess(
+            on_start=lambda process: (
+                setattr(process, "_alive", False),
+                setattr(process, "exitcode", 0),
+            ),
+        ),
+        planner=lambda _repo_id, _cache_dir: 100,
+    )
+
+    downloader.start_download(_make_model(), progress_updates.append)
+
+    _wait_for(lambda: any(update.status == "completed" for update in progress_updates))
+
+    statuses = [update.status for update in progress_updates]
+    assert "completed" in statuses
+    assert "failed" not in statuses
+    assert downloader.get_download("small") is None
 
 
 def test_model_downloader_cancel_terminates_active_process(tmp_path: Path) -> None:

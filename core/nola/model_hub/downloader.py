@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from queue import Empty
 from threading import Lock, Thread
+from time import monotonic
 from typing import Protocol
 
 from nola.common.types import JsonDict
@@ -241,6 +242,11 @@ class ModelDownloader:
                     raw_message = active.message_queue.get(timeout=0.1)
                 except Empty:
                     if not process.is_alive():
+                        terminal_progress = self._drain_queue_after_exit(active)
+                        if terminal_progress is not None:
+                            self._emit_progress(terminal_progress, active.callback)
+                            self._finalize_download(active)
+                            return
                         break
                     continue
 
@@ -287,6 +293,32 @@ class ModelDownloader:
             queue_close = getattr(active.message_queue, "close", None)
             if callable(queue_close):
                 queue_close()
+
+    def _drain_queue_after_exit(
+        self,
+        active: _ActiveDownload,
+        *,
+        timeout_seconds: float = 0.2,
+    ) -> DownloadProgress | None:
+        """Drain any trailing IPC messages that raced with subprocess exit."""
+        deadline = monotonic() + timeout_seconds
+
+        while True:
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                return None
+
+            try:
+                raw_message = active.message_queue.get(timeout=min(0.05, remaining))
+            except Empty:
+                return None
+
+            if not isinstance(raw_message, DownloadWorkerMessage):
+                continue
+
+            terminal_progress = self._handle_message(active, raw_message)
+            if terminal_progress is not None:
+                return terminal_progress
 
     def _handle_message(
         self,
