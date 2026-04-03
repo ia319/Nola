@@ -19,7 +19,7 @@ from nola.model_hub.storage import (
 class _FakeRevision:
     """Describe one cached revision for storage tests."""
 
-    commit_hash: str
+    commit_hash: object
 
 
 @dataclass(frozen=True)
@@ -120,7 +120,11 @@ def test_model_storage_deletes_revisions_via_cache_metadata(
             _FakeRepo(
                 repo_id="repo/a",
                 size_on_disk=10,
-                revisions=(_FakeRevision("rev-a1"), _FakeRevision("rev-a2")),
+                revisions=(
+                    _FakeRevision("rev-a1"),
+                    _FakeRevision(123),
+                    _FakeRevision("rev-a2"),
+                ),
             ),
         )
     )
@@ -160,6 +164,7 @@ def test_model_storage_deletes_partial_cache_and_lock_dirs(
     assert not repo_dir.exists()
     assert not lock_dir.exists()
     assert cache_info.deleted_revisions == ()
+    assert cache_info.delete_strategy.executed is False
 
 
 def test_model_storage_rejects_deletion_when_repo_is_missing(
