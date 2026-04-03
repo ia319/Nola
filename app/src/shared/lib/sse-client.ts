@@ -13,12 +13,18 @@ export interface SSEOptions<T = unknown> {
   eventNames?: string[]
 }
 
+function buildSSEUrl(baseUrl: string, path: string): string {
+  const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${normalizedBase}${normalizedPath}`
+}
+
 /**
  * Open an SSE connection and return a cleanup function.
  * Auto-reconnect relies on browser-native EventSource behaviour.
  */
 export function createSSEConnection<T = unknown>(path: string, options: SSEOptions<T>): () => void {
-  const url = `${env.apiBaseUrl}${path}`
+  const url = buildSSEUrl(env.apiBaseUrl, path)
   const source = new EventSource(url)
 
   const eventNames = options.eventNames ?? ['message']
