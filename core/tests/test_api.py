@@ -1,5 +1,6 @@
 """Pytest tests for API endpoints."""
 
+import asyncio
 import tempfile
 from pathlib import Path
 from unittest.mock import PropertyMock, patch
@@ -8,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from nola.api.deps import get_app_config_db, get_file_db, get_task_db
+from nola.api.routes import models as models_routes
 from nola.config.constants import MAX_BATCH_TASK_IDS
 from nola.config.settings import Settings
 from nola.main import app
@@ -224,6 +226,59 @@ class TestTranscriptionsAPI:
 
 class TestModelsAPI:
     """Test model-management endpoints."""
+
+    def test_model_events_streams_progress_payload(self, client: TestClient) -> None:
+        """The SSE endpoint should be reachable and stream progress events."""
+
+        class _SingleEventBus:
+            async def subscribe(self, channel: str):
+                assert channel == "model_downloads"
+                yield {"model_id": "small", "status": "downloading"}
+
+        with patch(
+            "nola.api.routes.models.get_event_bus",
+            return_value=_SingleEventBus(),
+        ):
+            with client.stream("GET", "/api/models/events") as response:
+                assert response.status_code == 200
+                lines = list(response.iter_lines())
+
+        assert lines[:2] == [
+            "event: progress",
+            'data: {"model_id": "small", "status": "downloading"}',
+        ]
+
+    def test_model_events_emits_keepalive_when_idle(self) -> None:
+        """Idle SSE streams should emit keepalive comments before any progress."""
+
+        class _IdleEventBus:
+            async def subscribe(self, channel: str):
+                assert channel == "model_downloads"
+                while True:
+                    await asyncio.sleep(3600)
+                    yield {}
+
+        async def exercise() -> None:
+            with (
+                patch(
+                    "nola.api.routes.models.get_event_bus",
+                    return_value=_IdleEventBus(),
+                ),
+                patch(
+                    "nola.api.routes.models._SSE_KEEPALIVE_INTERVAL_SECONDS",
+                    0.01,
+                ),
+            ):
+                response = await models_routes.model_events()
+                first_chunk = await anext(response.body_iterator)
+
+                assert first_chunk == ": keepalive\n\n"
+
+                aclose = getattr(response.body_iterator, "aclose", None)
+                if callable(aclose):
+                    await aclose()
+
+        asyncio.run(exercise())
 
     def test_patch_model_settings_rejects_dir_change_while_downloading(
         self, client: TestClient

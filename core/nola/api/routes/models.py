@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncGenerator
+from contextlib import suppress
 from pathlib import Path
 
 from fastapi import APIRouter, Response, status
@@ -16,6 +18,11 @@ from nola.api.deps import (
     get_model_downloader,
     get_model_storage,
     invalidate_model_dir_caches,
+)
+from nola.api.routes._model_helpers import (
+    canonicalize_model_id,
+    canonicalize_optional_model_id,
+    compute_restart_required,
 )
 from nola.api.schemas.models import (
     DownloadProgressResponse,
@@ -38,7 +45,6 @@ from nola.model_hub import (
     ModelDownloadNotFoundError,
     ModelNotDownloadedError,
     UnknownModelError,
-    get_model,
     list_models,
     normalize_configured_model_dir,
     require_model,
@@ -49,12 +55,7 @@ from nola.model_hub.errors import InvalidModelDirectoryError
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/models", tags=["models"])
-
-
-def _canonicalize(raw_model_id: str) -> str:
-    """Resolve an alias to its canonical model_id."""
-    model = get_model(raw_model_id)
-    return model.model_id if model is not None else raw_model_id
+_SSE_KEEPALIVE_INTERVAL_SECONDS = 20.0
 
 
 def _read_model_config() -> ConfigMap:
@@ -85,13 +86,11 @@ def _build_model_response(
     worker_state: ConfigMap,
 ) -> list[ModelResponse]:
     """Assemble response items for all registered models."""
-    configured_raw = model_config.get("configured_model_id")
-    configured_id = (
-        _canonicalize(configured_raw) if isinstance(configured_raw, str) else None
+    configured_id = canonicalize_optional_model_id(
+        model_config.get("configured_model_id")
     )
-    last_loaded_raw = worker_state.get("last_loaded_model_id")
-    last_loaded_id = (
-        _canonicalize(last_loaded_raw) if isinstance(last_loaded_raw, str) else None
+    last_loaded_id = canonicalize_optional_model_id(
+        worker_state.get("last_loaded_model_id")
     )
 
     storage = get_model_storage()
@@ -138,22 +137,6 @@ def _build_model_response(
     return items
 
 
-def _compute_restart_required(
-    configured_model_id: str,
-    effective_model_dir: Path,
-    worker_state: ConfigMap,
-) -> bool:
-    """Compare target config against Worker last-loaded state."""
-    last_loaded_raw = worker_state.get("last_loaded_model_id")
-    last_loaded_dir = worker_state.get("last_loaded_model_dir")
-    if not isinstance(last_loaded_raw, str) or not isinstance(last_loaded_dir, str):
-        return False
-    return (
-        configured_model_id != _canonicalize(last_loaded_raw)
-        or str(effective_model_dir) != last_loaded_dir
-    )
-
-
 # --- Endpoints ---
 
 
@@ -169,20 +152,101 @@ def list_all_models() -> ModelListResponse:
     worker_state = _read_worker_state()
     effective_dir, _ = _resolve_effective_dir(model_config)
 
-    configured_raw = model_config.get("configured_model_id")
-    configured_id = (
-        _canonicalize(configured_raw) if isinstance(configured_raw, str) else None
-    )
-    last_loaded_raw = worker_state.get("last_loaded_model_id")
-    last_loaded_id = (
-        _canonicalize(last_loaded_raw) if isinstance(last_loaded_raw, str) else None
-    )
-
     return ModelListResponse(
         models=_build_model_response(model_config, worker_state),
+        configured_model_id=canonicalize_optional_model_id(
+            model_config.get("configured_model_id")
+        ),
+        last_loaded_model_id=canonicalize_optional_model_id(
+            worker_state.get("last_loaded_model_id")
+        ),
+        effective_model_dir=str(effective_dir),
+    )
+
+
+@router.get(
+    "/settings",
+    summary="Get model settings",
+    response_model=ModelSettingsResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_model_settings() -> ModelSettingsResponse:
+    """Return model directory configuration and override state."""
+    config_db = get_app_config_db()
+    model_config = config_db.get_all("model.")
+    worker_state = _read_worker_state()
+    effective_dir, source = _resolve_effective_dir(model_config)
+
+    configured_id = canonicalize_optional_model_id(
+        model_config.get("configured_model_id")
+    )
+    last_loaded_id = canonicalize_optional_model_id(
+        worker_state.get("last_loaded_model_id")
+    )
+    db_model_dir = model_config.get("configured_model_dir")
+
+    return ModelSettingsResponse(
         configured_model_id=configured_id,
         last_loaded_model_id=last_loaded_id,
+        configured_model_dir=db_model_dir if isinstance(db_model_dir, str) else None,
         effective_model_dir=str(effective_dir),
+        override_source=source,
+        restart_required=compute_restart_required(
+            configured_id or canonicalize_model_id(settings.model_size),
+            effective_dir,
+            worker_state,
+        ),
+    )
+
+
+@router.get(
+    "/events",
+    summary="Model download SSE stream",
+    status_code=status.HTTP_200_OK,
+    responses={200: {"content": {"text/event-stream": {}}}},
+)
+async def model_events() -> StreamingResponse:
+    """Stream model download progress events via SSE."""
+    bus = get_event_bus()
+
+    async def event_generator() -> AsyncGenerator[str]:
+        subscription = bus.subscribe("model_downloads")
+        pending_event: asyncio.Task[object] | None = asyncio.create_task(
+            anext(subscription)
+        )
+
+        try:
+            while pending_event is not None:
+                done, _ = await asyncio.wait(
+                    {pending_event},
+                    timeout=_SSE_KEEPALIVE_INTERVAL_SECONDS,
+                )
+                if not done:
+                    yield ": keepalive\n\n"
+                    continue
+
+                try:
+                    payload = pending_event.result()
+                except StopAsyncIteration:
+                    break
+
+                pending_event = asyncio.create_task(anext(subscription))
+                yield f"event: progress\ndata: {json.dumps(payload)}\n\n"
+        finally:
+            if pending_event is not None:
+                pending_event.cancel()
+                with suppress(asyncio.CancelledError, StopAsyncIteration):
+                    await pending_event
+            await subscription.aclose()
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
@@ -206,13 +270,11 @@ def get_model_detail(model_id: str) -> ModelDetailResponse:
 
     model_config = _read_model_config()
     worker_state = _read_worker_state()
-    configured_raw = model_config.get("configured_model_id")
-    configured_id = (
-        _canonicalize(configured_raw) if isinstance(configured_raw, str) else None
+    configured_id = canonicalize_optional_model_id(
+        model_config.get("configured_model_id")
     )
-    last_loaded_raw = worker_state.get("last_loaded_model_id")
-    last_loaded_id = (
-        _canonicalize(last_loaded_raw) if isinstance(last_loaded_raw, str) else None
+    last_loaded_id = canonicalize_optional_model_id(
+        worker_state.get("last_loaded_model_id")
     )
 
     storage = get_model_storage()
@@ -301,7 +363,7 @@ def start_download(model_id: str) -> ModelDownloadStartedResponse | Response:
 )
 def cancel_download(model_id: str) -> ModelCancelResponse | Response:
     """Cancel one active download."""
-    canonical_id = _canonicalize(model_id)
+    canonical_id = canonicalize_model_id(model_id)
     downloader = get_model_downloader()
     try:
         downloader.cancel_download(canonical_id)
@@ -357,7 +419,7 @@ def delete_model(model_id: str) -> ModelDeleteResponse | Response:
     configured_raw = model_config.get("configured_model_id")
     if (
         isinstance(configured_raw, str)
-        and _canonicalize(configured_raw) == info.model_id
+        and canonicalize_model_id(configured_raw) == info.model_id
     ):
         return Response(
             content=json.dumps(
@@ -420,50 +482,12 @@ def select_model(model_id: str) -> ModelSelectResponse | Response:
     model_config = _read_model_config()
     worker_state = _read_worker_state()
     effective_dir, _ = _resolve_effective_dir(model_config)
-    restart = _compute_restart_required(info.model_id, effective_dir, worker_state)
+    restart = compute_restart_required(info.model_id, effective_dir, worker_state)
 
     return ModelSelectResponse(
         configured_model_id=info.model_id,
         restart_required=restart,
         message=f"Configured model set to {info.name}",
-    )
-
-
-@router.get(
-    "/settings",
-    summary="Get model settings",
-    response_model=ModelSettingsResponse,
-    status_code=status.HTTP_200_OK,
-)
-def get_model_settings() -> ModelSettingsResponse:
-    """Return model directory configuration and override state."""
-    config_db = get_app_config_db()
-    model_config = config_db.get_all("model.")
-    worker_state = _read_worker_state()
-    effective_dir, source = _resolve_effective_dir(model_config)
-
-    configured_raw = model_config.get("configured_model_id")
-    configured_id = (
-        _canonicalize(configured_raw) if isinstance(configured_raw, str) else None
-    )
-    last_loaded_raw = worker_state.get("last_loaded_model_id")
-    last_loaded_id = (
-        _canonicalize(last_loaded_raw) if isinstance(last_loaded_raw, str) else None
-    )
-
-    db_model_dir = model_config.get("configured_model_dir")
-
-    return ModelSettingsResponse(
-        configured_model_id=configured_id,
-        last_loaded_model_id=last_loaded_id,
-        configured_model_dir=db_model_dir if isinstance(db_model_dir, str) else None,
-        effective_model_dir=str(effective_dir),
-        override_source=source,
-        restart_required=_compute_restart_required(
-            configured_id or _canonicalize(settings.model_size),
-            effective_dir,
-            worker_state,
-        ),
     )
 
 
@@ -510,27 +534,3 @@ def patch_model_settings(
         invalidate_model_dir_caches()
 
     return get_model_settings()
-
-
-@router.get(
-    "/events",
-    summary="Model download SSE stream",
-    status_code=status.HTTP_200_OK,
-    responses={200: {"content": {"text/event-stream": {}}}},
-)
-async def model_events() -> StreamingResponse:
-    """Stream model download progress events via SSE."""
-    bus = get_event_bus()
-
-    async def event_generator() -> AsyncGenerator[str]:
-        async for payload in bus.subscribe("model_downloads"):
-            yield f"event: progress\ndata: {json.dumps(payload)}\n\n"
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-        },
-    )
