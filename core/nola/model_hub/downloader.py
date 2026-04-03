@@ -11,6 +11,7 @@ from threading import Lock, Thread
 from typing import Protocol
 
 from nola.common.types import JsonDict
+from nola.model_hub._download_constants import DOWNLOAD_ALLOW_PATTERNS
 from nola.model_hub._download_messages import DownloadWorkerMessage
 from nola.model_hub._download_worker import run_download_subprocess
 from nola.model_hub._hf_api import plan_snapshot_download
@@ -21,13 +22,6 @@ from nola.model_hub.errors import (
     ModelDownloadNotFoundError,
 )
 
-_ALLOW_PATTERNS = (
-    "config.json",
-    "preprocessor_config.json",
-    "model.bin",
-    "tokenizer.json",
-    "vocabulary.*",
-)
 _GLOBAL_CHANNEL = "model_downloads"
 
 
@@ -94,7 +88,7 @@ def _plan_download_bytes(repo_id: str, cache_dir: str) -> int:
     files = plan_snapshot_download(
         repo_id,
         cache_dir=cache_dir,
-        allow_patterns=list(_ALLOW_PATTERNS),
+        allow_patterns=list(DOWNLOAD_ALLOW_PATTERNS),
     )
     total_bytes = 0
     for file_info in files:

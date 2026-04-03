@@ -5,16 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Protocol, cast
 
+from nola.model_hub._download_constants import DOWNLOAD_ALLOW_PATTERNS
 from nola.model_hub._download_messages import DownloadWorkerMessage
 from nola.model_hub._hf_api import download_snapshot, load_base_tqdm
-
-_ALLOW_PATTERNS = (
-    "config.json",
-    "preprocessor_config.json",
-    "model.bin",
-    "tokenizer.json",
-    "vocabulary.*",
-)
 
 
 class _MessageQueue(Protocol):
@@ -40,11 +33,9 @@ def _build_ipc_tqdm_class(message_queue: _MessageQueue) -> type[Any]:
     def update(self: Any, n: int = 1) -> Any:
         result = base_tqdm.update(self, n)
         total_value = self.total
-        total_bytes = (
-            int(total_value) if isinstance(total_value, (int, float)) else None
-        )
+        total_bytes = int(total_value) if isinstance(total_value, int | float) else None
         rate_value = self.format_dict.get("rate")
-        speed_bps = float(rate_value) if isinstance(rate_value, (int, float)) else 0.0
+        speed_bps = float(rate_value) if isinstance(rate_value, int | float) else 0.0
         message_queue.put(
             DownloadWorkerMessage(
                 kind="progress",
@@ -82,7 +73,7 @@ def run_download_subprocess(
         download_snapshot(
             repo_id,
             cache_dir=Path(cache_dir),
-            allow_patterns=list(_ALLOW_PATTERNS),
+            allow_patterns=list(DOWNLOAD_ALLOW_PATTERNS),
             tqdm_class=tqdm_class,
         )
     except Exception as exc:

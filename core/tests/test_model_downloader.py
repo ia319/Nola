@@ -12,9 +12,11 @@ from pathlib import Path
 import pytest
 
 from nola.common.types import JsonDict
+from nola.model_hub._download_constants import DOWNLOAD_ALLOW_PATTERNS
 from nola.model_hub._download_messages import DownloadWorkerMessage
+from nola.model_hub._download_worker import run_download_subprocess
 from nola.model_hub.contracts import DownloadProgress, ModelInfo
-from nola.model_hub.downloader import ModelDownloader
+from nola.model_hub.downloader import ModelDownloader, _plan_download_bytes
 from nola.model_hub.errors import (
     ModelAlreadyDownloadingError,
     ModelDownloadNotFoundError,
@@ -44,6 +46,56 @@ def _wait_for(predicate: Callable[[], bool], *, timeout: float = 2.0) -> None:
             return
         time.sleep(0.01)
     raise AssertionError("Timed out waiting for condition")
+
+
+def test_download_components_share_allow_patterns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Use one shared file-set definition for planning and actual downloads."""
+    captured_plan: dict[str, tuple[str, ...]] = {}
+    captured_worker: dict[str, tuple[str, ...]] = {}
+
+    class _QueueRecorder:
+        def put(
+            self,
+            item: DownloadWorkerMessage,
+            block: bool = True,
+            timeout: float | None = None,
+        ) -> None:
+            return None
+
+    def fake_plan_snapshot_download(
+        repo_id: str,
+        *,
+        cache_dir: str,
+        allow_patterns: list[str],
+    ) -> list[object]:
+        captured_plan["allow_patterns"] = tuple(allow_patterns)
+        return []
+
+    def fake_download_snapshot(
+        repo_id: str,
+        *,
+        cache_dir: Path,
+        allow_patterns: list[str],
+        tqdm_class: type[object],
+    ) -> None:
+        captured_worker["allow_patterns"] = tuple(allow_patterns)
+
+    monkeypatch.setattr(
+        "nola.model_hub.downloader.plan_snapshot_download",
+        fake_plan_snapshot_download,
+    )
+    monkeypatch.setattr(
+        "nola.model_hub._download_worker.download_snapshot",
+        fake_download_snapshot,
+    )
+
+    _plan_download_bytes("repo/small", "cache-root")
+    run_download_subprocess(_QueueRecorder(), "repo/small", "cache-root")
+
+    assert captured_plan["allow_patterns"] == DOWNLOAD_ALLOW_PATTERNS
+    assert captured_worker["allow_patterns"] == DOWNLOAD_ALLOW_PATTERNS
 
 
 @dataclass
