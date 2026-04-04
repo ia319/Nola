@@ -1,6 +1,13 @@
 """Pytest tests for worker module."""
 
+from pathlib import Path
+from unittest.mock import PropertyMock, patch
+
+from nola.config import settings as app_settings
+from nola.config.settings import Settings
 from nola.engines.base import TranscribeOptions
+from nola.model_hub.errors import UnknownModelError
+from nola.services import worker as worker_module
 from nola.services.worker import build_transcribe_options
 
 
@@ -154,3 +161,62 @@ class TestBuildTranscribeOptions:
         options = build_transcribe_options({"hotwords": "inf"})
 
         assert options.hotwords == "inf"
+
+
+class _WorkerModelConfigStore:
+    """Provide the minimal model config contract used during worker startup."""
+
+    def get_all(self, prefix: str) -> dict[str, object]:
+        """Return empty model settings so the worker uses defaults."""
+        assert prefix == "model."
+        return {}
+
+    def set_many(self, prefix: str, values: dict[str, object]) -> None:
+        """Reject state writes when startup should exit before engine load."""
+        raise AssertionError(f"Unexpected set_many call for {prefix}: {values}")
+
+
+class TestWorkerStartup:
+    """Test worker startup guards around configured models."""
+
+    def test_worker_loop_logs_unknown_model_and_exits(self, tmp_path: Path) -> None:
+        """Exit cleanly when the configured model is not in the registry."""
+        model_dir = tmp_path / "models"
+        model_dir.mkdir()
+        db_path = tmp_path / "nola.db"
+
+        with (
+            patch.object(
+                Settings, "db_path", new_callable=PropertyMock, return_value=db_path
+            ),
+            patch.object(app_settings, "model_size", "missing-model"),
+            patch.object(app_settings, "model_dir", model_dir),
+            patch.object(
+                Settings,
+                "default_model_dir",
+                new_callable=PropertyMock,
+                return_value=model_dir,
+            ),
+            patch("nola.services.worker.FileDatabase"),
+            patch("nola.services.worker.TaskDatabase"),
+            patch(
+                "nola.services.worker.AppConfigDatabase",
+                return_value=_WorkerModelConfigStore(),
+            ),
+            patch(
+                "nola.services.worker.resolve_model_dir",
+                return_value=(model_dir, "settings"),
+            ),
+            patch(
+                "nola.model_hub.require_model",
+                side_effect=UnknownModelError("missing-model"),
+            ),
+            patch.object(worker_module.logger, "error") as logger_error,
+        ):
+            worker_module.worker_loop(db_path)
+
+        logger_error.assert_any_call(
+            "Configured model '%s' is not part of the supported registry. "
+            "Update the model setting before starting the Worker.",
+            "missing-model",
+        )

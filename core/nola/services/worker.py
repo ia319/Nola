@@ -234,10 +234,17 @@ def worker_loop(db_path: str | Path | None = None) -> None:
     # Verify the model is cached locally before loading.
     # WhisperModel would silently download from HF if missing; the plan
     # requires users to download via the model management page first.
-    from nola.model_hub import ModelStorage
-    from nola.model_hub import require_model as _require_model
+    from nola.model_hub import ModelStorage, UnknownModelError, require_model
 
-    model_info = _require_model(configured_model)
+    try:
+        model_info = require_model(configured_model)
+    except UnknownModelError:
+        logger.error(
+            "Configured model '%s' is not part of the supported registry. "
+            "Update the model setting before starting the Worker.",
+            configured_model,
+        )
+        return
     storage = ModelStorage(model_dir)
     if not storage.is_downloaded(model_info.repo_id):
         logger.error(

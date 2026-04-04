@@ -287,6 +287,51 @@ def test_model_downloader_cancel_terminates_active_process(tmp_path: Path) -> No
     assert progress_updates[-1].status == "cancelled"
 
 
+def test_model_downloader_does_not_hold_lock_while_planning(tmp_path: Path) -> None:
+    """Allow read-side queries to proceed while the dry-run planner is blocked."""
+    planning_started = threading.Event()
+    release_planner = threading.Event()
+    list_returned = threading.Event()
+    cache_dir = tmp_path / "model-cache"
+
+    def blocking_planner(_repo_id: str, _cache_dir: str) -> int:
+        planning_started.set()
+        if not release_planner.wait(timeout=2.0):
+            raise AssertionError("Planner was not released in time")
+        return 100
+
+    downloader = ModelDownloader(
+        cache_dir,
+        queue_factory=queue.Queue,
+        process_factory=lambda *_args: _FakeProcess(),
+        planner=blocking_planner,
+    )
+
+    start_thread = threading.Thread(
+        target=downloader.start_download,
+        args=(_make_model(),),
+        daemon=True,
+    )
+    start_thread.start()
+
+    _wait_for(planning_started.is_set)
+
+    def read_downloads() -> None:
+        assert downloader.list_downloads() == []
+        list_returned.set()
+
+    read_thread = threading.Thread(target=read_downloads, daemon=True)
+    read_thread.start()
+
+    _wait_for(list_returned.is_set)
+    release_planner.set()
+
+    start_thread.join(timeout=2.0)
+    read_thread.join(timeout=2.0)
+    assert not start_thread.is_alive()
+    assert not read_thread.is_alive()
+
+
 def test_model_downloader_rejects_duplicate_active_tasks(tmp_path: Path) -> None:
     """Fail fast when the same model already has one active subprocess."""
     cache_dir = tmp_path / "model-cache"

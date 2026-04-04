@@ -9,7 +9,7 @@ from collections.abc import AsyncGenerator
 from contextlib import suppress
 from pathlib import Path
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import StreamingResponse
 
 from nola.api.deps import (
@@ -257,7 +257,7 @@ def get_model_settings() -> ModelSettingsResponse:
     status_code=status.HTTP_200_OK,
     responses={200: {"content": {"text/event-stream": {}}}},
 )
-async def model_events() -> StreamingResponse:
+async def model_events(request: Request) -> StreamingResponse:
     """Stream model download progress events via SSE."""
     bus = get_event_bus()
 
@@ -269,11 +269,16 @@ async def model_events() -> StreamingResponse:
 
         try:
             while pending_event is not None:
+                if await request.is_disconnected():
+                    break
+
                 done, _ = await asyncio.wait(
                     {pending_event},
                     timeout=_SSE_KEEPALIVE_INTERVAL_SECONDS,
                 )
                 if not done:
+                    if await request.is_disconnected():
+                        break
                     yield ": keepalive\n\n"
                     continue
 
@@ -543,7 +548,10 @@ def select_model(model_id: str) -> ModelSelectResponse | Response:
     summary="Update model settings",
     response_model=ModelSettingsResponse,
     status_code=status.HTTP_200_OK,
-    responses={422: {"description": "Invalid model directory"}},
+    responses={
+        409: {"description": "Downloads active for current model directory"},
+        422: {"description": "Invalid model directory"},
+    },
 )
 def patch_model_settings(
     request: ModelSettingsUpdateRequest,

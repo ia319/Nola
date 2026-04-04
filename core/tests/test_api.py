@@ -316,6 +316,10 @@ class TestModelsAPI:
                     await asyncio.sleep(3600)
                     yield {}
 
+        class _ConnectedRequest:
+            async def is_disconnected(self) -> bool:
+                return False
+
         async def exercise() -> None:
             with (
                 patch(
@@ -327,7 +331,7 @@ class TestModelsAPI:
                     0.01,
                 ),
             ):
-                response = await models_routes.model_events()
+                response = await models_routes.model_events(_ConnectedRequest())
                 first_chunk = await anext(response.body_iterator)
 
                 assert first_chunk == ": keepalive\n\n"
@@ -378,6 +382,56 @@ class TestModelsAPI:
         events_get = schema["paths"]["/api/models/events"]["get"]
         events_content = events_get["responses"]["200"]["content"]
         assert events_content == {"text/event-stream": {}}
+
+    def test_model_events_closes_subscription_after_disconnect(self) -> None:
+        """SSE subscription should close promptly after the client disconnects."""
+        state = {"closed": False, "checks": 0}
+
+        class _DisconnectingRequest:
+            async def is_disconnected(self) -> bool:
+                state["checks"] += 1
+                return True
+
+        class _TrackedSubscription:
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self) -> dict[str, str]:
+                raise StopAsyncIteration
+
+            async def aclose(self) -> None:
+                state["closed"] = True
+
+        class _TrackedEventBus:
+            def subscribe(self, channel: str) -> _TrackedSubscription:
+                assert channel == "model_downloads"
+                return _TrackedSubscription()
+
+        async def exercise() -> None:
+            with patch(
+                "nola.api.routes.models.get_event_bus",
+                return_value=_TrackedEventBus(),
+            ):
+                response = await models_routes.model_events(_DisconnectingRequest())
+                chunks = [chunk async for chunk in response.body_iterator]
+
+            assert chunks == []
+            assert state["checks"] >= 1
+            assert state["closed"] is True
+
+        asyncio.run(exercise())
+
+    def test_patch_model_settings_openapi_declares_conflict_response(
+        self, client: TestClient
+    ) -> None:
+        """OpenAPI should document the active-download conflict for settings updates."""
+        response = client.get("/openapi.json")
+        assert response.status_code == 200
+        schema = response.json()
+
+        patch_operation = schema["paths"]["/api/models/settings"]["patch"]
+        conflict = patch_operation["responses"]["409"]
+        assert conflict["description"] == "Downloads active for current model directory"
 
 
 class TestTranscriptionTasksPhaseA:

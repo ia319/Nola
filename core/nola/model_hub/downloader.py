@@ -145,7 +145,12 @@ class ModelDownloader:
             if model_info.model_id in self._active_downloads:
                 raise ModelAlreadyDownloadingError(model_info.model_id)
 
-            total_bytes = self._planner(model_info.repo_id, str(self.cache_dir))
+        total_bytes = self._planner(model_info.repo_id, str(self.cache_dir))
+
+        with self._lock:
+            if model_info.model_id in self._active_downloads:
+                raise ModelAlreadyDownloadingError(model_info.model_id)
+
             message_queue = self._queue_factory()
             process = self._process_factory(
                 message_queue,
