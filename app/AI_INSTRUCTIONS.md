@@ -108,6 +108,24 @@ app/                          # Frontend workspace root
 │   │   │   │   └── __tests__/
 │   │   │   │       └── filename.test.ts # Filename helper tests
 │   │   │   └── index.ts      # Feature public exports
+│   │   ├── models/           # Model management feature
+│   │   │   ├── api.ts        # Model list/detail/download/settings API client
+│   │   │   ├── __tests__/    # Model API tests
+│   │   │   │   └── api.test.ts # Verify model API request wiring
+│   │   │   ├── components/   # Model management UI components
+│   │   │   │   ├── DownloadProgress.tsx # Download progress display
+│   │   │   │   ├── ModelCard.tsx # Model card and action controls
+│   │   │   │   └── ModelList.tsx # Sorted model list composition
+│   │   │   ├── hooks/        # Model data and download-state hooks
+│   │   │   │   ├── useModels.ts # Load model list and settings
+│   │   │   │   ├── useModelDownload.ts # Merge REST and SSE download state
+│   │   │   │       ├── useModels.test.ts # Verify model list hook behavior
+│   │   │   │       └── useModelDownload.test.ts # Verify download hook behavior
+│   │   │   ├── lib/          # Model-private display helpers
+│   │   │   │   ├── model-helpers.ts # Format and sort model display data
+│   │   │   │       └── model-helpers.test.ts # Verify helper edge cases
+│   │   │   ├── index.ts      # Feature public exports
+│   │   │   └── types.ts      # Model domain contracts
 │   │   ├── tasks/            # Keep task lifecycle, polling, and history subdomain
 │   │   │   ├── api.ts        # Use create/list/get/cancel/delete and batch endpoints
 │   │   │   ├── actions.ts    # Wrap write actions and guarantee refresh signals
@@ -220,13 +238,15 @@ app/                          # Frontend workspace root
 │   │   │   ├── error-utils.ts      # API error normalization helpers
 │   │   │   ├── file-validation.ts  # Pure file validation (ext/MIME/size)
 │   │   │   ├── format.ts           # formatFileSize() human-readable sizes
+│   │   │   ├── sse-client.ts       # Shared EventSource wrapper for typed SSE streams
 │   │   │   ├── utils.ts            # downloadBlob helper
 │   │   │   └── __tests__/          # Unit tests (Vitest)
 │   │   │       ├── api-client.test.ts # Interceptor error mapping tests
 │   │   │       ├── error-factory.test.ts # AppError factory contract tests
 │   │   │       ├── error-utils.test.ts # API error formatting tests
 │   │   │       ├── file-validation.test.ts # validateFile unit tests
-│   │   │       └── format.test.ts # formatFileSize unit tests
+│   │   │       ├── format.test.ts # formatFileSize unit tests
+│   │   │       └── sse-client.test.ts # SSE connection wiring tests
 │   │   └── types/            # Shared type contracts
 │   │       ├── openapi.d.ts   # AUTO-GENERATED (pnpm gen:types)
 │   │       ├── api-error.ts   # Backend error payload types
@@ -240,8 +260,15 @@ app/                          # Frontend workspace root
 │   └── routes/               # Route composition and URL query contracts
 │       ├── AppShell.tsx      # Shared shell route component
 │       ├── HistoryPage.tsx   # History route composition component
+│       ├── ModelsPage.tsx    # Models route composition component
 │       └── history-search.ts # History URL query normalize/build helpers
 ```
+
+### Recent Additions
+
+- `src/features/models/`: Model-management feature with API client, hooks, helpers, and page components.
+- `src/shared/lib/sse-client.ts`: Shared EventSource wrapper for model download streaming.
+- `src/routes/ModelsPage.tsx`: `/models` route mounted alongside `/` and `/history`.
 
 ---
 
@@ -415,6 +442,19 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `lib/filename.ts`: Build frontend fallback filename aligned with backend rules.
   - `lib/__tests__/filename.test.ts`: Verify filename helper behavior.
   - `index.ts`: Expose export feature public exports.
+- **models**:
+  - `api.ts`: Use model list/detail/download/cancel/delete/select/settings/download-runtime endpoints.
+  - `__tests__/api.test.ts`: Verify model API request wiring.
+  - `components/DownloadProgress.tsx`: Render real download percentage, transferred bytes, and speed.
+  - `components/ModelCard.tsx`: Render one model row/card with status badges and contextual actions.
+  - `components/ModelList.tsx`: Compose sorted model display using runtime download state.
+  - `hooks/useModels.ts`: Load model list/settings and preserve structured `AppError` semantics.
+  - `hooks/useModelDownload.ts`: Merge REST baseline download state with SSE progress events.
+  - `hooks/__tests__/useModels.test.ts`, `hooks/__tests__/useModelDownload.test.ts`: Verify model hook behavior.
+  - `lib/model-helpers.ts`: Keep pure display helpers for sorting and byte formatting.
+  - `lib/__tests__/model-helpers.test.ts`: Verify helper edge cases.
+  - `types.ts`: Keep model feature contracts stable over generated OpenAPI types.
+  - `index.ts`: Expose model feature public exports.
 - **realtime**:
   - `index.ts`: Reserve placeholder exports for future WebSocket live updates.
 
@@ -441,6 +481,8 @@ Cross-feature shared code, split into `lib/` and `types/`.
 - **lib/__tests__/error-utils.test.ts**: Formatting tests for string and validation-array payloads.
 - **lib/file-validation.ts**: Pure function `validateFile(file, config)` with config injection. Checks extension, MIME, size, empty file, no extension. Returns `AppError` on failure.
 - **lib/format.ts**: `formatFileSize(bytes)` — base-1024 human-readable string (B/KB/MB/GB/TB). Guards against negative/NaN/Infinity.
+- **lib/sse-client.ts**: Shared EventSource wrapper with typed payloads and normalized API-base URL joining.
+- **lib/__tests__/sse-client.test.ts**: Verify SSE connection wiring, event parsing, and cleanup.
 - **lib/utils.ts**: `downloadBlob()` triggers browser file download from Blob (appends `<a>` to DOM, defers `URL.revokeObjectURL`).
 - **lib/\_\_tests\_\_/**: Vitest unit tests for API-client mapping plus pure helpers (`error-factory`, `error-utils`, `file-validation`, `format`).
 - **types/openapi.d.ts**: Auto-generated by `pnpm gen:types`. Never edit manually.
@@ -458,6 +500,7 @@ Keep route composition and search-model helpers in this directory.
 
 - **AppShell.tsx**: Keep shared navigation shell and global polling mount.
 - **HistoryPage.tsx**: Compose `/history` page interactions and route callbacks.
+- **ModelsPage.tsx**: Compose `/models` page interactions, model settings summary, and model action toasts.
 - **history-search.ts**: Normalize route search params and build task query model.
 
 ### src/lib/

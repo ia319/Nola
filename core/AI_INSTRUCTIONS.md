@@ -70,6 +70,7 @@ core/
 │   ├── common/                # Shared backend helpers
 │   │   ├── __init__.py        # Common helper package exports
 │   │   ├── merge.py           # Recursive deep-merge helper
+│   │   ├── event_bus.py       # Process-wide in-memory event bus
 │   │   └── types.py           # Shared recursive JSON type aliases
 │   ├── utils/                 # Utility functions
 │   │   ├── __init__.py        # Utility package exports
@@ -79,8 +80,10 @@ core/
 │   │   ├── deps.py            # Dependency injection
 │   │   ├── routes/            # API endpoints
 │   │   │   ├── __init__.py    # Route package exports
+│   │   │   ├── _model_helpers.py # Shared model-route helper functions
 │   │   │   ├── config.py      # Config aggregation and defaults endpoints
 │   │   │   ├── files.py       # File upload/management
+│   │   │   ├── models.py      # Model management and download runtime endpoints
 │   │   │   ├── transcriptions.py  # Canonical task route composition entry
 │   │   │   └── tasks/         # Task route modules grouped by responsibility
 │   │   │       ├── __init__.py  # Task route package exports
@@ -92,6 +95,7 @@ core/
 │   │       ├── __init__.py    # Schema package exports
 │   │       ├── config.py      # Export defaults update request schema
 │   │       ├── files.py       # FileResponse, FileListResponse, etc.
+│   │       ├── models.py      # Model request/response schema set
 │   │       ├── responses.py   # TaskDetailResponse, CreateTaskResponse, etc.
 │   │       ├── transcriptions.py  # TranscriptionRequest, BatchExportRequest, defaults update
 │   │       └── validators.py  # Reusable schema validators
@@ -115,6 +119,17 @@ core/
 │   │   └── utils/             # SQLite utility module
 │   │       ├── __init__.py    # Utility exports
 │   │       └── db.py          # sqlite version and connection checks
+│   ├── model_hub/             # Managed model registry, storage, and downloads
+│   │   ├── __init__.py        # Model-hub exports
+│   │   ├── contracts.py       # Shared model metadata and download contracts
+│   │   ├── downloader.py      # Subprocess-backed model downloads
+│   │   ├── errors.py          # Model-hub domain errors
+│   │   ├── registry.py        # Curated model registry and alias lookup
+│   │   ├── storage.py         # Cache inspection and deletion helpers
+│   │   ├── _download_constants.py # Shared download allow-pattern constants
+│   │   ├── _download_messages.py # Download IPC message contracts
+│   │   ├── _download_worker.py # Subprocess download worker entry
+│   │   └── _hf_api.py         # Thin Hugging Face hub wrappers
 │   └── services/              # Business logic
 │       ├── __init__.py        # Service package exports
 │       ├── worker.py          # Background worker process
@@ -132,8 +147,12 @@ core/
     ├── test_config_api.py     # Config endpoint contract tests
     ├── test_config_db.py      # App config persistence tests
     ├── test_engines.py        # Engine tests
+    ├── test_event_bus.py      # Event-bus publish/subscribe tests
     ├── test_export_filenames.py # Export filename helper tests
     ├── test_models.py         # Database tests
+    ├── test_model_downloader.py # Model downloader tests
+    ├── test_model_registry.py # Model registry tests
+    ├── test_model_storage.py  # Model storage tests
     ├── test_task_repositories.py # taskdb repository tests
     ├── test_transcription_config.py # Transcription schema/defaults tests
     ├── test_transcription_contracts.py # Transcription contract consistency tests
@@ -142,6 +161,12 @@ core/
     ├── test_worker.py         # Worker tests
     └── test_formatters.py     # Formatter tests
 ```
+
+### Recent Additions
+
+- `nola/common/event_bus.py`: Process-wide in-memory event bus for model-download SSE.
+- `nola/model_hub/`: Model registry, storage, downloader, and domain errors.
+- `nola/api/routes/models.py` + `nola/api/schemas/models.py`: Model management and runtime download APIs.
 
 ---
 
@@ -195,6 +220,15 @@ Data persistence layer (SQLite):
 Shared backend helper layer:
 - `merge.py`: Provide recursive deep-merge behavior for defaults composition.
 - `types.py`: Provide recursive JSON-compatible type aliases for shared config code.
+- `event_bus.py`: Publish and subscribe process-wide model-download events for SSE streaming.
+
+### nola/model_hub/
+Model lifecycle management:
+- `registry.py`: Keep the curated model registry and canonical/alias lookup helpers.
+- `storage.py`: Resolve model cache roots, inspect Hugging Face cache state, and delete full or partial cache artifacts.
+- `downloader.py`: Run subprocess-backed downloads, aggregate real byte progress and speed, and expose active download snapshots.
+- `contracts.py`: Keep shared model metadata and download/runtime value objects.
+- `errors.py`: Define model-hub domain errors for API mapping and worker startup guards.
 
 ### nola/engines/
 Transcription engine layer:
@@ -206,9 +240,10 @@ Transcription engine layer:
 
 ### nola/api/
 REST API layer:
-- `deps.py`: Dependency injection for database instances (singletons)
+- `deps.py`: Dependency injection for database singletons plus shared model storage, downloader, and event-bus singletons.
 - `routes/config.py`: Aggregated config endpoints, transcription defaults management, and export defaults management.
 - `routes/files.py`: File upload/list/delete with validation. All endpoints use `response_model`.
+- `routes/models.py`: Model list/detail/download/cancel/delete/select/settings endpoints, SSE event stream, and active-download runtime summary.
 - `routes/transcriptions.py`: Canonical task router composition entry. Mount read/actions/export task route modules under `/api/transcription-tasks`.
 - `routes/tasks/read.py`: Read endpoints for task list/detail; keep sync handlers for sync DB dependencies.
 - `routes/tasks/actions.py`: Mutation endpoints for create/cancel/batch/retry/delete-record.
@@ -216,6 +251,7 @@ REST API layer:
 - `routes/tasks/_errors.py`: Convert task use-case errors into HTTP exceptions.
 - `schemas/config.py`: Export defaults update request schema.
 - `schemas/files.py`: 8 Pydantic response models (`FileResponse`, `FileListResponse`, etc.)
+- `schemas/models.py`: Model management request/response models for list/detail/settings/download runtime.
 - `schemas/responses.py`: 7 Pydantic response models (`TaskDetailResponse`, `CreateTaskResponse`, etc.)
 - `schemas/transcriptions.py`: Request models (`TranscriptionRequest`, `BatchTaskActionRequest`, `BatchExportRequest`, `TranscriptionDefaultsUpdateRequest`) with typed `VadParametersRequest` and `extra=forbid`
 - `schemas/validators.py`: Reusable validation functions for language, task options, temperature, and nested `vad_parameters` keys
@@ -236,6 +272,9 @@ Background services:
   - Loads engine once for performance
   - `build_transcribe_options()` merges engine defaults, app defaults, and task overrides
   - JSON options parsing with error handling
+  - Resolves `configured_model_id` and effective `model_dir` before engine startup
+  - Rejects implicit model auto-download and requires cached models from model management
+  - Persists `worker.last_loaded_model_id` and `worker.last_loaded_model_dir` for runtime config state
 - `formatters/`: Subtitle export formatters (SRT, VTT, TXT, ASS)
   - `get_formatter(format, include_timestamps)` factory function
   - Static registry pattern for format discovery
@@ -251,6 +290,16 @@ FastAPI entry point with lifespan management:
 - `GET /api/config/export` - Get effective export defaults
 - `PATCH /api/config/export/defaults` - Persist export default overrides
 - `DELETE /api/config/export/defaults` - Reset persisted export defaults
+- `GET /api/models` - List registered models with local and download state
+- `GET /api/models/downloads` - List active downloads with real current speed
+- `GET /api/models/settings` - Read model directory and configured-model settings
+- `PATCH /api/models/settings` - Update model directory settings
+- `GET /api/models/events` - Stream model download SSE events
+- `GET /api/models/{model_id}` - Get one model detail
+- `POST /api/models/{model_id}/download` - Start model download
+- `POST /api/models/{model_id}/cancel` - Cancel active model download
+- `DELETE /api/models/{model_id}` - Delete local model cache
+- `POST /api/models/{model_id}/select` - Select configured model for next worker startup
 - `POST /api/files/` - Upload audio file
 - `GET /api/files/` - List all files
 - `GET /api/files/{file_id}` - Get file metadata
