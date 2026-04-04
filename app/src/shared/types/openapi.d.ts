@@ -132,6 +132,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/models/downloads': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List active model downloads
+     * @description Return active model downloads with real current speed snapshots.
+     */
+    get: operations['list_active_downloads_api_models_downloads_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/models/settings': {
     parameters: {
       query?: never
@@ -603,6 +623,43 @@ export interface paths {
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
+    /**
+     * ActiveModelDownloadResponse
+     * @description Expose one active model download with registry identity.
+     */
+    ActiveModelDownloadResponse: {
+      /** Model Id */
+      model_id: string
+      /** Name */
+      name: string
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'downloading' | 'completed' | 'failed' | 'cancelled'
+      /** Percent */
+      percent: number
+      /** Downloaded Bytes */
+      downloaded_bytes: number
+      /** Total Bytes */
+      total_bytes: number
+      /** Speed Bps */
+      speed_bps: number
+      /** Error */
+      error?: string | null
+    }
+    /**
+     * ActiveModelDownloadsResponse
+     * @description Expose the current active-download runtime summary.
+     */
+    ActiveModelDownloadsResponse: {
+      /** Downloads */
+      downloads: components['schemas']['ActiveModelDownloadResponse'][]
+      /** Active Count */
+      active_count: number
+      /** Total Speed Bps */
+      total_speed_bps: number
+    }
     /**
      * AppConfigResponse
      * @description Aggregate application configuration required by the frontend.
@@ -2192,6 +2249,26 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ModelListResponse']
+        }
+      }
+    }
+  }
+  list_active_downloads_api_models_downloads_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ActiveModelDownloadsResponse']
         }
       }
     }

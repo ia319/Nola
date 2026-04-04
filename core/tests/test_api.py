@@ -13,6 +13,7 @@ from nola.api.routes import models as models_routes
 from nola.config.constants import MAX_BATCH_TASK_IDS
 from nola.config.settings import Settings
 from nola.main import app
+from nola.model_hub import DownloadProgress
 from nola.models import init_db
 
 
@@ -226,6 +227,63 @@ class TestTranscriptionsAPI:
 
 class TestModelsAPI:
     """Test model-management endpoints."""
+
+    def test_list_active_model_downloads_reports_real_speed(
+        self, client: TestClient
+    ) -> None:
+        """The downloads endpoint should expose live per-model and total speed."""
+
+        class _FakeDownloader:
+            def list_downloads(self) -> list[DownloadProgress]:
+                return [
+                    DownloadProgress(
+                        model_id="small",
+                        status="downloading",
+                        downloaded_bytes=50,
+                        total_bytes=200,
+                        speed_bps=1250.4,
+                    ),
+                    DownloadProgress(
+                        model_id="large-v3",
+                        status="downloading",
+                        downloaded_bytes=300,
+                        total_bytes=600,
+                        speed_bps=2048.9,
+                    ),
+                ]
+
+        with patch(
+            "nola.api.routes.models.get_model_downloader",
+            return_value=_FakeDownloader(),
+        ):
+            response = client.get("/api/models/downloads")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["active_count"] == 2
+        assert data["total_speed_bps"] == 3298
+        assert data["downloads"] == [
+            {
+                "model_id": "small",
+                "name": "Small",
+                "status": "downloading",
+                "percent": 25.0,
+                "downloaded_bytes": 50,
+                "total_bytes": 200,
+                "speed_bps": 1250,
+                "error": None,
+            },
+            {
+                "model_id": "large-v3",
+                "name": "Large V3",
+                "status": "downloading",
+                "percent": 50.0,
+                "downloaded_bytes": 300,
+                "total_bytes": 600,
+                "speed_bps": 2048,
+                "error": None,
+            },
+        ]
 
     def test_model_events_streams_progress_payload(self, client: TestClient) -> None:
         """The SSE endpoint should be reachable and stream progress events."""

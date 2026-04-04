@@ -25,6 +25,8 @@ from nola.api.routes._model_helpers import (
     compute_restart_required,
 )
 from nola.api.schemas.models import (
+    ActiveModelDownloadResponse,
+    ActiveModelDownloadsResponse,
     DownloadProgressResponse,
     ModelCancelResponse,
     ModelDeleteResponse,
@@ -40,6 +42,7 @@ from nola.api.schemas.models import (
 from nola.config import settings
 from nola.config.common.types import ConfigMap
 from nola.model_hub import (
+    DownloadProgress,
     ModelAlreadyDownloadingError,
     ModelDirSource,
     ModelDownloadNotFoundError,
@@ -81,6 +84,47 @@ def _resolve_effective_dir(
     return effective_dir, source
 
 
+def _to_download_progress_response(
+    progress: DownloadProgress,
+) -> DownloadProgressResponse:
+    """Translate one runtime download snapshot into the public schema."""
+    return DownloadProgressResponse(
+        percent=progress.percent,
+        downloaded_bytes=progress.downloaded_bytes,
+        total_bytes=progress.total_bytes,
+        speed_bps=int(progress.speed_bps),
+        error=progress.error,
+    )
+
+
+def _build_active_downloads_response() -> ActiveModelDownloadsResponse:
+    """Return the current active-download summary for UI polling."""
+    downloader = get_model_downloader()
+    runtime_downloads = downloader.list_downloads()
+    items: list[ActiveModelDownloadResponse] = []
+
+    for progress in runtime_downloads:
+        model_info = require_model(progress.model_id)
+        items.append(
+            ActiveModelDownloadResponse(
+                model_id=model_info.model_id,
+                name=model_info.name,
+                status=progress.status,
+                percent=progress.percent,
+                downloaded_bytes=progress.downloaded_bytes,
+                total_bytes=progress.total_bytes,
+                speed_bps=int(progress.speed_bps),
+                error=progress.error,
+            )
+        )
+
+    return ActiveModelDownloadsResponse(
+        downloads=items,
+        active_count=len(items),
+        total_speed_bps=sum(item.speed_bps for item in items),
+    )
+
+
 def _build_model_response(
     model_config: ConfigMap,
     worker_state: ConfigMap,
@@ -109,12 +153,7 @@ def _build_model_response(
 
         progress_resp = None
         if download is not None:
-            progress_resp = DownloadProgressResponse(
-                percent=download.percent,
-                downloaded_bytes=download.downloaded_bytes,
-                total_bytes=download.total_bytes,
-                speed_bps=int(download.speed_bps),
-            )
+            progress_resp = _to_download_progress_response(download)
 
         items.append(
             ModelResponse(
@@ -162,6 +201,17 @@ def list_all_models() -> ModelListResponse:
         ),
         effective_model_dir=str(effective_dir),
     )
+
+
+@router.get(
+    "/downloads",
+    summary="List active model downloads",
+    response_model=ActiveModelDownloadsResponse,
+    status_code=status.HTTP_200_OK,
+)
+def list_active_downloads() -> ActiveModelDownloadsResponse:
+    """Return active model downloads with real current speed snapshots."""
+    return _build_active_downloads_response()
 
 
 @router.get(
@@ -293,12 +343,7 @@ def get_model_detail(model_id: str) -> ModelDetailResponse:
 
     progress_resp = None
     if download is not None:
-        progress_resp = DownloadProgressResponse(
-            percent=download.percent,
-            downloaded_bytes=download.downloaded_bytes,
-            total_bytes=download.total_bytes,
-            speed_bps=int(download.speed_bps),
-        )
+        progress_resp = _to_download_progress_response(download)
 
     return ModelDetailResponse(
         model_id=info.model_id,

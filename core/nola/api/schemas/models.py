@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 ModelStatusLiteral = Literal["not_downloaded", "downloading", "downloaded"]
 ModelDirSourceLiteral = Literal["environment", "database", "default"]
+DownloadStatusLiteral = Literal["downloading", "completed", "failed", "cancelled"]
 
 
 class DownloadProgressResponse(BaseModel):
@@ -18,6 +19,27 @@ class DownloadProgressResponse(BaseModel):
     total_bytes: int
     speed_bps: int
     error: str | None = None
+
+
+class ActiveModelDownloadResponse(BaseModel):
+    """Expose one active model download with registry identity."""
+
+    model_id: str
+    name: str
+    status: DownloadStatusLiteral
+    percent: float
+    downloaded_bytes: int
+    total_bytes: int
+    speed_bps: int
+    error: str | None = None
+
+
+class ActiveModelDownloadsResponse(BaseModel):
+    """Expose the current active-download runtime summary."""
+
+    downloads: list[ActiveModelDownloadResponse]
+    active_count: int
+    total_speed_bps: int
 
 
 class ModelResponse(BaseModel):
