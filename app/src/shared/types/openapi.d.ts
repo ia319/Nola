@@ -2315,6 +2315,13 @@ export interface operations {
           'application/json': components['schemas']['ModelSettingsResponse']
         }
       }
+      /** @description Downloads active for current model directory */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
       /** @description Invalid model directory */
       422: {
         headers: {
