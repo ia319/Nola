@@ -485,6 +485,9 @@ class TestModelsAPI:
         patch_operation = schema["paths"]["/api/models/settings"]["patch"]
         conflict = patch_operation["responses"]["409"]
         assert conflict["description"] == "Downloads active for current model directory"
+        conflict_content = conflict["content"]["application/json"]
+        detail_schema = conflict_content["schema"]
+        assert detail_schema == {"$ref": "#/components/schemas/DetailResponse"}
 
 
 class TestTranscriptionTasksPhaseA:

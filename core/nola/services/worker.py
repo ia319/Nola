@@ -199,8 +199,8 @@ def run_transcription(
         task_db.fail(task_id, str(e), should_retry=True)
 
 
-def worker_loop(db_path: str | Path | None = None) -> None:
-    """Run the main worker loop."""
+def worker_loop(db_path: str | Path | None = None) -> bool:
+    """Run the main worker loop and report whether startup succeeded."""
     from nola.config import settings
 
     db_path = db_path or settings.db_path
@@ -239,7 +239,7 @@ def worker_loop(db_path: str | Path | None = None) -> None:
             "Update the model setting before starting the Worker.",
             configured_model,
         )
-        return
+        return False
 
     configured_model = model_info.model_id
     logger.info(f"Loading model '{configured_model}' from {model_dir}")
@@ -250,7 +250,7 @@ def worker_loop(db_path: str | Path | None = None) -> None:
             f"Model '{configured_model}' is not downloaded in {model_dir}. "
             "Download it via the model management page before starting the Worker."
         )
-        return
+        return False
 
     engine_config = EngineConfig(
         model_size=configured_model,
@@ -259,14 +259,21 @@ def worker_loop(db_path: str | Path | None = None) -> None:
     engine = FasterWhisperEngine(config=engine_config)
     logger.info("Model loaded successfully")
 
-    # Report loaded state for restart_required calculation
-    app_config_db.set_many(
-        "worker.",
-        {
-            "last_loaded_model_id": configured_model,
-            "last_loaded_model_dir": str(model_dir),
-        },
-    )
+    # Report loaded state for restart_required calculation. This should not
+    # block task execution if the UI-facing restart state cannot be written.
+    try:
+        app_config_db.set_many(
+            "worker.",
+            {
+                "last_loaded_model_id": configured_model,
+                "last_loaded_model_dir": str(model_dir),
+            },
+        )
+    except Exception:
+        logger.warning(
+            "Failed to persist worker model state for restart tracking.",
+            exc_info=True,
+        )
 
     while _running:
         try:
@@ -284,6 +291,7 @@ def worker_loop(db_path: str | Path | None = None) -> None:
             time.sleep(5)
 
     logger.info("Worker stopped")
+    return True
 
 
 def signal_handler(signum: int, frame: Any) -> None:
@@ -304,7 +312,8 @@ def main() -> None:
     signal.signal(signal.SIGTERM, signal_handler)
 
     init_db()
-    worker_loop()
+    if not worker_loop():
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

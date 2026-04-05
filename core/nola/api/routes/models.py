@@ -27,6 +27,7 @@ from nola.api.routes._model_helpers import (
 from nola.api.schemas.models import (
     ActiveModelDownloadResponse,
     ActiveModelDownloadsResponse,
+    DetailResponse,
     DownloadProgressResponse,
     ModelCancelResponse,
     ModelDeleteResponse,
@@ -549,8 +550,10 @@ def select_model(model_id: str) -> ModelSelectResponse | Response:
     response_model=ModelSettingsResponse,
     status_code=status.HTTP_200_OK,
     responses={
-        409: {"description": "Downloads active for current model directory"},
-        422: {"description": "Invalid model directory"},
+        409: {
+            "model": DetailResponse,
+            "description": "Downloads active for current model directory",
+        },
     },
 )
 def patch_model_settings(

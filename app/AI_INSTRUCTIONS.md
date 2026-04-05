@@ -493,7 +493,7 @@ Cross-feature shared code, split into `lib/` and `types/`.
 - **types/app-error.ts**: Frontend error contract (`AppError`: `code`, `i18nKey`, `params`, `retriable`).
 - **types/config.ts**: Thin aliases for config contracts (`AppConfig`, `EngineDefaults`, `TranscriptionDefaultsUpdateRequest`).
 - **types/file.ts**: Thin aliases over OpenAPI file schemas (`FileInfo`, `FileUploadResponse`, etc.).
-- **types/task.ts**: Thin aliases over OpenAPI task schemas + derived types (`TaskStatus`, `ExportFormat` from schema enums).
+- **types/task.ts**: Thin aliases over OpenAPI task schemas + derived types (`TaskStatus`, `ExportFormat` from schema enums); task read responses now include reserved `model_id` context.
 - **types/task-query.ts**: Shared query model for list toolbar and pagination contracts.
 - **types/index.ts**: Barrel re-export for `import type { ... } from '@/shared/types'`.
 

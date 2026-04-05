@@ -123,6 +123,12 @@ class ModelSettingsUpdateRequest(BaseModel):
     )
 
 
+class DetailResponse(BaseModel):
+    """Expose one JSON error detail message."""
+
+    detail: str
+
+
 class ModelConfigResponse(BaseModel):
     """Expose model state inside the aggregated /api/config response."""
 

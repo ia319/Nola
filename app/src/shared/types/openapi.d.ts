@@ -833,6 +833,14 @@ export interface components {
       message: string
     }
     /**
+     * DetailResponse
+     * @description Expose one JSON error detail message.
+     */
+    DetailResponse: {
+      /** Detail */
+      detail: string
+    }
+    /**
      * DownloadProgressResponse
      * @description Expose one active download snapshot.
      */
@@ -2324,14 +2332,18 @@ export interface operations {
         headers: {
           [name: string]: unknown
         }
-        content?: never
+        content: {
+          'application/json': components['schemas']['DetailResponse']
+        }
       }
-      /** @description Invalid model directory */
+      /** @description Validation Error */
       422: {
         headers: {
           [name: string]: unknown
         }
-        content?: never
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
       }
     }
   }

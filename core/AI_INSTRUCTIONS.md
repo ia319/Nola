@@ -252,15 +252,15 @@ REST API layer:
 - `schemas/config.py`: Export defaults update request schema.
 - `schemas/files.py`: 8 Pydantic response models (`FileResponse`, `FileListResponse`, etc.)
 - `schemas/models.py`: Model management request/response models for list/detail/settings/download runtime.
-- `schemas/responses.py`: 7 Pydantic response models (`TaskDetailResponse`, `CreateTaskResponse`, etc.)
+- `schemas/responses.py`: 7 Pydantic response models (`TaskDetailResponse`, `CreateTaskResponse`, etc.); task read responses now expose persisted `model_id` context
 - `schemas/transcriptions.py`: Request models (`TranscriptionRequest`, `BatchTaskActionRequest`, `BatchExportRequest`, `TranscriptionDefaultsUpdateRequest`) with typed `VadParametersRequest` and `extra=forbid`
 - `schemas/validators.py`: Reusable validation functions for language, task options, temperature, and nested `vad_parameters` keys
 
 ### nola/application/
 Application-layer orchestration:
 - `tasks/contracts.py`: Protocol contracts for task/file gateways used by use-cases.
-- `tasks/types.py`: TypedDict payload contracts for task use-case outputs.
-- `tasks/payloads.py`: Shared task payload builders (`to_task_summary_payload`, batch summary builder).
+- `tasks/types.py`: TypedDict payload contracts for task use-case outputs, including persisted task `model_id` in read payloads.
+- `tasks/payloads.py`: Shared task payload builders (`to_task_summary_payload`, batch summary builder); preserve task `model_id` across list/detail/cancel responses.
 - `tasks/actions/`: Write-side use-cases (`create_task`, `cancel_task`, `batch_cancel_tasks`, `batch_retry_tasks`, `delete_task_record`).
 - `tasks/actions/_batch_action.py`: Reuse batch execution skeleton; keep per-task result semantics; return item-level failures instead of aborting whole batch.
 - `tasks/queries/`: Read-side use-cases (`list_tasks`, `get_task`).
@@ -272,9 +272,9 @@ Background services:
   - Loads engine once for performance
   - `build_transcribe_options()` merges engine defaults, app defaults, and task overrides
   - JSON options parsing with error handling
-  - Resolves `configured_model_id` and effective `model_dir` before engine startup
+  - Resolves `configured_model_id` and effective `model_dir` before engine startup; validate explicit configured ids instead of silently replacing them
   - Rejects implicit model auto-download and requires cached models from model management
-  - Persists `worker.last_loaded_model_id` and `worker.last_loaded_model_dir` for runtime config state
+  - Persists canonical `worker.last_loaded_model_id` and `worker.last_loaded_model_dir` for runtime config state
 - `formatters/`: Subtitle export formatters (SRT, VTT, TXT, ASS)
   - `get_formatter(format, include_timestamps)` factory function
   - Static registry pattern for format discovery
@@ -371,7 +371,7 @@ poetry run ruff format --check nola tests
 poetry run mypy nola
 
 # Run tests
-poetry run pytest tests -v --tb=short
+poetry run ruff check nola tests --fix
 
 # Auto-fix lint issues
 poetry run ruff check nola tests --fix

@@ -261,8 +261,14 @@ def test_model_downloader_emits_progress_and_completion(tmp_path: Path) -> None:
     assert completed_updates[-1].downloaded_bytes == 100
     assert completed_updates[-1].percent == 100.0
     assert downloader.get_download("small") is None
-    assert any(channel == "model_downloads" for channel, _ in event_bus.published)
-    assert any(channel == "model_downloads.small" for channel, _ in event_bus.published)
+    assert any(
+        channel == "model_downloads" and payload["status"] == "completed"
+        for channel, payload in event_bus.published
+    )
+    assert any(
+        channel == "model_downloads.small" and payload["status"] == "completed"
+        for channel, payload in event_bus.published
+    )
 
 
 def test_model_downloader_drains_terminal_message_after_process_exit(
@@ -344,9 +350,12 @@ def test_model_downloader_ignores_observer_failures(tmp_path: Path) -> None:
     """Let download cleanup finish even if callbacks or event publishes fail."""
     message_queue: queue.Queue[DownloadWorkerMessage] = queue.Queue()
     cache_dir = tmp_path / "model-cache"
+    callback_calls: list[str] = []
+    publish_channels: list[str] = []
 
     class _ExplodingEventBus:
         def publish(self, channel: str, data: JsonDict) -> None:
+            publish_channels.append(channel)
             raise RuntimeError(f"publish failed on {channel}")
 
     def process_factory(
@@ -369,6 +378,7 @@ def test_model_downloader_ignores_observer_failures(tmp_path: Path) -> None:
         return _FakeProcess(on_start=on_start)
 
     def exploding_callback(progress: DownloadProgress) -> None:
+        callback_calls.append(progress.status)
         raise RuntimeError(f"callback failed for {progress.model_id}")
 
     cache_dir_path = cache_dir.resolve(strict=False)
@@ -383,6 +393,10 @@ def test_model_downloader_ignores_observer_failures(tmp_path: Path) -> None:
     downloader.start_download(_make_model(), exploding_callback)
 
     _wait_for(lambda: downloader.is_downloading("small") is False)
+    assert callback_calls
+    assert "completed" in callback_calls
+    assert "model_downloads" in publish_channels
+    assert "model_downloads.small" in publish_channels
     assert downloader.get_download("small") is None
 
 
@@ -391,6 +405,7 @@ def test_model_downloader_does_not_hold_lock_while_planning(tmp_path: Path) -> N
     planning_started = threading.Event()
     release_planner = threading.Event()
     list_returned = threading.Event()
+    thread_errors: list[BaseException] = []
     cache_dir = tmp_path / "model-cache"
 
     def blocking_planner(_repo_id: str, _cache_dir: str) -> int:
@@ -406,15 +421,21 @@ def test_model_downloader_does_not_hold_lock_while_planning(tmp_path: Path) -> N
         planner=blocking_planner,
     )
 
-    start_thread = threading.Thread(
-        target=downloader.start_download,
-        args=(_make_model(),),
-        daemon=True,
-    )
-    read_thread = threading.Thread(
-        target=lambda: (assert_downloads_empty(downloader), list_returned.set()),
-        daemon=True,
-    )
+    def start_download() -> None:
+        try:
+            downloader.start_download(_make_model())
+        except BaseException as exc:
+            thread_errors.append(exc)
+
+    def read_downloads() -> None:
+        try:
+            assert_downloads_empty(downloader)
+            list_returned.set()
+        except BaseException as exc:
+            thread_errors.append(exc)
+
+    start_thread = threading.Thread(target=start_download, daemon=True)
+    read_thread = threading.Thread(target=read_downloads, daemon=True)
 
     try:
         start_thread.start()
@@ -431,6 +452,7 @@ def test_model_downloader_does_not_hold_lock_while_planning(tmp_path: Path) -> N
 
     assert not start_thread.is_alive()
     assert not read_thread.is_alive()
+    assert thread_errors == []
 
 
 def assert_downloads_empty(downloader: ModelDownloader) -> None:
