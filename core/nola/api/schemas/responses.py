@@ -28,6 +28,7 @@ class TaskSummaryResponse(BaseModel):
     task_id: str
     file_id: str
     filename: str | None = None
+    model_id: str | None = None
     status: TaskStatusLiteral
     progress: float
     created_at: str

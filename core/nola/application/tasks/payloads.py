@@ -20,6 +20,7 @@ def to_task_summary_payload(
         "task_id": task["id"],
         "file_id": task["file_id"],
         "filename": filename,
+        "model_id": task["model_id"],
         "status": task["status"],
         "progress": task["progress"],
         "created_at": task["created_at"],

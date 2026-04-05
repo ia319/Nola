@@ -1380,6 +1380,8 @@ export interface components {
       file_id: string
       /** Filename */
       filename?: string | null
+      /** Model Id */
+      model_id?: string | null
       /**
        * Status
        * @enum {string}
@@ -1423,6 +1425,8 @@ export interface components {
       file_id: string
       /** Filename */
       filename?: string | null
+      /** Model Id */
+      model_id?: string | null
       /**
        * Status
        * @enum {string}

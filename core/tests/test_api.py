@@ -124,8 +124,12 @@ class TestTranscriptionsAPI:
             path="/tmp/cancel-audio.mp3",
             size=1000,
         )
-        task_db.enqueue(task_id="cancel-task-1", file_id="cancel-file-1", options=None)
-
+        task_db.enqueue(
+            task_id="cancel-task-1",
+            file_id="cancel-file-1",
+            options=None,
+            model_id="small",
+        )
         response = client.delete("/api/transcription-tasks/cancel-task-1")
         assert response.status_code == 200
         data = response.json()
@@ -135,6 +139,7 @@ class TestTranscriptionsAPI:
         assert data["task"]["task_id"] == "cancel-task-1"
         assert data["task"]["status"] == "cancelled"
         assert data["task"]["filename"] == "cancel-audio.mp3"
+        assert data["task"]["model_id"] == "small"
 
     def test_cancel_already_cancelled_task_is_idempotent(self, client: TestClient):
         """Repeated cancel should be idempotent and still return cancelled task."""
@@ -199,6 +204,54 @@ class TestTranscriptionsAPI:
         )
         # Should fail because file doesn't exist, not because of options
         assert response.status_code == 404
+
+    def test_get_task_detail_exposes_reserved_model_id(self, client: TestClient):
+        """Task detail should expose one persisted task-level model id."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="task-detail-file",
+            filename="detail-model.mp3",
+            path="/tmp/detail-model.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="task-detail-1",
+            file_id="task-detail-file",
+            options=None,
+            model_id="large-v3",
+        )
+
+        response = client.get("/api/transcription-tasks/task-detail-1")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["task_id"] == "task-detail-1"
+        assert data["model_id"] == "large-v3"
+
+    def test_list_transcriptions_exposes_reserved_model_id(self, client: TestClient):
+        """Task list should expose persisted task-level model ids."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="task-list-file",
+            filename="list-model.mp3",
+            path="/tmp/list-model.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="task-list-1",
+            file_id="task-list-file",
+            options=None,
+            model_id="small",
+        )
+
+        response = client.get("/api/transcription-tasks")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["tasks"][0]["task_id"] == "task-list-1"
+        assert data["tasks"][0]["model_id"] == "small"
 
     def test_create_task_persists_canonical_reserved_model_id(self, client: TestClient):
         """Task creation should store one canonical task-level model id."""
