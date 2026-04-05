@@ -18,6 +18,9 @@ export function AppShell() {
         <Link to="/history" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
           {t('tasks.history.title')}
         </Link>
+        <Link to="/models" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+          {t('models.title')}
+        </Link>
       </nav>
 
       <Outlet />

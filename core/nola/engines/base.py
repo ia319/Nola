@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from nola.config import settings
 
@@ -26,6 +27,7 @@ class EngineConfig:
     model_size: str = field(default_factory=lambda: settings.model_size)
     device: str = field(default_factory=lambda: settings.device)
     compute_type: str = field(default_factory=lambda: settings.compute_type)
+    download_root: Path | None = None
 
 
 @dataclass

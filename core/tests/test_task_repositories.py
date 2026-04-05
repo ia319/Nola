@@ -104,3 +104,19 @@ def test_task_store_get_task_drops_invalid_json_shapes(task_repositories):
     assert task is not None
     assert task["segments"] is None
     assert task["options"] is None
+
+
+def test_task_store_preserves_model_id(task_repositories):
+    """Queue and store layers should keep one reserved task model id."""
+    file_db, queue_repo, store_repo = task_repositories
+
+    file_db.create_file("file-001", "audio.wav", "/tmp/audio.wav", 1024)
+    queue_repo.enqueue("task-001", "file-001", model_id="small")
+
+    claimed = queue_repo.dequeue("worker-001")
+    stored = store_repo.get_task("task-001")
+
+    assert claimed is not None
+    assert claimed["model_id"] == "small"
+    assert stored is not None
+    assert stored["model_id"] == "small"

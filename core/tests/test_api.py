@@ -1,5 +1,6 @@
 """Pytest tests for API endpoints."""
 
+import asyncio
 import tempfile
 from pathlib import Path
 from unittest.mock import PropertyMock, patch
@@ -8,9 +9,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from nola.api.deps import get_app_config_db, get_file_db, get_task_db
+from nola.api.routes import models as models_routes
 from nola.config.constants import MAX_BATCH_TASK_IDS
 from nola.config.settings import Settings
 from nola.main import app
+from nola.model_hub import DownloadProgress
 from nola.models import init_db
 
 
@@ -121,8 +124,12 @@ class TestTranscriptionsAPI:
             path="/tmp/cancel-audio.mp3",
             size=1000,
         )
-        task_db.enqueue(task_id="cancel-task-1", file_id="cancel-file-1", options=None)
-
+        task_db.enqueue(
+            task_id="cancel-task-1",
+            file_id="cancel-file-1",
+            options=None,
+            model_id="small",
+        )
         response = client.delete("/api/transcription-tasks/cancel-task-1")
         assert response.status_code == 200
         data = response.json()
@@ -132,6 +139,7 @@ class TestTranscriptionsAPI:
         assert data["task"]["task_id"] == "cancel-task-1"
         assert data["task"]["status"] == "cancelled"
         assert data["task"]["filename"] == "cancel-audio.mp3"
+        assert data["task"]["model_id"] == "small"
 
     def test_cancel_already_cancelled_task_is_idempotent(self, client: TestClient):
         """Repeated cancel should be idempotent and still return cancelled task."""
@@ -196,6 +204,290 @@ class TestTranscriptionsAPI:
         )
         # Should fail because file doesn't exist, not because of options
         assert response.status_code == 404
+
+    def test_get_task_detail_exposes_reserved_model_id(self, client: TestClient):
+        """Task detail should expose one persisted task-level model id."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="task-detail-file",
+            filename="detail-model.mp3",
+            path="/tmp/detail-model.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="task-detail-1",
+            file_id="task-detail-file",
+            options=None,
+            model_id="large-v3",
+        )
+
+        response = client.get("/api/transcription-tasks/task-detail-1")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["task_id"] == "task-detail-1"
+        assert data["model_id"] == "large-v3"
+
+    def test_list_transcriptions_exposes_reserved_model_id(self, client: TestClient):
+        """Task list should expose persisted task-level model ids."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="task-list-file",
+            filename="list-model.mp3",
+            path="/tmp/list-model.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="task-list-1",
+            file_id="task-list-file",
+            options=None,
+            model_id="small",
+        )
+
+        response = client.get("/api/transcription-tasks")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["tasks"][0]["task_id"] == "task-list-1"
+        assert data["tasks"][0]["model_id"] == "small"
+
+    def test_create_task_persists_canonical_reserved_model_id(self, client: TestClient):
+        """Task creation should store one canonical task-level model id."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="task-model-file",
+            filename="task-model.mp3",
+            path="/tmp/task-model.mp3",
+            size=1000,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks",
+            json={"file_id": "task-model-file", "model_id": "large"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["model_id"] == "large-v3"
+
+        stored = task_db.get_task(data["task_id"])
+        assert stored is not None
+        assert stored["model_id"] == "large-v3"
+
+
+class TestModelsAPI:
+    """Test model-management endpoints."""
+
+    def test_list_active_model_downloads_reports_real_speed(
+        self, client: TestClient
+    ) -> None:
+        """The downloads endpoint should expose live per-model and total speed."""
+
+        class _FakeDownloader:
+            def list_downloads(self) -> list[DownloadProgress]:
+                return [
+                    DownloadProgress(
+                        model_id="small",
+                        status="downloading",
+                        downloaded_bytes=50,
+                        total_bytes=200,
+                        speed_bps=1250.4,
+                    ),
+                    DownloadProgress(
+                        model_id="large-v3",
+                        status="downloading",
+                        downloaded_bytes=300,
+                        total_bytes=600,
+                        speed_bps=2048.9,
+                    ),
+                ]
+
+        with patch(
+            "nola.api.routes.models.get_model_downloader",
+            return_value=_FakeDownloader(),
+        ):
+            response = client.get("/api/models/downloads")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["active_count"] == 2
+        assert data["total_speed_bps"] == 3298
+        assert data["downloads"] == [
+            {
+                "model_id": "small",
+                "name": "Small",
+                "status": "downloading",
+                "percent": 25.0,
+                "downloaded_bytes": 50,
+                "total_bytes": 200,
+                "speed_bps": 1250,
+                "error": None,
+            },
+            {
+                "model_id": "large-v3",
+                "name": "Large V3",
+                "status": "downloading",
+                "percent": 50.0,
+                "downloaded_bytes": 300,
+                "total_bytes": 600,
+                "speed_bps": 2048,
+                "error": None,
+            },
+        ]
+
+    def test_model_events_streams_progress_payload(self, client: TestClient) -> None:
+        """The SSE endpoint should be reachable and stream progress events."""
+
+        class _SingleEventBus:
+            async def subscribe(self, channel: str):
+                assert channel == "model_downloads"
+                yield {"model_id": "small", "status": "downloading"}
+
+        with patch(
+            "nola.api.routes.models.get_event_bus",
+            return_value=_SingleEventBus(),
+        ):
+            with client.stream("GET", "/api/models/events") as response:
+                assert response.status_code == 200
+                lines = list(response.iter_lines())
+
+        assert lines[:2] == [
+            "event: progress",
+            'data: {"model_id": "small", "status": "downloading"}',
+        ]
+
+    def test_model_events_emits_keepalive_when_idle(self) -> None:
+        """Idle SSE streams should emit keepalive comments before any progress."""
+
+        class _IdleEventBus:
+            async def subscribe(self, channel: str):
+                assert channel == "model_downloads"
+                while True:
+                    await asyncio.sleep(3600)
+                    yield {}
+
+        class _ConnectedRequest:
+            async def is_disconnected(self) -> bool:
+                return False
+
+        async def exercise() -> None:
+            with (
+                patch(
+                    "nola.api.routes.models.get_event_bus",
+                    return_value=_IdleEventBus(),
+                ),
+                patch(
+                    "nola.api.routes.models._SSE_KEEPALIVE_INTERVAL_SECONDS",
+                    0.01,
+                ),
+            ):
+                response = await models_routes.model_events(_ConnectedRequest())
+                first_chunk = await anext(response.body_iterator)
+
+                assert first_chunk == ": keepalive\n\n"
+
+                aclose = getattr(response.body_iterator, "aclose", None)
+                if callable(aclose):
+                    await aclose()
+
+        asyncio.run(exercise())
+
+    def test_patch_model_settings_rejects_dir_change_while_downloading(
+        self, client: TestClient
+    ) -> None:
+        """Changing the cache root should fail while downloads are active."""
+
+        class _FakeDownloader:
+            def list_downloads(self) -> list[object]:
+                return [object()]
+
+        with patch(
+            "nola.api.routes.models.get_model_downloader",
+            return_value=_FakeDownloader(),
+        ):
+            response = client.patch(
+                "/api/models/settings",
+                json={
+                    "configured_model_dir": str(
+                        Path(tempfile.gettempdir()).resolve() / "nola-alt-models"
+                    )
+                },
+            )
+
+        assert response.status_code == 409
+        assert (
+            response.json()["detail"]
+            == "Cannot change model directory while downloads are active. "
+            "Cancel all downloads first."
+        )
+
+    def test_model_events_openapi_declares_only_sse_success(
+        self, client: TestClient
+    ) -> None:
+        """OpenAPI should expose only the SSE success content type for model events."""
+        response = client.get("/openapi.json")
+        assert response.status_code == 200
+        schema = response.json()
+
+        events_get = schema["paths"]["/api/models/events"]["get"]
+        events_content = events_get["responses"]["200"]["content"]
+        assert events_content == {"text/event-stream": {}}
+
+    def test_model_events_closes_subscription_after_disconnect(self) -> None:
+        """SSE subscription should close promptly after the client disconnects."""
+        state = {"closed": False, "checks": 0}
+
+        class _DisconnectingRequest:
+            async def is_disconnected(self) -> bool:
+                state["checks"] += 1
+                return True
+
+        class _TrackedSubscription:
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self) -> dict[str, str]:
+                raise StopAsyncIteration
+
+            async def aclose(self) -> None:
+                state["closed"] = True
+
+        class _TrackedEventBus:
+            def subscribe(self, channel: str) -> _TrackedSubscription:
+                assert channel == "model_downloads"
+                return _TrackedSubscription()
+
+        async def exercise() -> None:
+            with patch(
+                "nola.api.routes.models.get_event_bus",
+                return_value=_TrackedEventBus(),
+            ):
+                response = await models_routes.model_events(_DisconnectingRequest())
+                chunks = [chunk async for chunk in response.body_iterator]
+
+            assert chunks == []
+            assert state["checks"] >= 1
+            assert state["closed"] is True
+
+        asyncio.run(exercise())
+
+    def test_patch_model_settings_openapi_declares_conflict_response(
+        self, client: TestClient
+    ) -> None:
+        """OpenAPI should document the active-download conflict for settings updates."""
+        response = client.get("/openapi.json")
+        assert response.status_code == 200
+        schema = response.json()
+
+        patch_operation = schema["paths"]["/api/models/settings"]["patch"]
+        conflict = patch_operation["responses"]["409"]
+        assert conflict["description"] == "Downloads active for current model directory"
+        conflict_content = conflict["content"]["application/json"]
+        detail_schema = conflict_content["schema"]
+        assert detail_schema == {"$ref": "#/components/schemas/DetailResponse"}
 
 
 class TestTranscriptionTasksPhaseA:

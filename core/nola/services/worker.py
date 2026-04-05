@@ -14,8 +14,9 @@ from pathlib import Path
 from typing import Any
 
 from nola.common.merge import deep_merge
-from nola.engines.base import TranscribeOptions
+from nola.engines.base import EngineConfig, TranscribeOptions
 from nola.engines.faster_whisper import FasterWhisperEngine
+from nola.model_hub import resolve_model_dir
 from nola.models import AppConfigDatabase, FileDatabase, TaskDatabase, init_db
 from nola.models.tasks import TaskRowRaw
 
@@ -198,12 +199,8 @@ def run_transcription(
         task_db.fail(task_id, str(e), should_retry=True)
 
 
-def worker_loop(db_path: str | Path | None = None) -> None:
-    """Main worker loop.
-
-    Args:
-        db_path: Path to database file (defaults to settings.db_path)
-    """
+def worker_loop(db_path: str | Path | None = None) -> bool:
+    """Run the main worker loop and report whether startup succeeded."""
     from nola.config import settings
 
     db_path = db_path or settings.db_path
@@ -216,10 +213,67 @@ def worker_loop(db_path: str | Path | None = None) -> None:
     task_db = TaskDatabase(db_path)
     app_config_db = AppConfigDatabase(db_path)
 
-    # Load engine once for all tasks
-    logger.info("Loading Whisper model...")
-    engine = FasterWhisperEngine()
+    # Resolve configured model and cache directory
+    model_config = app_config_db.get_all("model.")
+    configured_raw = model_config.get("configured_model_id")
+    configured_model = (
+        configured_raw if isinstance(configured_raw, str) else settings.model_size
+    )
+    db_model_dir = model_config.get("configured_model_dir")
+    model_dir, _ = resolve_model_dir(
+        settings.model_dir,
+        db_model_dir if isinstance(db_model_dir, str) else None,
+        settings.default_model_dir,
+    )
+
+    # Verify the model is cached locally before loading.
+    # WhisperModel would silently download from HF if missing; the plan
+    # requires users to download via the model management page first.
+    from nola.model_hub import ModelStorage, UnknownModelError, require_model
+
+    try:
+        model_info = require_model(configured_model)
+    except UnknownModelError:
+        logger.error(
+            "Configured model '%s' is not part of the supported registry. "
+            "Update the model setting before starting the Worker.",
+            configured_model,
+        )
+        return False
+
+    configured_model = model_info.model_id
+    logger.info(f"Loading model '{configured_model}' from {model_dir}")
+
+    storage = ModelStorage(model_dir)
+    if not storage.is_downloaded(model_info.repo_id):
+        logger.error(
+            f"Model '{configured_model}' is not downloaded in {model_dir}. "
+            "Download it via the model management page before starting the Worker."
+        )
+        return False
+
+    engine_config = EngineConfig(
+        model_size=configured_model,
+        download_root=model_dir,
+    )
+    engine = FasterWhisperEngine(config=engine_config)
     logger.info("Model loaded successfully")
+
+    # Report loaded state for restart_required calculation. This should not
+    # block task execution if the UI-facing restart state cannot be written.
+    try:
+        app_config_db.set_many(
+            "worker.",
+            {
+                "last_loaded_model_id": configured_model,
+                "last_loaded_model_dir": str(model_dir),
+            },
+        )
+    except Exception:
+        logger.warning(
+            "Failed to persist worker model state for restart tracking.",
+            exc_info=True,
+        )
 
     while _running:
         try:
@@ -237,6 +291,7 @@ def worker_loop(db_path: str | Path | None = None) -> None:
             time.sleep(5)
 
     logger.info("Worker stopped")
+    return True
 
 
 def signal_handler(signum: int, frame: Any) -> None:
@@ -257,7 +312,8 @@ def main() -> None:
     signal.signal(signal.SIGTERM, signal_handler)
 
     init_db()
-    worker_loop()
+    if not worker_loop():
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

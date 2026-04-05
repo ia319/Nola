@@ -49,6 +49,7 @@ class SupportsTaskMutations(Protocol):
         priority: int = 0,
         max_retries: int = 3,
         options: TaskOptions | None = None,
+        model_id: str | None = None,
     ) -> None:
         """Insert a pending task."""
         ...

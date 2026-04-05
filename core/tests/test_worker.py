@@ -1,6 +1,16 @@
 """Pytest tests for worker module."""
 
+from pathlib import Path
+from unittest.mock import Mock, PropertyMock, patch
+
+import pytest
+
+from nola.config import settings as app_settings
+from nola.config.settings import Settings
 from nola.engines.base import TranscribeOptions
+from nola.model_hub.contracts import ModelInfo
+from nola.model_hub.errors import UnknownModelError
+from nola.services import worker as worker_module
 from nola.services.worker import build_transcribe_options
 
 
@@ -154,3 +164,206 @@ class TestBuildTranscribeOptions:
         options = build_transcribe_options({"hotwords": "inf"})
 
         assert options.hotwords == "inf"
+
+
+class _WorkerModelConfigStore:
+    """Provide the minimal model config contract used during worker startup."""
+
+    def __init__(self, values: dict[str, object] | None = None) -> None:
+        """Store model config reads and later worker state writes."""
+        self.values = values or {}
+        self.writes: list[tuple[str, dict[str, object]]] = []
+
+    def get_all(self, prefix: str) -> dict[str, object]:
+        """Return model settings for the requested prefix."""
+        assert prefix == "model."
+        return self.values
+
+    def set_many(self, prefix: str, values: dict[str, object]) -> None:
+        """Record worker state writes for later assertions."""
+        self.writes.append((prefix, values))
+
+
+class TestWorkerStartup:
+    """Test worker startup guards around configured models."""
+
+    def test_worker_loop_logs_unknown_model_and_exits(self, tmp_path: Path) -> None:
+        """Exit cleanly when the configured model is not in the registry."""
+        model_dir = tmp_path / "models"
+        model_dir.mkdir()
+        db_path = tmp_path / "nola.db"
+        config_store = _WorkerModelConfigStore({"configured_model_id": "missing-model"})
+
+        with (
+            patch.object(
+                Settings, "db_path", new_callable=PropertyMock, return_value=db_path
+            ),
+            patch.object(app_settings, "model_size", "small"),
+            patch.object(app_settings, "model_dir", model_dir),
+            patch.object(
+                Settings,
+                "default_model_dir",
+                new_callable=PropertyMock,
+                return_value=model_dir,
+            ),
+            patch("nola.services.worker.FileDatabase"),
+            patch("nola.services.worker.TaskDatabase"),
+            patch(
+                "nola.services.worker.AppConfigDatabase",
+                return_value=config_store,
+            ),
+            patch(
+                "nola.services.worker.resolve_model_dir",
+                return_value=(model_dir, "settings"),
+            ),
+            patch(
+                "nola.model_hub.require_model",
+                side_effect=UnknownModelError("missing-model"),
+            ),
+            patch.object(worker_module.logger, "error") as logger_error,
+        ):
+            started = worker_module.worker_loop(db_path)
+
+        logger_error.assert_any_call(
+            "Configured model '%s' is not part of the supported registry. "
+            "Update the model setting before starting the Worker.",
+            "missing-model",
+        )
+        assert started is False
+        assert config_store.writes == []
+
+    def test_worker_loop_persists_canonical_loaded_model_id(
+        self, tmp_path: Path
+    ) -> None:
+        """Persist the canonical model id after startup resolves aliases."""
+        model_dir = tmp_path / "models"
+        model_dir.mkdir()
+        db_path = tmp_path / "nola.db"
+        config_store = _WorkerModelConfigStore({"configured_model_id": "large"})
+        task_db = Mock()
+        task_db.dequeue.side_effect = KeyboardInterrupt
+        storage = Mock()
+        storage.is_downloaded.return_value = True
+        model_info = ModelInfo(
+            model_id="large-v3",
+            name="Large V3",
+            repo_id="repo/large-v3",
+            runtime="faster-whisper",
+            languages="multilingual",
+            size_bytes=1,
+            speed_rank=1,
+            accuracy_rank=1,
+            description="test model",
+        )
+
+        with (
+            patch.object(
+                Settings, "db_path", new_callable=PropertyMock, return_value=db_path
+            ),
+            patch.object(app_settings, "model_size", "small"),
+            patch.object(app_settings, "model_dir", model_dir),
+            patch.object(
+                Settings,
+                "default_model_dir",
+                new_callable=PropertyMock,
+                return_value=model_dir,
+            ),
+            patch.object(worker_module, "_running", True),
+            patch("nola.services.worker.FileDatabase"),
+            patch("nola.services.worker.TaskDatabase", return_value=task_db),
+            patch(
+                "nola.services.worker.AppConfigDatabase",
+                return_value=config_store,
+            ),
+            patch(
+                "nola.services.worker.resolve_model_dir",
+                return_value=(model_dir, "settings"),
+            ),
+            patch("nola.model_hub.require_model", return_value=model_info),
+            patch("nola.model_hub.ModelStorage", return_value=storage),
+            patch("nola.services.worker.FasterWhisperEngine") as engine_cls,
+        ):
+            started = worker_module.worker_loop(db_path)
+
+        engine_config = engine_cls.call_args.kwargs["config"]
+        assert started is True
+        assert engine_config.model_size == "large-v3"
+        assert engine_config.download_root == model_dir
+        assert config_store.writes == [
+            (
+                "worker.",
+                {
+                    "last_loaded_model_id": "large-v3",
+                    "last_loaded_model_dir": str(model_dir),
+                },
+            )
+        ]
+
+    def test_worker_loop_warns_when_worker_state_persistence_fails(
+        self, tmp_path: Path
+    ) -> None:
+        """Keep the worker running when restart-tracking writes fail."""
+        model_dir = tmp_path / "models"
+        model_dir.mkdir()
+        db_path = tmp_path / "nola.db"
+        config_store = _WorkerModelConfigStore({"configured_model_id": "large"})
+        task_db = Mock()
+        task_db.dequeue.side_effect = KeyboardInterrupt
+        storage = Mock()
+        storage.is_downloaded.return_value = True
+        model_info = ModelInfo(
+            model_id="large-v3",
+            name="Large V3",
+            repo_id="repo/large-v3",
+            runtime="faster-whisper",
+            languages="multilingual",
+            size_bytes=1,
+            speed_rank=1,
+            accuracy_rank=1,
+            description="test model",
+        )
+        config_store.set_many = Mock(side_effect=RuntimeError("db busy"))
+
+        with (
+            patch.object(
+                Settings, "db_path", new_callable=PropertyMock, return_value=db_path
+            ),
+            patch.object(app_settings, "model_size", "small"),
+            patch.object(app_settings, "model_dir", model_dir),
+            patch.object(
+                Settings,
+                "default_model_dir",
+                new_callable=PropertyMock,
+                return_value=model_dir,
+            ),
+            patch.object(worker_module, "_running", True),
+            patch("nola.services.worker.FileDatabase"),
+            patch("nola.services.worker.TaskDatabase", return_value=task_db),
+            patch(
+                "nola.services.worker.AppConfigDatabase",
+                return_value=config_store,
+            ),
+            patch(
+                "nola.services.worker.resolve_model_dir",
+                return_value=(model_dir, "settings"),
+            ),
+            patch("nola.model_hub.require_model", return_value=model_info),
+            patch("nola.model_hub.ModelStorage", return_value=storage),
+            patch("nola.services.worker.FasterWhisperEngine"),
+            patch.object(worker_module.logger, "warning") as logger_warning,
+        ):
+            started = worker_module.worker_loop(db_path)
+
+        assert started is True
+        logger_warning.assert_called_once()
+
+    def test_main_exits_non_zero_when_worker_startup_fails(self) -> None:
+        """Exit with a failure status when worker startup preflight fails."""
+        with (
+            patch("nola.services.worker.init_db"),
+            patch("nola.services.worker.worker_loop", return_value=False),
+            patch("nola.services.worker.signal.signal"),
+            patch("nola.services.worker.logging.basicConfig"),
+            pytest.raises(SystemExit, match="1"),
+        ):
+            worker_module.main()

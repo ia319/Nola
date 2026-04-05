@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from nola.api.schemas.models import ModelConfigResponse
 from nola.config.constants import ALLOWED_AUDIO_TYPES, ALLOWED_EXTENSIONS
 from nola.config.settings import settings
 from nola.config.transcription.languages import LanguageOptionSchema
@@ -99,6 +100,7 @@ class AppConfigResponse(BaseModel):
     transcription: TranscriptionConfigResponse
     file: FileConfigResponse
     effective_languages: list[LanguageOptionSchema]
+    model: ModelConfigResponse | None = None
 
 
 class EngineDefaultsResponse(BaseModel):

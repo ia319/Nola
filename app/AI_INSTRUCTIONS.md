@@ -108,6 +108,26 @@ app/                          # Frontend workspace root
 │   │   │   │   └── __tests__/
 │   │   │   │       └── filename.test.ts # Filename helper tests
 │   │   │   └── index.ts      # Feature public exports
+│   │   ├── models/           # Model management feature
+│   │   │   ├── api.ts        # Model list/detail/download/settings API client
+│   │   │   ├── __tests__/    # Model API tests
+│   │   │   │   └── api.test.ts # Verify model API request wiring
+│   │   │   ├── components/   # Model management UI components
+│   │   │   │   ├── DownloadProgress.tsx # Download progress display
+│   │   │   │   ├── ModelCard.tsx # Model card and action controls
+│   │   │   │   └── ModelList.tsx # Sorted model list composition
+│   │   │   ├── hooks/        # Model data and download-state hooks
+│   │   │   │   ├── useModels.ts # Load model list and settings
+│   │   │   │   ├── useModelDownload.ts # Merge REST and SSE download state
+│   │   │   │   └── __tests__/    # Model hook tests
+│   │   │   │       ├── useModels.test.ts # Verify model list hook behavior
+│   │   │   │       └── useModelDownload.test.ts # Verify download hook behavior
+│   │   │   ├── lib/          # Model-private display helpers
+│   │   │   │   ├── model-helpers.ts # Format and sort model display data
+│   │   │   │   └── __tests__/    # Model helper tests
+│   │   │   │       └── model-helpers.test.ts # Verify helper edge cases
+│   │   │   ├── index.ts      # Feature public exports
+│   │   │   └── types.ts      # Model domain contracts
 │   │   ├── tasks/            # Keep task lifecycle, polling, and history subdomain
 │   │   │   ├── api.ts        # Use create/list/get/cancel/delete and batch endpoints
 │   │   │   ├── actions.ts    # Wrap write actions and guarantee refresh signals
@@ -220,13 +240,15 @@ app/                          # Frontend workspace root
 │   │   │   ├── error-utils.ts      # API error normalization helpers
 │   │   │   ├── file-validation.ts  # Pure file validation (ext/MIME/size)
 │   │   │   ├── format.ts           # formatFileSize() human-readable sizes
+│   │   │   ├── sse-client.ts       # Shared EventSource wrapper for typed SSE streams
 │   │   │   ├── utils.ts            # downloadBlob helper
 │   │   │   └── __tests__/          # Unit tests (Vitest)
 │   │   │       ├── api-client.test.ts # Interceptor error mapping tests
 │   │   │       ├── error-factory.test.ts # AppError factory contract tests
 │   │   │       ├── error-utils.test.ts # API error formatting tests
 │   │   │       ├── file-validation.test.ts # validateFile unit tests
-│   │   │       └── format.test.ts # formatFileSize unit tests
+│   │   │       ├── format.test.ts # formatFileSize unit tests
+│   │   │       └── sse-client.test.ts # SSE connection wiring tests
 │   │   └── types/            # Shared type contracts
 │   │       ├── openapi.d.ts   # AUTO-GENERATED (pnpm gen:types)
 │   │       ├── api-error.ts   # Backend error payload types
@@ -240,8 +262,15 @@ app/                          # Frontend workspace root
 │   └── routes/               # Route composition and URL query contracts
 │       ├── AppShell.tsx      # Shared shell route component
 │       ├── HistoryPage.tsx   # History route composition component
+│       ├── ModelsPage.tsx    # Models route composition component
 │       └── history-search.ts # History URL query normalize/build helpers
 ```
+
+### Recent Additions
+
+- `src/features/models/`: Model-management feature with API client, hooks, helpers, and page components.
+- `src/shared/lib/sse-client.ts`: Shared EventSource wrapper for model download streaming.
+- `src/routes/ModelsPage.tsx`: `/models` route mounted alongside `/` and `/history`.
 
 ---
 
@@ -415,6 +444,19 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `lib/filename.ts`: Build frontend fallback filename aligned with backend rules.
   - `lib/__tests__/filename.test.ts`: Verify filename helper behavior.
   - `index.ts`: Expose export feature public exports.
+- **models**:
+  - `api.ts`: Use model list/detail/download/cancel/delete/select/settings/download-runtime endpoints.
+  - `__tests__/api.test.ts`: Verify model API request wiring.
+  - `components/DownloadProgress.tsx`: Render real download percentage, transferred bytes, and speed.
+  - `components/ModelCard.tsx`: Render one model row/card with status badges and contextual actions.
+  - `components/ModelList.tsx`: Compose sorted model display using runtime download state.
+  - `hooks/useModels.ts`: Load model list/settings and preserve structured `AppError` semantics.
+  - `hooks/useModelDownload.ts`: Merge REST baseline download state with SSE progress events.
+  - `hooks/__tests__/useModels.test.ts`, `hooks/__tests__/useModelDownload.test.ts`: Verify model hook behavior.
+  - `lib/model-helpers.ts`: Keep pure display helpers for sorting and byte formatting.
+  - `lib/__tests__/model-helpers.test.ts`: Verify helper edge cases.
+  - `types.ts`: Keep model feature contracts stable over generated OpenAPI types.
+  - `index.ts`: Expose model feature public exports.
 - **realtime**:
   - `index.ts`: Reserve placeholder exports for future WebSocket live updates.
 
@@ -426,21 +468,24 @@ Cross-feature composite components with feature-agnostic behavior.
 - **ListToolbar.tsx**: Share task list search/status/sort/order controls across recent/history panels.
 - **TaskListPanel.tsx**: Share task row rendering, row actions, and pagination shell across recent/history panels.
 - **types.ts**: Keep shared task action callback contracts.
-- **__tests__/ErrorBoundary.test.tsx**: Component tests covering fallback rendering and retry recovery.
-- **__tests__/TaskListPanel.test.tsx**: Component tests covering task row actions and pagination behavior.
+- ****tests**/ErrorBoundary.test.tsx**: Component tests covering fallback rendering and retry recovery.
+- ****tests**/TaskListPanel.test.tsx**: Component tests covering task row actions and pagination behavior.
 - **index.ts**: Barrel entry for common components. Prefer importing via `@/components/common`.
 
 ### src/shared/
 
 Cross-feature shared code, split into `lib/` and `types/`.
+
 - **lib/api-client.ts**: Axios instance (30s timeout, no global Content-Type). Request interceptor logs debug. Response interceptor converts HTTP errors to `AppError` via `createApiError` and network failures to `createNetworkError`. Preserve `CanceledError` for upload cancellation semantics.
-- **lib/__tests__/api-client.test.ts**: Interceptor tests covering cancel passthrough plus client, server, timeout, and offline mappings.
+- **lib/**tests**/api-client.test.ts**: Interceptor tests covering cancel passthrough plus client, server, timeout, and offline mappings.
 - **lib/error-factory.ts**: Central factory functions for `AppError` (`createValidationError`, `createNetworkError`, `createApiError`, `isAppError`). Mark 408/429 as `retriable: true`; other 4xx as `retriable: false`; 5xx as `retriable: true`.
-- **lib/__tests__/error-factory.test.ts**: Factory contract tests for retry semantics and `isAppError`.
+- **lib/**tests**/error-factory.test.ts**: Factory contract tests for retry semantics and `isAppError`.
 - **lib/error-utils.ts**: `formatApiError()` converts FastAPI error payloads into readable messages.
-- **lib/__tests__/error-utils.test.ts**: Formatting tests for string and validation-array payloads.
+- **lib/**tests**/error-utils.test.ts**: Formatting tests for string and validation-array payloads.
 - **lib/file-validation.ts**: Pure function `validateFile(file, config)` with config injection. Checks extension, MIME, size, empty file, no extension. Returns `AppError` on failure.
 - **lib/format.ts**: `formatFileSize(bytes)` — base-1024 human-readable string (B/KB/MB/GB/TB). Guards against negative/NaN/Infinity.
+- **lib/sse-client.ts**: Shared EventSource wrapper with typed payloads and normalized API-base URL joining.
+- **lib/**tests**/sse-client.test.ts**: Verify SSE connection wiring, event parsing, and cleanup.
 - **lib/utils.ts**: `downloadBlob()` triggers browser file download from Blob (appends `<a>` to DOM, defers `URL.revokeObjectURL`).
 - **lib/\_\_tests\_\_/**: Vitest unit tests for API-client mapping plus pure helpers (`error-factory`, `error-utils`, `file-validation`, `format`).
 - **types/openapi.d.ts**: Auto-generated by `pnpm gen:types`. Never edit manually.
@@ -448,7 +493,7 @@ Cross-feature shared code, split into `lib/` and `types/`.
 - **types/app-error.ts**: Frontend error contract (`AppError`: `code`, `i18nKey`, `params`, `retriable`).
 - **types/config.ts**: Thin aliases for config contracts (`AppConfig`, `EngineDefaults`, `TranscriptionDefaultsUpdateRequest`).
 - **types/file.ts**: Thin aliases over OpenAPI file schemas (`FileInfo`, `FileUploadResponse`, etc.).
-- **types/task.ts**: Thin aliases over OpenAPI task schemas + derived types (`TaskStatus`, `ExportFormat` from schema enums).
+- **types/task.ts**: Thin aliases over OpenAPI task schemas + derived types (`TaskStatus`, `ExportFormat` from schema enums); task read responses now include reserved `model_id` context.
 - **types/task-query.ts**: Shared query model for list toolbar and pagination contracts.
 - **types/index.ts**: Barrel re-export for `import type { ... } from '@/shared/types'`.
 
@@ -458,6 +503,7 @@ Keep route composition and search-model helpers in this directory.
 
 - **AppShell.tsx**: Keep shared navigation shell and global polling mount.
 - **HistoryPage.tsx**: Compose `/history` page interactions and route callbacks.
+- **ModelsPage.tsx**: Compose `/models` page interactions, model settings summary, and model action toasts.
 - **history-search.ts**: Normalize route search params and build task query model.
 
 ### src/lib/

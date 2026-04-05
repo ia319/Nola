@@ -49,22 +49,16 @@ class TaskDatabase:
         priority: int = 0,
         max_retries: int = 3,
         options: dict[str, Any] | None = None,
+        model_id: str | None = None,
     ) -> None:
-        """Add task to queue.
-
-        Args:
-            task_id: Unique task identifier
-            file_id: Associated file ID
-            priority: Task priority (higher = sooner)
-            max_retries: Maximum retry attempts
-            options: Transcription options (non-None values only)
-        """
+        """Add task to queue."""
         self._queue.enqueue(
             task_id=task_id,
             file_id=file_id,
             priority=priority,
             max_retries=max_retries,
             options=options,
+            model_id=model_id,
         )
 
     def dequeue(self, worker_id: str) -> TaskRowRaw | None:

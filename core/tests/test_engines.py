@@ -1,5 +1,6 @@
 """Test transcription engine base interface."""
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -36,6 +37,7 @@ class TestEngineConfig:
         assert config.model_size == "small"
         assert config.device == "cpu"
         assert config.compute_type == "default"
+        assert config.download_root is None
 
     def test_config_custom_values(self) -> None:
         """Create config with custom values."""
@@ -46,6 +48,12 @@ class TestEngineConfig:
         assert config.model_size == "large-v3"
         assert config.device == "cuda"
         assert config.compute_type == "float16"
+
+    def test_config_accepts_download_root(self, tmp_path: Path) -> None:
+        """Store an explicit model cache root in the engine config."""
+        config = EngineConfig(download_root=tmp_path)
+
+        assert config.download_root == tmp_path
 
 
 class TestTranscriptionEngine:
@@ -78,6 +86,27 @@ class TestFasterWhisperEngine:
 
         mock_model.assert_called_once_with("small", device="cpu", compute_type="int8")
         assert engine._config.model_size == "small"
+
+    @patch("nola.engines.faster_whisper.WhisperModel")
+    def test_engine_creation_with_download_root(
+        self, mock_model: MagicMock, tmp_path: Path
+    ) -> None:
+        """Forward one managed model cache root to WhisperModel."""
+        config = EngineConfig(
+            model_size="small",
+            device="cpu",
+            compute_type="int8",
+            download_root=tmp_path,
+        )
+        engine = FasterWhisperEngine(config)
+
+        mock_model.assert_called_once_with(
+            "small",
+            device="cpu",
+            compute_type="int8",
+            download_root=str(tmp_path),
+        )
+        assert engine._config.download_root == tmp_path
 
     @patch("nola.engines.faster_whisper.WhisperModel")
     def test_transcribe_yields_segments(self, mock_model: MagicMock) -> None:

@@ -14,6 +14,7 @@ def create_task(
     task_store: SupportsTaskMutations,
     file_id: str,
     options: TaskOptions | None,
+    model_id: str | None = None,
     task_id_factory: Callable[[], str] | None = None,
 ) -> CreateTaskPayload:
     """Create a pending transcription task for an uploaded file."""
@@ -27,6 +28,7 @@ def create_task(
         task_id=next_task_id,
         file_id=file_id,
         options=resolved_options,
+        model_id=model_id,
     )
 
     return {
@@ -35,4 +37,5 @@ def create_task(
         "filename": file_row["filename"],
         "status": "pending",
         "options": resolved_options,
+        "model_id": model_id,
     }

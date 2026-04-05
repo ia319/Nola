@@ -12,6 +12,7 @@ class Settings(BaseSettings):
 
     # Model settings
     model_size: str = "small"
+    model_dir: Path | None = None
     device: str = "cpu"  # "auto", "cpu", "cuda"
     compute_type: str = "default"  # "default", "float16", "int8"
 
@@ -37,6 +38,11 @@ class Settings(BaseSettings):
     def exports_dir(self) -> Path:
         """Directory for exported subtitle files."""
         return self.data_dir / "exports"
+
+    @property
+    def default_model_dir(self) -> Path:
+        """Directory for managed model cache files."""
+        return self.data_dir / "models"
 
 
 settings = Settings()

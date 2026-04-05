@@ -19,6 +19,7 @@ class TaskSummaryPayload(TypedDict):
     task_id: str
     file_id: str
     filename: str | None
+    model_id: str | None
     status: TaskStatusValue
     progress: float
     created_at: str
@@ -50,6 +51,7 @@ class CreateTaskPayload(TypedDict):
     filename: str
     status: Literal["pending"]
     options: TaskOptions | None
+    model_id: str | None
 
 
 class CancelTaskPayload(TypedDict):

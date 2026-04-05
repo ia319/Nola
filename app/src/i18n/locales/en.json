@@ -390,5 +390,55 @@
       "description": "An unexpected error occurred in this section.",
       "retry": "Try Again"
     }
+  },
+  "models": {
+    "title": "Models",
+    "description": "Manage Whisper models",
+    "empty": "No models available",
+    "loading": "Loading models...",
+    "configured": "Default",
+    "lastLoaded": "Running",
+    "restartRequired": "Restart required to apply model change",
+    "status": {
+      "not_downloaded": "Not Downloaded",
+      "downloading": "Downloading",
+      "downloaded": "Downloaded"
+    },
+    "fields": {
+      "size": "Size",
+      "diskUsage": "Disk Usage",
+      "languages": "Languages",
+      "speed": "Speed",
+      "accuracy": "Accuracy"
+    },
+    "actions": {
+      "download": "Download",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "select": "Set as Default",
+      "downloading": "Downloading..."
+    },
+    "toast": {
+      "downloadStarted": "Download started: {{modelId}}",
+      "downloadCancelled": "Download cancelled: {{modelId}}",
+      "downloadCompleted": "Download completed: {{modelId}}",
+      "deleted": "Model deleted: {{modelId}}",
+      "selected": "Default model set to {{modelId}}",
+      "actionFailed": "Model action failed, please retry"
+    },
+    "rank": {
+      "1": "Very Fast",
+      "2": "Fast",
+      "3": "Medium",
+      "4": "Slow",
+      "5": "Very Slow"
+    },
+    "accuracyRank": {
+      "1": "Low",
+      "2": "Fair",
+      "3": "Good",
+      "4": "High",
+      "5": "Very High"
+    }
   }
 }
