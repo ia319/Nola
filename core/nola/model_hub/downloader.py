@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import multiprocessing
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -24,6 +25,7 @@ from nola.model_hub.errors import (
 )
 
 _GLOBAL_CHANNEL = "model_downloads"
+logger = logging.getLogger(__name__)
 
 
 class _MessageQueue(Protocol):
@@ -80,7 +82,7 @@ class _ActiveDownload:
     message_queue: _MessageQueue
     callback: ProgressCallback | None
     progress: DownloadProgress
-    cancelled: bool = False
+    cancel_requested: bool = False
     watcher: Thread | None = None
 
 
@@ -191,26 +193,38 @@ class ModelDownloader:
         return progress
 
     def cancel_download(self, model_id: str) -> DownloadProgress:
-        """Terminate one active download subprocess and mark it cancelled."""
+        """Request cancellation and let the watcher resolve the final state."""
         with self._lock:
             active = self._active_downloads.get(model_id)
             if active is None:
                 raise ModelDownloadNotFoundError(model_id)
 
-            active.cancelled = True
-            cancelled_progress = DownloadProgress(
+            active.cancel_requested = True
+            active.progress = DownloadProgress(
                 model_id=model_id,
                 status="cancelled",
                 downloaded_bytes=active.progress.downloaded_bytes,
                 total_bytes=active.progress.total_bytes,
                 speed_bps=0.0,
             )
-            active.progress = cancelled_progress
 
         self._terminate_process(active.process)
-        self._emit_progress(cancelled_progress, active.callback)
-        self._finalize_download(active, remove_from_registry=True)
-        return cancelled_progress
+
+        if active.watcher is not None:
+            active.watcher.join(timeout=0.3)
+            if active.watcher.is_alive():
+                return active.progress
+
+        if active.process.is_alive():
+            return active.progress
+
+        terminal_progress = self._drain_queue_after_exit(active, timeout_seconds=0.05)
+        if terminal_progress is not None:
+            active.progress = terminal_progress
+            self._emit_progress(terminal_progress, active.callback)
+            self._finalize_download(active)
+
+        return active.progress
 
     def is_downloading(self, model_id: str) -> bool:
         """Return whether one model id currently has an active download."""
@@ -249,6 +263,7 @@ class ModelDownloader:
                     if not process.is_alive():
                         terminal_progress = self._drain_queue_after_exit(active)
                         if terminal_progress is not None:
+                            active.progress = terminal_progress
                             self._emit_progress(terminal_progress, active.callback)
                             self._finalize_download(active)
                             return
@@ -261,11 +276,14 @@ class ModelDownloader:
                 message = raw_message
                 terminal_progress = self._handle_message(active, message)
                 if terminal_progress is not None:
+                    active.progress = terminal_progress
                     self._emit_progress(terminal_progress, active.callback)
                     self._finalize_download(active)
                     return
 
-            if active.cancelled:
+            if active.cancel_requested:
+                self._emit_progress(active.progress, active.callback)
+                self._finalize_download(active)
                 return
 
             if getattr(process, "exitcode", None) == 0:
@@ -276,6 +294,7 @@ class ModelDownloader:
                     total_bytes=active.progress.total_bytes,
                     speed_bps=0.0,
                 )
+                active.progress = completed_progress
                 self._emit_progress(completed_progress, active.callback)
                 self._finalize_download(active)
                 return
@@ -292,6 +311,7 @@ class ModelDownloader:
                 speed_bps=0.0,
                 error=failure.detail,
             )
+            active.progress = failed_progress
             self._emit_progress(failed_progress, active.callback)
             self._finalize_download(active)
         finally:
@@ -331,13 +351,12 @@ class ModelDownloader:
         message: DownloadWorkerMessage,
     ) -> DownloadProgress | None:
         """Update one active task from one subprocess message."""
-        if active.cancelled:
-            return None
-
         if message.kind == "started":
             return None
 
         if message.kind == "progress":
+            if active.cancel_requested:
+                return None
             downloaded_bytes = (
                 active.progress.downloaded_bytes + message.downloaded_delta
             )
@@ -384,16 +403,29 @@ class ModelDownloader:
         progress: DownloadProgress,
         callback: ProgressCallback | None,
     ) -> None:
-        """Publish one progress snapshot to the callback and event bus."""
+        """Publish one progress snapshot without letting observers own cleanup."""
         if callback is not None:
-            callback(progress)
+            try:
+                callback(progress)
+            except Exception:
+                logger.exception(
+                    "Model download callback failed for %s",
+                    progress.model_id,
+                )
 
         if self._event_bus is None:
             return
 
         payload = self._serialize_progress(progress)
-        self._event_bus.publish(_GLOBAL_CHANNEL, payload)
-        self._event_bus.publish(f"{_GLOBAL_CHANNEL}.{progress.model_id}", payload)
+        for channel in (_GLOBAL_CHANNEL, f"{_GLOBAL_CHANNEL}.{progress.model_id}"):
+            try:
+                self._event_bus.publish(channel, payload)
+            except Exception:
+                logger.exception(
+                    "Model download event publish failed for %s on %s",
+                    progress.model_id,
+                    channel,
+                )
 
     def _serialize_progress(self, progress: DownloadProgress) -> JsonDict:
         """Serialize one progress snapshot into an event payload."""

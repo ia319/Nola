@@ -16,7 +16,7 @@ from typing import Any
 from nola.common.merge import deep_merge
 from nola.engines.base import EngineConfig, TranscribeOptions
 from nola.engines.faster_whisper import FasterWhisperEngine
-from nola.model_hub import get_model, resolve_model_dir
+from nola.model_hub import resolve_model_dir
 from nola.models import AppConfigDatabase, FileDatabase, TaskDatabase, init_db
 from nola.models.tasks import TaskRowRaw
 
@@ -216,20 +216,15 @@ def worker_loop(db_path: str | Path | None = None) -> None:
     # Resolve configured model and cache directory
     model_config = app_config_db.get_all("model.")
     configured_raw = model_config.get("configured_model_id")
-    configured_model = settings.model_size
-    if isinstance(configured_raw, str):
-        resolved = get_model(configured_raw)
-        if resolved is not None:
-            configured_model = resolved.model_id
-
+    configured_model = (
+        configured_raw if isinstance(configured_raw, str) else settings.model_size
+    )
     db_model_dir = model_config.get("configured_model_dir")
     model_dir, _ = resolve_model_dir(
         settings.model_dir,
         db_model_dir if isinstance(db_model_dir, str) else None,
         settings.default_model_dir,
     )
-
-    logger.info(f"Loading model '{configured_model}' from {model_dir}")
 
     # Verify the model is cached locally before loading.
     # WhisperModel would silently download from HF if missing; the plan
@@ -245,6 +240,10 @@ def worker_loop(db_path: str | Path | None = None) -> None:
             configured_model,
         )
         return
+
+    configured_model = model_info.model_id
+    logger.info(f"Loading model '{configured_model}' from {model_dir}")
+
     storage = ModelStorage(model_dir)
     if not storage.is_downloaded(model_info.repo_id):
         logger.error(

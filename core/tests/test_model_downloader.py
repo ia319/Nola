@@ -165,6 +165,36 @@ class _ExitDrainQueue:
         raise queue.Empty()
 
 
+class _GateTerminalQueue:
+    """Hold one terminal message until cancellation requests process exit."""
+
+    def __init__(self, release_terminal: threading.Event) -> None:
+        self._release_terminal = release_terminal
+        self._reads = 0
+
+    def get(self, block: bool = True, timeout: float | None = None) -> object:
+        """Return one completed message only after the release gate opens."""
+        self._reads += 1
+        if self._reads > 1:
+            raise queue.Empty()
+        if not self._release_terminal.wait(timeout=2.0):
+            raise AssertionError("Timed out waiting for terminal release")
+        return DownloadWorkerMessage(kind="completed")
+
+
+class _TerminalOnTerminateProcess(_FakeProcess):
+    """Release one queued terminal message as soon as termination starts."""
+
+    def __init__(self, release_terminal: threading.Event) -> None:
+        super().__init__()
+        self._release_terminal = release_terminal
+
+    def terminate(self) -> None:
+        """Make the completed message visible before the watcher drains it."""
+        super().terminate()
+        self._release_terminal.set()
+
+
 def test_model_downloader_emits_progress_and_completion(tmp_path: Path) -> None:
     """Aggregate subprocess byte deltas into stable progress snapshots."""
     progress_updates: list[DownloadProgress] = []
@@ -287,6 +317,75 @@ def test_model_downloader_cancel_terminates_active_process(tmp_path: Path) -> No
     assert progress_updates[-1].status == "cancelled"
 
 
+def test_model_downloader_preserves_terminal_state_when_cancel_races(
+    tmp_path: Path,
+) -> None:
+    """Keep a completed terminal state when cancellation races with watcher drain."""
+    progress_updates: list[DownloadProgress] = []
+    release_terminal = threading.Event()
+    cache_dir = tmp_path / "model-cache"
+
+    downloader = ModelDownloader(
+        cache_dir,
+        queue_factory=lambda: _GateTerminalQueue(release_terminal),
+        process_factory=lambda *_args: _TerminalOnTerminateProcess(release_terminal),
+        planner=lambda _repo_id, _cache_dir: 100,
+    )
+
+    downloader.start_download(_make_model(), progress_updates.append)
+    terminal = downloader.cancel_download("small")
+
+    _wait_for(lambda: downloader.is_downloading("small") is False)
+    assert terminal.status == "completed"
+    assert progress_updates[-1].status == "completed"
+
+
+def test_model_downloader_ignores_observer_failures(tmp_path: Path) -> None:
+    """Let download cleanup finish even if callbacks or event publishes fail."""
+    message_queue: queue.Queue[DownloadWorkerMessage] = queue.Queue()
+    cache_dir = tmp_path / "model-cache"
+
+    class _ExplodingEventBus:
+        def publish(self, channel: str, data: JsonDict) -> None:
+            raise RuntimeError(f"publish failed on {channel}")
+
+    def process_factory(
+        task_queue: object,
+        repo_id: str,
+        cache_dir: str,
+    ) -> _FakeProcess:
+        assert task_queue is message_queue
+        assert repo_id == "repo/small"
+        assert Path(cache_dir) == cache_dir_path
+
+        def on_start(process: _FakeProcess) -> None:
+            def publish_messages() -> None:
+                message_queue.put(DownloadWorkerMessage(kind="completed"))
+                process._alive = False
+                process.exitcode = 0
+
+            threading.Thread(target=publish_messages, daemon=True).start()
+
+        return _FakeProcess(on_start=on_start)
+
+    def exploding_callback(progress: DownloadProgress) -> None:
+        raise RuntimeError(f"callback failed for {progress.model_id}")
+
+    cache_dir_path = cache_dir.resolve(strict=False)
+    downloader = ModelDownloader(
+        cache_dir,
+        event_bus=_ExplodingEventBus(),
+        queue_factory=lambda: message_queue,
+        process_factory=process_factory,
+        planner=lambda _repo_id, _cache_dir: 100,
+    )
+
+    downloader.start_download(_make_model(), exploding_callback)
+
+    _wait_for(lambda: downloader.is_downloading("small") is False)
+    assert downloader.get_download("small") is None
+
+
 def test_model_downloader_does_not_hold_lock_while_planning(tmp_path: Path) -> None:
     """Allow read-side queries to proceed while the dry-run planner is blocked."""
     planning_started = threading.Event()
@@ -312,24 +411,31 @@ def test_model_downloader_does_not_hold_lock_while_planning(tmp_path: Path) -> N
         args=(_make_model(),),
         daemon=True,
     )
-    start_thread.start()
+    read_thread = threading.Thread(
+        target=lambda: (assert_downloads_empty(downloader), list_returned.set()),
+        daemon=True,
+    )
 
-    _wait_for(planning_started.is_set)
+    try:
+        start_thread.start()
+        _wait_for(planning_started.is_set)
+        read_thread.start()
+        _wait_for(list_returned.is_set)
+    finally:
+        release_planner.set()
+        start_thread.join(timeout=2.0)
+        read_thread.join(timeout=2.0)
+        if downloader.is_downloading("small"):
+            downloader.cancel_download("small")
+            _wait_for(lambda: downloader.is_downloading("small") is False)
 
-    def read_downloads() -> None:
-        assert downloader.list_downloads() == []
-        list_returned.set()
-
-    read_thread = threading.Thread(target=read_downloads, daemon=True)
-    read_thread.start()
-
-    _wait_for(list_returned.is_set)
-    release_planner.set()
-
-    start_thread.join(timeout=2.0)
-    read_thread.join(timeout=2.0)
     assert not start_thread.is_alive()
     assert not read_thread.is_alive()
+
+
+def assert_downloads_empty(downloader: ModelDownloader) -> None:
+    """Keep the read-side assertion reusable inside the planning test."""
+    assert downloader.list_downloads() == []
 
 
 def test_model_downloader_rejects_duplicate_active_tasks(tmp_path: Path) -> None:
@@ -341,10 +447,16 @@ def test_model_downloader_rejects_duplicate_active_tasks(tmp_path: Path) -> None
         process_factory=lambda *_args: _FakeProcess(),
         planner=lambda _repo_id, _cache_dir: 100,
     )
-    downloader.start_download(_make_model())
 
-    with pytest.raises(ModelAlreadyDownloadingError, match="small"):
+    try:
         downloader.start_download(_make_model())
+
+        with pytest.raises(ModelAlreadyDownloadingError, match="small"):
+            downloader.start_download(_make_model())
+    finally:
+        if downloader.is_downloading("small"):
+            downloader.cancel_download("small")
+            _wait_for(lambda: downloader.is_downloading("small") is False)
 
 
 def test_model_downloader_rejects_cancelling_unknown_task(tmp_path: Path) -> None:
