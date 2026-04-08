@@ -20,7 +20,6 @@ export type DetailSheetProps = {
   mode?: DetailSheetMode
   size?: DetailSheetSize
   closeLabel?: string
-  contentClassName?: string
   bodyClassName?: string
   footerClassName?: string
 } & Omit<ComponentPropsWithoutRef<typeof DialogPrimitive.Content>, 'children'>
@@ -48,7 +47,6 @@ export function DetailSheet({
   size = 'default',
   closeLabel = 'Close',
   className,
-  contentClassName,
   bodyClassName,
   footerClassName,
   ...props
@@ -104,11 +102,8 @@ export function DetailSheet({
           </div>
 
           <div
-            className={cn(
-              'min-h-0 flex-1 overflow-y-auto px-6 py-5',
-              bodyClassName,
-              contentClassName,
-            )}
+            data-slot="detail-sheet-body"
+            className={cn('min-h-0 flex-1 overflow-y-auto px-6 py-5', bodyClassName)}
           >
             {children}
           </div>

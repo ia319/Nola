@@ -206,4 +206,25 @@ describe('DetailSheet', () => {
     expect(sheet).toHaveAttribute('data-mode', 'sheet')
     expect(within(sheet as HTMLElement).getByText('Detail body')).toBeTruthy()
   })
+
+  it('keeps shell and body class names on separate elements', () => {
+    render(
+      <DetailSheet
+        open
+        onOpenChange={() => {}}
+        title="Task Detail"
+        className="sheet-shell"
+        bodyClassName="sheet-body"
+      >
+        <div>Detail body</div>
+      </DetailSheet>,
+    )
+
+    const sheet = screen.getByText('Task Detail').closest('[data-slot="detail-sheet"]')
+    const body = screen.getByText('Detail body').closest('[data-slot="detail-sheet-body"]')
+
+    expect(sheet).toHaveClass('sheet-shell')
+    expect(body).toHaveClass('sheet-body')
+    expect(body).not.toHaveClass('sheet-shell')
+  })
 })
