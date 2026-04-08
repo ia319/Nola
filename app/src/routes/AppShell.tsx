@@ -1,8 +1,8 @@
 import { Link, Outlet } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { Toaster } from 'sonner'
 
 import { buttonVariants } from '@/components/ui/button'
+import { Toaster } from '@/components/ui/sonner'
 import { useTaskPolling } from '@/features/tasks'
 
 export function AppShell() {
