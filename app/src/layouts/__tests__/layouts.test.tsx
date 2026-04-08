@@ -96,6 +96,26 @@ describe('SettingsLayout', () => {
       'page',
     )
   })
+
+  it('renders disabled settings destinations as disabled buttons', () => {
+    render(
+      <SettingsLayout
+        tabs={[
+          {
+            key: 'system-info',
+            label: 'System Info',
+            href: '/settings/system-info',
+            disabled: true,
+          },
+        ]}
+      >
+        <div>Disabled body</div>
+      </SettingsLayout>,
+    )
+
+    expect(screen.queryByRole('link', { name: 'System Info' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'System Info' })).toBeDisabled()
+  })
 })
 
 describe('SectionHeader', () => {

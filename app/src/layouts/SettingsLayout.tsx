@@ -95,7 +95,7 @@ export function SettingsLayout({
                   tab.disabled && 'pointer-events-none opacity-50',
                 )
 
-                if (tab.href) {
+                if (tab.href && !tab.disabled) {
                   return (
                     <a
                       key={tab.key}
@@ -112,6 +112,7 @@ export function SettingsLayout({
                   <button
                     key={tab.key}
                     type="button"
+                    disabled={tab.disabled}
                     aria-current={active ? 'page' : undefined}
                     className={tabClassName}
                   >
