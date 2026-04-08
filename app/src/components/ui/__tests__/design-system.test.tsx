@@ -16,14 +16,14 @@ import { StatusBadge } from '../StatusBadge'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => {
+    t: (key: string, options?: { defaultValue?: string }) => {
       const dictionary: Record<string, string> = {
         'tasks.status.processing': 'Processing',
         'tasks.status.completed': 'Completed',
         'models.status.downloading': 'Downloading',
         'models.status.downloaded': 'Downloaded',
       }
-      return dictionary[key] ?? key
+      return dictionary[key] ?? options?.defaultValue ?? key
     },
   }),
 }))
@@ -45,6 +45,12 @@ describe('StatusBadge', () => {
       'data-kind',
       'model',
     )
+  })
+
+  it('falls back to a humanized label when a translation is missing', () => {
+    render(<StatusBadge status="pending" />)
+
+    expect(screen.getByText('Pending')).toBeTruthy()
   })
 })
 

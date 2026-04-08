@@ -43,12 +43,7 @@ export {
 export { Separator } from './separator'
 export { Slider } from './slider'
 export { Toaster } from './sonner'
-export {
-  StatusBadge,
-  type StatusBadgeKind,
-  type StatusBadgeProps,
-  type StatusBadgeStatus,
-} from './StatusBadge'
+export { StatusBadge, type StatusBadgeProps, type StatusBadgeStatus } from './StatusBadge'
 export { Switch } from './switch'
 export { Textarea } from './textarea'
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'

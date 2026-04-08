@@ -15,11 +15,9 @@ type TaskBadgeStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'canc
 type ModelBadgeStatus = 'not_downloaded' | 'downloading' | 'downloaded'
 
 export type StatusBadgeStatus = TaskBadgeStatus | ModelBadgeStatus
-export type StatusBadgeKind = 'task' | 'model'
 
 export type StatusBadgeProps = HTMLAttributes<HTMLSpanElement> & {
   status: StatusBadgeStatus
-  kind?: StatusBadgeKind
   label?: ReactNode
   showIcon?: boolean
 }
@@ -67,19 +65,19 @@ function humanizeStatus(status: StatusBadgeStatus): string {
 
 export function StatusBadge({
   status,
-  kind,
   label,
   showIcon = true,
   className,
   ...props
 }: StatusBadgeProps) {
   const { t } = useTranslation()
-  const resolvedKind = kind ?? (isTaskStatus(status) ? 'task' : 'model')
+  const resolvedKind = isTaskStatus(status) ? 'task' : 'model'
   const Icon = STATUS_ICONS[status]
   const resolvedLabel =
     label ??
-    (resolvedKind === 'task' ? t(`tasks.status.${status}`) : t(`models.status.${status}`)) ??
-    humanizeStatus(status)
+    t(resolvedKind === 'task' ? `tasks.status.${status}` : `models.status.${status}`, {
+      defaultValue: humanizeStatus(status),
+    })
 
   return (
     <span
