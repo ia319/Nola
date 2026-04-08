@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 
 import { render, screen } from '@testing-library/react'
+import { BellDot } from 'lucide-react'
 import { describe, expect, it } from 'vitest'
 
 import { ContentCanvas } from '../ContentCanvas'
+import { FormRow } from '../FormRow'
 import { PageHeader } from '../PageHeader'
+import { SectionHeader } from '../SectionHeader'
 import { SettingsLayout } from '../SettingsLayout'
 import { TwoColumnLayout } from '../TwoColumnLayout'
 
@@ -92,5 +95,48 @@ describe('SettingsLayout', () => {
       'aria-current',
       'page',
     )
+  })
+})
+
+describe('SectionHeader', () => {
+  it('renders the section eyebrow, description, icon, and action affordance', () => {
+    render(
+      <SectionHeader
+        label="Interface"
+        title="Workspace Configuration"
+        description="Manage how the Nola interface appears."
+        icon={<BellDot className="size-4" />}
+        action={<button type="button">Edit</button>}
+      />,
+    )
+
+    expect(screen.getByText('Interface')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Workspace Configuration' })).toBeTruthy()
+    expect(screen.getByText('Manage how the Nola interface appears.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
+  })
+})
+
+describe('FormRow', () => {
+  it('renders the setting label, helper text, and control slot', () => {
+    render(
+      <FormRow
+        label="Interface Language"
+        description="Select the default language for menus and notifications."
+        htmlFor="language"
+        action={<span>Required</span>}
+      >
+        <select id="language" aria-label="Language">
+          <option>English</option>
+        </select>
+      </FormRow>,
+    )
+
+    expect(screen.getByText('Interface Language')).toBeTruthy()
+    expect(
+      screen.getByText('Select the default language for menus and notifications.'),
+    ).toBeTruthy()
+    expect(screen.getByText('Required')).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Language' })).toBeTruthy()
   })
 })
