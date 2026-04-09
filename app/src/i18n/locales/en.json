@@ -440,5 +440,8 @@
       "4": "High",
       "5": "Very High"
     }
+  },
+  "settings": {
+    "title": "Settings"
   }
 }
