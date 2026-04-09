@@ -18,24 +18,24 @@ const SIDEBAR_NAV_ITEMS: readonly SidebarNavItem[] = [
     key: 'tasks',
     href: '/',
     icon: AudioLines,
-    labelKey: 'tasks.currentBatch.title',
+    labelKey: 'shell.navigation.tasks',
   },
   {
     key: 'history',
     href: '/history',
     icon: TimerReset,
-    labelKey: 'tasks.history.title',
+    labelKey: 'shell.navigation.history',
   },
   {
     key: 'models',
     href: '/models',
     icon: Boxes,
-    labelKey: 'models.title',
+    labelKey: 'shell.navigation.models',
   },
   {
     key: 'settings',
     icon: Settings2,
-    labelKey: 'settings.title',
+    labelKey: 'shell.navigation.settings',
     disabled: true,
   },
 ] as const

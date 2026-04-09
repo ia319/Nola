@@ -20,10 +20,10 @@ vi.mock('react-i18next', () => ({
     t: (key: string) =>
       (
         ({
-          'tasks.currentBatch.title': 'Tasks',
-          'tasks.history.title': 'History',
-          'models.title': 'Models',
-          'settings.title': 'Settings',
+          'shell.navigation.tasks': 'Tasks',
+          'shell.navigation.history': 'History',
+          'shell.navigation.models': 'Models',
+          'shell.navigation.settings': 'Settings',
         }) as const
       )[key] ?? key,
   }),
