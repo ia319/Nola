@@ -1,5 +1,5 @@
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
-import { Outlet } from '@tanstack/react-router'
+import { Link, Outlet } from '@tanstack/react-router'
 
 import { cn } from '@/lib/utils'
 import { ContentCanvas } from './ContentCanvas'
@@ -39,6 +39,10 @@ export type SettingsTabItem = {
   label: string
   href?: string
   disabled?: boolean
+}
+
+function isSettingsTabKey(value: string): value is SettingsTabKey {
+  return SETTINGS_TABS.some((tab) => tab.key === value)
 }
 
 export type SettingsLayoutProps = ComponentPropsWithoutRef<'div'> & {
@@ -96,6 +100,22 @@ export function SettingsLayout({
                 )
 
                 if (tab.href && !tab.disabled) {
+                  const canUseClientLink = isSettingsTabKey(tab.key)
+
+                  if (canUseClientLink) {
+                    return (
+                      <Link
+                        key={tab.key}
+                        to="/settings/$tab"
+                        params={{ tab: tab.key }}
+                        aria-current={active ? 'page' : undefined}
+                        className={tabClassName}
+                      >
+                        {tab.label}
+                      </Link>
+                    )
+                  }
+
                   return (
                     <a
                       key={tab.key}

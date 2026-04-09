@@ -7,7 +7,7 @@ import { useBreakpoint } from '@/shared/responsive'
 
 type SidebarNavItem = {
   key: 'tasks' | 'history' | 'models' | 'settings'
-  href?: '/' | '/history' | '/models'
+  href?: '/' | '/history' | '/models' | '/settings'
   icon: LucideIcon
   labelKey: string
   disabled?: boolean
@@ -34,9 +34,9 @@ const SIDEBAR_NAV_ITEMS: readonly SidebarNavItem[] = [
   },
   {
     key: 'settings',
+    href: '/settings',
     icon: Settings2,
     labelKey: 'shell.navigation.settings',
-    disabled: true,
   },
 ] as const
 

@@ -64,7 +64,7 @@ describe('AppSidebar', () => {
     expect(screen.getByRole('link', { name: 'Tasks' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: 'History' })).toHaveAttribute('href', '/history')
     expect(screen.getByRole('link', { name: 'Models' })).toHaveAttribute('href', '/models')
-    expect(screen.getByRole('button', { name: 'Settings' })).toBeDisabled()
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
   })
 
   it('highlights the active destination from the current path', () => {

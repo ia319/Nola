@@ -1,8 +1,28 @@
 // @vitest-environment jsdom
 
+import type { ReactNode } from 'react'
+
 import { render, screen } from '@testing-library/react'
 import { BellDot } from 'lucide-react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({
+    to,
+    className,
+    children,
+    ...props
+  }: {
+    to: string
+    className?: string
+    children: ReactNode
+  }) => (
+    <a href={to} className={className} {...props}>
+      {children}
+    </a>
+  ),
+  Outlet: () => <div data-slot="mock-outlet" />,
+}))
 
 import { ContentCanvas } from '../ContentCanvas'
 import { FormRow } from '../FormRow'
