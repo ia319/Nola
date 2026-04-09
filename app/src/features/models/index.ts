@@ -22,6 +22,7 @@ export { formatBytes, formatPercent, formatSpeed, sortModelsForDisplay } from '.
 export type {
   DownloadProgressResponse,
   ModelCancelResponse,
+  ModelDownloadStatus,
   ModelDeleteResponse,
   ModelDetailResponse,
   ModelDirSource,

@@ -9,10 +9,11 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import type { ModelStatus, TaskStatus } from '@/shared/types'
 import { cn } from '@/lib/utils'
 
-type TaskBadgeStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
-type ModelBadgeStatus = 'not_downloaded' | 'downloading' | 'downloaded'
+type TaskBadgeStatus = TaskStatus
+type ModelBadgeStatus = ModelStatus
 
 export type StatusBadgeStatus = TaskBadgeStatus | ModelBadgeStatus
 
@@ -22,38 +23,46 @@ export type StatusBadgeProps = HTMLAttributes<HTMLSpanElement> & {
   showIcon?: boolean
 }
 
-const TASK_STATUSES: readonly TaskBadgeStatus[] = [
-  'pending',
-  'processing',
-  'completed',
-  'failed',
-  'cancelled',
-]
-
-const STATUS_STYLES: Record<StatusBadgeStatus, string> = {
+const TASK_STATUS_STYLES: Record<TaskBadgeStatus, string> = {
   pending: 'border-warning/15 bg-warning-container text-on-warning-container',
   processing: 'border-border bg-secondary text-secondary-foreground',
   completed: 'border-success/15 bg-success-container text-on-success-container',
   failed: 'border-destructive/15 bg-destructive-container text-on-destructive-container',
   cancelled: 'border-outline-variant bg-surface-container text-on-surface-variant',
+}
+
+const MODEL_STATUS_STYLES: Record<ModelBadgeStatus, string> = {
   not_downloaded: 'border-outline-variant bg-surface-container text-on-surface-variant',
   downloading: 'border-border bg-secondary text-secondary-foreground',
   downloaded: 'border-success/15 bg-success-container text-on-success-container',
 }
 
-const STATUS_ICONS: Record<StatusBadgeStatus, typeof Clock3> = {
+const STATUS_STYLES: Record<StatusBadgeStatus, string> = {
+  ...TASK_STATUS_STYLES,
+  ...MODEL_STATUS_STYLES,
+}
+
+const TASK_STATUS_ICONS: Record<TaskBadgeStatus, typeof Clock3> = {
   pending: Clock3,
   processing: LoaderCircle,
   completed: CheckCircle2,
   failed: AlertCircle,
   cancelled: CircleSlash,
+}
+
+const MODEL_STATUS_ICONS: Record<ModelBadgeStatus, typeof Clock3> = {
   not_downloaded: Download,
   downloading: LoaderCircle,
   downloaded: CheckCircle2,
 }
 
+const STATUS_ICONS: Record<StatusBadgeStatus, typeof Clock3> = {
+  ...TASK_STATUS_ICONS,
+  ...MODEL_STATUS_ICONS,
+}
+
 function isTaskStatus(status: StatusBadgeStatus): status is TaskBadgeStatus {
-  return TASK_STATUSES.includes(status as TaskBadgeStatus)
+  return Object.hasOwn(TASK_STATUS_STYLES, status)
 }
 
 function humanizeStatus(status: StatusBadgeStatus): string {

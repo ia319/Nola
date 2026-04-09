@@ -3,10 +3,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createSSEConnection } from '@/shared/lib/sse-client'
 
 import { cancelDownload, startDownload } from '../api'
-import type { DownloadProgressResponse, ModelDownloadSSEPayload } from '../types'
+import type {
+  DownloadProgressResponse,
+  ModelDownloadSSEPayload,
+  ModelDownloadStatus,
+} from '../types'
 
 export interface DownloadState {
-  status: 'downloading' | 'completed' | 'failed' | 'cancelled'
+  status: ModelDownloadStatus
   percent: number
   downloadedBytes: number
   totalBytes: number
