@@ -441,6 +441,21 @@
       "5": "Very High"
     }
   },
+  "shell": {
+    "navigation": {
+      "tasks": "Tasks",
+      "history": "History",
+      "models": "Models",
+      "settings": "Settings"
+    },
+    "topBar": {
+      "actions": {
+        "activity": "Activity",
+        "toggleTheme": "Toggle theme",
+        "help": "Help"
+      }
+    }
+  },
   "settings": {
     "title": "Settings"
   }

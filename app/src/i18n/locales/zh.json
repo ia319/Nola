@@ -440,6 +440,21 @@
       "5": "极高"
     }
   },
+  "shell": {
+    "navigation": {
+      "tasks": "任务",
+      "history": "历史",
+      "models": "模型",
+      "settings": "设置"
+    },
+    "topBar": {
+      "actions": {
+        "activity": "活动中心",
+        "toggleTheme": "切换主题",
+        "help": "帮助"
+      }
+    }
+  },
   "settings": {
     "title": "设置"
   }
