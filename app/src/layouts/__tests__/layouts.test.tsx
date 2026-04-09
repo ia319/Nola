@@ -68,6 +68,22 @@ describe('TwoColumnLayout', () => {
     expect(left).toHaveClass('lg:col-span-6')
     expect(right).toHaveClass('lg:col-span-6')
   })
+
+  it('supports the sidebar-heavy desktop split', () => {
+    render(
+      <TwoColumnLayout
+        left={<div>Left column</div>}
+        right={<div>Right column</div>}
+        ratio="sidebar-heavy"
+      />,
+    )
+
+    const left = screen.getByText('Left column').parentElement
+    const right = screen.getByText('Right column').parentElement
+
+    expect(left).toHaveClass('lg:col-span-5')
+    expect(right).toHaveClass('lg:col-span-7')
+  })
 })
 
 describe('SettingsLayout', () => {
@@ -87,6 +103,19 @@ describe('SettingsLayout', () => {
   it('can resolve the active tab from the current path when no explicit key is provided', () => {
     render(
       <SettingsLayout currentPath="/settings/model-storage">
+        <div>Storage body</div>
+      </SettingsLayout>,
+    )
+
+    expect(screen.getByRole('link', { name: 'Model Storage' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+  })
+
+  it('keeps a tab active for nested settings paths', () => {
+    render(
+      <SettingsLayout currentPath="/settings/model-storage/cache">
         <div>Storage body</div>
       </SettingsLayout>,
     )
