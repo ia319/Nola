@@ -27,6 +27,7 @@ describe('queryFetcher', () => {
       }),
     ).resolves.toEqual(responseData)
 
+    expect(apiClientMocks.request).toHaveBeenCalledTimes(1)
     expect(apiClientMocks.request).toHaveBeenCalledWith({
       url: '/api/transcription-tasks/',
       method: 'GET',

@@ -1,3 +1,4 @@
+import axios from 'axios'
 import type { DefaultOptions } from '@tanstack/react-query'
 import { describe, expect, it } from 'vitest'
 
@@ -37,6 +38,13 @@ describe('createAppQueryClient', () => {
     }
 
     expect(retry(0, error)).toBe(false)
+  })
+
+  it('does not retry canceled requests', () => {
+    const queryClient = createAppQueryClient()
+    const retry = getQueryRetryHandler(queryClient.getDefaultOptions())
+
+    expect(retry(0, new axios.CanceledError('aborted'))).toBe(false)
   })
 
   it('disables mutation retries by default', () => {

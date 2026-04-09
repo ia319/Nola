@@ -1,9 +1,14 @@
+import axios from 'axios'
 import { QueryClient } from '@tanstack/react-query'
 
 import { isAppError } from '@/shared/lib/error-factory'
 
 function shouldRetryQuery(failureCount: number, error: unknown): boolean {
   if (failureCount >= 2) {
+    return false
+  }
+
+  if (axios.isCancel(error)) {
     return false
   }
 
