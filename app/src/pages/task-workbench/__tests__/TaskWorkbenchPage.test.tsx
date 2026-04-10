@@ -5,8 +5,8 @@ import type { ReactNode } from 'react'
 import { render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { OptionsBarProps } from '@/features/transcription-options'
 import type { CurrentBatchTasksPanelProps } from '@/features/tasks'
+import type { TaskWorkbenchSessionConfigProps } from '../TaskWorkbenchSessionConfig'
 import type { TaskWorkbenchUploadQueueProps } from '../TaskWorkbenchUploadQueue'
 
 const taskWorkbenchMocks = vi.hoisted(() => ({
@@ -27,8 +27,11 @@ const taskWorkbenchMocks = vi.hoisted(() => ({
   taskWorkbenchUploadQueue: vi.fn((_props: TaskWorkbenchUploadQueueProps) => (
     <div data-slot="mock-task-workbench-upload-queue">upload queue</div>
   )),
-  optionsBar: vi.fn((_props: OptionsBarProps) => (
-    <div data-slot="mock-options-bar">options bar</div>
+  taskWorkbenchSessionConfig: vi.fn((_props: TaskWorkbenchSessionConfigProps) => (
+    <section data-slot="mock-task-workbench-session-config">
+      <h2>Session Configuration</h2>
+      <div>session config</div>
+    </section>
   )),
   currentBatchTasksPanel: vi.fn((_props: CurrentBatchTasksPanelProps) => (
     <div data-slot="mock-current-batch-tasks-panel">current batch tasks panel</div>
@@ -87,10 +90,6 @@ vi.mock('@/features/upload', () => ({
   useFileUpload: taskWorkbenchMocks.useFileUpload,
 }))
 
-vi.mock('@/features/transcription-options', () => ({
-  OptionsBar: taskWorkbenchMocks.optionsBar,
-}))
-
 vi.mock('@/features/tasks', () => ({
   CurrentBatchTasksPanel: taskWorkbenchMocks.currentBatchTasksPanel,
   cancelTaskAndRefresh: taskWorkbenchMocks.cancelTaskAndRefresh,
@@ -102,6 +101,10 @@ vi.mock('@/features/tasks', () => ({
 
 vi.mock('../TaskWorkbenchUploadQueue', () => ({
   TaskWorkbenchUploadQueue: taskWorkbenchMocks.taskWorkbenchUploadQueue,
+}))
+
+vi.mock('../TaskWorkbenchSessionConfig', () => ({
+  TaskWorkbenchSessionConfig: taskWorkbenchMocks.taskWorkbenchSessionConfig,
 }))
 
 import { TaskWorkbenchPage } from '../TaskWorkbenchPage'
@@ -117,7 +120,7 @@ describe('TaskWorkbenchPage', () => {
     taskWorkbenchMocks.addCreatedTask.mockReset()
     taskWorkbenchMocks.upsertSessionTask.mockReset()
     taskWorkbenchMocks.taskWorkbenchUploadQueue.mockClear()
-    taskWorkbenchMocks.optionsBar.mockClear()
+    taskWorkbenchMocks.taskWorkbenchSessionConfig.mockClear()
     taskWorkbenchMocks.currentBatchTasksPanel.mockClear()
 
     const sessionState = {
@@ -233,7 +236,7 @@ describe('TaskWorkbenchPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Session Configuration', level: 2 })).toBeTruthy()
     expect(screen.getByText('upload queue')).toBeTruthy()
-    expect(screen.getByText('options bar')).toBeTruthy()
+    expect(screen.getByText('session config')).toBeTruthy()
     expect(screen.getByText('current batch tasks panel')).toBeTruthy()
   })
 
@@ -248,7 +251,7 @@ describe('TaskWorkbenchPage', () => {
       onCancelTask: expect.any(Function),
       onRetryTask: expect.any(Function),
     })
-    expect(taskWorkbenchMocks.optionsBar.mock.calls[0]?.[0]).toMatchObject({
+    expect(taskWorkbenchMocks.taskWorkbenchSessionConfig.mock.calls[0]?.[0]).toMatchObject({
       fileIds: ['file-ready', 'file-created'],
       disabled: false,
       onCreateTask: expect.any(Function),

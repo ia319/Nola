@@ -4,7 +4,6 @@ import { toast } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
 import { MetricCard } from '@/components/ui'
-import { Card, CardContent } from '@/components/ui/card'
 import { useAppConfig } from '@/config/use-app-config'
 import {
   cancelTaskAndRefresh,
@@ -15,11 +14,11 @@ import {
   useSessionTasksStore,
 } from '@/features/tasks'
 import type { TaskCreateResult } from '@/features/transcription-options'
-import { OptionsBar } from '@/features/transcription-options'
 import { useFileUpload } from '@/features/upload'
 import { ContentCanvas, PageHeader, TwoColumnLayout } from '@/layouts'
 import type { TaskSummary } from '@/shared/types'
 import { buildTaskWorkbenchSummary } from './task-workbench-summary'
+import { TaskWorkbenchSessionConfig } from './TaskWorkbenchSessionConfig'
 import { TaskWorkbenchUploadQueue } from './TaskWorkbenchUploadQueue'
 
 export function TaskWorkbenchPage() {
@@ -192,29 +191,14 @@ export function TaskWorkbenchPage() {
           </ErrorBoundary>
         }
         right={
-          <section data-slot="task-workbench-session-config" className="space-y-4">
-            <div className="space-y-1">
-              <h2 className="text-foreground text-lg font-semibold tracking-tight">
-                {t('tasks.workbench.sections.sessionConfig.title')}
-              </h2>
-              <p className="text-muted-foreground text-sm leading-6">
-                {t('tasks.workbench.sections.sessionConfig.description')}
-              </p>
-            </div>
-
-            <Card className="gap-0 py-0">
-              <CardContent className="px-5 py-5">
-                <ErrorBoundary>
-                  <OptionsBar
-                    fileIds={availableFileIds}
-                    onCreateTask={createTask}
-                    onTasksCreated={handleTasksCreated}
-                    disabled={isUploading}
-                  />
-                </ErrorBoundary>
-              </CardContent>
-            </Card>
-          </section>
+          <ErrorBoundary>
+            <TaskWorkbenchSessionConfig
+              fileIds={availableFileIds}
+              onCreateTask={createTask}
+              onTasksCreated={handleTasksCreated}
+              disabled={isUploading}
+            />
+          </ErrorBoundary>
         }
       />
 
