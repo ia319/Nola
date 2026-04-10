@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTranscriptionOptions } from '../useTranscriptionOptions'
 import type { UseAppConfigReturn } from '@/config/use-app-config'
 import type { TranscriptionDefaults } from '@/shared/types'
+import { buildTranscriptionDefaults } from '@/test-utils/transcription-defaults'
 
 const useAppConfigMock = vi.fn<() => UseAppConfigReturn>()
 
@@ -12,7 +13,9 @@ vi.mock('@/config/use-app-config', () => ({
   useAppConfig: (...args: unknown[]) => useAppConfigMock(...(args as [])),
 }))
 
-function buildAppConfigReturn(defaults: Record<string, unknown> = {}): UseAppConfigReturn {
+function buildAppConfigReturn(overrides: Partial<TranscriptionDefaults> = {}): UseAppConfigReturn {
+  const defaults = buildTranscriptionDefaults(overrides)
+
   return {
     config: {
       engine: {
@@ -21,7 +24,7 @@ function buildAppConfigReturn(defaults: Record<string, unknown> = {}): UseAppCon
         compute_type: 'default',
         is_multilingual: true,
       },
-      transcription: { defaults: defaults as TranscriptionDefaults, schema: [] },
+      transcription: { defaults, schema: [] },
       file: { allowed_extensions: [], allowed_mime_types: [], max_file_size: 0 },
       effective_languages: [],
     },
@@ -38,8 +41,10 @@ function buildLoadingReturn(): UseAppConfigReturn {
   }
 }
 
-async function renderTranscriptionOptions(defaults: Record<string, unknown> = {}) {
-  useAppConfigMock.mockReturnValue(buildAppConfigReturn(defaults))
+async function renderTranscriptionOptions(overrides: Partial<TranscriptionDefaults> = {}) {
+  const defaults = buildTranscriptionDefaults(overrides)
+
+  useAppConfigMock.mockReturnValue(buildAppConfigReturn(overrides))
 
   const hook = renderHook(() => useTranscriptionOptions())
 
@@ -56,8 +61,9 @@ describe('useTranscriptionOptions', () => {
   })
 
   it('returns correct initial state and loads backend defaults', async () => {
-    const defaults = { beam_size: 5, temperature: [0, 0.2, 0.4] }
-    const { result } = await renderTranscriptionOptions(defaults)
+    const overrides = { beam_size: 5, temperature: [0, 0.2, 0.4] }
+    const defaults = buildTranscriptionDefaults(overrides)
+    const { result } = await renderTranscriptionOptions(overrides)
 
     expect(result.current.language).toBeUndefined()
     expect(result.current.task).toBe('transcribe')
@@ -67,8 +73,7 @@ describe('useTranscriptionOptions', () => {
   })
 
   it('hydrates language and task from persisted defaults', async () => {
-    const defaults = { language: 'ja', task: 'translate' }
-    const { result } = await renderTranscriptionOptions(defaults)
+    const { result } = await renderTranscriptionOptions({ language: 'ja', task: 'translate' })
 
     expect(result.current.language).toBe('ja')
     expect(result.current.task).toBe('translate')
@@ -145,8 +150,7 @@ describe('useTranscriptionOptions', () => {
   })
 
   it('resets local option overrides to backend defaults', async () => {
-    const defaults = { language: 'ja', task: 'translate' }
-    const { result } = await renderTranscriptionOptions(defaults)
+    const { result } = await renderTranscriptionOptions({ language: 'ja', task: 'translate' })
 
     act(() => {
       result.current.setLanguage('en')
