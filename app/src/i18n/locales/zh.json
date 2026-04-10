@@ -271,6 +271,29 @@
         }
       }
     },
+    "uploadQueue": {
+      "empty": {
+        "title": "还没有上传文件",
+        "description": "将音频或视频文件拖到这里，或点击下方按钮浏览文件。",
+        "action": "选择文件"
+      },
+      "table": {
+        "fileName": "文件名",
+        "status": "状态",
+        "size": "大小",
+        "action": "操作"
+      },
+      "actions": {
+        "addMoreFiles": "继续添加文件"
+      },
+      "status": {
+        "pending": "等待上传",
+        "uploading": "上传中",
+        "ready": "就绪",
+        "failed": "失败",
+        "cancelled": "已取消"
+      }
+    },
     "history": {
       "title": "任务历史",
       "description": "所有转写任务",

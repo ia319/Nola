@@ -272,6 +272,29 @@
         }
       }
     },
+    "uploadQueue": {
+      "empty": {
+        "title": "No files uploaded yet",
+        "description": "Drag and drop audio or video files here, or click the button below to browse.",
+        "action": "Select Files"
+      },
+      "table": {
+        "fileName": "File Name",
+        "status": "Status",
+        "size": "Size",
+        "action": "Action"
+      },
+      "actions": {
+        "addMoreFiles": "Add More Files"
+      },
+      "status": {
+        "pending": "Pending",
+        "uploading": "Uploading",
+        "ready": "Ready",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      }
+    },
     "history": {
       "title": "Task History",
       "description": "All transcription tasks",
