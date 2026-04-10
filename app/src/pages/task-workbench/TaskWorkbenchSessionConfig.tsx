@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
-import { Play, SlidersHorizontal } from 'lucide-react'
+import { Play, RotateCcw, SlidersHorizontal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -13,18 +14,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useAppConfig } from '@/config/use-app-config'
+import { Textarea } from '@/components/ui/textarea'
+import { fetchEngineDefaults, patchTranscriptionDefaults } from '@/config/api'
+import logger from '@/config/logger'
+import { refreshAppConfig, useAppConfig } from '@/config/use-app-config'
 import { AdvancedOptions, useTranscriptionOptions } from '@/features/transcription-options'
 import type { TaskCreateResult } from '@/features/transcription-options'
 import type {
   AdvancedOptionValue,
   AdvancedTranscriptionOptions,
 } from '@/features/transcription-options'
+import {
+  buildDefaultsPatchPayload,
+  buildEffectiveDefaults,
+} from '@/features/transcription-options/lib/defaults-patch'
+import { getValueByPath } from '@/features/transcription-options/lib/object-path'
 import { buildTranscriptionSchemaUiModel } from '@/features/transcription-options/lib/schema-adapter'
 import { useModels } from '@/features/models'
 import { cn } from '@/lib/utils'
 import { isAppError } from '@/shared/lib/error-factory'
-import type { AppError, CreateTaskPayload, CreateTaskResponse } from '@/shared/types'
+import type {
+  AppError,
+  CreateTaskPayload,
+  CreateTaskResponse,
+  TranscriptionDefaults,
+} from '@/shared/types'
 
 const MODEL_LOADING_VALUE = '__loading__'
 const MODEL_EMPTY_VALUE = '__empty__'
@@ -93,6 +107,40 @@ function applyAdvancedDraftChange(
   return next
 }
 
+function resolveInitialPromptValue(initialPrompt: string | null | undefined): string {
+  if (typeof initialPrompt === 'string') return initialPrompt
+  if (initialPrompt === null) return ''
+  return ''
+}
+
+function isSameAdvancedValue(left: AdvancedOptionValue, right: unknown): boolean {
+  if (Array.isArray(left) && Array.isArray(right)) {
+    if (left.length !== right.length) return false
+
+    return left.every((value, index) => Object.is(value, right[index]))
+  }
+
+  return Object.is(left, right)
+}
+
+function buildAppliedAdvancedOptions(
+  draft: AdvancedTranscriptionOptions,
+  defaults: TranscriptionDefaults | null,
+): AdvancedTranscriptionOptions {
+  const next: AdvancedTranscriptionOptions = {}
+
+  for (const [key, value] of Object.entries(draft)) {
+    if (value === undefined) continue
+
+    const defaultValue = getValueByPath(defaults, key)
+    if (isSameAdvancedValue(value, defaultValue)) continue
+
+    next[key] = value
+  }
+
+  return next
+}
+
 export function TaskWorkbenchSessionConfig({
   fileIds,
   onCreateTask,
@@ -102,8 +150,10 @@ export function TaskWorkbenchSessionConfig({
   const { t } = useTranslation()
   const creatingRef = useRef(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [isSavingDefaults, setIsSavingDefaults] = useState(false)
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
   const [draftAdvancedOptions, setDraftAdvancedOptions] = useState<AdvancedTranscriptionOptions>({})
+  const [draftInitialPrompt, setDraftInitialPrompt] = useState<string | null | undefined>(undefined)
 
   const { config } = useAppConfig()
   const { models, configuredModelId, lastLoadedModelId, isLoading: isModelsLoading } = useModels()
@@ -116,7 +166,10 @@ export function TaskWorkbenchSessionConfig({
     setTask,
     setAdvancedOption,
     resetAdvancedOptions,
+    resetOptionOverrides,
     buildRequest,
+    initialPrompt,
+    setInitialPrompt,
   } = useTranscriptionOptions()
 
   const schemaUiModel = useMemo(
@@ -134,8 +187,10 @@ export function TaskWorkbenchSessionConfig({
   )
 
   const advancedOverrideCount = useMemo(
-    () => Object.values(advancedOptions).filter((value) => value !== undefined).length,
-    [advancedOptions],
+    () =>
+      Object.values(advancedOptions).filter((value) => value !== undefined).length +
+      (initialPrompt !== undefined ? 1 : 0),
+    [advancedOptions, initialPrompt],
   )
 
   const modelOptions = useMemo<ModelSelectOption[]>(() => {
@@ -189,7 +244,7 @@ export function TaskWorkbenchSessionConfig({
     return modelOptions[0]?.value ?? MODEL_EMPTY_VALUE
   }, [configuredModelId, lastLoadedModelId, modelOptions])
 
-  const controlsDisabled = disabled || isCreating
+  const controlsDisabled = disabled || isCreating || isSavingDefaults
   const startDisabled = controlsDisabled || fileIds.length === 0
 
   async function handleStart() {
@@ -228,23 +283,91 @@ export function TaskWorkbenchSessionConfig({
 
   function handleOpenAdvanced(): void {
     setDraftAdvancedOptions({ ...advancedOptions })
+    setDraftInitialPrompt(
+      initialPrompt === undefined ? (defaults?.initial_prompt ?? null) : initialPrompt,
+    )
     setIsAdvancedOpen(true)
   }
 
   function handleApplyAdvancedChanges(): void {
+    const nextAdvancedOptions = buildAppliedAdvancedOptions(draftAdvancedOptions, defaults)
+
     resetAdvancedOptions()
 
-    for (const [key, value] of Object.entries(draftAdvancedOptions)) {
+    for (const [key, value] of Object.entries(nextAdvancedOptions)) {
       if (value !== undefined) {
         setAdvancedOption(key, value)
       }
     }
 
+    const nextPrompt =
+      draftInitialPrompt === undefined
+        ? undefined
+        : draftInitialPrompt === (defaults?.initial_prompt ?? null)
+          ? undefined
+          : draftInitialPrompt
+
+    setInitialPrompt(nextPrompt)
     setIsAdvancedOpen(false)
   }
 
   function handleDraftOptionChange(key: string, value: AdvancedOptionValue | undefined): void {
     setDraftAdvancedOptions((previous) => applyAdvancedDraftChange(previous, key, value))
+  }
+
+  function handleResetDraftToDefaults(): void {
+    setDraftAdvancedOptions({})
+    setDraftInitialPrompt(defaults?.initial_prompt ?? null)
+  }
+
+  async function refreshDefaultsView(): Promise<boolean> {
+    try {
+      await refreshAppConfig()
+      return true
+    } catch (error: unknown) {
+      logger.error('config.defaults.refreshFailed', { context: 'save', error })
+      return false
+    }
+  }
+
+  async function handleSaveAsDefault(): Promise<void> {
+    if (!defaults || isSavingDefaults || disabled) return
+
+    setIsSavingDefaults(true)
+
+    try {
+      const engineDefaults = (await fetchEngineDefaults()).defaults
+      const nextEffectiveDefaults = buildEffectiveDefaults({
+        defaults,
+        language,
+        task,
+        initialPrompt: draftInitialPrompt,
+        advancedOptions: buildAppliedAdvancedOptions(draftAdvancedOptions, defaults),
+      })
+
+      const payload = buildDefaultsPatchPayload({
+        engineDefaults,
+        previousEffectiveDefaults: defaults,
+        nextEffectiveDefaults,
+      })
+
+      await patchTranscriptionDefaults(payload)
+      const refreshed = await refreshDefaultsView()
+
+      if (refreshed) {
+        resetOptionOverrides()
+        setDraftAdvancedOptions({})
+        setDraftInitialPrompt(nextEffectiveDefaults.initial_prompt)
+      }
+
+      toast.success(t('options.defaults.saved'))
+    } catch (error: unknown) {
+      logger.error('config.defaults.saveFailed', { error })
+      const appError = toAppError(error)
+      toast.error(t(appError.i18nKey, appError.params ?? {}))
+    } finally {
+      setIsSavingDefaults(false)
+    }
   }
 
   return (
@@ -408,27 +531,83 @@ export function TaskWorkbenchSessionConfig({
         title={t('tasks.workbench.advancedSheet.title')}
         description={t('tasks.workbench.advancedSheet.description')}
         closeLabel={t('tasks.workbench.advancedSheet.close')}
+        headerAdornment={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={handleResetDraftToDefaults}
+            disabled={controlsDisabled}
+          >
+            <RotateCcw className="size-4" />
+            {t('tasks.workbench.advancedSheet.reset')}
+          </Button>
+        }
         footer={
-          <div className="flex items-center justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setIsAdvancedOpen(false)}>
-              {t('tasks.workbench.advancedSheet.cancel')}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleSaveAsDefault()}
+              disabled={controlsDisabled || defaults === null}
+            >
+              {isSavingDefaults
+                ? t('tasks.workbench.advancedSheet.savingDefault')
+                : t('tasks.workbench.advancedSheet.saveDefault')}
             </Button>
-            <Button type="button" onClick={handleApplyAdvancedChanges}>
-              {t('tasks.workbench.advancedSheet.apply')}
-            </Button>
+
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsAdvancedOpen(false)}
+                disabled={controlsDisabled}
+              >
+                {t('tasks.workbench.advancedSheet.cancel')}
+              </Button>
+              <Button
+                type="button"
+                onClick={handleApplyAdvancedChanges}
+                disabled={controlsDisabled}
+              >
+                {t('tasks.workbench.advancedSheet.apply')}
+              </Button>
+            </div>
           </div>
         }
       >
-        <AdvancedOptions
-          schema={schemaUiModel.advancedSchema}
-          advancedOptions={draftAdvancedOptions}
-          defaults={defaults}
-          onOptionChange={handleDraftOptionChange}
-          onReset={() => setDraftAdvancedOptions({})}
-          showToggle={false}
-          showReset={false}
-          defaultOpen
-        />
+        <div className="space-y-5">
+          <div className="space-y-1.5">
+            <Label htmlFor="task-workbench-initial-prompt">
+              {t(schemaUiModel.initialPromptControl.labelKey)}
+            </Label>
+            <Textarea
+              id="task-workbench-initial-prompt"
+              value={resolveInitialPromptValue(draftInitialPrompt)}
+              placeholder={
+                typeof defaults?.initial_prompt === 'string' ? defaults.initial_prompt : undefined
+              }
+              disabled={controlsDisabled}
+              onChange={(event) => {
+                const next = event.target.value
+                setDraftInitialPrompt(next === '' ? null : next)
+              }}
+            />
+          </div>
+
+          <AdvancedOptions
+            schema={schemaUiModel.advancedSchema}
+            advancedOptions={draftAdvancedOptions}
+            defaults={defaults}
+            onOptionChange={handleDraftOptionChange}
+            onReset={handleResetDraftToDefaults}
+            showToggle={false}
+            showReset={false}
+            defaultOpen
+            disabled={controlsDisabled}
+          />
+        </div>
       </DetailSheet>
     </section>
   )
