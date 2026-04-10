@@ -8,15 +8,14 @@ import { useAppConfig } from '@/config/use-app-config'
 import {
   cancelTaskAndRefresh,
   createTask,
-  CurrentBatchTasksPanel,
   requestTaskRefresh,
-  retryTaskAndRefresh,
   useSessionTasksStore,
 } from '@/features/tasks'
 import type { TaskCreateResult } from '@/features/transcription-options'
 import { useFileUpload } from '@/features/upload'
 import { ContentCanvas, PageHeader, TwoColumnLayout } from '@/layouts'
 import type { TaskSummary } from '@/shared/types'
+import { TaskWorkbenchActivityMonitor } from './TaskWorkbenchActivityMonitor'
 import { buildTaskWorkbenchSummary } from './task-workbench-summary'
 import { TaskWorkbenchSessionConfig } from './TaskWorkbenchSessionConfig'
 import { TaskWorkbenchUploadQueue } from './TaskWorkbenchUploadQueue'
@@ -132,21 +131,6 @@ export function TaskWorkbenchPage() {
     }
   }
 
-  async function handleRetryRecentTask(task: TaskSummary) {
-    try {
-      const response = await retryTaskAndRefresh({ file_id: task.file_id })
-      addCreatedTask({
-        task_id: response.task_id,
-        file_id: task.file_id,
-        filename: response.filename,
-        status: 'pending',
-      })
-      toast.success(t('tasks.toast.retried', { taskId: response.task_id }))
-    } catch {
-      toast.error(t('tasks.toast.actionFailed'))
-    }
-  }
-
   // Surface batch-level errors such as duplicate file skips as toast feedback.
   useEffect(() => {
     if (!batchError) return
@@ -204,12 +188,9 @@ export function TaskWorkbenchPage() {
 
       <section data-slot="task-workbench-activity">
         <ErrorBoundary>
-          <CurrentBatchTasksPanel
-            title={t('tasks.workbench.sections.activity.title')}
-            description={t('tasks.workbench.sections.activity.description')}
-            emptyText={t('tasks.workbench.sections.activity.empty')}
+          <TaskWorkbenchActivityMonitor
+            tasks={sessionTasks}
             onCancelTask={handleCancelRecentTask}
-            onRetryTask={handleRetryRecentTask}
           />
         </ErrorBoundary>
       </section>
