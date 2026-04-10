@@ -297,8 +297,11 @@
         "title": "高级配置",
         "description": "微调会话覆盖项和执行设置。",
         "close": "关闭",
+        "reset": "重置为默认值",
         "cancel": "取消",
-        "apply": "应用更改"
+        "apply": "应用更改",
+        "saveDefault": "保存为默认值",
+        "savingDefault": "保存中..."
       }
     },
     "uploadQueue": {

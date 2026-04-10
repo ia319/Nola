@@ -298,8 +298,11 @@
         "title": "Advanced Configuration",
         "description": "Fine-tune session overrides and execution settings.",
         "close": "Close",
+        "reset": "Reset to Defaults",
         "cancel": "Cancel",
-        "apply": "Apply Changes"
+        "apply": "Apply Changes",
+        "saveDefault": "Save as Default",
+        "savingDefault": "Saving..."
       }
     },
     "uploadQueue": {
