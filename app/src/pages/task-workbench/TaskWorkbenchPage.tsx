@@ -4,7 +4,6 @@ import { toast } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
 import { MetricCard } from '@/components/ui'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAppConfig } from '@/config/use-app-config'
 import {
@@ -17,11 +16,11 @@ import {
 } from '@/features/tasks'
 import type { TaskCreateResult } from '@/features/transcription-options'
 import { OptionsBar } from '@/features/transcription-options'
-import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
+import { useFileUpload } from '@/features/upload'
 import { ContentCanvas, PageHeader, TwoColumnLayout } from '@/layouts'
-import { formatFileSize } from '@/shared/lib/format'
 import type { TaskSummary } from '@/shared/types'
 import { buildTaskWorkbenchSummary } from './task-workbench-summary'
+import { TaskWorkbenchUploadQueue } from './TaskWorkbenchUploadQueue'
 
 export function TaskWorkbenchPage() {
   const { t } = useTranslation()
@@ -177,51 +176,20 @@ export function TaskWorkbenchPage() {
 
       <TwoColumnLayout
         left={
-          <section data-slot="task-workbench-upload-queue" className="space-y-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="space-y-1">
-                <h2 className="text-foreground text-lg font-semibold tracking-tight">
-                  {t('tasks.workbench.sections.uploadQueue.title')}
-                </h2>
-                <p className="text-muted-foreground text-sm leading-6">
-                  {t('tasks.workbench.sections.uploadQueue.description')}
-                </p>
-              </div>
-              <p className="text-muted-foreground text-xs">
-                {t('tasks.workbench.sections.uploadQueue.maxFileSize', {
-                  maxSize: formatFileSize(fileValidationConfig.maxFileSize),
-                })}
-              </p>
-            </div>
-
-            <Card className="gap-0 py-0">
-              <CardContent className="space-y-4 px-5 py-5">
-                <ErrorBoundary>
-                  <FileUploader onFilesSelected={handleFilesSelected} disabled={isUploading} />
-
-                  <UploadList
-                    uploads={uploads}
-                    onCancel={cancelUpload}
-                    onRetry={retryUpload}
-                    onRemove={removeFile}
-                  />
-
-                  {uploads.length > 0 ? (
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      {hasPending ? (
-                        <Button onClick={startUpload} disabled={isUploading}>
-                          {isUploading ? t('upload.progress.uploading') : t('upload.startUpload')}
-                        </Button>
-                      ) : null}
-                      <Button variant="outline" onClick={handleReset} disabled={isUploading}>
-                        {t('upload.reset')}
-                      </Button>
-                    </div>
-                  ) : null}
-                </ErrorBoundary>
-              </CardContent>
-            </Card>
-          </section>
+          <ErrorBoundary>
+            <TaskWorkbenchUploadQueue
+              uploads={uploads}
+              maxFileSize={fileValidationConfig.maxFileSize}
+              isUploading={isUploading}
+              hasPending={hasPending}
+              onFilesSelected={handleFilesSelected}
+              onCancelUpload={cancelUpload}
+              onRetryUpload={retryUpload}
+              onRemoveUpload={removeFile}
+              onStartUpload={startUpload}
+              onReset={handleReset}
+            />
+          </ErrorBoundary>
         }
         right={
           <section data-slot="task-workbench-session-config" className="space-y-4">

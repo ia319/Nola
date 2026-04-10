@@ -5,6 +5,10 @@ import type { ReactNode } from 'react'
 import { render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { OptionsBarProps } from '@/features/transcription-options'
+import type { CurrentBatchTasksPanelProps } from '@/features/tasks'
+import type { TaskWorkbenchUploadQueueProps } from '../TaskWorkbenchUploadQueue'
+
 const taskWorkbenchMocks = vi.hoisted(() => ({
   toast: {
     success: vi.fn(),
@@ -20,12 +24,13 @@ const taskWorkbenchMocks = vi.hoisted(() => ({
   cancelTaskAndRefresh: vi.fn(),
   retryTaskAndRefresh: vi.fn(),
   requestTaskRefresh: vi.fn(),
-  fileUploader: vi.fn(() => <div data-slot="mock-file-uploader">file uploader</div>),
-  uploadList: vi.fn(() => <div data-slot="mock-upload-list">upload list</div>),
-  optionsBar: vi.fn((_props: Record<string, unknown>) => (
+  taskWorkbenchUploadQueue: vi.fn((_props: TaskWorkbenchUploadQueueProps) => (
+    <div data-slot="mock-task-workbench-upload-queue">upload queue</div>
+  )),
+  optionsBar: vi.fn((_props: OptionsBarProps) => (
     <div data-slot="mock-options-bar">options bar</div>
   )),
-  currentBatchTasksPanel: vi.fn((_props: Record<string, unknown>) => (
+  currentBatchTasksPanel: vi.fn((_props: CurrentBatchTasksPanelProps) => (
     <div data-slot="mock-current-batch-tasks-panel">current batch tasks panel</div>
   )),
 }))
@@ -79,8 +84,6 @@ vi.mock('@/config/use-app-config', () => ({
 }))
 
 vi.mock('@/features/upload', () => ({
-  FileUploader: taskWorkbenchMocks.fileUploader,
-  UploadList: taskWorkbenchMocks.uploadList,
   useFileUpload: taskWorkbenchMocks.useFileUpload,
 }))
 
@@ -97,6 +100,10 @@ vi.mock('@/features/tasks', () => ({
   useSessionTasksStore: taskWorkbenchMocks.useSessionTasksStore,
 }))
 
+vi.mock('../TaskWorkbenchUploadQueue', () => ({
+  TaskWorkbenchUploadQueue: taskWorkbenchMocks.taskWorkbenchUploadQueue,
+}))
+
 import { TaskWorkbenchPage } from '../TaskWorkbenchPage'
 
 describe('TaskWorkbenchPage', () => {
@@ -109,8 +116,7 @@ describe('TaskWorkbenchPage', () => {
     taskWorkbenchMocks.useSessionTasksStore.mockReset()
     taskWorkbenchMocks.addCreatedTask.mockReset()
     taskWorkbenchMocks.upsertSessionTask.mockReset()
-    taskWorkbenchMocks.fileUploader.mockClear()
-    taskWorkbenchMocks.uploadList.mockClear()
+    taskWorkbenchMocks.taskWorkbenchUploadQueue.mockClear()
     taskWorkbenchMocks.optionsBar.mockClear()
     taskWorkbenchMocks.currentBatchTasksPanel.mockClear()
 
@@ -225,13 +231,8 @@ describe('TaskWorkbenchPage', () => {
     expect(within(processingCard as HTMLElement).getByText('2')).toBeTruthy()
     expect(within(completedCard as HTMLElement).getByText('1')).toBeTruthy()
 
-    expect(screen.getByRole('heading', { name: 'Upload Queue', level: 2 })).toBeTruthy()
-    expect(screen.getByText('Max file size: 500.0 MB per file')).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Session Configuration', level: 2 })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Start Upload' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Reset All' })).toBeTruthy()
-    expect(screen.getByText('file uploader')).toBeTruthy()
-    expect(screen.getByText('upload list')).toBeTruthy()
+    expect(screen.getByText('upload queue')).toBeTruthy()
     expect(screen.getByText('options bar')).toBeTruthy()
     expect(screen.getByText('current batch tasks panel')).toBeTruthy()
   })
@@ -252,6 +253,18 @@ describe('TaskWorkbenchPage', () => {
       disabled: false,
       onCreateTask: expect.any(Function),
       onTasksCreated: expect.any(Function),
+    })
+    expect(taskWorkbenchMocks.taskWorkbenchUploadQueue.mock.calls[0]?.[0]).toMatchObject({
+      uploads: expect.any(Array),
+      maxFileSize: 500 * 1024 * 1024,
+      isUploading: false,
+      hasPending: true,
+      onFilesSelected: expect.any(Function),
+      onCancelUpload: expect.any(Function),
+      onRetryUpload: expect.any(Function),
+      onRemoveUpload: expect.any(Function),
+      onStartUpload: expect.any(Function),
+      onReset: expect.any(Function),
     })
   })
 })
