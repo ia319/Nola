@@ -44,18 +44,23 @@ function parsePositiveInt(value: unknown): number | undefined {
   return undefined
 }
 
+function isSearchRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 /**
  * Normalize route search params to one canonical representation.
  *
  * Keep defaults omitted from URL so links stay compact and stable.
  */
-export function normalizeHistorySearch(search: Record<string, unknown>): HistoryRouteSearch {
-  const qValue = typeof search.q === 'string' ? search.q.trim() : ''
-  const statusValue = typeof search.status === 'string' ? search.status : ''
-  const sortByValue = typeof search.sort_by === 'string' ? search.sort_by : ''
-  const orderValue = typeof search.order === 'string' ? search.order : ''
-  const pageValue = parsePositiveInt(search.page)
-  const pageSizeValue = parsePositiveInt(search.page_size)
+export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
+  const searchRecord = isSearchRecord(search) ? search : {}
+  const qValue = typeof searchRecord.q === 'string' ? searchRecord.q.trim() : ''
+  const statusValue = typeof searchRecord.status === 'string' ? searchRecord.status : ''
+  const sortByValue = typeof searchRecord.sort_by === 'string' ? searchRecord.sort_by : ''
+  const orderValue = typeof searchRecord.order === 'string' ? searchRecord.order : ''
+  const pageValue = parsePositiveInt(searchRecord.page)
+  const pageSizeValue = parsePositiveInt(searchRecord.page_size)
 
   const next: HistoryRouteSearch = {}
 

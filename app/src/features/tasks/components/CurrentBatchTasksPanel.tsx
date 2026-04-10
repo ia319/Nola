@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button'
 import { useRecentTaskQuery } from '@/features/tasks/hooks/useRecentTaskQuery'
 import { useTaskSelection } from '@/features/tasks/hooks/useTaskSelection'
 import { useSessionTasksStore } from '@/features/tasks/store/session-tasks-store'
-import type { TaskSummary } from '@/shared/types'
+import type { BatchTaskActionResponse, TaskSummary } from '@/shared/types'
 
 import { TaskBatchActionBar } from './TaskBatchActionBar'
+
+type BatchTaskHandler = (taskIds: string[]) => Promise<void | BatchTaskActionResponse>
 
 export interface CurrentBatchTasksPanelProps {
   title?: string
@@ -18,8 +20,8 @@ export interface CurrentBatchTasksPanelProps {
   resolveFileName?: (task: TaskSummary) => string | undefined
   onCancelTask?: TaskActionHandler
   onRetryTask?: TaskActionHandler
-  onBatchCancelTasks?: (taskIds: string[]) => Promise<unknown>
-  onBatchRetryTasks?: (taskIds: string[]) => Promise<unknown>
+  onBatchCancelTasks?: BatchTaskHandler
+  onBatchRetryTasks?: BatchTaskHandler
   pageSize?: number
 }
 

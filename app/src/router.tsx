@@ -21,7 +21,7 @@ const homeRoute = createRoute({
 const historyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/history',
-  validateSearch: (search: Record<string, unknown>) => normalizeHistorySearch(search),
+  validateSearch: normalizeHistorySearch,
   component: HistoryPage,
 })
 

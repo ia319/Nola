@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next'
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -56,7 +57,7 @@ function normalizeTaskIds(taskIds: string[]): string[] {
 function notifyBatchActionSummary(
   action: HistoryTaskAction,
   summary: BatchTaskActionResponse['summary'],
-  t: (key: string, options?: Record<string, unknown>) => string,
+  t: TFunction,
 ): void {
   if (summary.succeeded > 0 && summary.failed === 0) {
     toast.success(t(`tasks.toast.batch.${action}.success`, { count: summary.succeeded }))

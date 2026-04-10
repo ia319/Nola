@@ -14,7 +14,19 @@ import {
 import { TaskBatchActionBar } from '@/features/tasks/components/TaskBatchActionBar'
 import { useTaskSelection } from '@/features/tasks/hooks/useTaskSelection'
 import type { ExportRequestOptions, SingleExportRequestOptions } from '@/features/export'
-import type { TaskFilterStatus, TaskQueryModel, TaskSortBy, TaskSummary } from '@/shared/types'
+import type {
+  BatchTaskActionResponse,
+  TaskFilterStatus,
+  TaskQueryModel,
+  TaskSortBy,
+  TaskSummary,
+} from '@/shared/types'
+
+type BatchTaskHandler = (taskIds: string[]) => Promise<void | BatchTaskActionResponse>
+type BatchExportHandler = (
+  taskIds: string[],
+  options: ExportRequestOptions & { zip_name?: string | null },
+) => Promise<void>
 
 export interface TaskHistoryPanelProps {
   tasks: TaskSummary[]
@@ -35,12 +47,9 @@ export interface TaskHistoryPanelProps {
     task: TaskSummary,
     options: SingleExportRequestOptions,
   ) => Promise<{ mode: 'download' } | { mode: 'save'; savedPath: string }>
-  onBatchCancelTasks?: (taskIds: string[]) => Promise<unknown>
-  onBatchRetryTasks?: (taskIds: string[]) => Promise<unknown>
-  onBatchExportTasks?: (
-    taskIds: string[],
-    options: ExportRequestOptions & { zip_name?: string | null },
-  ) => Promise<unknown>
+  onBatchCancelTasks?: BatchTaskHandler
+  onBatchRetryTasks?: BatchTaskHandler
+  onBatchExportTasks?: BatchExportHandler
 }
 
 interface ExportDialogState {
@@ -139,7 +148,7 @@ export function TaskHistoryPanel({
   async function runBatchAction(
     action: 'cancel' | 'retry',
     taskIds: string[],
-    handler?: (taskIds: string[]) => Promise<unknown>,
+    handler?: BatchTaskHandler,
   ): Promise<void> {
     if (!handler || taskIds.length === 0 || runningBatchActionRef.current) {
       return

@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -14,7 +15,7 @@ import {
 import type { DownloadState } from '@/features/models'
 import { isAppError } from '@/shared/lib/error-factory'
 
-function toastError(t: (key: string, params?: Record<string, unknown>) => string, err: unknown) {
+function toastError(t: TFunction, err: unknown) {
   if (isAppError(err)) {
     toast.error(t(err.i18nKey, err.params ?? {}))
   } else {
