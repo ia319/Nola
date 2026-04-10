@@ -11,12 +11,18 @@ import type {
   AdvancedTranscriptionOptions,
 } from '@/features/transcription-options'
 import type { AppError, TranscriptionDefaults } from '@/shared/types'
+import { buildTranscriptionDefaults } from '@/test-utils/transcription-defaults'
 import { TaskWorkbenchSessionConfig } from '../TaskWorkbenchSessionConfig'
 
 const taskWorkbenchSessionConfigMocks = vi.hoisted(() => ({
   useAppConfigMock: vi.fn<() => UseAppConfigReturn>(),
+  refreshAppConfigMock: vi.fn(),
   useModelsMock: vi.fn<() => UseModelsResult>(),
   useTranscriptionOptionsMock: vi.fn<() => UseTranscriptionOptionsReturn>(),
+  fetchEngineDefaultsMock: vi.fn(),
+  patchTranscriptionDefaultsMock: vi.fn(),
+  toastSuccessMock: vi.fn(),
+  toastErrorMock: vi.fn(),
   onCreateTaskMock: vi.fn(),
   onTasksCreatedMock: vi.fn(),
   buildRequestMock: vi.fn(),
@@ -24,6 +30,8 @@ const taskWorkbenchSessionConfigMocks = vi.hoisted(() => ({
   setTaskMock: vi.fn(),
   setAdvancedOptionMock: vi.fn(),
   resetAdvancedOptionsMock: vi.fn(),
+  resetOptionOverridesMock: vi.fn(),
+  setInitialPromptMock: vi.fn(),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -36,8 +44,10 @@ vi.mock('react-i18next', () => ({
         'options.task.label': 'Task',
         'options.task.transcribe': 'Transcribe',
         'options.task.translate': 'Translate',
+        'options.field.initialPrompt': 'Initial Prompt',
         'options.creating': 'Creating',
         'options.startDisabled': 'Start Transcription',
+        'options.defaults.saved': 'Defaults saved',
         'tasks.workbench.sections.sessionConfig.title': 'Session Configuration',
         'tasks.workbench.sessionConfig.globalSettings': 'Global Settings',
         'tasks.workbench.sessionConfig.executionEngine': 'Execution Engine',
@@ -56,6 +66,9 @@ vi.mock('react-i18next', () => ({
         'tasks.workbench.advancedSheet.close': 'Close',
         'tasks.workbench.advancedSheet.cancel': 'Cancel',
         'tasks.workbench.advancedSheet.apply': 'Apply Changes',
+        'tasks.workbench.advancedSheet.reset': 'Reset to Defaults',
+        'tasks.workbench.advancedSheet.saveDefault': 'Save as Default',
+        'tasks.workbench.advancedSheet.savingDefault': 'Saving...',
       }
 
       if (key === 'options.start') {
@@ -71,9 +84,29 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
+vi.mock('sonner', () => ({
+  toast: {
+    success: taskWorkbenchSessionConfigMocks.toastSuccessMock,
+    error: taskWorkbenchSessionConfigMocks.toastErrorMock,
+  },
+}))
+
+vi.mock('@/config/logger', () => ({
+  default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}))
+
+vi.mock('@/config/api', () => ({
+  fetchEngineDefaults: (...args: unknown[]) =>
+    taskWorkbenchSessionConfigMocks.fetchEngineDefaultsMock(...(args as [])),
+  patchTranscriptionDefaults: (...args: unknown[]) =>
+    taskWorkbenchSessionConfigMocks.patchTranscriptionDefaultsMock(...(args as [])),
+}))
+
 vi.mock('@/config/use-app-config', () => ({
   useAppConfig: (...args: unknown[]) =>
     taskWorkbenchSessionConfigMocks.useAppConfigMock(...(args as [])),
+  refreshAppConfig: (...args: unknown[]) =>
+    taskWorkbenchSessionConfigMocks.refreshAppConfigMock(...(args as [])),
 }))
 
 vi.mock('@/features/models', () => ({
@@ -99,54 +132,12 @@ vi.mock('@/features/transcription-options', () => ({
 }))
 
 function buildDefaults(overrides: Partial<TranscriptionDefaults> = {}): TranscriptionDefaults {
-  return {
-    language: null,
-    task: 'transcribe',
-    beam_size: 5,
-    best_of: 5,
-    patience: 1,
-    length_penalty: 1,
-    repetition_penalty: 1,
-    no_repeat_ngram_size: 0,
-    temperature: [0, 0.2, 0.4, 0.6, 0.8, 1],
-    compression_ratio_threshold: 2.4,
-    log_prob_threshold: -1,
-    no_speech_threshold: 0.6,
-    condition_on_previous_text: true,
-    prompt_reset_on_temperature: 0.5,
-    initial_prompt: null,
-    prefix: null,
-    hotwords: null,
-    suppress_blank: true,
-    suppress_tokens: [-1],
-    max_new_tokens: null,
-    without_timestamps: false,
-    max_initial_timestamp: 1,
-    word_timestamps: false,
-    prepend_punctuations: `"'“¿([{-`,
-    append_punctuations: `"'.。,，!！?？:：”)]}、`,
-    vad_filter: false,
-    vad_parameters: {
-      threshold: 0.5,
-      neg_threshold: null,
-      min_speech_duration_ms: 0,
-      max_speech_duration_s: 'inf',
-      min_silence_duration_ms: 2000,
-      speech_pad_ms: 400,
-      min_silence_at_max_speech: 98,
-      use_max_poss_sil_at_max_speech: true,
-    },
-    multilingual: false,
-    chunk_length: null,
-    clip_timestamps: '0',
-    hallucination_silence_threshold: null,
-    language_detection_threshold: 0.5,
-    language_detection_segments: 1,
-    ...overrides,
-  }
+  return buildTranscriptionDefaults(overrides)
 }
 
-function buildAppConfigReturn(): UseAppConfigReturn {
+function buildAppConfigReturn(
+  overrides: Partial<UseAppConfigReturn['config']> = {},
+): UseAppConfigReturn {
   return {
     config: {
       engine: {
@@ -158,6 +149,7 @@ function buildAppConfigReturn(): UseAppConfigReturn {
       transcription: { defaults: buildDefaults(), schema: [] },
       file: { allowed_extensions: [], allowed_mime_types: [], max_file_size: 0 },
       effective_languages: [{ code: 'en', label_key: 'options.language.en' }],
+      ...overrides,
     },
     fileValidationConfig: { allowedExtensions: [], allowedMimeTypes: [], maxFileSize: 0 },
     isLoading: false,
@@ -204,10 +196,10 @@ function buildTranscriptionOptionsReturn(
     setTask: taskWorkbenchSessionConfigMocks.setTaskMock,
     setAdvancedOption: taskWorkbenchSessionConfigMocks.setAdvancedOptionMock,
     resetAdvancedOptions: taskWorkbenchSessionConfigMocks.resetAdvancedOptionsMock,
-    resetOptionOverrides: vi.fn(),
+    resetOptionOverrides: taskWorkbenchSessionConfigMocks.resetOptionOverridesMock,
     buildRequest: taskWorkbenchSessionConfigMocks.buildRequestMock,
     initialPrompt: undefined,
-    setInitialPrompt: vi.fn(),
+    setInitialPrompt: taskWorkbenchSessionConfigMocks.setInitialPromptMock,
     ...overrides,
   }
 }
@@ -223,6 +215,15 @@ describe('TaskWorkbenchSessionConfig', () => {
     taskWorkbenchSessionConfigMocks.buildRequestMock.mockImplementation((fileId: string) => ({
       file_id: fileId,
     }))
+    taskWorkbenchSessionConfigMocks.fetchEngineDefaultsMock.mockResolvedValue({
+      defaults: buildDefaults(),
+    })
+    taskWorkbenchSessionConfigMocks.patchTranscriptionDefaultsMock.mockResolvedValue({
+      defaults: buildDefaults(),
+    })
+    taskWorkbenchSessionConfigMocks.refreshAppConfigMock.mockResolvedValue(
+      buildAppConfigReturn().config,
+    )
   })
 
   it('renders the planned session config layout and current execution engine values', () => {
@@ -291,7 +292,7 @@ describe('TaskWorkbenchSessionConfig', () => {
     expect(taskWorkbenchSessionConfigMocks.buildRequestMock).toHaveBeenNthCalledWith(2, 'file-2')
   })
 
-  it('applies advanced draft changes through the shared transcription option state', async () => {
+  it('applies advanced draft changes and the initial prompt through the shared session state', async () => {
     render(
       <TaskWorkbenchSessionConfig
         fileIds={['file-1']}
@@ -302,7 +303,9 @@ describe('TaskWorkbenchSessionConfig', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Advanced Parameters' }))
 
-    expect(screen.getByText('Advanced Configuration')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Initial Prompt'), {
+      target: { value: 'Prompt for this batch' },
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Change Beam Size' }))
     fireEvent.click(screen.getByRole('button', { name: 'Apply Changes' }))
 
@@ -311,6 +314,115 @@ describe('TaskWorkbenchSessionConfig', () => {
       expect(taskWorkbenchSessionConfigMocks.setAdvancedOptionMock).toHaveBeenCalledWith(
         'beam_size',
         9,
+      )
+      expect(taskWorkbenchSessionConfigMocks.setInitialPromptMock).toHaveBeenCalledWith(
+        'Prompt for this batch',
+      )
+    })
+  })
+
+  it('resets the advanced draft back to the current effective defaults', async () => {
+    taskWorkbenchSessionConfigMocks.useAppConfigMock.mockReturnValue(
+      buildAppConfigReturn({
+        transcription: {
+          defaults: buildDefaults({ initial_prompt: 'Default prompt' }),
+          schema: [],
+        },
+      }),
+    )
+    taskWorkbenchSessionConfigMocks.useTranscriptionOptionsMock.mockReturnValue(
+      buildTranscriptionOptionsReturn({
+        defaults: buildDefaults({ initial_prompt: 'Default prompt' }),
+        advancedOptions: { beam_size: 7 },
+        initialPrompt: 'Session prompt',
+      }),
+    )
+
+    render(
+      <TaskWorkbenchSessionConfig
+        fileIds={['file-1']}
+        onCreateTask={taskWorkbenchSessionConfigMocks.onCreateTaskMock}
+        onTasksCreated={taskWorkbenchSessionConfigMocks.onTasksCreatedMock}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced Parameters' }))
+
+    const initialPromptInput = screen.getByLabelText('Initial Prompt') as HTMLTextAreaElement
+    expect(initialPromptInput.value).toBe('Session prompt')
+
+    fireEvent.change(initialPromptInput, { target: { value: 'Temporary prompt' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Change Beam Size' }))
+
+    expect(screen.getByTestId('advanced-options').getAttribute('data-beam-size')).toBe('9')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to Defaults' }))
+
+    await waitFor(() => {
+      expect((screen.getByLabelText('Initial Prompt') as HTMLTextAreaElement).value).toBe(
+        'Default prompt',
+      )
+      expect(screen.getByTestId('advanced-options').getAttribute('data-beam-size')).toBe('')
+    })
+  })
+
+  it('saves the current session draft as transcription defaults and refreshes shared config', async () => {
+    const defaults = buildDefaults({
+      language: null,
+      task: 'transcribe',
+      beam_size: 3,
+      initial_prompt: null,
+    })
+
+    taskWorkbenchSessionConfigMocks.useAppConfigMock.mockReturnValue(
+      buildAppConfigReturn({
+        transcription: { defaults, schema: [] },
+      }),
+    )
+    taskWorkbenchSessionConfigMocks.useTranscriptionOptionsMock.mockReturnValue(
+      buildTranscriptionOptionsReturn({
+        defaults,
+        language: 'en',
+        task: 'translate',
+        advancedOptions: { beam_size: 7 },
+      }),
+    )
+    taskWorkbenchSessionConfigMocks.fetchEngineDefaultsMock.mockResolvedValue({
+      defaults: buildDefaults({
+        language: null,
+        task: 'transcribe',
+        beam_size: 5,
+        initial_prompt: null,
+      }),
+    })
+
+    render(
+      <TaskWorkbenchSessionConfig
+        fileIds={['file-1']}
+        onCreateTask={taskWorkbenchSessionConfigMocks.onCreateTaskMock}
+        onTasksCreated={taskWorkbenchSessionConfigMocks.onTasksCreatedMock}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced Parameters' }))
+    fireEvent.change(screen.getByLabelText('Initial Prompt'), {
+      target: { value: 'Keep names consistent' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Change Beam Size' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save as Default' }))
+
+    await waitFor(() => {
+      expect(taskWorkbenchSessionConfigMocks.fetchEngineDefaultsMock).toHaveBeenCalledTimes(1)
+      expect(taskWorkbenchSessionConfigMocks.patchTranscriptionDefaultsMock).toHaveBeenCalledWith({
+        language: 'en',
+        task: 'translate',
+        beam_size: 9,
+        initial_prompt: 'Keep names consistent',
+      })
+      expect(taskWorkbenchSessionConfigMocks.refreshAppConfigMock).toHaveBeenCalledTimes(1)
+      expect(taskWorkbenchSessionConfigMocks.resetOptionOverridesMock).toHaveBeenCalledTimes(1)
+      expect(taskWorkbenchSessionConfigMocks.toastSuccessMock).toHaveBeenCalledWith(
+        'Defaults saved',
       )
     })
   })
