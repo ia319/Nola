@@ -268,7 +268,19 @@
         "activity": {
           "title": "Session Activity Monitor",
           "description": "Track tasks created during the current session.",
-          "empty": "No tasks in this session yet"
+          "empty": "No tasks in this session yet",
+          "waiting": "Waiting for input...",
+          "caption": "Current session transcription tasks",
+          "state": {
+            "active": "Processing active",
+            "idle": "System idle"
+          },
+          "columns": {
+            "filename": "Filename",
+            "status": "Status",
+            "progress": "Progress",
+            "action": "Action"
+          }
         }
       },
       "sessionConfig": {

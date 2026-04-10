@@ -267,7 +267,19 @@
         "activity": {
           "title": "会话活动监控",
           "description": "跟踪当前会话内创建的任务。",
-          "empty": "当前会话还没有任务"
+          "empty": "当前会话还没有任务",
+          "waiting": "等待输入...",
+          "caption": "当前会话转写任务",
+          "state": {
+            "active": "正在处理",
+            "idle": "系统空闲"
+          },
+          "columns": {
+            "filename": "文件名",
+            "status": "状态",
+            "progress": "进度",
+            "action": "操作"
+          }
         }
       },
       "sessionConfig": {
