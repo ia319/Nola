@@ -269,6 +269,36 @@
           "description": "跟踪当前会话内创建的任务。",
           "empty": "当前会话还没有任务"
         }
+      },
+      "sessionConfig": {
+        "globalSettings": "全局设置",
+        "executionEngine": "执行引擎",
+        "sessionOverride": "会话覆盖",
+        "unavailable": "不可用",
+        "model": {
+          "label": "模型",
+          "badge": "即将支持",
+          "loading": "正在加载模型",
+          "comingSoon": "即将支持"
+        },
+        "device": {
+          "label": "设备"
+        },
+        "computeType": {
+          "label": "计算类型"
+        },
+        "advanced": {
+          "button": "高级参数",
+          "overrides_one": "{{count}} 项覆盖",
+          "overrides_other": "{{count}} 项覆盖"
+        }
+      },
+      "advancedSheet": {
+        "title": "高级配置",
+        "description": "微调会话覆盖项和执行设置。",
+        "close": "关闭",
+        "cancel": "取消",
+        "apply": "应用更改"
       }
     },
     "uploadQueue": {

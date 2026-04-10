@@ -270,6 +270,36 @@
           "description": "Track tasks created during the current session.",
           "empty": "No tasks in this session yet"
         }
+      },
+      "sessionConfig": {
+        "globalSettings": "Global Settings",
+        "executionEngine": "Execution Engine",
+        "sessionOverride": "Session override",
+        "unavailable": "Unavailable",
+        "model": {
+          "label": "Model",
+          "badge": "Coming soon",
+          "loading": "Loading models",
+          "comingSoon": "Coming soon"
+        },
+        "device": {
+          "label": "Device"
+        },
+        "computeType": {
+          "label": "Compute Type"
+        },
+        "advanced": {
+          "button": "Advanced Parameters",
+          "overrides_one": "{{count}} override",
+          "overrides_other": "{{count}} overrides"
+        }
+      },
+      "advancedSheet": {
+        "title": "Advanced Configuration",
+        "description": "Fine-tune session overrides and execution settings.",
+        "close": "Close",
+        "cancel": "Cancel",
+        "apply": "Apply Changes"
       }
     },
     "uploadQueue": {
