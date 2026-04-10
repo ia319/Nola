@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { CurrentBatchTasksPanelProps } from '@/features/tasks'
+import type { TaskWorkbenchActivityMonitorProps } from '../TaskWorkbenchActivityMonitor'
 import type { TaskWorkbenchSessionConfigProps } from '../TaskWorkbenchSessionConfig'
 import type { TaskWorkbenchUploadQueueProps } from '../TaskWorkbenchUploadQueue'
 
@@ -33,8 +33,8 @@ const taskWorkbenchMocks = vi.hoisted(() => ({
       <div>session config</div>
     </section>
   )),
-  currentBatchTasksPanel: vi.fn((_props: CurrentBatchTasksPanelProps) => (
-    <div data-slot="mock-current-batch-tasks-panel">current batch tasks panel</div>
+  taskWorkbenchActivityMonitor: vi.fn((_props: TaskWorkbenchActivityMonitorProps) => (
+    <div data-slot="mock-task-workbench-activity-monitor">activity monitor</div>
   )),
 }))
 
@@ -57,10 +57,6 @@ vi.mock('react-i18next', () => ({
         'tasks.workbench.sections.sessionConfig.title': 'Session Configuration',
         'tasks.workbench.sections.sessionConfig.description':
           'Choose language and task settings before starting transcription.',
-        'tasks.workbench.sections.activity.title': 'Session Activity Monitor',
-        'tasks.workbench.sections.activity.description':
-          'Track tasks created during the current session.',
-        'tasks.workbench.sections.activity.empty': 'No tasks in this session yet',
         'upload.startUpload': 'Start Upload',
         'upload.reset': 'Reset All',
       }
@@ -91,11 +87,9 @@ vi.mock('@/features/upload', () => ({
 }))
 
 vi.mock('@/features/tasks', () => ({
-  CurrentBatchTasksPanel: taskWorkbenchMocks.currentBatchTasksPanel,
   cancelTaskAndRefresh: taskWorkbenchMocks.cancelTaskAndRefresh,
   createTask: taskWorkbenchMocks.createTask,
   requestTaskRefresh: taskWorkbenchMocks.requestTaskRefresh,
-  retryTaskAndRefresh: taskWorkbenchMocks.retryTaskAndRefresh,
   useSessionTasksStore: taskWorkbenchMocks.useSessionTasksStore,
 }))
 
@@ -105,6 +99,10 @@ vi.mock('../TaskWorkbenchUploadQueue', () => ({
 
 vi.mock('../TaskWorkbenchSessionConfig', () => ({
   TaskWorkbenchSessionConfig: taskWorkbenchMocks.taskWorkbenchSessionConfig,
+}))
+
+vi.mock('../TaskWorkbenchActivityMonitor', () => ({
+  TaskWorkbenchActivityMonitor: taskWorkbenchMocks.taskWorkbenchActivityMonitor,
 }))
 
 import { TaskWorkbenchPage } from '../TaskWorkbenchPage'
@@ -121,7 +119,7 @@ describe('TaskWorkbenchPage', () => {
     taskWorkbenchMocks.upsertSessionTask.mockReset()
     taskWorkbenchMocks.taskWorkbenchUploadQueue.mockClear()
     taskWorkbenchMocks.taskWorkbenchSessionConfig.mockClear()
-    taskWorkbenchMocks.currentBatchTasksPanel.mockClear()
+    taskWorkbenchMocks.taskWorkbenchActivityMonitor.mockClear()
 
     const sessionState = {
       addCreatedTask: taskWorkbenchMocks.addCreatedTask,
@@ -237,19 +235,16 @@ describe('TaskWorkbenchPage', () => {
     expect(screen.getByRole('heading', { name: 'Session Configuration', level: 2 })).toBeTruthy()
     expect(screen.getByText('upload queue')).toBeTruthy()
     expect(screen.getByText('session config')).toBeTruthy()
-    expect(screen.getByText('current batch tasks panel')).toBeTruthy()
+    expect(screen.getByText('activity monitor')).toBeTruthy()
   })
 
-  it('passes the workbench-specific activity copy into the current batch panel', () => {
+  it('passes the current session task list into the workbench activity monitor', () => {
     render(<TaskWorkbenchPage />)
 
-    expect(taskWorkbenchMocks.currentBatchTasksPanel).toHaveBeenCalledTimes(1)
-    expect(taskWorkbenchMocks.currentBatchTasksPanel.mock.calls[0]?.[0]).toMatchObject({
-      title: 'Session Activity Monitor',
-      description: 'Track tasks created during the current session.',
-      emptyText: 'No tasks in this session yet',
+    expect(taskWorkbenchMocks.taskWorkbenchActivityMonitor).toHaveBeenCalledTimes(1)
+    expect(taskWorkbenchMocks.taskWorkbenchActivityMonitor.mock.calls[0]?.[0]).toMatchObject({
+      tasks: expect.any(Array),
       onCancelTask: expect.any(Function),
-      onRetryTask: expect.any(Function),
     })
     expect(taskWorkbenchMocks.taskWorkbenchSessionConfig.mock.calls[0]?.[0]).toMatchObject({
       fileIds: ['file-ready', 'file-created'],
