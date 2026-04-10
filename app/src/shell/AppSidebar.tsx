@@ -1,7 +1,8 @@
 import { Link, useLocation } from '@tanstack/react-router'
-import { AudioLines, Boxes, Orbit, Settings2, TimerReset, type LucideIcon } from 'lucide-react'
+import { AudioLines, Boxes, Settings2, TimerReset, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import nolaLogoMark from '@/assets/brand/nola-logo-mark.svg'
 import { cn } from '@/lib/utils'
 import { useBreakpoint } from '@/shared/responsive'
 
@@ -68,9 +69,12 @@ export function AppSidebar() {
     >
       <div className="flex h-full flex-col px-4 py-5">
         <div className="flex items-center gap-3 px-2">
-          <div className="bg-primary text-primary-foreground flex size-11 shrink-0 items-center justify-center rounded-2xl shadow-sm">
-            <Orbit className="size-5" />
-          </div>
+          <img
+            src={nolaLogoMark}
+            alt=""
+            aria-hidden="true"
+            className="size-11 shrink-0 rounded-xl object-cover shadow-xs ring-1 ring-black/5 dark:ring-white/10 dark:invert"
+          />
           <div className="min-w-0">
             <p className="text-foreground text-sm font-semibold tracking-tight">Nola</p>
             <p className="text-muted-foreground text-xs font-medium">v3.0</p>
