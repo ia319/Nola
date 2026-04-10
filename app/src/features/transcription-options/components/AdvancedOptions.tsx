@@ -23,6 +23,7 @@ import type {
 import { cn } from '@/lib/utils'
 import type {
   NumberOptionField,
+  TranscriptionDefaults,
   TranscriptionOptionField,
   TranscriptionOptionGroup,
 } from '@/shared/types'
@@ -267,10 +268,13 @@ function NumberField({ field, label, disabled, value, placeholder, onChange }: N
 export interface AdvancedOptionsProps {
   schema: TranscriptionOptionGroup[]
   advancedOptions: AdvancedTranscriptionOptions
-  defaults: Record<string, unknown> | null
+  defaults: TranscriptionDefaults | null
   onOptionChange: (key: string, value: AdvancedOptionValue | undefined) => void
   onReset: () => void
   disabled?: boolean
+  defaultOpen?: boolean
+  showToggle?: boolean
+  showReset?: boolean
 }
 
 function resolveSliderDisplayValue(value: unknown, fallback: unknown): number | undefined {
@@ -289,7 +293,7 @@ function hasSpecialValue(field: NumberOptionField, token: string): boolean {
 /**
  * Render options from backend transcription schema metadata.
  * Drive groups, field types, and dependency states from `/api/config`.
- * Skip `initial_prompt`; render it in `OptionsBar`.
+ * Skip `initial_prompt`; render it in the dedicated session editor.
  */
 function AdvancedOptionsInner({
   schema,
@@ -298,9 +302,12 @@ function AdvancedOptionsInner({
   onOptionChange,
   onReset,
   disabled,
+  defaultOpen = false,
+  showToggle = true,
+  showReset = true,
 }: AdvancedOptionsProps) {
   const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [resetNonce, setResetNonce] = useState(0)
   const numberListErrorMessages: Record<TemperatureParseErrorCode, string> = {
     emptySegment: t('options.advanced.numberListError.emptySegment'),
@@ -325,6 +332,187 @@ function AdvancedOptionsInner({
     return resolveEffective(field.depends_on) !== true
   }
 
+  const content = (
+    <div className="space-y-5 rounded-md border p-4">
+      {schema.map((group, gi) => (
+        <div key={group.group}>
+          {gi > 0 && <Separator className="mb-4" />}
+          <h4 className="text-muted-foreground mb-3 text-xs font-medium tracking-wide uppercase">
+            {t(group.group_label_key)}
+          </h4>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {group.fields
+              // Keep `initial_prompt` in a dedicated editor outside this renderer.
+              .filter((field) => field.key !== 'initial_prompt')
+              .map((field) => {
+                const value = advancedOptions[field.key]
+                const placeholder = resolveDefault(field.key)
+                const fieldDisabled = isFieldDisabled(field)
+
+                switch (field.type) {
+                  case 'switch':
+                    return (
+                      <div key={field.key} className="flex items-center justify-between gap-2">
+                        <Label htmlFor={`opt-${field.key}`} className="text-sm">
+                          {t(field.label_key)}
+                        </Label>
+                        <Switch
+                          id={`opt-${field.key}`}
+                          disabled={fieldDisabled}
+                          checked={
+                            typeof value === 'boolean'
+                              ? value
+                              : typeof placeholder === 'boolean'
+                                ? placeholder
+                                : false
+                          }
+                          onCheckedChange={(checked) => onOptionChange(field.key, checked)}
+                        />
+                      </div>
+                    )
+
+                  case 'slider': {
+                    const sliderDisplayValue = resolveSliderDisplayValue(value, placeholder)
+                    const sliderInteractionValue = sliderDisplayValue ?? field.min
+
+                    return (
+                      <div key={field.key} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor={`opt-${field.key}`} className="text-sm">
+                            {t(field.label_key)}
+                          </Label>
+                          <span className="text-muted-foreground text-xs tabular-nums">
+                            {sliderDisplayValue ?? '--'}
+                          </span>
+                        </div>
+                        <Slider
+                          id={`opt-${field.key}`}
+                          disabled={fieldDisabled}
+                          min={field.min}
+                          max={field.max}
+                          step={field.step}
+                          value={[sliderInteractionValue]}
+                          onValueChange={([nextValue]) => onOptionChange(field.key, nextValue)}
+                        />
+                      </div>
+                    )
+                  }
+
+                  case 'number': {
+                    const numberKeyValue =
+                      typeof value === 'number' || typeof value === 'string' ? String(value) : ''
+
+                    return (
+                      <NumberField
+                        key={`${field.key}:${numberKeyValue}:${resetNonce}`}
+                        field={field}
+                        label={t(field.label_key)}
+                        disabled={fieldDisabled}
+                        value={value}
+                        placeholder={placeholder !== undefined ? String(placeholder) : undefined}
+                        onChange={(parsed) => onOptionChange(field.key, parsed)}
+                      />
+                    )
+                  }
+
+                  case 'text':
+                    return (
+                      <div key={field.key} className="col-span-full space-y-1.5">
+                        <Label htmlFor={`opt-${field.key}`} className="text-sm">
+                          {t(field.label_key)}
+                        </Label>
+                        <Input
+                          id={`opt-${field.key}`}
+                          disabled={fieldDisabled}
+                          value={typeof value === 'string' ? value : ''}
+                          placeholder={
+                            Array.isArray(placeholder)
+                              ? placeholder.map(String).join(', ')
+                              : typeof placeholder === 'string'
+                                ? placeholder
+                                : undefined
+                          }
+                          onChange={(e) => {
+                            const next = e.target.value
+                            onOptionChange(field.key, next === '' ? null : next)
+                          }}
+                        />
+                      </div>
+                    )
+
+                  case 'number_list': {
+                    const allowNegative = field.allow_negative ?? false
+                    const integerOnly = field.integer_only ?? false
+                    const collapseSingleValue = field.collapse_single_value ?? false
+                    const useTemperatureCodec =
+                      collapseSingleValue && !allowNegative && !integerOnly
+                    const parser = useTemperatureCodec
+                      ? parseTemperatureDraft
+                      : (raw: string) =>
+                          parseNumberListDraft(raw, {
+                            allowNegative,
+                            integerOnly,
+                          })
+                    const serializer = useTemperatureCodec
+                      ? serializeTemperatureValue
+                      : (input: TemperatureInputValue) =>
+                          serializeGenericNumberList(input, integerOnly)
+
+                    return (
+                      <NumberListField
+                        key={`${field.key}:${serializer(value as TemperatureInputValue)}:${resetNonce}`}
+                        fieldKey={field.key}
+                        label={t(field.label_key)}
+                        disabled={fieldDisabled}
+                        value={value as TemperatureInputValue}
+                        placeholder={
+                          Array.isArray(placeholder)
+                            ? placeholder.join(', ')
+                            : placeholder !== undefined
+                              ? String(placeholder)
+                              : undefined
+                        }
+                        hint={t('options.advanced.numberListHint')}
+                        errorMessages={numberListErrorMessages}
+                        parser={parser}
+                        serializer={serializer}
+                        collapseSingleValue={collapseSingleValue}
+                        onChange={(parsed) => onOptionChange(field.key, parsed)}
+                      />
+                    )
+                  }
+
+                  default:
+                    return null
+                }
+              })}
+          </div>
+        </div>
+      ))}
+
+      {showReset ? (
+        <div className="flex justify-end pt-2">
+          <Button
+            id="reset-advanced-options"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setResetNonce((n) => n + 1)
+              onReset()
+            }}
+            disabled={disabled}
+          >
+            {t('options.advanced.reset')}
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  )
+
+  if (!showToggle) {
+    return content
+  }
+
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
@@ -341,182 +529,7 @@ function AdvancedOptionsInner({
       </CollapsibleTrigger>
 
       <CollapsibleContent>
-        <div className="mt-3 space-y-5 rounded-md border p-4">
-          {schema.map((group, gi) => (
-            <div key={group.group}>
-              {gi > 0 && <Separator className="mb-4" />}
-              <h4 className="text-muted-foreground mb-3 text-xs font-medium tracking-wide uppercase">
-                {t(group.group_label_key)}
-              </h4>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {group.fields
-                  // Keep `initial_prompt` in the dedicated top-level textarea.
-                  .filter((field) => field.key !== 'initial_prompt')
-                  .map((field) => {
-                    const value = advancedOptions[field.key]
-                    const placeholder = resolveDefault(field.key)
-                    const fieldDisabled = isFieldDisabled(field)
-
-                    switch (field.type) {
-                      case 'switch':
-                        return (
-                          <div key={field.key} className="flex items-center justify-between gap-2">
-                            <Label htmlFor={`opt-${field.key}`} className="text-sm">
-                              {t(field.label_key)}
-                            </Label>
-                            <Switch
-                              id={`opt-${field.key}`}
-                              disabled={fieldDisabled}
-                              checked={
-                                typeof value === 'boolean'
-                                  ? value
-                                  : typeof placeholder === 'boolean'
-                                    ? placeholder
-                                    : false
-                              }
-                              onCheckedChange={(checked) => onOptionChange(field.key, checked)}
-                            />
-                          </div>
-                        )
-
-                      case 'slider': {
-                        const sliderDisplayValue = resolveSliderDisplayValue(value, placeholder)
-                        const sliderInteractionValue = sliderDisplayValue ?? field.min
-
-                        return (
-                          <div key={field.key} className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <Label htmlFor={`opt-${field.key}`} className="text-sm">
-                                {t(field.label_key)}
-                              </Label>
-                              <span className="text-muted-foreground text-xs tabular-nums">
-                                {sliderDisplayValue ?? '--'}
-                              </span>
-                            </div>
-                            <Slider
-                              id={`opt-${field.key}`}
-                              disabled={fieldDisabled}
-                              min={field.min}
-                              max={field.max}
-                              step={field.step}
-                              value={[sliderInteractionValue]}
-                              onValueChange={([nextValue]) => onOptionChange(field.key, nextValue)}
-                            />
-                          </div>
-                        )
-                      }
-
-                      case 'number': {
-                        const numberKeyValue =
-                          typeof value === 'number' || typeof value === 'string'
-                            ? String(value)
-                            : ''
-
-                        return (
-                          <NumberField
-                            key={`${field.key}:${numberKeyValue}:${resetNonce}`}
-                            field={field}
-                            label={t(field.label_key)}
-                            disabled={fieldDisabled}
-                            value={value}
-                            placeholder={
-                              placeholder !== undefined ? String(placeholder) : undefined
-                            }
-                            onChange={(parsed) => onOptionChange(field.key, parsed)}
-                          />
-                        )
-                      }
-
-                      case 'text':
-                        return (
-                          <div key={field.key} className="col-span-full space-y-1.5">
-                            <Label htmlFor={`opt-${field.key}`} className="text-sm">
-                              {t(field.label_key)}
-                            </Label>
-                            <Input
-                              id={`opt-${field.key}`}
-                              disabled={fieldDisabled}
-                              value={typeof value === 'string' ? value : ''}
-                              placeholder={
-                                Array.isArray(placeholder)
-                                  ? placeholder.map(String).join(', ')
-                                  : typeof placeholder === 'string'
-                                    ? placeholder
-                                    : undefined
-                              }
-                              onChange={(e) => {
-                                const next = e.target.value
-                                onOptionChange(field.key, next === '' ? null : next)
-                              }}
-                            />
-                          </div>
-                        )
-
-                      case 'number_list': {
-                        const allowNegative = field.allow_negative ?? false
-                        const integerOnly = field.integer_only ?? false
-                        const collapseSingleValue = field.collapse_single_value ?? false
-                        const useTemperatureCodec =
-                          collapseSingleValue && !allowNegative && !integerOnly
-                        const parser = useTemperatureCodec
-                          ? parseTemperatureDraft
-                          : (raw: string) =>
-                              parseNumberListDraft(raw, {
-                                allowNegative,
-                                integerOnly,
-                              })
-                        const serializer = useTemperatureCodec
-                          ? serializeTemperatureValue
-                          : (input: TemperatureInputValue) =>
-                              serializeGenericNumberList(input, integerOnly)
-
-                        return (
-                          <NumberListField
-                            key={`${field.key}:${serializer(value as TemperatureInputValue)}:${resetNonce}`}
-                            fieldKey={field.key}
-                            label={t(field.label_key)}
-                            disabled={fieldDisabled}
-                            value={value as TemperatureInputValue}
-                            placeholder={
-                              Array.isArray(placeholder)
-                                ? placeholder.join(', ')
-                                : placeholder !== undefined
-                                  ? String(placeholder)
-                                  : undefined
-                            }
-                            hint={t('options.advanced.numberListHint')}
-                            errorMessages={numberListErrorMessages}
-                            parser={parser}
-                            serializer={serializer}
-                            collapseSingleValue={collapseSingleValue}
-                            onChange={(parsed) => onOptionChange(field.key, parsed)}
-                          />
-                        )
-                      }
-
-                      default:
-                        return null
-                    }
-                  })}
-              </div>
-            </div>
-          ))}
-
-          <div className="flex justify-end pt-2">
-            <Button
-              id="reset-advanced-options"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setResetNonce((n) => n + 1)
-                onReset()
-              }}
-              disabled={disabled}
-            >
-              {t('options.advanced.reset')}
-            </Button>
-          </div>
-        </div>
+        <div className="mt-3">{content}</div>
       </CollapsibleContent>
     </Collapsible>
   )
