@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2, XCircle, Ban, X } from 'lucide-react'
+import { RefreshCcw, X } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import type { UploadStatus } from '@/features/upload/types'
 import { formatFileSize } from '@/shared/lib/format'
+import type { AppError } from '@/shared/types'
+import { cn } from '@/lib/utils'
 
 interface UploadProgressProps {
   fileName: string
@@ -11,7 +13,7 @@ interface UploadProgressProps {
   progress: number
   status: UploadStatus
   errorKey?: string
-  errorParams?: Record<string, unknown>
+  errorParams?: AppError['params']
   onCancel?: () => void
   onRetry?: () => void
   onRemove?: () => void
@@ -32,52 +34,69 @@ export function UploadProgress({
   onRemove,
 }: UploadProgressProps) {
   const { t } = useTranslation()
+  const statusLabel = (() => {
+    switch (status) {
+      case 'pending':
+        return t('tasks.uploadQueue.status.pending')
+      case 'uploading':
+        return t('tasks.uploadQueue.status.uploading')
+      case 'success':
+        return t('tasks.uploadQueue.status.ready')
+      case 'error':
+        return t('tasks.uploadQueue.status.failed')
+      case 'cancelled':
+        return t('tasks.uploadQueue.status.cancelled')
+      default:
+        return status
+    }
+  })()
+
+  const errorText = errorKey
+    ? t(errorKey, { ...errorParams, defaultValue: t('upload.progress.error') })
+    : t('upload.progress.error')
 
   return (
-    <div className="bg-card flex items-center gap-3 rounded-lg border p-3">
-      {/* Status icon */}
-      <div className="shrink-0">
-        {status === 'success' && <CheckCircle2 className="size-5 text-emerald-500" />}
-        {status === 'error' && <XCircle className="text-destructive size-5" />}
-        {status === 'cancelled' && <Ban className="text-muted-foreground size-5" />}
-        {(status === 'uploading' || status === 'pending') && (
-          <div className="border-primary size-5 animate-spin rounded-full border-2 border-t-transparent" />
-        )}
+    <div
+      className={cn(
+        'grid grid-cols-[minmax(0,1.4fr)_minmax(8rem,1fr)_5.5rem_auto] items-center gap-4 px-5 py-4',
+        status === 'error' && 'bg-surface-container-lowest/30',
+      )}
+    >
+      <div className="min-w-0 space-y-1">
+        <p
+          className={cn(
+            'truncate text-sm font-medium',
+            status === 'error' && 'text-muted-foreground italic',
+          )}
+        >
+          {fileName}
+        </p>
+
+        {status === 'error' ? (
+          <p className="text-destructive line-clamp-1 text-xs">{errorText}</p>
+        ) : status === 'cancelled' ? (
+          <p className="text-muted-foreground text-xs">{t('upload.progress.cancelled')}</p>
+        ) : null}
       </div>
 
-      {/* File info and progress */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-2">
-          <p className="truncate text-sm font-medium">{fileName}</p>
-          <span className="text-muted-foreground shrink-0 text-xs">{formatFileSize(fileSize)}</span>
-        </div>
-
-        {status === 'uploading' && (
-          <div className="mt-1.5 flex items-center gap-2">
+      <div className="min-w-0">
+        {status === 'uploading' ? (
+          <div className="flex max-w-32 flex-col gap-2">
             <Progress value={progress} className="h-1.5" />
-            <span className="text-muted-foreground shrink-0 text-xs tabular-nums">{progress}%</span>
+            <span className="text-muted-foreground text-[11px] font-semibold tracking-[0.18em] uppercase">
+              {progress}% {statusLabel}
+            </span>
           </div>
-        )}
-
-        {status === 'error' && (
-          <p className="text-destructive mt-1 text-xs">
-            {errorKey
-              ? t(errorKey, { ...errorParams, defaultValue: t('upload.progress.error') })
-              : t('upload.progress.error')}
-          </p>
-        )}
-
-        {status === 'success' && (
-          <p className="mt-1 text-xs text-emerald-600">{t('upload.progress.success')}</p>
-        )}
-
-        {status === 'cancelled' && (
-          <p className="text-muted-foreground mt-1 text-xs">{t('upload.progress.cancelled')}</p>
+        ) : (
+          <span className="bg-surface-container text-muted-foreground inline-flex min-h-6 items-center rounded-md px-2 py-0.5 text-[11px] font-semibold tracking-[0.18em] uppercase">
+            {statusLabel}
+          </span>
         )}
       </div>
 
-      {/* Action buttons */}
-      <div className="flex shrink-0 gap-1">
+      <span className="text-muted-foreground text-sm tabular-nums">{formatFileSize(fileSize)}</span>
+
+      <div className="flex shrink-0 justify-end gap-1">
         {status === 'uploading' && onCancel && (
           <Button
             variant="ghost"
@@ -90,7 +109,8 @@ export function UploadProgress({
         )}
 
         {(status === 'error' || status === 'cancelled') && onRetry && (
-          <Button variant="ghost" size="xs" onClick={onRetry}>
+          <Button variant="ghost" size="xs" onClick={onRetry} className="uppercase">
+            <RefreshCcw className="size-3" />
             {t('upload.progress.retry')}
           </Button>
         )}

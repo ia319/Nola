@@ -1,8 +1,10 @@
 import type { UploadItem } from '@/features/upload/types'
+import { useTranslation } from 'react-i18next'
+
 import logger from '@/config/logger'
 import { UploadProgress } from './UploadProgress'
 
-interface UploadListProps {
+export interface UploadListProps {
   uploads: UploadItem[]
   onCancel: (id: string) => void
   onRetry: (id: string) => Promise<void>
@@ -13,10 +15,19 @@ interface UploadListProps {
  * Render a list of UploadProgress items. Returns null when the list is empty.
  */
 export function UploadList({ uploads, onCancel, onRetry, onRemove }: UploadListProps) {
+  const { t } = useTranslation()
+
   if (uploads.length === 0) return null
 
   return (
-    <div className="flex flex-col gap-2">
+    <div data-slot="upload-list" className="flex flex-col">
+      <div className="text-muted-foreground grid grid-cols-[minmax(0,1.4fr)_minmax(8rem,1fr)_5.5rem_auto] gap-4 border-b px-5 py-3 text-[11px] font-semibold tracking-[0.24em] uppercase">
+        <span>{t('tasks.uploadQueue.table.fileName')}</span>
+        <span>{t('tasks.uploadQueue.table.status')}</span>
+        <span>{t('tasks.uploadQueue.table.size')}</span>
+        <span className="text-right">{t('tasks.uploadQueue.table.action')}</span>
+      </div>
+
       {uploads.map((item) => (
         <UploadProgress
           key={item.id}
