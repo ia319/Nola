@@ -12,6 +12,9 @@ import type { TaskSummary } from '@/shared/types'
 import { TaskBatchActionBar } from './TaskBatchActionBar'
 
 export interface CurrentBatchTasksPanelProps {
+  title?: string
+  description?: string
+  emptyText?: string
   resolveFileName?: (task: TaskSummary) => string | undefined
   onCancelTask?: TaskActionHandler
   onRetryTask?: TaskActionHandler
@@ -21,6 +24,9 @@ export interface CurrentBatchTasksPanelProps {
 }
 
 export function CurrentBatchTasksPanel({
+  title,
+  description,
+  emptyText,
   resolveFileName,
   onCancelTask,
   onRetryTask,
@@ -121,9 +127,9 @@ export function CurrentBatchTasksPanel({
 
   return (
     <TaskListPanel
-      title={t('tasks.currentBatch.title')}
-      description={t('tasks.currentBatch.description')}
-      emptyText={t('tasks.currentBatch.empty')}
+      title={title ?? t('tasks.currentBatch.title')}
+      description={description ?? t('tasks.currentBatch.description')}
+      emptyText={emptyText ?? t('tasks.currentBatch.empty')}
       tasks={pagedTasks}
       resolveFileName={resolveFileName}
       onCancelTask={onCancelTask}

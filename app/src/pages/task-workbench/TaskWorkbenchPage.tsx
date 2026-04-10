@@ -1,9 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
+import { MetricCard } from '@/components/ui'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { useAppConfig } from '@/config/use-app-config'
 import {
   cancelTaskAndRefresh,
@@ -16,12 +18,16 @@ import {
 import type { TaskCreateResult } from '@/features/transcription-options'
 import { OptionsBar } from '@/features/transcription-options'
 import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
+import { ContentCanvas, PageHeader, TwoColumnLayout } from '@/layouts'
+import { formatFileSize } from '@/shared/lib/format'
 import type { TaskSummary } from '@/shared/types'
 
 export function TaskWorkbenchPage() {
   const { t } = useTranslation()
   const { fileValidationConfig } = useAppConfig()
   const addCreatedTask = useSessionTasksStore((state) => state.addCreatedTask)
+  const sessionTaskOrder = useSessionTasksStore((state) => state.order)
+  const sessionTaskById = useSessionTasksStore((state) => state.byId)
   const upsertSessionTask = useSessionTasksStore((state) => state.upsertSessionTask)
 
   const {
@@ -40,6 +46,49 @@ export function TaskWorkbenchPage() {
   } = useFileUpload(fileValidationConfig)
 
   const hasPending = uploads.some((upload) => upload.status === 'pending')
+  const sessionTasks = useMemo(() => {
+    return sessionTaskOrder
+      .map((taskId) => sessionTaskById[taskId])
+      .filter((task): task is TaskSummary => Boolean(task))
+  }, [sessionTaskById, sessionTaskOrder])
+
+  const summaryCards = useMemo(() => {
+    const uploadedCount = uploads.length
+    const readyCount = uploads.filter(
+      (upload) => upload.status === 'success' && !upload.taskCreated,
+    ).length
+    const processingCount = sessionTasks.filter(
+      (task) => task.status === 'pending' || task.status === 'processing',
+    ).length
+    const completedCount = sessionTasks.filter((task) => task.status === 'completed').length
+
+    return [
+      {
+        key: 'uploaded',
+        title: t('tasks.workbench.summary.uploaded.title'),
+        value: uploadedCount,
+        description: t('tasks.workbench.summary.uploaded.description'),
+      },
+      {
+        key: 'ready',
+        title: t('tasks.workbench.summary.ready.title'),
+        value: readyCount,
+        description: t('tasks.workbench.summary.ready.description'),
+      },
+      {
+        key: 'processing',
+        title: t('tasks.workbench.summary.processing.title'),
+        value: processingCount,
+        description: t('tasks.workbench.summary.processing.description'),
+      },
+      {
+        key: 'completed',
+        title: t('tasks.workbench.summary.completed.title'),
+        value: completedCount,
+        description: t('tasks.workbench.summary.completed.description'),
+      },
+    ]
+  }, [sessionTasks, t, uploads])
 
   function handleFilesSelected(files: File[]) {
     addFiles(files)
@@ -111,46 +160,110 @@ export function TaskWorkbenchPage() {
   }, [batchError, clearBatchError, t])
 
   return (
-    <div className="space-y-6">
-      <ErrorBoundary>
-        <FileUploader onFilesSelected={handleFilesSelected} disabled={isUploading} />
+    <ContentCanvas as="main" data-slot="task-workbench-page" className="gap-6">
+      <PageHeader title={t('shell.navigation.tasks')} />
 
-        <UploadList
-          uploads={uploads}
-          onCancel={cancelUpload}
-          onRetry={retryUpload}
-          onRemove={removeFile}
-        />
+      <section
+        data-slot="task-workbench-summary"
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      >
+        {summaryCards.map((card) => (
+          <MetricCard
+            key={card.key}
+            title={card.title}
+            value={card.value}
+            description={card.description}
+            className="gap-3 py-5"
+          />
+        ))}
+      </section>
 
-        {uploads.length > 0 ? (
-          <div className="flex gap-2 pt-2">
-            {hasPending ? (
-              <Button onClick={startUpload} disabled={isUploading}>
-                {isUploading ? t('upload.progress.uploading') : t('upload.startUpload')}
-              </Button>
-            ) : null}
-            <Button variant="outline" onClick={handleReset} disabled={isUploading}>
-              {t('upload.reset')}
-            </Button>
-          </div>
-        ) : null}
-      </ErrorBoundary>
+      <TwoColumnLayout
+        left={
+          <section data-slot="task-workbench-upload-queue" className="space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <h2 className="text-foreground text-lg font-semibold tracking-tight">
+                  {t('tasks.workbench.sections.uploadQueue.title')}
+                </h2>
+                <p className="text-muted-foreground text-sm leading-6">
+                  {t('tasks.workbench.sections.uploadQueue.description')}
+                </p>
+              </div>
+              <p className="text-muted-foreground text-xs">
+                {t('tasks.workbench.sections.uploadQueue.maxFileSize', {
+                  maxSize: formatFileSize(fileValidationConfig.maxFileSize),
+                })}
+              </p>
+            </div>
 
-      <ErrorBoundary>
-        <OptionsBar
-          fileIds={availableFileIds}
-          onCreateTask={createTask}
-          onTasksCreated={handleTasksCreated}
-          disabled={isUploading}
-        />
-      </ErrorBoundary>
+            <Card className="gap-0 py-0">
+              <CardContent className="space-y-4 px-5 py-5">
+                <ErrorBoundary>
+                  <FileUploader onFilesSelected={handleFilesSelected} disabled={isUploading} />
 
-      <ErrorBoundary>
-        <CurrentBatchTasksPanel
-          onCancelTask={handleCancelRecentTask}
-          onRetryTask={handleRetryRecentTask}
-        />
-      </ErrorBoundary>
-    </div>
+                  <UploadList
+                    uploads={uploads}
+                    onCancel={cancelUpload}
+                    onRetry={retryUpload}
+                    onRemove={removeFile}
+                  />
+
+                  {uploads.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {hasPending ? (
+                        <Button onClick={startUpload} disabled={isUploading}>
+                          {isUploading ? t('upload.progress.uploading') : t('upload.startUpload')}
+                        </Button>
+                      ) : null}
+                      <Button variant="outline" onClick={handleReset} disabled={isUploading}>
+                        {t('upload.reset')}
+                      </Button>
+                    </div>
+                  ) : null}
+                </ErrorBoundary>
+              </CardContent>
+            </Card>
+          </section>
+        }
+        right={
+          <section data-slot="task-workbench-session-config" className="space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-foreground text-lg font-semibold tracking-tight">
+                {t('tasks.workbench.sections.sessionConfig.title')}
+              </h2>
+              <p className="text-muted-foreground text-sm leading-6">
+                {t('tasks.workbench.sections.sessionConfig.description')}
+              </p>
+            </div>
+
+            <Card className="gap-0 py-0">
+              <CardContent className="px-5 py-5">
+                <ErrorBoundary>
+                  <OptionsBar
+                    fileIds={availableFileIds}
+                    onCreateTask={createTask}
+                    onTasksCreated={handleTasksCreated}
+                    disabled={isUploading}
+                  />
+                </ErrorBoundary>
+              </CardContent>
+            </Card>
+          </section>
+        }
+      />
+
+      <section data-slot="task-workbench-activity">
+        <ErrorBoundary>
+          <CurrentBatchTasksPanel
+            title={t('tasks.workbench.sections.activity.title')}
+            description={t('tasks.workbench.sections.activity.description')}
+            emptyText={t('tasks.workbench.sections.activity.empty')}
+            onCancelTask={handleCancelRecentTask}
+            onRetryTask={handleRetryRecentTask}
+          />
+        </ErrorBoundary>
+      </section>
+    </ContentCanvas>
   )
 }

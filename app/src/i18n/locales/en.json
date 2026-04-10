@@ -236,6 +236,42 @@
       },
       "backToFirstPage": "Back to first page"
     },
+    "workbench": {
+      "summary": {
+        "uploaded": {
+          "title": "Uploaded",
+          "description": "Files added to this session"
+        },
+        "ready": {
+          "title": "Ready",
+          "description": "Uploads ready for transcription"
+        },
+        "processing": {
+          "title": "Processing",
+          "description": "Tasks pending or running"
+        },
+        "completed": {
+          "title": "Completed",
+          "description": "Tasks finished in this session"
+        }
+      },
+      "sections": {
+        "uploadQueue": {
+          "title": "Upload Queue",
+          "description": "Add audio files and prepare the current batch.",
+          "maxFileSize": "Max file size: {{maxSize}} per file"
+        },
+        "sessionConfig": {
+          "title": "Session Configuration",
+          "description": "Choose language and task settings before starting transcription."
+        },
+        "activity": {
+          "title": "Session Activity Monitor",
+          "description": "Track tasks created during the current session.",
+          "empty": "No tasks in this session yet"
+        }
+      }
+    },
     "history": {
       "title": "Task History",
       "description": "All transcription tasks",

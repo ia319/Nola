@@ -235,6 +235,42 @@
       },
       "backToFirstPage": "返回第一页"
     },
+    "workbench": {
+      "summary": {
+        "uploaded": {
+          "title": "已上传",
+          "description": "已添加到当前会话的文件"
+        },
+        "ready": {
+          "title": "就绪",
+          "description": "已上传完成，等待创建任务"
+        },
+        "processing": {
+          "title": "处理中",
+          "description": "等待中或正在运行的任务"
+        },
+        "completed": {
+          "title": "已完成",
+          "description": "当前会话内已结束的任务"
+        }
+      },
+      "sections": {
+        "uploadQueue": {
+          "title": "上传队列",
+          "description": "添加音频文件并准备当前批次。",
+          "maxFileSize": "单文件最大大小：{{maxSize}}"
+        },
+        "sessionConfig": {
+          "title": "会话配置",
+          "description": "在开始转写前选择语言和任务设置。"
+        },
+        "activity": {
+          "title": "会话活动监控",
+          "description": "跟踪当前会话内创建的任务。",
+          "empty": "当前会话还没有任务"
+        }
+      }
+    },
     "history": {
       "title": "任务历史",
       "description": "所有转写任务",
