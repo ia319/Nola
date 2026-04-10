@@ -21,6 +21,7 @@ import { FileUploader, UploadList, useFileUpload } from '@/features/upload'
 import { ContentCanvas, PageHeader, TwoColumnLayout } from '@/layouts'
 import { formatFileSize } from '@/shared/lib/format'
 import type { TaskSummary } from '@/shared/types'
+import { buildTaskWorkbenchSummary } from './task-workbench-summary'
 
 export function TaskWorkbenchPage() {
   const { t } = useTranslation()
@@ -52,43 +53,39 @@ export function TaskWorkbenchPage() {
       .filter((task): task is TaskSummary => Boolean(task))
   }, [sessionTaskById, sessionTaskOrder])
 
-  const summaryCards = useMemo(() => {
-    const uploadedCount = uploads.length
-    const readyCount = uploads.filter(
-      (upload) => upload.status === 'success' && !upload.taskCreated,
-    ).length
-    const processingCount = sessionTasks.filter(
-      (task) => task.status === 'pending' || task.status === 'processing',
-    ).length
-    const completedCount = sessionTasks.filter((task) => task.status === 'completed').length
+  const summary = useMemo(
+    () => buildTaskWorkbenchSummary(uploads, sessionTasks),
+    [sessionTasks, uploads],
+  )
 
+  const summaryCards = useMemo(() => {
     return [
       {
         key: 'uploaded',
         title: t('tasks.workbench.summary.uploaded.title'),
-        value: uploadedCount,
+        value: summary.uploaded,
         description: t('tasks.workbench.summary.uploaded.description'),
       },
       {
         key: 'ready',
         title: t('tasks.workbench.summary.ready.title'),
-        value: readyCount,
+        value: summary.ready,
         description: t('tasks.workbench.summary.ready.description'),
       },
       {
         key: 'processing',
         title: t('tasks.workbench.summary.processing.title'),
-        value: processingCount,
+        value: summary.processing,
         description: t('tasks.workbench.summary.processing.description'),
       },
       {
         key: 'completed',
         title: t('tasks.workbench.summary.completed.title'),
-        value: completedCount,
+        value: summary.completed,
         description: t('tasks.workbench.summary.completed.description'),
       },
     ]
-  }, [sessionTasks, t, uploads])
+  }, [summary, t])
 
   function handleFilesSelected(files: File[]) {
     addFiles(files)
