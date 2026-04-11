@@ -4,19 +4,21 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
+import { HISTORY_PAGE_SIZE } from '@/config/constants'
 import type { SingleExportRequestOptions } from '@/features/export'
 import {
   deleteTaskRecordAction,
   requestTaskRefresh,
-  TaskHistoryPanel,
   useHistoryTaskActions,
   useHistoryTasks,
   useSessionTasksStore,
 } from '@/features/tasks'
+import { ContentCanvas, PageHeader } from '@/layouts'
 import {
   buildHistoryQuery,
   isSameHistorySearch,
   normalizeHistorySearch,
+  type HistoryPageSize,
   type HistoryRouteSearch,
 } from '@/routes/history-search'
 import type {
@@ -26,6 +28,7 @@ import type {
   TaskSortBy,
   TaskSummary,
 } from '@/shared/types'
+import { HistoryTaskRecordsView } from './HistoryTaskRecordsView'
 
 export function HistoryPage() {
   const { t } = useTranslation()
@@ -100,6 +103,19 @@ export function HistoryPage() {
     [updateSearch],
   )
 
+  const handlePageSizeChange = useCallback(
+    (value: HistoryPageSize) => {
+      updateSearch(
+        {
+          page: undefined,
+          page_size: value === HISTORY_PAGE_SIZE ? undefined : value,
+        },
+        false,
+      )
+    },
+    [updateSearch],
+  )
+
   const handlePageClamp = useCallback(
     (page: number) => {
       updateSearch({ page: page <= 1 ? undefined : page }, true)
@@ -164,27 +180,36 @@ export function HistoryPage() {
 
   return (
     <ErrorBoundary>
-      <TaskHistoryPanel
-        tasks={historyTasks.tasks}
-        query={query}
-        total={historyTasks.total}
-        isLoading={historyTasks.isLoading}
-        errorMessage={
-          historyTasks.error ? t(historyTasks.error.i18nKey, historyTasks.error.params ?? {}) : null
-        }
-        onSearchChange={handleSearchChange}
-        onStatusChange={handleStatusChange}
-        onSortByChange={handleSortByChange}
-        onOrderChange={handleOrderChange}
-        onPageChange={handlePageChange}
-        onCancelTask={handleCancelHistoryTask}
-        onRetryTask={handleRetryHistoryTask}
-        onDeleteTaskRecord={handleDeleteHistoryTask}
-        onExportTask={handleExportHistoryTask}
-        onBatchCancelTasks={historyTaskActions.cancelTasks}
-        onBatchRetryTasks={historyTaskActions.retryTasks}
-        onBatchExportTasks={historyTaskActions.exportTasks}
-      />
+      <ContentCanvas as="main" className="max-w-none gap-6" data-slot="history-page">
+        <PageHeader title={t('history.title')} description={t('history.description')} />
+        <HistoryTaskRecordsView
+          tasks={historyTasks.tasks}
+          query={query}
+          total={historyTasks.total}
+          isLoading={historyTasks.isLoading}
+          errorMessage={
+            historyTasks.error
+              ? t(historyTasks.error.i18nKey, historyTasks.error.params ?? {})
+              : null
+          }
+          onSearchChange={handleSearchChange}
+          onStatusChange={handleStatusChange}
+          onSortByChange={handleSortByChange}
+          onOrderChange={handleOrderChange}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+          onCreateTask={() => {
+            void navigate({ to: '/' })
+          }}
+          onCancelTask={handleCancelHistoryTask}
+          onRetryTask={handleRetryHistoryTask}
+          onDeleteTaskRecord={handleDeleteHistoryTask}
+          onExportTask={handleExportHistoryTask}
+          onBatchCancelTasks={historyTaskActions.cancelTasks}
+          onBatchRetryTasks={historyTaskActions.retryTasks}
+          onBatchExportTasks={historyTaskActions.exportTasks}
+        />
+      </ContentCanvas>
     </ErrorBoundary>
   )
 }
