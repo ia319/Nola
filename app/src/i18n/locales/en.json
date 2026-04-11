@@ -562,5 +562,69 @@
   },
   "settings": {
     "title": "Settings"
+  },
+  "history": {
+    "title": "History",
+    "description": "Review archived task records and recent execution output.",
+    "modes": {
+      "files": "Filename",
+      "tasks": "Task ID"
+    },
+    "toolbar": {
+      "searchPlaceholder": "Search by task ID or filename",
+      "exportSelected": "Export Selected",
+      "status": "Status",
+      "sortBy": "Sort by",
+      "order": "Order"
+    },
+    "selection": {
+      "selectedCount_one": "{{count}} selected",
+      "selectedCount_other": "{{count}} selected"
+    },
+    "table": {
+      "caption": "History task records",
+      "selectAll": "Select all history rows",
+      "selectRow": "Select task {{taskId}}",
+      "filenameFallback": "Unnamed file",
+      "modelFallback": "System default",
+      "columns": {
+        "identity": "Task ID / Filename",
+        "model": "Model Engine",
+        "status": "Status",
+        "progress": "Progress / Notes",
+        "executionDate": "Execution Date",
+        "actions": "Actions"
+      },
+      "execution": {
+        "created": "CRE",
+        "completed": "FIN",
+        "inProgress": "In progress"
+      },
+      "progressNotes": {
+        "pending": "Queued for processing",
+        "processing": "Task in progress",
+        "completed": "Ready to export",
+        "failed": "Needs attention",
+        "cancelled": "Stopped before completion"
+      },
+      "actions": {
+        "export": "Export record",
+        "cancel": "Cancel task",
+        "retry": "Retry task",
+        "deleteRecord": "Delete record"
+      }
+    },
+    "pagination": {
+      "summary": "Showing {{start}}-{{end}} of {{total}} records",
+      "pageSize": "Page size",
+      "previous": "Previous page",
+      "next": "Next page",
+      "page": "Page {{page}}"
+    },
+    "empty": {
+      "title": "No transcription records found",
+      "description": "Your archive is currently empty. Initialize a new transcription task to begin populating your operational history.",
+      "action": "Create transcription task"
+    }
   }
 }

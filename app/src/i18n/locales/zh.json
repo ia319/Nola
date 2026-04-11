@@ -561,5 +561,69 @@
   },
   "settings": {
     "title": "设置"
+  },
+  "history": {
+    "title": "历史",
+    "description": "查看归档任务记录和最近执行结果。",
+    "modes": {
+      "files": "文件名",
+      "tasks": "任务 ID"
+    },
+    "toolbar": {
+      "searchPlaceholder": "按任务 ID 或文件名搜索",
+      "exportSelected": "导出所选",
+      "status": "状态",
+      "sortBy": "排序字段",
+      "order": "排序方向"
+    },
+    "selection": {
+      "selectedCount_one": "已选择 {{count}} 项",
+      "selectedCount_other": "已选择 {{count}} 项"
+    },
+    "table": {
+      "caption": "历史任务记录",
+      "selectAll": "选择所有历史记录",
+      "selectRow": "选择任务 {{taskId}}",
+      "filenameFallback": "未命名文件",
+      "modelFallback": "系统默认",
+      "columns": {
+        "identity": "任务 ID / 文件名",
+        "model": "模型引擎",
+        "status": "状态",
+        "progress": "进度 / 备注",
+        "executionDate": "执行时间",
+        "actions": "操作"
+      },
+      "execution": {
+        "created": "创",
+        "completed": "完",
+        "inProgress": "进行中"
+      },
+      "progressNotes": {
+        "pending": "等待处理",
+        "processing": "任务进行中",
+        "completed": "可导出",
+        "failed": "需要关注",
+        "cancelled": "已在完成前停止"
+      },
+      "actions": {
+        "export": "导出记录",
+        "cancel": "取消任务",
+        "retry": "重试任务",
+        "deleteRecord": "删除记录"
+      }
+    },
+    "pagination": {
+      "summary": "显示 {{start}}-{{end}} / 共 {{total}} 条记录",
+      "pageSize": "每页",
+      "previous": "上一页",
+      "next": "下一页",
+      "page": "第 {{page}} 页"
+    },
+    "empty": {
+      "title": "暂无转写记录",
+      "description": "当前归档为空。先创建新的转写任务，再逐步建立运行历史。",
+      "action": "创建转写任务"
+    }
   }
 }
