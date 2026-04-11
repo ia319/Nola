@@ -12,14 +12,14 @@ const STATUS_OPTIONS: TaskFilterStatus[] = [
 
 const SORT_OPTIONS: TaskSortBy[] = ['created_at', 'completed_at', 'status', 'progress', 'filename']
 const ORDER_OPTIONS: SortOrder[] = ['desc', 'asc']
-const PAGE_SIZE_OPTIONS = [20, 50, 100] as const
+export const HISTORY_PAGE_SIZE_OPTIONS = [20, 50, 100] as const
 
 const STATUS_SET = new Set(STATUS_OPTIONS)
 const SORT_SET = new Set(SORT_OPTIONS)
 const ORDER_SET = new Set(ORDER_OPTIONS)
-const PAGE_SIZE_SET = new Set<number>(PAGE_SIZE_OPTIONS)
+const PAGE_SIZE_SET = new Set<number>(HISTORY_PAGE_SIZE_OPTIONS)
 
-export type HistoryPageSize = (typeof PAGE_SIZE_OPTIONS)[number]
+export type HistoryPageSize = (typeof HISTORY_PAGE_SIZE_OPTIONS)[number]
 
 export interface HistoryRouteSearch {
   q?: string
