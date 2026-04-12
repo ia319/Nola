@@ -587,7 +587,11 @@
       "selectRow": "Select task {{taskId}}",
       "filenameFallback": "Unnamed file",
       "modelFallback": "System default",
+      "durationFallback": "Not finished",
       "columns": {
+        "taskId": "Task ID",
+        "filename": "Filename",
+        "duration": "Duration",
         "identity": "Task ID / Filename",
         "model": "Model Engine",
         "status": "Status",
@@ -627,20 +631,48 @@
       "action": "Create transcription task"
     },
     "files": {
+      "selection": {
+        "selectedCount_one": "{{count}} selected",
+        "selectedCount_other": "{{count}} selected"
+      },
+      "batch": {
+        "deleteComingSoon": "Delete selected coming soon"
+      },
       "table": {
         "caption": "History file records",
         "typeFallback": "Unknown",
+        "selectAll": "Select all history files",
+        "selectRow": "Select file {{fileId}}",
+        "tasksUnavailable": "—",
+        "tasksCount_one": "{{count}} task",
+        "tasksCount_other": "{{count}} tasks",
         "columns": {
           "file": "File",
+          "tasks": "Tasks",
           "size": "Size",
           "contentType": "Content Type",
-          "uploadedAt": "Uploaded At"
+          "uploadedAt": "Uploaded At",
+          "actions": "Actions"
+        },
+        "actions": {
+          "delete": "Delete file"
         }
       },
       "empty": {
         "title": "No uploaded files found",
         "description": "Your file archive is empty. Return to the task workbench to add source audio and start new runs.",
         "action": "Go to task workbench"
+      },
+      "deleteDialog": {
+        "title": "Delete file",
+        "description": "Delete {{filename}} and its associated data?",
+        "cancel": "Cancel",
+        "confirm": "Delete file",
+        "deleting": "Deleting..."
+      },
+      "toast": {
+        "deleted": "File deleted: {{filename}}",
+        "deleteFailed": "File delete failed, please retry"
       }
     }
   }
