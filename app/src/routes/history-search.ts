@@ -20,8 +20,18 @@ const ORDER_SET = new Set(ORDER_OPTIONS)
 const PAGE_SIZE_SET = new Set<number>(HISTORY_PAGE_SIZE_OPTIONS)
 
 export type HistoryPageSize = (typeof HISTORY_PAGE_SIZE_OPTIONS)[number]
+export type HistoryRecordsMode = 'files' | 'tasks'
+
+const MODE_OPTIONS: readonly HistoryRecordsMode[] = ['tasks', 'files']
+const MODE_SET = new Set(MODE_OPTIONS)
+
+export interface HistoryFileQuery {
+  page: number
+  page_size: HistoryPageSize
+}
 
 export interface HistoryRouteSearch {
+  mode?: HistoryRecordsMode
   q?: string
   status?: TaskFilterStatus
   sort_by?: TaskSortBy
@@ -55,6 +65,7 @@ function isSearchRecord(value: unknown): value is Record<string, unknown> {
  */
 export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
   const searchRecord = isSearchRecord(search) ? search : {}
+  const modeValue = typeof searchRecord.mode === 'string' ? searchRecord.mode : ''
   const qValue = typeof searchRecord.q === 'string' ? searchRecord.q.trim() : ''
   const statusValue = typeof searchRecord.status === 'string' ? searchRecord.status : ''
   const sortByValue = typeof searchRecord.sort_by === 'string' ? searchRecord.sort_by : ''
@@ -63,6 +74,10 @@ export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
   const pageSizeValue = parsePositiveInt(searchRecord.page_size)
 
   const next: HistoryRouteSearch = {}
+
+  if (MODE_SET.has(modeValue as HistoryRecordsMode) && modeValue !== 'tasks') {
+    next.mode = modeValue as HistoryRecordsMode
+  }
 
   if (qValue !== '') {
     next.q = qValue
@@ -96,7 +111,7 @@ export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
 }
 
 /** Convert normalized route search params into backend query model. */
-export function buildHistoryQuery(search: HistoryRouteSearch): TaskQueryModel {
+export function buildHistoryTaskQuery(search: HistoryRouteSearch): TaskQueryModel {
   return {
     q: search.q ?? '',
     status: search.status ?? 'all',
@@ -107,9 +122,18 @@ export function buildHistoryQuery(search: HistoryRouteSearch): TaskQueryModel {
   }
 }
 
+/** Convert normalized route search params into filename-mode query model. */
+export function buildHistoryFileQuery(search: HistoryRouteSearch): HistoryFileQuery {
+  return {
+    page: search.page ?? 1,
+    page_size: search.page_size ?? HISTORY_PAGE_SIZE,
+  }
+}
+
 /** Check whether two normalized search models are equivalent. */
 export function isSameHistorySearch(a: HistoryRouteSearch, b: HistoryRouteSearch): boolean {
   return (
+    a.mode === b.mode &&
     a.q === b.q &&
     a.status === b.status &&
     a.sort_by === b.sort_by &&
