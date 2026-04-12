@@ -6,11 +6,13 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { ExportDialogValue, ExportRequestOptions } from '@/features/export'
-import type { TaskSummary } from '@/shared/types'
+import type { FileInfo, TaskSummary } from '@/shared/types'
 
 const historyPageMocks = vi.hoisted(() => ({
   navigate: vi.fn(),
+  search: {} as Record<string, unknown>,
   useHistoryTasks: vi.fn(),
+  useHistoryFiles: vi.fn(),
   useHistoryTaskActions: vi.fn(),
   useSessionTasksStore: vi.fn(),
   deleteTaskRecordAction: vi.fn(),
@@ -51,6 +53,16 @@ vi.mock('react-i18next', () => ({
         'history.toolbar.status': 'Status',
         'history.toolbar.sortBy': 'Sort by',
         'history.toolbar.order': 'Order',
+        'history.files.table.caption': 'History file records',
+        'history.files.table.typeFallback': 'Unknown',
+        'history.files.table.columns.file': 'File',
+        'history.files.table.columns.size': 'Size',
+        'history.files.table.columns.contentType': 'Content Type',
+        'history.files.table.columns.uploadedAt': 'Uploaded At',
+        'history.files.empty.title': 'No uploaded files found',
+        'history.files.empty.description':
+          'Your file archive is empty. Return to the task workbench to add source audio and start new runs.',
+        'history.files.empty.action': 'Go to task workbench',
         'history.table.caption': 'History task records',
         'history.table.columns.identity': 'Task ID / Filename',
         'history.table.columns.model': 'Model Engine',
@@ -138,7 +150,7 @@ vi.mock('sonner', () => ({
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => historyPageMocks.navigate,
-  useSearch: () => ({}),
+  useSearch: () => historyPageMocks.search,
 }))
 
 vi.mock('@/components/common', () => ({
@@ -173,6 +185,10 @@ vi.mock('@/features/tasks', async () => {
   }
 })
 
+vi.mock('../useHistoryFiles', () => ({
+  useHistoryFiles: historyPageMocks.useHistoryFiles,
+}))
+
 import { HistoryPage } from '../HistoryPage'
 
 function createTask(overrides: Partial<TaskSummary>): TaskSummary {
@@ -189,10 +205,23 @@ function createTask(overrides: Partial<TaskSummary>): TaskSummary {
   }
 }
 
+function createFile(overrides: Partial<FileInfo>): FileInfo {
+  return {
+    file_id: 'file-1',
+    filename: 'briefing.wav',
+    size: 1048576,
+    content_type: 'audio/wav',
+    created_at: '2026-04-11T10:00:00.000Z',
+    ...overrides,
+  }
+}
+
 describe('HistoryPage', () => {
   beforeEach(() => {
     historyPageMocks.navigate.mockReset()
+    historyPageMocks.search = {}
     historyPageMocks.useHistoryTasks.mockReset()
+    historyPageMocks.useHistoryFiles.mockReset()
     historyPageMocks.useHistoryTaskActions.mockReset()
     historyPageMocks.useSessionTasksStore.mockReset()
     historyPageMocks.deleteTaskRecordAction.mockReset()
@@ -226,6 +255,14 @@ describe('HistoryPage', () => {
       exportTasks: vi.fn(),
     })
 
+    historyPageMocks.useHistoryFiles.mockReturnValue({
+      files: [createFile({ file_id: 'file-archive', filename: 'archive.wav' })],
+      total: 1,
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(),
+    })
+
     const sessionState = {
       addCreatedTask: vi.fn(),
       removeSessionTask: vi.fn(),
@@ -246,8 +283,8 @@ describe('HistoryPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'History', hidden: true })).toBeTruthy()
     expect(screen.getByPlaceholderText('Search by task ID or filename')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Export Selected' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Filename' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Task ID' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Filename' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Task ID' })).toBeEnabled()
     expect(screen.getByText('Task ID / Filename')).toBeTruthy()
     expect(screen.getByText('Model Engine')).toBeTruthy()
     expect(screen.getByText('Progress / Notes')).toBeTruthy()
@@ -256,6 +293,38 @@ describe('HistoryPage', () => {
     expect(screen.getByText('queue.wav')).toBeTruthy()
     expect(screen.getByText('Ready to export')).toBeTruthy()
     expect(screen.getByText('Task in progress')).toBeTruthy()
+  })
+
+  it('switches to filename mode through the route search model', () => {
+    historyPageMocks.search = {
+      order: 'asc',
+      page: 3,
+      q: 'alpha',
+      sort_by: 'filename',
+      status: 'processing',
+    }
+
+    render(<HistoryPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filename' }))
+
+    const navigation = historyPageMocks.navigate.mock.calls.at(-1)?.[0]
+    expect(navigation?.replace).toBe(false)
+    expect(
+      navigation?.search({
+        order: 'asc',
+        page: 3,
+        q: 'alpha',
+        sort_by: 'filename',
+        status: 'processing',
+      }),
+    ).toEqual({
+      mode: 'files',
+      order: 'asc',
+      q: 'alpha',
+      sort_by: 'filename',
+      status: 'processing',
+    })
   })
 
   it('shows batch actions after selecting a row and opens the export dialog', async () => {
@@ -298,5 +367,29 @@ describe('HistoryPage', () => {
     expect(screen.getByText('No transcription records found')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Create transcription task' }))
     expect(historyPageMocks.navigate).toHaveBeenCalledWith({ to: '/' })
+  })
+
+  it('renders the filename mode with the files data source', () => {
+    historyPageMocks.search = {
+      mode: 'files',
+      page: 2,
+      page_size: 50,
+    }
+
+    render(<HistoryPage />)
+
+    expect(historyPageMocks.useHistoryTasks).not.toHaveBeenCalled()
+    expect(historyPageMocks.useHistoryFiles).toHaveBeenCalledWith({
+      onPageClamp: expect.any(Function),
+      query: {
+        page: 2,
+        page_size: 50,
+      },
+    })
+    expect(screen.queryByPlaceholderText('Search by task ID or filename')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Export Selected' })).toBeNull()
+    expect(screen.getByRole('columnheader', { name: 'File' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: 'Content Type' })).toBeTruthy()
+    expect(screen.getByText('archive.wav')).toBeTruthy()
   })
 })

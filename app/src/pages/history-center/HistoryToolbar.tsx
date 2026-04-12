@@ -11,9 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import type { HistoryRecordsMode } from '@/routes/history-search'
 import type { SortOrder, TaskFilterStatus, TaskSortBy } from '@/shared/types'
-
-export type HistoryRecordsMode = 'files' | 'tasks'
 
 export interface HistoryToolbarProps {
   mode: HistoryRecordsMode
@@ -23,6 +22,7 @@ export interface HistoryToolbarProps {
   orderValue: SortOrder
   isLoading?: boolean
   canExportSelection?: boolean
+  showExportSelection?: boolean
   onSearchChange: (value: string) => void
   onSearchSubmit: (value: string) => void
   onStatusChange: (value: TaskFilterStatus) => void
@@ -59,6 +59,7 @@ export function HistoryToolbar({
   orderValue,
   isLoading = false,
   canExportSelection = false,
+  showExportSelection = true,
   onSearchChange,
   onSearchSubmit,
   onStatusChange,
@@ -213,16 +214,18 @@ export function HistoryToolbar({
           ) : null}
         </div>
 
-        <Button
-          type="button"
-          size="sm"
-          className="text-[11px] font-semibold tracking-[0.18em] uppercase"
-          disabled={isLoading || !canExportSelection || !onExportSelection}
-          onClick={onExportSelection}
-        >
-          <Download />
-          {t('history.toolbar.exportSelected')}
-        </Button>
+        {showExportSelection ? (
+          <Button
+            type="button"
+            size="sm"
+            className="text-[11px] font-semibold tracking-[0.18em] uppercase"
+            disabled={isLoading || !canExportSelection || !onExportSelection}
+            onClick={onExportSelection}
+          >
+            <Download />
+            {t('history.toolbar.exportSelected')}
+          </Button>
+        ) : null}
       </div>
     </div>
   )

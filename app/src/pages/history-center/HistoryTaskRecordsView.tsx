@@ -26,9 +26,9 @@ import type {
   TaskSortBy,
   TaskSummary,
 } from '@/shared/types'
-import type { HistoryPageSize } from '@/routes/history-search'
+import type { HistoryPageSize, HistoryRecordsMode } from '@/routes/history-search'
 import { HistoryPagination } from './HistoryPagination'
-import { HistoryToolbar, type HistoryRecordsMode } from './HistoryToolbar'
+import { HistoryToolbar } from './HistoryToolbar'
 
 type BatchTaskHandler = (taskIds: string[]) => Promise<void | BatchTaskActionResponse>
 type BatchExportHandler = (
