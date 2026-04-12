@@ -37,9 +37,9 @@ export function TaskWorkbenchUploadQueue({
   const hasUploads = uploads.length > 0
 
   return (
-    <section data-slot="task-workbench-upload-queue" className="space-y-4">
+    <section data-slot="task-workbench-upload-queue" className="flex h-full flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h2 className="text-foreground text-lg font-semibold tracking-tight">
+        <h2 className="text-foreground text-base font-semibold tracking-tight">
           {t('tasks.workbench.sections.uploadQueue.title')}
         </h2>
         <p className="text-muted-foreground text-xs">
@@ -50,14 +50,16 @@ export function TaskWorkbenchUploadQueue({
       </div>
 
       {hasUploads ? (
-        <Card className="gap-0 overflow-hidden py-0">
-          <CardContent className="px-0 py-0">
-            <UploadList
-              uploads={uploads}
-              onCancel={onCancelUpload}
-              onRetry={onRetryUpload}
-              onRemove={onRemoveUpload}
-            />
+        <Card className="flex min-h-[28rem] flex-1 flex-col gap-0 overflow-hidden py-0">
+          <CardContent className="flex flex-1 flex-col px-0 py-0">
+            <div className="min-h-0 flex-1 overflow-auto">
+              <UploadList
+                uploads={uploads}
+                onCancel={onCancelUpload}
+                onRetry={onRetryUpload}
+                onRemove={onRemoveUpload}
+              />
+            </div>
 
             <div className="bg-surface-container-lowest flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
               <FileUploader
@@ -101,7 +103,7 @@ export function TaskWorkbenchUploadQueue({
           onFilesSelected={onFilesSelected}
           disabled={isUploading}
           ariaLabel={t('tasks.uploadQueue.empty.action')}
-          className="border-outline-variant/70 min-h-[420px] justify-center rounded-xl border-dashed px-8 py-10 lg:min-h-[460px]"
+          className="border-outline-variant/70 min-h-[28rem] justify-center rounded-xl border-dashed px-8 py-10"
         >
           <EmptyState
             icon={<CloudUpload className="size-7" />}

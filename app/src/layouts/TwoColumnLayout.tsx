@@ -47,11 +47,13 @@ export function TwoColumnLayout({
   return (
     <div
       data-slot="two-column-layout"
-      className={cn('grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8', className)}
+      className={cn('grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-stretch lg:gap-8', className)}
       {...props}
     >
-      <div className={cn('min-w-0 space-y-6', columns.left, leftClassName)}>{left}</div>
-      <div className={cn('min-w-0 space-y-6', columns.right, rightClassName)}>{right}</div>
+      <div className={cn('flex min-w-0 flex-col gap-6', columns.left, leftClassName)}>{left}</div>
+      <div className={cn('flex min-w-0 flex-col gap-6', columns.right, rightClassName)}>
+        {right}
+      </div>
     </div>
   )
 }

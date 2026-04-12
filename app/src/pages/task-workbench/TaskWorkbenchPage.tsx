@@ -13,7 +13,7 @@ import {
 } from '@/features/tasks'
 import type { TaskCreateResult } from '@/features/transcription-options'
 import { useFileUpload } from '@/features/upload'
-import { ContentCanvas, PageHeader, TwoColumnLayout } from '@/layouts'
+import { ContentCanvas, TwoColumnLayout } from '@/layouts'
 import type { TaskSummary } from '@/shared/types'
 import { TaskWorkbenchActivityMonitor } from './TaskWorkbenchActivityMonitor'
 import { buildTaskWorkbenchSummary } from './task-workbench-summary'
@@ -139,12 +139,16 @@ export function TaskWorkbenchPage() {
   }, [batchError, clearBatchError, t])
 
   return (
-    <ContentCanvas as="main" data-slot="task-workbench-page" className="gap-6">
-      <PageHeader title={t('shell.navigation.tasks')} />
+    <ContentCanvas
+      as="main"
+      data-slot="task-workbench-page"
+      className="max-w-[1400px] gap-8 px-0 py-0"
+    >
+      <h1 className="sr-only">{t('shell.navigation.tasks')}</h1>
 
       <section
         data-slot="task-workbench-summary"
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4"
       >
         {summaryCards.map((card) => (
           <MetricCard
@@ -152,7 +156,7 @@ export function TaskWorkbenchPage() {
             title={card.title}
             value={card.value}
             description={card.description}
-            className="gap-3 py-5"
+            className="gap-2.5 py-4"
           />
         ))}
       </section>
@@ -186,7 +190,7 @@ export function TaskWorkbenchPage() {
         }
       />
 
-      <section data-slot="task-workbench-activity">
+      <section data-slot="task-workbench-activity" className="min-h-0">
         <ErrorBoundary>
           <TaskWorkbenchActivityMonitor
             tasks={sessionTasks}

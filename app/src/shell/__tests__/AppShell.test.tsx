@@ -54,7 +54,7 @@ describe('AppShell', () => {
     expect(screen.getByText('topbar')).toBeTruthy()
     expect(screen.getByText('outlet').closest('[data-slot="app-shell-content"]')).toBeTruthy()
     expect(screen.getByText('toaster')).toBeTruthy()
-    expect(screen.getByText('outlet').closest('[data-slot="app-shell-main"]')).toHaveClass(
+    expect(screen.getByText('topbar').closest('[data-slot="app-shell-workspace"]')).toHaveClass(
       'lg:ml-[var(--sidebar-width)]',
     )
   })

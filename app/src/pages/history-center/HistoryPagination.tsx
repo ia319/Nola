@@ -75,7 +75,7 @@ export function HistoryPagination({
   return (
     <footer
       data-slot="history-pagination"
-      className="flex flex-col gap-4 border-t px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+      className="flex flex-col gap-4 border-t px-5 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
     >
       <div className="flex flex-wrap items-center gap-4">
         <p className="text-muted-foreground">

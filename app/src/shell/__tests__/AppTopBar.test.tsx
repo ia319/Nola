@@ -61,10 +61,6 @@ describe('AppTopBar', () => {
 
     const topBar = screen.getByText('Tasks').closest('[data-slot="app-topbar"]')
     expect(topBar).toHaveAttribute('data-breakpoint', 'lg')
-    expect(topBar).toHaveStyle({
-      marginLeft: 'var(--sidebar-width)',
-      width: 'calc(100% - var(--sidebar-width))',
-    })
     expect(screen.getByRole('button', { name: 'Activity' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Toggle theme' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Help' })).toBeTruthy()
@@ -98,9 +94,10 @@ describe('AppTopBar', () => {
 
     render(<AppTopBar />)
 
-    expect(screen.getByText('Tasks').closest('[data-slot="app-topbar"]')).toHaveStyle({
-      width: '100%',
-    })
+    expect(screen.getByText('Tasks').closest('[data-slot="app-topbar"]')).toHaveAttribute(
+      'data-breakpoint',
+      'md',
+    )
   })
 
   it('toggles to the opposite explicit theme from the resolved app theme', () => {

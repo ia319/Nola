@@ -74,17 +74,9 @@ export function AppTopBar({
         'bg-background/95 border-border supports-[backdrop-filter]:bg-background/80 sticky top-0 z-30 flex h-12 items-center justify-between border-b px-4 backdrop-blur-sm lg:px-6',
         className,
       )}
-      style={
-        breakpoint === 'lg'
-          ? {
-              marginLeft: 'var(--sidebar-width)',
-              width: 'calc(100% - var(--sidebar-width))',
-            }
-          : { width: '100%' }
-      }
     >
       <div className="flex min-w-0 items-center gap-3">
-        <h1 className="truncate text-lg font-semibold tracking-tight">{t(titleKey)}</h1>
+        <h1 className="truncate text-base font-semibold tracking-tight">{t(titleKey)}</h1>
 
         {showSettingsTabs ? (
           <div

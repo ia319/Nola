@@ -217,7 +217,7 @@ describe('TaskWorkbenchPage', () => {
 
     const page = screen.getByRole('main')
     expect(page).toHaveAttribute('data-slot', 'task-workbench-page')
-    expect(screen.getByRole('heading', { name: 'Tasks', level: 1 })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Tasks', level: 1, hidden: true })).toBeTruthy()
 
     const summary = screen.getByText('Uploaded').closest('[data-slot="task-workbench-summary"]')
     expect(summary).toBeTruthy()

@@ -243,7 +243,7 @@ describe('HistoryPage', () => {
 
     const page = screen.getByRole('main')
     expect(page).toHaveAttribute('data-slot', 'history-page')
-    expect(screen.getByRole('heading', { level: 1, name: 'History' })).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'History', hidden: true })).toBeTruthy()
     expect(screen.getByPlaceholderText('Search by task ID or filename')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Export Selected' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Filename' })).toBeDisabled()

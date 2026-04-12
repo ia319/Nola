@@ -79,7 +79,7 @@ export function HistoryToolbar({
   return (
     <div
       data-slot="history-toolbar"
-      className="bg-surface-container-low/30 flex flex-col gap-4 border-b px-4 py-4"
+      className="bg-surface-container-low/30 flex flex-col gap-4 border-b px-5 py-4"
     >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:items-center">
@@ -90,7 +90,7 @@ export function HistoryToolbar({
                 value={searchValue}
                 disabled={isLoading}
                 placeholder={t('history.toolbar.searchPlaceholder')}
-                className="pl-9"
+                className="bg-background pl-9"
                 onChange={(event) => {
                   onSearchChange(event.target.value)
                 }}
@@ -107,6 +107,7 @@ export function HistoryToolbar({
               type="button"
               size="xs"
               variant={mode === 'files' ? 'secondary' : 'ghost'}
+              className="text-[10px] font-semibold tracking-[0.18em] uppercase"
               disabled={isLoading || !onModeChange}
               onClick={() => {
                 onModeChange?.('files')
@@ -119,6 +120,7 @@ export function HistoryToolbar({
               type="button"
               size="xs"
               variant={mode === 'tasks' ? 'secondary' : 'ghost'}
+              className="text-[10px] font-semibold tracking-[0.18em] uppercase"
               disabled={isLoading || !onModeChange}
               onClick={() => {
                 onModeChange?.('tasks')
@@ -214,6 +216,7 @@ export function HistoryToolbar({
         <Button
           type="button"
           size="sm"
+          className="text-[11px] font-semibold tracking-[0.18em] uppercase"
           disabled={isLoading || !canExportSelection || !onExportSelection}
           onClick={onExportSelection}
         >

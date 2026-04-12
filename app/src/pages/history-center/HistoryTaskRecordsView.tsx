@@ -607,7 +607,7 @@ export function HistoryTaskRecordsView({
   return (
     <section
       data-slot="history-records-view"
-      className="bg-card overflow-hidden rounded-xl border shadow-sm"
+      className="bg-card flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-sm"
     >
       <HistoryToolbar
         mode={mode}
@@ -726,6 +726,8 @@ export function HistoryTaskRecordsView({
         rows={tasks}
         getRowId={(task) => task.task_id}
         caption={t('history.table.caption')}
+        scrollAreaClassName="max-h-[56vh] overflow-auto"
+        stickyHeader
         selection={{
           selectedRowIds: selectedTaskIds,
           selectAllLabel: t('history.table.selectAll'),

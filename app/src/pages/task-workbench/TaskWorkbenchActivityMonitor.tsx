@@ -124,7 +124,7 @@ export function TaskWorkbenchActivityMonitor({
   }, [canCancelTasks, handleCancel, runningTaskIdSet, t])
 
   return (
-    <section data-slot="task-workbench-activity-monitor" className="space-y-4">
+    <section data-slot="task-workbench-activity-monitor" className="space-y-3">
       <div className="border-border flex flex-wrap items-center justify-between gap-3 border-b pb-2">
         <h2 className="text-foreground text-base font-semibold tracking-tight uppercase">
           {t('tasks.workbench.sections.activity.title')}
@@ -145,10 +145,13 @@ export function TaskWorkbenchActivityMonitor({
       </div>
 
       <DataTable
+        className="shadow-sm"
         columns={columns}
         rows={tasks}
         getRowId={(task) => task.task_id}
         caption={t('tasks.workbench.sections.activity.caption')}
+        scrollAreaClassName="max-h-[18rem] overflow-auto"
+        stickyHeader
         emptyState={
           <EmptyState
             icon={<ListTodo className="size-7" />}

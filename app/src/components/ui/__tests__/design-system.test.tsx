@@ -174,6 +174,22 @@ describe('DataTable', () => {
     fireEvent.click(interviewCell)
     expect(onRowClick).toHaveBeenCalledWith(rows[0])
   })
+
+  it('allows sticky headers and custom scroll containers for dense console tables', () => {
+    render(
+      <DataTable
+        rows={rows}
+        getRowId={(row) => row.id}
+        stickyHeader
+        scrollAreaClassName="max-h-40"
+        columns={[{ key: 'name', header: 'Name', cell: (row) => row.name }]}
+      />,
+    )
+
+    const header = screen.getByText('Name').closest('thead')
+    expect(header).toHaveClass('sticky')
+    expect(screen.getByRole('table').parentElement).toHaveClass('max-h-40')
+  })
 })
 
 describe('DetailSheet', () => {

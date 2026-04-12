@@ -13,7 +13,7 @@ import {
   useHistoryTasks,
   useSessionTasksStore,
 } from '@/features/tasks'
-import { ContentCanvas, PageHeader } from '@/layouts'
+import { ContentCanvas } from '@/layouts'
 import {
   buildHistoryQuery,
   isSameHistorySearch,
@@ -180,8 +180,13 @@ export function HistoryPage() {
 
   return (
     <ErrorBoundary>
-      <ContentCanvas as="main" className="max-w-none gap-6" data-slot="history-page">
-        <PageHeader title={t('history.title')} description={t('history.description')} />
+      <ContentCanvas
+        as="main"
+        className="max-w-[1440px] flex-1 gap-0 px-0 py-0"
+        data-slot="history-page"
+      >
+        <h1 className="sr-only">{t('history.title')}</h1>
+        <p className="sr-only">{t('history.description')}</p>
         <HistoryTaskRecordsView
           tasks={historyTasks.tasks}
           query={query}

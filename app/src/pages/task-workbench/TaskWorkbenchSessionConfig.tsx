@@ -371,9 +371,9 @@ export function TaskWorkbenchSessionConfig({
   }
 
   return (
-    <section data-slot="task-workbench-session-config" className="space-y-4">
+    <section data-slot="task-workbench-session-config" className="flex h-full flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h2 className="text-foreground text-lg font-semibold tracking-tight">
+        <h2 className="text-foreground text-base font-semibold tracking-tight">
           {t('tasks.workbench.sections.sessionConfig.title')}
         </h2>
         <p className="text-muted-foreground text-xs">
@@ -381,8 +381,8 @@ export function TaskWorkbenchSessionConfig({
         </p>
       </div>
 
-      <Card className="gap-0 py-0 shadow-sm">
-        <CardContent className="space-y-6 px-5 py-5">
+      <Card className="flex min-h-[28rem] flex-1 flex-col gap-0 py-0 shadow-sm">
+        <CardContent className="flex flex-1 flex-col gap-6 px-5 py-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="task-workbench-language-select">
@@ -433,7 +433,7 @@ export function TaskWorkbenchSessionConfig({
             </div>
           </div>
 
-          <div className="bg-surface-container-low space-y-4 rounded-xl border px-4 py-4">
+          <div className="bg-surface-container-low flex flex-1 flex-col gap-4 rounded-xl border px-4 py-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-[11px] font-semibold tracking-[0.22em] uppercase">
                 {t('tasks.workbench.sessionConfig.executionEngine')}
@@ -485,7 +485,7 @@ export function TaskWorkbenchSessionConfig({
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t pt-4">
+          <div className="mt-auto flex items-center justify-between gap-3 border-t pt-4">
             <Button
               type="button"
               variant="ghost"
@@ -511,7 +511,7 @@ export function TaskWorkbenchSessionConfig({
 
           <Button
             type="button"
-            className="w-full gap-2"
+            className="mt-auto w-full gap-2"
             onClick={() => void handleStart()}
             disabled={startDisabled}
           >

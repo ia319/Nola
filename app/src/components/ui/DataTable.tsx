@@ -28,6 +28,8 @@ export type DataTableProps<T> = Omit<ComponentPropsWithoutRef<'div'>, 'children'
   emptyState?: EmptyStateProps | ReactNode
   onRowClick?: (row: T) => void
   rowClassName?: string | ((row: T) => string | undefined)
+  scrollAreaClassName?: string
+  stickyHeader?: boolean
 }
 
 function isEmptyStateConfig(
@@ -45,6 +47,8 @@ export function DataTable<T>({
   emptyState,
   onRowClick,
   rowClassName,
+  scrollAreaClassName,
+  stickyHeader = false,
   className,
   ...props
 }: DataTableProps<T>) {
@@ -70,11 +74,16 @@ export function DataTable<T>({
       className={cn('bg-card overflow-hidden rounded-xl border shadow-sm', className)}
       {...props}
     >
-      <div className="overflow-x-auto">
+      <div className={cn('overflow-x-auto', scrollAreaClassName)}>
         <table className="w-full min-w-full border-collapse text-sm">
           {caption ? <caption className="sr-only">{caption}</caption> : null}
 
-          <thead className="bg-surface-container-low text-muted-foreground">
+          <thead
+            className={cn(
+              'bg-surface-container-low text-muted-foreground',
+              stickyHeader && 'sticky top-0 z-10',
+            )}
+          >
             <tr>
               {selection ? (
                 <th className="w-12 px-4 py-3 text-left">
