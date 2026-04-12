@@ -625,6 +625,23 @@
       "title": "No transcription records found",
       "description": "Your archive is currently empty. Initialize a new transcription task to begin populating your operational history.",
       "action": "Create transcription task"
+    },
+    "files": {
+      "table": {
+        "caption": "History file records",
+        "typeFallback": "Unknown",
+        "columns": {
+          "file": "File",
+          "size": "Size",
+          "contentType": "Content Type",
+          "uploadedAt": "Uploaded At"
+        }
+      },
+      "empty": {
+        "title": "No uploaded files found",
+        "description": "Your file archive is empty. Return to the task workbench to add source audio and start new runs.",
+        "action": "Go to task workbench"
+      }
     }
   }
 }
