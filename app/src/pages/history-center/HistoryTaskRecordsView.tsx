@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Download, FileText, RotateCcw, SquareSlash, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -7,7 +7,6 @@ import logger from '@/config/logger'
 import { Button } from '@/components/ui/button'
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { ProgressBar } from '@/components/ui/ProgressBar'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import {
   ExportDialog,
@@ -77,11 +76,33 @@ const FALLBACK_EXPORT_OPTIONS: ExportRequestOptions = {
   include_timestamps: true,
 }
 
-function clampProgress(progress: number): number {
-  if (!Number.isFinite(progress)) return 0
-  if (progress <= 0) return 0
-  if (progress >= 100) return 100
-  return progress
+function formatDuration(
+  createdAt: string,
+  completedAt: string | null,
+  fallbackLabel: string,
+): string {
+  if (!completedAt) {
+    return fallbackLabel
+  }
+
+  const createdTimestamp = Date.parse(createdAt)
+  const completedTimestamp = Date.parse(completedAt)
+  if (Number.isNaN(createdTimestamp) || Number.isNaN(completedTimestamp)) {
+    return fallbackLabel
+  }
+
+  const totalSeconds = Math.max(0, (completedTimestamp - createdTimestamp) / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  if (hours > 0) {
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${seconds
+      .toFixed(1)
+      .padStart(4, '0')}`
+  }
+
+  return `${String(minutes).padStart(2, '0')}:${seconds.toFixed(1).padStart(4, '0')}`
 }
 
 function createExportDialogValue(defaults: ExportRequestOptions): ExportDialogValue {
@@ -97,21 +118,6 @@ function createExportDialogValue(defaults: ExportRequestOptions): ExportDialogVa
 
 function buildRowActionKey(taskId: string, action: RowAction): string {
   return `${taskId}:${action}`
-}
-
-function formatTimestamp(value: string | null, fallback: ReactNode): ReactNode {
-  if (!value) return fallback
-  const timestamp = Date.parse(value)
-  if (Number.isNaN(timestamp)) return value
-
-  return new Intl.DateTimeFormat(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(new Date(timestamp))
 }
 
 export function HistoryTaskRecordsView({
@@ -451,34 +457,27 @@ export function HistoryTaskRecordsView({
 
   const columns: readonly DataTableColumn<TaskSummary>[] = [
     {
-      key: 'identity',
-      header: t('history.table.columns.identity'),
-      className: 'min-w-[240px]',
+      key: 'taskId',
+      header: t('history.table.columns.taskId'),
+      className: 'min-w-[220px]',
+      cell: (task) => {
+        return (
+          <span className="font-mono text-sm font-semibold tracking-tight">{task.task_id}</span>
+        )
+      },
+    },
+    {
+      key: 'filename',
+      header: t('history.table.columns.filename'),
+      className: 'min-w-[280px]',
       cell: (task) => {
         const fileLabel =
           task.filename?.trim() ||
           resolveFileName?.(task)?.trim() ||
           t('history.table.filenameFallback')
 
-        return (
-          <div className="min-w-0 space-y-1">
-            <p className="font-mono text-sm font-semibold tracking-tight">{task.task_id}</p>
-            <p className="text-muted-foreground truncate text-[11px] font-medium tracking-[0.14em] uppercase">
-              {fileLabel}
-            </p>
-          </div>
-        )
+        return <span className="block truncate text-sm font-medium">{fileLabel}</span>
       },
-    },
-    {
-      key: 'model',
-      header: t('history.table.columns.model'),
-      className: 'min-w-[160px]',
-      cell: (task) => (
-        <span className="text-sm font-medium">
-          {task.model_id ?? t('history.table.modelFallback')}
-        </span>
-      ),
     },
     {
       key: 'status',
@@ -487,39 +486,13 @@ export function HistoryTaskRecordsView({
       cell: (task) => <StatusBadge status={task.status} />,
     },
     {
-      key: 'progress',
-      header: t('history.table.columns.progress'),
-      className: 'min-w-[220px]',
+      key: 'duration',
+      header: t('history.table.columns.duration'),
+      className: 'min-w-[140px]',
       cell: (task) => (
-        <div className="space-y-2">
-          <ProgressBar percent={clampProgress(task.progress)} showValue={false} />
-          <p className="text-muted-foreground text-xs">
-            {t(`history.table.progressNotes.${task.status}`)}
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: 'executionDate',
-      header: t('history.table.columns.executionDate'),
-      className: 'min-w-[220px]',
-      cell: (task) => (
-        <div className="space-y-1 text-xs">
-          <div className="flex items-start gap-2">
-            <span className="text-muted-foreground w-8 font-semibold tracking-[0.14em] uppercase">
-              {t('history.table.execution.created')}
-            </span>
-            <span>{formatTimestamp(task.created_at, '—')}</span>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-muted-foreground w-8 font-semibold tracking-[0.14em] uppercase">
-              {t('history.table.execution.completed')}
-            </span>
-            <span>
-              {formatTimestamp(task.completed_at, t('history.table.execution.inProgress'))}
-            </span>
-          </div>
-        </div>
+        <span className="text-sm">
+          {formatDuration(task.created_at, task.completed_at, t('history.table.durationFallback'))}
+        </span>
       ),
     },
     {

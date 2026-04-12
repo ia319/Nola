@@ -34,6 +34,7 @@ export function useHistoryFiles({
   query,
   onPageClamp,
 }: UseHistoryFilesOptions): UseHistoryFilesResult {
+  // Keep file-mode fetching in the page layer until file-detail flows settle into a reusable boundary.
   const limit = query.page_size
   const offset = (query.page - 1) * query.page_size
 

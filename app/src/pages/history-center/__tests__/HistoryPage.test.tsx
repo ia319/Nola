@@ -13,6 +13,8 @@ const historyPageMocks = vi.hoisted(() => ({
   search: {} as Record<string, unknown>,
   useHistoryTasks: vi.fn(),
   useHistoryFiles: vi.fn(),
+  useHistoryFileTaskCounts: vi.fn(),
+  useHistoryFileActions: vi.fn(),
   useHistoryTaskActions: vi.fn(),
   useSessionTasksStore: vi.fn(),
   deleteTaskRecordAction: vi.fn(),
@@ -55,31 +57,32 @@ vi.mock('react-i18next', () => ({
         'history.toolbar.order': 'Order',
         'history.files.table.caption': 'History file records',
         'history.files.table.typeFallback': 'Unknown',
+        'history.files.table.tasksUnavailable': '—',
         'history.files.table.columns.file': 'File',
+        'history.files.table.columns.tasks': 'Tasks',
         'history.files.table.columns.size': 'Size',
         'history.files.table.columns.contentType': 'Content Type',
         'history.files.table.columns.uploadedAt': 'Uploaded At',
+        'history.files.table.columns.actions': 'Actions',
+        'history.files.table.actions.delete': 'Delete file',
+        'history.files.table.selectAll': 'Select all history files',
         'history.files.empty.title': 'No uploaded files found',
         'history.files.empty.description':
           'Your file archive is empty. Return to the task workbench to add source audio and start new runs.',
         'history.files.empty.action': 'Go to task workbench',
+        'history.files.batch.deleteComingSoon': 'Delete selected coming soon',
+        'history.files.deleteDialog.title': 'Delete file',
+        'history.files.deleteDialog.cancel': 'Cancel',
+        'history.files.deleteDialog.confirm': 'Delete file',
+        'history.files.deleteDialog.deleting': 'Deleting...',
         'history.table.caption': 'History task records',
-        'history.table.columns.identity': 'Task ID / Filename',
-        'history.table.columns.model': 'Model Engine',
+        'history.table.columns.taskId': 'Task ID',
+        'history.table.columns.filename': 'Filename',
         'history.table.columns.status': 'Status',
-        'history.table.columns.progress': 'Progress / Notes',
-        'history.table.columns.executionDate': 'Execution Date',
+        'history.table.columns.duration': 'Duration',
         'history.table.columns.actions': 'Actions',
-        'history.table.modelFallback': 'System default',
         'history.table.filenameFallback': 'Unnamed file',
-        'history.table.progressNotes.pending': 'Queued for processing',
-        'history.table.progressNotes.processing': 'Task in progress',
-        'history.table.progressNotes.completed': 'Ready to export',
-        'history.table.progressNotes.failed': 'Needs attention',
-        'history.table.progressNotes.cancelled': 'Stopped before completion',
-        'history.table.execution.created': 'CRE',
-        'history.table.execution.completed': 'FIN',
-        'history.table.execution.inProgress': 'In progress',
+        'history.table.durationFallback': 'Not finished',
         'history.table.actions.export': 'Export record',
         'history.table.actions.cancel': 'Cancel task',
         'history.table.actions.retry': 'Retry task',
@@ -121,6 +124,22 @@ vi.mock('react-i18next', () => ({
 
       if (key === 'history.table.selectRow') {
         return `Select task ${String(params?.taskId)}`
+      }
+
+      if (key === 'history.files.selection.selectedCount') {
+        return `${String(params?.count)} selected`
+      }
+
+      if (key === 'history.files.table.selectRow') {
+        return `Select file ${String(params?.fileId)}`
+      }
+
+      if (key === 'history.files.table.tasksCount') {
+        return `${String(params?.count)} tasks`
+      }
+
+      if (key === 'history.files.deleteDialog.description') {
+        return `Delete ${String(params?.filename)} and its associated data?`
       }
 
       if (key === 'history.pagination.summary') {
@@ -189,6 +208,14 @@ vi.mock('../useHistoryFiles', () => ({
   useHistoryFiles: historyPageMocks.useHistoryFiles,
 }))
 
+vi.mock('../useHistoryFileTaskCounts', () => ({
+  useHistoryFileTaskCounts: historyPageMocks.useHistoryFileTaskCounts,
+}))
+
+vi.mock('../useHistoryFileActions', () => ({
+  useHistoryFileActions: historyPageMocks.useHistoryFileActions,
+}))
+
 import { HistoryPage } from '../HistoryPage'
 
 function createTask(overrides: Partial<TaskSummary>): TaskSummary {
@@ -222,6 +249,8 @@ describe('HistoryPage', () => {
     historyPageMocks.search = {}
     historyPageMocks.useHistoryTasks.mockReset()
     historyPageMocks.useHistoryFiles.mockReset()
+    historyPageMocks.useHistoryFileTaskCounts.mockReset()
+    historyPageMocks.useHistoryFileActions.mockReset()
     historyPageMocks.useHistoryTaskActions.mockReset()
     historyPageMocks.useSessionTasksStore.mockReset()
     historyPageMocks.deleteTaskRecordAction.mockReset()
@@ -262,6 +291,11 @@ describe('HistoryPage', () => {
       error: null,
       refresh: vi.fn(),
     })
+    historyPageMocks.useHistoryFileTaskCounts.mockReturnValue(new Map([['file-archive', 3]]))
+    historyPageMocks.useHistoryFileActions.mockReturnValue({
+      deletingFileId: null,
+      deleteHistoryFile: vi.fn(),
+    })
 
     const sessionState = {
       addCreatedTask: vi.fn(),
@@ -285,14 +319,14 @@ describe('HistoryPage', () => {
     expect(screen.getByRole('button', { name: 'Export Selected' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Filename' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Task ID' })).toBeEnabled()
-    expect(screen.getByText('Task ID / Filename')).toBeTruthy()
-    expect(screen.getByText('Model Engine')).toBeTruthy()
-    expect(screen.getByText('Progress / Notes')).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: 'Task ID' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: 'Filename' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: 'Duration' })).toBeTruthy()
     expect(screen.getByText('Showing 1-2 of 2 records')).toBeTruthy()
     expect(screen.getByText('briefing.wav')).toBeTruthy()
     expect(screen.getByText('queue.wav')).toBeTruthy()
-    expect(screen.getByText('Ready to export')).toBeTruthy()
-    expect(screen.getByText('Task in progress')).toBeTruthy()
+    expect(screen.getByText('05:00.0')).toBeTruthy()
+    expect(screen.getByText('Not finished')).toBeTruthy()
   })
 
   it('switches to filename mode through the route search model', () => {
@@ -320,10 +354,6 @@ describe('HistoryPage', () => {
       }),
     ).toEqual({
       mode: 'files',
-      order: 'asc',
-      q: 'alpha',
-      sort_by: 'filename',
-      status: 'processing',
     })
   })
 
@@ -389,7 +419,46 @@ describe('HistoryPage', () => {
     expect(screen.queryByPlaceholderText('Search by task ID or filename')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Export Selected' })).toBeNull()
     expect(screen.getByRole('columnheader', { name: 'File' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: 'Tasks' })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: 'Content Type' })).toBeTruthy()
     expect(screen.getByText('archive.wav')).toBeTruthy()
+    expect(screen.getByText('3 tasks')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Delete file' })).toBeTruthy()
+  })
+
+  it('shows the file selection placeholder and file delete confirmation in filename mode', async () => {
+    const deleteHistoryFile = vi.fn().mockResolvedValue(undefined)
+    historyPageMocks.search = {
+      mode: 'files',
+    }
+    historyPageMocks.useHistoryFiles.mockReturnValue({
+      files: [createFile({ file_id: 'file-archive', filename: 'archive.wav' })],
+      total: 1,
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(),
+    })
+    historyPageMocks.useHistoryFileActions.mockReturnValue({
+      deletingFileId: null,
+      deleteHistoryFile,
+    })
+
+    render(<HistoryPage />)
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select file file-archive' }))
+    expect(screen.getByText('1 selected')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Delete selected coming soon' })).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete file' }))
+    expect(screen.getByText('Delete archive.wav and its associated data?')).toBeTruthy()
+
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete file' }))
+
+    await waitFor(() => {
+      expect(deleteHistoryFile).toHaveBeenCalledWith(
+        expect.objectContaining({ file_id: 'file-archive' }),
+      )
+    })
   })
 })

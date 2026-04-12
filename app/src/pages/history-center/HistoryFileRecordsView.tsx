@@ -1,4 +1,5 @@
-import { AudioLines } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { AudioLines, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -9,17 +10,24 @@ import { HistoryToolbar } from './HistoryToolbar'
 import type { HistoryFileQuery, HistoryPageSize, HistoryRecordsMode } from '@/routes/history-search'
 import type { FileInfo } from '@/shared/types'
 
+export interface HistoryFileRecordRow {
+  file: FileInfo
+  knownTaskCount: number | null
+}
+
 export interface HistoryFileRecordsViewProps {
-  files: FileInfo[]
+  rows: HistoryFileRecordRow[]
   query: HistoryFileQuery
   total: number
   isLoading?: boolean
   errorMessage?: string | null
+  deletingFileId?: string | null
   mode?: HistoryRecordsMode
   onPageChange: (value: number) => void
   onPageSizeChange: (value: HistoryPageSize) => void
   onModeChange?: (mode: HistoryRecordsMode) => void
   onCreateTask?: () => void
+  onRequestDeleteFile?: (file: FileInfo) => void
 }
 
 function formatFileSize(sizeInBytes: number): string {
@@ -56,25 +64,61 @@ function formatTimestamp(value: string): string {
 const NOOP = () => {}
 
 export function HistoryFileRecordsView({
-  files,
+  rows,
   query,
   total,
   isLoading = false,
   errorMessage,
+  deletingFileId = null,
   mode = 'files',
   onPageChange,
   onPageSizeChange,
   onModeChange,
   onCreateTask,
+  onRequestDeleteFile,
 }: HistoryFileRecordsViewProps) {
   const { t } = useTranslation()
+  const selectionResetToken = `${query.page}|${query.page_size}|${rows
+    .map((row) => row.file.file_id)
+    .join('|')}`
+  const currentPageFileIds = useMemo(() => rows.map((row) => row.file.file_id), [rows])
+  const currentPageFileIdSet = useMemo(() => new Set(currentPageFileIds), [currentPageFileIds])
+  const [selectionState, setSelectionState] = useState<{
+    resetToken: string
+    ids: string[]
+  }>(() => ({
+    resetToken: selectionResetToken,
+    ids: [],
+  }))
 
-  const columns: readonly DataTableColumn<FileInfo>[] = [
+  const rawSelectedFileIds = useMemo(() => {
+    return selectionState.resetToken === selectionResetToken ? selectionState.ids : []
+  }, [selectionResetToken, selectionState.ids, selectionState.resetToken])
+  const selectedFileIds = useMemo(() => {
+    return rawSelectedFileIds.filter((fileId) => currentPageFileIdSet.has(fileId))
+  }, [currentPageFileIdSet, rawSelectedFileIds])
+  const selectedFileIdSet = useMemo(() => new Set(selectedFileIds), [selectedFileIds])
+  const allCurrentPageSelected =
+    rows.length > 0 && rows.every((row) => selectedFileIdSet.has(row.file.file_id))
+
+  function getScopedSelectedIds(previous: { resetToken: string; ids: string[] }): string[] {
+    const previousIds = previous.resetToken === selectionResetToken ? previous.ids : []
+    return previousIds.filter((fileId) => currentPageFileIdSet.has(fileId))
+  }
+
+  function clearSelection(): void {
+    setSelectionState({
+      resetToken: selectionResetToken,
+      ids: [],
+    })
+  }
+
+  const columns: readonly DataTableColumn<HistoryFileRecordRow>[] = [
     {
       key: 'file',
       header: t('history.files.table.columns.file'),
       className: 'min-w-[280px]',
-      cell: (file) => (
+      cell: ({ file }) => (
         <div className="min-w-0 space-y-1">
           <p className="truncate text-sm font-semibold">{file.filename}</p>
           <p className="text-muted-foreground font-mono text-[11px] tracking-tight">
@@ -84,16 +128,28 @@ export function HistoryFileRecordsView({
       ),
     },
     {
+      key: 'tasks',
+      header: t('history.files.table.columns.tasks'),
+      className: 'min-w-[140px]',
+      cell: ({ knownTaskCount }) => (
+        <span className="text-sm font-medium">
+          {knownTaskCount === null
+            ? t('history.files.table.tasksUnavailable')
+            : t('history.files.table.tasksCount', { count: knownTaskCount })}
+        </span>
+      ),
+    },
+    {
       key: 'size',
       header: t('history.files.table.columns.size'),
       className: 'min-w-[120px]',
-      cell: (file) => <span className="text-sm">{formatFileSize(file.size)}</span>,
+      cell: ({ file }) => <span className="text-sm">{formatFileSize(file.size)}</span>,
     },
     {
       key: 'contentType',
       header: t('history.files.table.columns.contentType'),
       className: 'min-w-[180px]',
-      cell: (file) => (
+      cell: ({ file }) => (
         <span className="text-sm">
           {file.content_type ?? t('history.files.table.typeFallback')}
         </span>
@@ -103,7 +159,30 @@ export function HistoryFileRecordsView({
       key: 'uploadedAt',
       header: t('history.files.table.columns.uploadedAt'),
       className: 'min-w-[220px]',
-      cell: (file) => <span className="text-sm">{formatTimestamp(file.created_at)}</span>,
+      cell: ({ file }) => <span className="text-sm">{formatTimestamp(file.created_at)}</span>,
+    },
+    {
+      key: 'actions',
+      header: t('history.files.table.columns.actions'),
+      className: 'w-[96px]',
+      headerClassName: 'text-right',
+      cell: ({ file }) => (
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            size="icon-xs"
+            variant="ghost"
+            aria-label={t('history.files.table.actions.delete')}
+            disabled={deletingFileId === file.file_id || !onRequestDeleteFile}
+            onClick={(event) => {
+              event.stopPropagation()
+              onRequestDeleteFile?.(file)
+            }}
+          >
+            <Trash2 />
+          </Button>
+        </div>
+      ),
     },
   ]
 
@@ -135,14 +214,77 @@ export function HistoryFileRecordsView({
         </div>
       ) : null}
 
+      {selectedFileIds.length > 0 ? (
+        <div
+          data-slot="history-file-selection-bar"
+          className="bg-surface-container flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs font-semibold tracking-[0.18em] uppercase">
+              {t('history.files.selection.selectedCount', { count: selectedFileIds.length })}
+            </span>
+            <div className="bg-border hidden h-4 w-px lg:block" />
+            <Button type="button" size="xs" variant="outline" disabled>
+              <Trash2 />
+              {t('history.files.batch.deleteComingSoon')}
+            </Button>
+          </div>
+
+          <Button type="button" size="icon-xs" variant="ghost" onClick={clearSelection}>
+            <X />
+          </Button>
+        </div>
+      ) : null}
+
       <DataTable
         className="rounded-none border-0 shadow-none"
         columns={columns}
-        rows={files}
-        getRowId={(file) => file.file_id}
+        rows={rows}
+        getRowId={(row) => row.file.file_id}
         caption={t('history.files.table.caption')}
         scrollAreaClassName="max-h-[56vh] overflow-auto"
         stickyHeader
+        selection={{
+          selectedRowIds: selectedFileIds,
+          selectAllLabel: t('history.files.table.selectAll'),
+          getRowLabel: (row) => t('history.files.table.selectRow', { fileId: row.file.file_id }),
+          onToggleRow: (rowId, checked) => {
+            setSelectionState((previous) => {
+              const scopedIds = getScopedSelectedIds(previous)
+              if (checked) {
+                return {
+                  resetToken: selectionResetToken,
+                  ids: scopedIds.includes(rowId) ? scopedIds : [...scopedIds, rowId],
+                }
+              }
+
+              return {
+                resetToken: selectionResetToken,
+                ids: scopedIds.filter((value) => value !== rowId),
+              }
+            })
+          },
+          onToggleAllRows: () => {
+            setSelectionState((previous) => {
+              const scopedIds = getScopedSelectedIds(previous)
+              if (allCurrentPageSelected) {
+                return {
+                  resetToken: selectionResetToken,
+                  ids: scopedIds.filter((fileId) => !currentPageFileIdSet.has(fileId)),
+                }
+              }
+
+              const next = new Set(scopedIds)
+              for (const fileId of currentPageFileIds) {
+                next.add(fileId)
+              }
+              return {
+                resetToken: selectionResetToken,
+                ids: Array.from(next),
+              }
+            })
+          },
+        }}
         emptyState={
           <EmptyState
             icon={<AudioLines className="size-6" />}

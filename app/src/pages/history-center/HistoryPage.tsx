@@ -117,6 +117,10 @@ export function HistoryPage() {
       updateSearch(
         {
           mode: nextMode === 'tasks' ? undefined : nextMode,
+          q: undefined,
+          status: undefined,
+          sort_by: undefined,
+          order: undefined,
           page: undefined,
         },
         false,
