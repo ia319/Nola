@@ -74,25 +74,29 @@ export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
   const pageSizeValue = parsePositiveInt(searchRecord.page_size)
 
   const next: HistoryRouteSearch = {}
+  const normalizedMode =
+    MODE_SET.has(modeValue as HistoryRecordsMode) && modeValue === 'files' ? 'files' : 'tasks'
 
-  if (MODE_SET.has(modeValue as HistoryRecordsMode) && modeValue !== 'tasks') {
-    next.mode = modeValue as HistoryRecordsMode
+  if (normalizedMode === 'files') {
+    next.mode = 'files'
   }
 
-  if (qValue !== '') {
-    next.q = qValue
-  }
+  if (normalizedMode === 'tasks') {
+    if (qValue !== '') {
+      next.q = qValue
+    }
 
-  if (STATUS_SET.has(statusValue as TaskFilterStatus) && statusValue !== 'all') {
-    next.status = statusValue as TaskFilterStatus
-  }
+    if (STATUS_SET.has(statusValue as TaskFilterStatus) && statusValue !== 'all') {
+      next.status = statusValue as TaskFilterStatus
+    }
 
-  if (SORT_SET.has(sortByValue as TaskSortBy) && sortByValue !== 'created_at') {
-    next.sort_by = sortByValue as TaskSortBy
-  }
+    if (SORT_SET.has(sortByValue as TaskSortBy) && sortByValue !== 'created_at') {
+      next.sort_by = sortByValue as TaskSortBy
+    }
 
-  if (ORDER_SET.has(orderValue as SortOrder) && orderValue !== 'desc') {
-    next.order = orderValue as SortOrder
+    if (ORDER_SET.has(orderValue as SortOrder) && orderValue !== 'desc') {
+      next.order = orderValue as SortOrder
+    }
   }
 
   if (typeof pageValue !== 'undefined' && pageValue > 1) {

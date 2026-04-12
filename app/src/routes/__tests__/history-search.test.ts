@@ -21,12 +21,8 @@ describe('history-search', () => {
       }),
     ).toEqual({
       mode: 'files',
-      order: 'asc',
       page: 2,
       page_size: 50,
-      q: 'briefing',
-      sort_by: 'filename',
-      status: 'processing',
     })
   })
 
@@ -42,12 +38,12 @@ describe('history-search', () => {
     })
 
     expect(buildHistoryTaskQuery(search)).toEqual({
-      order: 'asc',
+      order: 'desc',
       page: 3,
       page_size: 100,
-      q: 'delta',
-      sort_by: 'filename',
-      status: 'failed',
+      q: '',
+      sort_by: 'created_at',
+      status: 'all',
     })
     expect(buildHistoryFileQuery(search)).toEqual({
       page: 3,
