@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import logger from '@/config/logger'
 import type { SingleExportRequestOptions } from '@/features/export'
 import {
   deleteTaskRecordAction,
@@ -94,7 +95,8 @@ export function HistoryTaskModeView({
       await deleteTaskRecordAction(task.task_id)
       removeSessionTask(task.task_id)
       toast.success(t('tasks.toast.recordDeleted', { taskId: task.task_id }))
-    } catch {
+    } catch (error: unknown) {
+      logger.error('history.deleteTaskRecordFailed', { error, taskId: task.task_id })
       toast.error(t('tasks.toast.actionFailed'))
     } finally {
       await historyTasks.refresh()

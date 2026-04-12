@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import logger from '@/config/logger'
 import { requestTaskRefresh } from '@/features/tasks'
 import { deleteFile } from '@/features/upload/api'
 import { queryKeys } from '@/shared/lib/query-keys'
@@ -32,7 +33,8 @@ export function useHistoryFileActions(): UseHistoryFileActionsResult {
         queryClient.invalidateQueries({ queryKey: queryKeys.tasks.lists() }),
       ])
     },
-    onError: () => {
+    onError: (error, file) => {
+      logger.error('history.deleteFileFailed', { error, fileId: file.file_id })
       toast.error(t('history.files.toast.deleteFailed'))
     },
     onSettled: () => {

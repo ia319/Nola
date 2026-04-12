@@ -9,6 +9,9 @@ import type { ExportDialogValue, ExportRequestOptions } from '@/features/export'
 import type { FileInfo, TaskSummary } from '@/shared/types'
 
 const historyPageMocks = vi.hoisted(() => ({
+  logger: {
+    error: vi.fn(),
+  },
   navigate: vi.fn(),
   search: {} as Record<string, unknown>,
   useHistoryTasks: vi.fn(),
@@ -167,6 +170,10 @@ vi.mock('sonner', () => ({
   },
 }))
 
+vi.mock('@/config/logger', () => ({
+  default: historyPageMocks.logger,
+}))
+
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => historyPageMocks.navigate,
   useSearch: () => historyPageMocks.search,
@@ -245,6 +252,7 @@ function createFile(overrides: Partial<FileInfo>): FileInfo {
 
 describe('HistoryPage', () => {
   beforeEach(() => {
+    historyPageMocks.logger.error.mockReset()
     historyPageMocks.navigate.mockReset()
     historyPageMocks.search = {}
     historyPageMocks.useHistoryTasks.mockReset()
@@ -460,5 +468,25 @@ describe('HistoryPage', () => {
         expect.objectContaining({ file_id: 'file-archive' }),
       )
     })
+  })
+
+  it('logs task record delete failures before showing the generic action toast', async () => {
+    const { toast } = await import('sonner')
+    historyPageMocks.deleteTaskRecordAction.mockRejectedValueOnce(new Error('delete failed'))
+
+    render(<HistoryPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete record' }))
+
+    await waitFor(() => {
+      expect(historyPageMocks.logger.error).toHaveBeenCalledWith(
+        'history.deleteTaskRecordFailed',
+        expect.objectContaining({
+          error: expect.any(Error),
+          taskId: 'task-completed',
+        }),
+      )
+    })
+    expect(toast.error).toHaveBeenCalledWith('Task action failed, please retry')
   })
 })
