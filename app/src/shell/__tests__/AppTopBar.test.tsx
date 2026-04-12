@@ -19,18 +19,23 @@ vi.mock('@/shared/responsive', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) =>
-      (
-        ({
-          'shell.navigation.tasks': 'Tasks',
-          'shell.navigation.history': 'History',
-          'shell.navigation.models': 'Models',
-          'shell.navigation.settings': 'Settings',
-          'shell.topBar.actions.activity': 'Activity',
-          'shell.topBar.actions.toggleTheme': 'Toggle theme',
-          'shell.topBar.actions.help': 'Help',
-        }) as const
-      )[key] ?? key,
+    t: (key: string, params?: Record<string, unknown>) => {
+      const messages: Record<string, string> = {
+        'shell.navigation.tasks': 'Tasks',
+        'shell.navigation.history': 'History',
+        'shell.navigation.models': 'Models',
+        'shell.navigation.settings': 'Settings',
+        'shell.topBar.actions.activity': 'Activity',
+        'shell.topBar.actions.toggleTheme': 'Toggle theme',
+        'shell.topBar.actions.help': 'Help',
+      }
+
+      if (key === 'shell.topBar.actions.activityWithCount') {
+        return `Activity (${String(params?.count)})`
+      }
+
+      return messages[key] ?? key
+    },
   }),
 }))
 
@@ -61,7 +66,7 @@ describe('AppTopBar', () => {
 
     const topBar = screen.getByText('Tasks').closest('[data-slot="app-topbar"]')
     expect(topBar).toHaveAttribute('data-breakpoint', 'lg')
-    expect(screen.getByRole('button', { name: 'Activity' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Activity (2)' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Toggle theme' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Help' })).toBeTruthy()
     expect(screen.getByText('2')).toBeTruthy()

@@ -554,6 +554,7 @@
     "topBar": {
       "actions": {
         "activity": "活动中心",
+        "activityWithCount": "活动中心（{{count}}）",
         "toggleTheme": "切换主题",
         "help": "帮助"
       }

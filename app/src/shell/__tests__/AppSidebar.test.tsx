@@ -73,15 +73,18 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
 
     expect(screen.getByRole('link', { name: 'Models' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('link', { name: 'Models' })).toHaveClass('bg-slate-200')
+    expect(screen.getByRole('link', { name: 'Models' })).toHaveClass('bg-sidebar-accent')
     expect(screen.getByRole('link', { name: 'Models' })).toHaveClass('font-semibold')
   })
 
-  it('does not render the desktop sidebar outside the lg breakpoint', () => {
-    sidebarMocks.breakpoint = 'md'
+  it.each(['sm', 'md'] as const)(
+    'does not render the desktop sidebar at the %s breakpoint',
+    (breakpoint) => {
+      sidebarMocks.breakpoint = breakpoint
 
-    render(<AppSidebar />)
+      render(<AppSidebar />)
 
-    expect(screen.queryByText('Nola')).toBeNull()
-  })
+      expect(screen.queryByText('Nola')).toBeNull()
+    },
+  )
 })

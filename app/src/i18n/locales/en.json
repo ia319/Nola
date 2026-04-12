@@ -555,6 +555,7 @@
     "topBar": {
       "actions": {
         "activity": "Activity",
+        "activityWithCount": "Activity ({{count}})",
         "toggleTheme": "Toggle theme",
         "help": "Help"
       }

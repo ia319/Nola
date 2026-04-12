@@ -88,7 +88,7 @@ export function AppSidebar() {
             const itemClassName = cn(
               'flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition-colors',
               active
-                ? 'bg-slate-200 text-foreground font-semibold shadow-sm'
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-sm'
                 : 'text-muted-foreground hover:bg-surface-container-low hover:text-foreground',
               item.disabled && 'pointer-events-none opacity-60',
             )

@@ -40,6 +40,19 @@ function formatActivityCount(activityCount: number): string {
   return String(normalizedCount)
 }
 
+function formatActivityLabel(
+  activityCount: number,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  const normalizedCount = Math.max(0, activityCount)
+
+  if (normalizedCount === 0) {
+    return t('shell.topBar.actions.activity')
+  }
+
+  return t('shell.topBar.actions.activityWithCount', { count: normalizedCount })
+}
+
 export function AppTopBar({
   activityCount = 0,
   className,
@@ -61,6 +74,7 @@ export function AppTopBar({
   const activeTheme = theme === 'system' ? (resolvedTheme ?? 'light') : theme
   const nextTheme = activeTheme === 'dark' ? 'light' : 'dark'
   const badgeLabel = formatActivityCount(activityCount)
+  const activityLabel = formatActivityLabel(activityCount, t)
   const hasActivity = activityCount > 0
   const showSettingsTabs = Boolean(
     settingsTabs && (pathname === '/settings' || pathname.startsWith('/settings/')),
@@ -93,7 +107,7 @@ export function AppTopBar({
           type="button"
           variant="ghost"
           size="icon-sm"
-          aria-label={t('shell.topBar.actions.activity')}
+          aria-label={activityLabel}
           className="text-muted-foreground hover:bg-surface-container-low hover:text-foreground relative"
           onClick={onActivityClick}
         >
