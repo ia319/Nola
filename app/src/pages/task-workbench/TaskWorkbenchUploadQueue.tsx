@@ -12,6 +12,7 @@ export interface TaskWorkbenchUploadQueueProps {
   uploads: UploadItem[]
   maxFileSize: number
   isUploading: boolean
+  disabled?: boolean
   hasPending: boolean
   onFilesSelected: (files: File[]) => void
   onCancelUpload: (id: string) => void
@@ -25,6 +26,7 @@ export function TaskWorkbenchUploadQueue({
   uploads,
   maxFileSize,
   isUploading,
+  disabled = false,
   hasPending,
   onFilesSelected,
   onCancelUpload,
@@ -35,6 +37,7 @@ export function TaskWorkbenchUploadQueue({
 }: TaskWorkbenchUploadQueueProps) {
   const { t } = useTranslation()
   const hasUploads = uploads.length > 0
+  const controlsDisabled = disabled || isUploading
 
   return (
     <section data-slot="task-workbench-upload-queue" className="flex h-full flex-col gap-4">
@@ -64,7 +67,7 @@ export function TaskWorkbenchUploadQueue({
             <div className="bg-surface-container-lowest flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
               <FileUploader
                 onFilesSelected={onFilesSelected}
-                disabled={isUploading}
+                disabled={controlsDisabled}
                 ariaLabel={t('tasks.uploadQueue.actions.addMoreFiles')}
                 className="text-muted-foreground hover:text-foreground min-h-0 items-start justify-start gap-0 border-0 bg-transparent p-0 shadow-none hover:bg-transparent"
               >
@@ -80,7 +83,7 @@ export function TaskWorkbenchUploadQueue({
                     type="button"
                     size="sm"
                     onClick={() => void onStartUpload()}
-                    disabled={isUploading}
+                    disabled={controlsDisabled}
                   >
                     {isUploading ? t('upload.progress.uploading') : t('upload.startUpload')}
                   </Button>
@@ -90,7 +93,7 @@ export function TaskWorkbenchUploadQueue({
                   size="sm"
                   variant="outline"
                   onClick={() => void onReset()}
-                  disabled={isUploading}
+                  disabled={controlsDisabled}
                 >
                   {t('upload.reset')}
                 </Button>
@@ -101,7 +104,7 @@ export function TaskWorkbenchUploadQueue({
       ) : (
         <FileUploader
           onFilesSelected={onFilesSelected}
-          disabled={isUploading}
+          disabled={controlsDisabled}
           ariaLabel={t('tasks.uploadQueue.empty.action')}
           className="border-outline-variant/70 min-h-[28rem] justify-center rounded-xl border-dashed px-8 py-10"
         >
@@ -110,7 +113,7 @@ export function TaskWorkbenchUploadQueue({
             title={t('tasks.uploadQueue.empty.title')}
             description={t('tasks.uploadQueue.empty.description')}
             action={
-              <Button type="button" variant="outline" size="sm" disabled={isUploading}>
+              <Button type="button" variant="outline" size="sm" disabled={controlsDisabled}>
                 <Plus className="size-4" />
                 {t('tasks.uploadQueue.empty.action')}
               </Button>

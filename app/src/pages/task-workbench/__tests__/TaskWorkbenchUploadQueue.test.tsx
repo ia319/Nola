@@ -75,6 +75,7 @@ describe('TaskWorkbenchUploadQueue', () => {
         uploads={[]}
         maxFileSize={500 * 1024 * 1024}
         isUploading={false}
+        disabled={false}
         hasPending={false}
         onFilesSelected={() => {}}
         onCancelUpload={() => {}}
@@ -117,6 +118,7 @@ describe('TaskWorkbenchUploadQueue', () => {
         ]}
         maxFileSize={500 * 1024 * 1024}
         isUploading={false}
+        disabled={false}
         hasPending
         onFilesSelected={() => {}}
         onCancelUpload={() => {}}
@@ -143,5 +145,31 @@ describe('TaskWorkbenchUploadQueue', () => {
       onRetry: expect.any(Function),
       onRemove: expect.any(Function),
     })
+  })
+
+  it('keeps queue actions disabled while upstream config is still loading', () => {
+    render(
+      <TaskWorkbenchUploadQueue
+        uploads={[
+          createUpload({
+            id: 'upload-pending',
+            status: 'pending',
+          }),
+        ]}
+        maxFileSize={500 * 1024 * 1024}
+        isUploading={false}
+        disabled
+        hasPending
+        onFilesSelected={() => {}}
+        onCancelUpload={() => {}}
+        onRetryUpload={async () => {}}
+        onRemoveUpload={async () => {}}
+        onStartUpload={async () => {}}
+        onReset={async () => {}}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Start Upload' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Reset All' })).toBeDisabled()
   })
 })

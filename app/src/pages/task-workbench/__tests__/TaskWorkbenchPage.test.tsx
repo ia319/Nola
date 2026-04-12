@@ -10,6 +10,9 @@ import type { TaskWorkbenchSessionConfigProps } from '../TaskWorkbenchSessionCon
 import type { TaskWorkbenchUploadQueueProps } from '../TaskWorkbenchUploadQueue'
 
 const taskWorkbenchMocks = vi.hoisted(() => ({
+  logger: {
+    error: vi.fn(),
+  },
   toast: {
     success: vi.fn(),
     error: vi.fn(),
@@ -59,6 +62,7 @@ vi.mock('react-i18next', () => ({
           'Choose language and task settings before starting transcription.',
         'upload.startUpload': 'Start Upload',
         'upload.reset': 'Reset All',
+        'tasks.toast.actionFailed': 'Task action failed, please retry',
       }
 
       if (key === 'tasks.workbench.sections.uploadQueue.maxFileSize') {
@@ -72,6 +76,10 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('sonner', () => ({
   toast: taskWorkbenchMocks.toast,
+}))
+
+vi.mock('@/config/logger', () => ({
+  default: taskWorkbenchMocks.logger,
 }))
 
 vi.mock('@/components/common', () => ({
@@ -109,6 +117,7 @@ import { TaskWorkbenchPage } from '../TaskWorkbenchPage'
 
 describe('TaskWorkbenchPage', () => {
   beforeEach(() => {
+    taskWorkbenchMocks.logger.error.mockReset()
     taskWorkbenchMocks.toast.success.mockClear()
     taskWorkbenchMocks.toast.error.mockClear()
     taskWorkbenchMocks.toast.warning.mockClear()
@@ -166,6 +175,7 @@ describe('TaskWorkbenchPage', () => {
         allowedMimeTypes: ['audio/mpeg', 'audio/wav'],
         maxFileSize: 500 * 1024 * 1024,
       },
+      isLoading: false,
     })
 
     taskWorkbenchMocks.useFileUpload.mockReturnValue({
@@ -256,6 +266,7 @@ describe('TaskWorkbenchPage', () => {
       uploads: expect.any(Array),
       maxFileSize: 500 * 1024 * 1024,
       isUploading: false,
+      disabled: false,
       hasPending: true,
       onFilesSelected: expect.any(Function),
       onCancelUpload: expect.any(Function),
@@ -264,5 +275,54 @@ describe('TaskWorkbenchPage', () => {
       onStartUpload: expect.any(Function),
       onReset: expect.any(Function),
     })
+  })
+
+  it('disables upload and task creation controls while app config is still loading', () => {
+    taskWorkbenchMocks.useAppConfig.mockReturnValue({
+      fileValidationConfig: {
+        allowedExtensions: ['mp3', 'wav'],
+        allowedMimeTypes: ['audio/mpeg', 'audio/wav'],
+        maxFileSize: 500 * 1024 * 1024,
+      },
+      isLoading: true,
+    })
+
+    render(<TaskWorkbenchPage />)
+
+    expect(taskWorkbenchMocks.taskWorkbenchUploadQueue.mock.calls[0]?.[0]).toMatchObject({
+      disabled: true,
+      isUploading: false,
+    })
+    expect(taskWorkbenchMocks.taskWorkbenchSessionConfig.mock.calls[0]?.[0]).toMatchObject({
+      disabled: true,
+    })
+  })
+
+  it('logs cancel failures before showing the generic task action toast', async () => {
+    taskWorkbenchMocks.cancelTaskAndRefresh.mockRejectedValueOnce(new Error('cancel failed'))
+
+    render(<TaskWorkbenchPage />)
+
+    const monitorProps = taskWorkbenchMocks.taskWorkbenchActivityMonitor.mock.calls[0]?.[0]
+    expect(monitorProps).toBeTruthy()
+
+    await monitorProps.onCancelTask({
+      task_id: 'task-processing',
+      file_id: 'file-processing',
+      filename: 'processing.wav',
+      status: 'processing',
+      progress: 42,
+      created_at: '2026-04-10T10:00:00.000Z',
+      completed_at: null,
+    })
+
+    expect(taskWorkbenchMocks.logger.error).toHaveBeenCalledWith(
+      'tasks.workbench.cancelFailed',
+      expect.objectContaining({
+        error: expect.any(Error),
+        taskId: 'task-processing',
+      }),
+    )
+    expect(taskWorkbenchMocks.toast.error).toHaveBeenCalledWith('Task action failed, please retry')
   })
 })

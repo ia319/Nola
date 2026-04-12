@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
 import { MetricCard } from '@/components/ui'
+import logger from '@/config/logger'
 import { useAppConfig } from '@/config/use-app-config'
 import {
   cancelTaskAndRefresh,
@@ -22,7 +23,7 @@ import { TaskWorkbenchUploadQueue } from './TaskWorkbenchUploadQueue'
 
 export function TaskWorkbenchPage() {
   const { t } = useTranslation()
-  const { fileValidationConfig } = useAppConfig()
+  const { fileValidationConfig, isLoading: isConfigLoading } = useAppConfig()
   const addCreatedTask = useSessionTasksStore((state) => state.addCreatedTask)
   const sessionTaskOrder = useSessionTasksStore((state) => state.order)
   const sessionTaskById = useSessionTasksStore((state) => state.byId)
@@ -44,6 +45,9 @@ export function TaskWorkbenchPage() {
   } = useFileUpload(fileValidationConfig)
 
   const hasPending = uploads.some((upload) => upload.status === 'pending')
+  // Keep the workbench visible while config loads, but block uploads and task creation
+  // until the server-backed config is ready.
+  const controlsDisabled = isUploading || isConfigLoading
   const sessionTasks = useMemo(() => {
     return sessionTaskOrder
       .map((taskId) => sessionTaskById[taskId])
@@ -126,7 +130,8 @@ export function TaskWorkbenchPage() {
       const response = await cancelTaskAndRefresh(task.task_id)
       upsertSessionTask(response.task)
       toast.success(t('tasks.toast.cancelled', { taskId: task.task_id }))
-    } catch {
+    } catch (error: unknown) {
+      logger.error('tasks.workbench.cancelFailed', { error, taskId: task.task_id })
       toast.error(t('tasks.toast.actionFailed'))
     }
   }
@@ -168,6 +173,7 @@ export function TaskWorkbenchPage() {
               uploads={uploads}
               maxFileSize={fileValidationConfig.maxFileSize}
               isUploading={isUploading}
+              disabled={isConfigLoading}
               hasPending={hasPending}
               onFilesSelected={handleFilesSelected}
               onCancelUpload={cancelUpload}
@@ -184,7 +190,7 @@ export function TaskWorkbenchPage() {
               fileIds={availableFileIds}
               onCreateTask={createTask}
               onTasksCreated={handleTasksCreated}
-              disabled={isUploading}
+              disabled={controlsDisabled}
             />
           </ErrorBoundary>
         }
