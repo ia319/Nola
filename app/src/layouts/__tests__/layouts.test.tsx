@@ -174,7 +174,7 @@ describe('SectionHeader', () => {
         label="Interface"
         title="Workspace Configuration"
         description="Manage how the Nola interface appears."
-        icon={<BellDot className="size-4" />}
+        icon={<BellDot data-testid="section-header-icon" className="size-4" />}
         action={<button type="button">Edit</button>}
       />,
     )
@@ -182,6 +182,7 @@ describe('SectionHeader', () => {
     expect(screen.getByText('Interface')).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Workspace Configuration' })).toBeTruthy()
     expect(screen.getByText('Manage how the Nola interface appears.')).toBeTruthy()
+    expect(screen.getByTestId('section-header-icon')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
   })
 })
@@ -195,7 +196,7 @@ describe('FormRow', () => {
         htmlFor="language"
         action={<span>Required</span>}
       >
-        <select id="language" aria-label="Language">
+        <select id="language">
           <option>English</option>
         </select>
       </FormRow>,
@@ -206,6 +207,6 @@ describe('FormRow', () => {
       screen.getByText('Select the default language for menus and notifications.'),
     ).toBeTruthy()
     expect(screen.getByText('Required')).toBeTruthy()
-    expect(screen.getByRole('combobox', { name: 'Language' })).toBeTruthy()
+    expect(screen.getByLabelText('Interface Language')).toBeTruthy()
   })
 })
