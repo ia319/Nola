@@ -104,7 +104,8 @@ export function StatusBadge({
         <Icon
           className={cn(
             'size-3.5 shrink-0',
-            (status === 'processing' || status === 'downloading') && 'animate-spin',
+            (status === 'processing' || status === 'downloading') &&
+              'motion-safe:animate-spin motion-reduce:animate-none',
           )}
         />
       ) : null}
