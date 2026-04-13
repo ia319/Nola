@@ -55,7 +55,10 @@ function parsePositiveInt(value: unknown): number | undefined {
 }
 
 function isSearchRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
+  if (typeof value !== 'object' || value === null) return false
+
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
 }
 
 /**

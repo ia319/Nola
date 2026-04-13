@@ -26,6 +26,16 @@ describe('history-search', () => {
     })
   })
 
+  it('ignores non-plain search objects', () => {
+    class SearchLike {
+      mode = 'files'
+      page = '2'
+    }
+
+    expect(normalizeHistorySearch(['files', '2'])).toEqual({})
+    expect(normalizeHistorySearch(new SearchLike())).toEqual({})
+  })
+
   it('builds independent task and file queries from one search model', () => {
     const search = normalizeHistorySearch({
       mode: 'files',
