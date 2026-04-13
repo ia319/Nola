@@ -1,8 +1,15 @@
 import type { TranscriptionDefaults } from '@/shared/types'
 
+type VadParameterOverrides = Partial<NonNullable<TranscriptionDefaults['vad_parameters']>>
+type TranscriptionDefaultsOverrides = Omit<Partial<TranscriptionDefaults>, 'vad_parameters'> & {
+  vad_parameters?: VadParameterOverrides
+}
+
 export function buildTranscriptionDefaults(
-  overrides: Partial<TranscriptionDefaults> = {},
+  overrides: TranscriptionDefaultsOverrides = {},
 ): TranscriptionDefaults {
+  const { vad_parameters: vadParameterOverrides, ...topLevelOverrides } = overrides
+
   return {
     language: null,
     task: 'transcribe',
@@ -27,8 +34,8 @@ export function buildTranscriptionDefaults(
     without_timestamps: false,
     max_initial_timestamp: 1,
     word_timestamps: false,
-    prepend_punctuations: '"\'\\u201c\\u00bf([{-',
-    append_punctuations: '"\'.\\u3002,\\uff0c!\\uff01?\\uff1f:\\uff1a\\u201d)]}\\u3001',
+    prepend_punctuations: `"'“¿([{-`,
+    append_punctuations: `"'.。,，!！?？:：”)]}、`,
     vad_filter: false,
     vad_parameters: {
       threshold: 0.5,
@@ -39,6 +46,7 @@ export function buildTranscriptionDefaults(
       speech_pad_ms: 400,
       min_silence_at_max_speech: 98,
       use_max_poss_sil_at_max_speech: true,
+      ...(vadParameterOverrides ?? {}),
     },
     multilingual: false,
     chunk_length: null,
@@ -46,6 +54,6 @@ export function buildTranscriptionDefaults(
     hallucination_silence_threshold: null,
     language_detection_threshold: 0.5,
     language_detection_segments: 1,
-    ...overrides,
+    ...topLevelOverrides,
   }
 }
