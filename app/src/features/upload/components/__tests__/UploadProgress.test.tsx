@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { UploadProgress } from '../UploadProgress'
 
@@ -35,6 +35,10 @@ vi.mock('react-i18next', () => ({
 }))
 
 describe('UploadProgress', () => {
+  beforeEach(() => {
+    tMock.mockClear()
+  })
+
   it('passes interpolation params to the translated error message', () => {
     render(
       <UploadProgress
@@ -47,8 +51,7 @@ describe('UploadProgress', () => {
       />,
     )
 
-    expect(tMock).toHaveBeenNthCalledWith(
-      3,
+    expect(tMock).toHaveBeenCalledWith(
       'upload.error.fileTooLarge',
       expect.objectContaining({
         maxSize: '100 MB',
