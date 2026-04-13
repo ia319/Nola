@@ -398,6 +398,11 @@ export function HistoryTaskRecordsView({
         return
       }
 
+      setExportDialog((previous) => ({
+        ...previous,
+        open: false,
+      }))
+
       if (exportValue.saveAsDefault) {
         try {
           await exportDefaults.updateDefaults(options)
@@ -406,11 +411,6 @@ export function HistoryTaskRecordsView({
           toast.error(t('tasks.toast.actionFailed'))
         }
       }
-
-      setExportDialog((previous) => ({
-        ...previous,
-        open: false,
-      }))
     } finally {
       setIsSubmittingExport(false)
     }

@@ -64,12 +64,134 @@ describe('history-search', () => {
   it('compares mode as part of the normalized search identity', () => {
     expect(
       isSameHistorySearch(
-        { mode: 'files', page: 2, page_size: 50 },
-        { mode: 'files', page: 2, page_size: 50 },
+        {
+          mode: 'files',
+          q: 'alpha',
+          status: 'processing',
+          sort_by: 'filename',
+          order: 'asc',
+          page: 2,
+          page_size: 50,
+        },
+        {
+          mode: 'files',
+          q: 'alpha',
+          status: 'processing',
+          sort_by: 'filename',
+          order: 'asc',
+          page: 2,
+          page_size: 50,
+        },
       ),
     ).toBe(true)
     expect(
-      isSameHistorySearch({ mode: 'files', page: 2, page_size: 50 }, { page: 2, page_size: 50 }),
+      isSameHistorySearch(
+        {
+          mode: 'files',
+          q: 'alpha',
+          status: 'processing',
+          sort_by: 'filename',
+          order: 'asc',
+          page: 2,
+          page_size: 50,
+        },
+        {
+          q: 'alpha',
+          status: 'processing',
+          sort_by: 'filename',
+          order: 'asc',
+          page: 2,
+          page_size: 50,
+        },
+      ),
+    ).toBe(false)
+    expect(
+      isSameHistorySearch(
+        {
+          mode: 'files',
+          q: 'alpha',
+          status: 'processing',
+          sort_by: 'filename',
+          order: 'asc',
+          page: 2,
+          page_size: 50,
+        },
+        {
+          mode: 'files',
+          q: 'beta',
+          status: 'processing',
+          sort_by: 'filename',
+          order: 'asc',
+          page: 2,
+          page_size: 50,
+        },
+      ),
+    ).toBe(false)
+    expect(
+      isSameHistorySearch(
+        {
+          mode: 'files',
+          q: 'alpha',
+          status: 'processing',
+          sort_by: 'filename',
+          order: 'asc',
+          page: 2,
+          page_size: 50,
+        },
+        {
+          mode: 'files',
+          q: 'alpha',
+          status: 'failed',
+          sort_by: 'filename',
+          order: 'asc',
+          page: 2,
+          page_size: 50,
+        },
+      ),
+    ).toBe(false)
+    expect(
+      isSameHistorySearch(
+        {
+          mode: 'files',
+          q: 'alpha',
+          status: 'processing',
+          sort_by: 'filename',
+          order: 'asc',
+          page: 2,
+          page_size: 50,
+        },
+        {
+          mode: 'files',
+          q: 'alpha',
+          status: 'processing',
+          sort_by: 'created_at',
+          order: 'asc',
+          page: 2,
+          page_size: 50,
+        },
+      ),
+    ).toBe(false)
+    expect(
+      isSameHistorySearch(
+        {
+          mode: 'files',
+          q: 'alpha',
+          status: 'processing',
+          sort_by: 'filename',
+          order: 'asc',
+          page: 2,
+          page_size: 50,
+        },
+        {
+          mode: 'files',
+          q: 'alpha',
+          status: 'processing',
+          sort_by: 'filename',
+          order: 'desc',
+          page: 2,
+          page_size: 50,
+        },
+      ),
     ).toBe(false)
   })
 })

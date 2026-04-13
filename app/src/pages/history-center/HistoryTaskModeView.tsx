@@ -99,7 +99,11 @@ export function HistoryTaskModeView({
       logger.error('history.deleteTaskRecordFailed', { error, taskId: task.task_id })
       toast.error(t('tasks.toast.actionFailed'))
     } finally {
-      await historyTasks.refresh()
+      try {
+        await historyTasks.refresh()
+      } catch (error: unknown) {
+        logger.error('history.refreshAfterDeleteFailed', { error, taskId: task.task_id })
+      }
     }
   }
 

@@ -131,11 +131,7 @@ export function HistoryPage() {
 
   return (
     <ErrorBoundary>
-      <ContentCanvas
-        as="main"
-        className="max-w-[1440px] flex-1 gap-0 px-0 py-0"
-        data-slot="history-page"
-      >
+      <ContentCanvas as="main" className="flex-1 gap-0 px-0 py-0" data-slot="history-page">
         <h1 className="sr-only">{t('history.title')}</h1>
         <p className="sr-only">{t('history.description')}</p>
         {mode === 'tasks' ? (
