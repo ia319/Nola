@@ -230,7 +230,13 @@ export function HistoryFileRecordsView({
             </Button>
           </div>
 
-          <Button type="button" size="icon-xs" variant="ghost" onClick={clearSelection}>
+          <Button
+            type="button"
+            size="icon-xs"
+            variant="ghost"
+            aria-label={t('history.selection.clear')}
+            onClick={clearSelection}
+          >
             <X />
           </Button>
         </div>

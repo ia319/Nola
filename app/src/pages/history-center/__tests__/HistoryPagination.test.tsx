@@ -61,4 +61,18 @@ describe('HistoryPagination', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Page 7' }))
     expect(onPageChange).toHaveBeenCalledWith(7)
   })
+
+  it('labels the page-size control for assistive technologies', () => {
+    render(
+      <HistoryPagination
+        page={1}
+        pageSize={20}
+        total={20}
+        onPageChange={vi.fn()}
+        onPageSizeChange={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByLabelText('Page size')).toBeTruthy()
+  })
 })

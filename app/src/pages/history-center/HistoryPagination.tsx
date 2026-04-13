@@ -101,7 +101,11 @@ export function HistoryPagination({
               }
             }}
           >
-            <SelectTrigger size="sm" className="w-[88px]">
+            <SelectTrigger
+              size="sm"
+              className="w-[88px]"
+              aria-label={t('history.pagination.pageSize')}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

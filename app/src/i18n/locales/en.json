@@ -572,6 +572,7 @@
       "tasks": "Task ID"
     },
     "toolbar": {
+      "searchLabel": "Search history records",
       "searchPlaceholder": "Search by task ID or filename",
       "exportSelected": "Export Selected",
       "status": "Status",
@@ -579,6 +580,7 @@
       "order": "Order"
     },
     "selection": {
+      "clear": "Clear selection",
       "selectedCount_one": "{{count}} selected",
       "selectedCount_other": "{{count}} selected"
     },

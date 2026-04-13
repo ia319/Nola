@@ -90,6 +90,7 @@ export function HistoryToolbar({
               <Input
                 value={searchValue}
                 disabled={isLoading}
+                aria-label={t('history.toolbar.searchLabel')}
                 placeholder={t('history.toolbar.searchPlaceholder')}
                 className="bg-background pl-9"
                 onChange={(event) => {

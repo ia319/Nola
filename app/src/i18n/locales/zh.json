@@ -571,6 +571,7 @@
       "tasks": "任务 ID"
     },
     "toolbar": {
+      "searchLabel": "搜索历史记录",
       "searchPlaceholder": "按任务 ID 或文件名搜索",
       "exportSelected": "导出所选",
       "status": "状态",
@@ -578,6 +579,7 @@
       "order": "排序方向"
     },
     "selection": {
+      "clear": "清除选择",
       "selectedCount_one": "已选择 {{count}} 项",
       "selectedCount_other": "已选择 {{count}} 项"
     },

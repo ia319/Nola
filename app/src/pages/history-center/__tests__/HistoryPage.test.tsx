@@ -53,11 +53,13 @@ vi.mock('react-i18next', () => ({
         'history.description': 'Review archived task records and recent execution output.',
         'history.modes.files': 'Filename',
         'history.modes.tasks': 'Task ID',
+        'history.toolbar.searchLabel': 'Search history records',
         'history.toolbar.searchPlaceholder': 'Search by task ID or filename',
         'history.toolbar.exportSelected': 'Export Selected',
         'history.toolbar.status': 'Status',
         'history.toolbar.sortBy': 'Sort by',
         'history.toolbar.order': 'Order',
+        'history.selection.clear': 'Clear selection',
         'history.files.table.caption': 'History file records',
         'history.files.table.typeFallback': 'Unknown',
         'history.files.table.tasksUnavailable': '—',
@@ -323,6 +325,7 @@ describe('HistoryPage', () => {
     const page = screen.getByRole('main')
     expect(page).toHaveAttribute('data-slot', 'history-page')
     expect(screen.getByRole('heading', { level: 1, name: 'History', hidden: true })).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: 'Search history records' })).toBeTruthy()
     expect(screen.getByPlaceholderText('Search by task ID or filename')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Export Selected' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Filename' })).toBeEnabled()
@@ -377,6 +380,7 @@ describe('HistoryPage', () => {
     expect(screen.getByText('1 selected')).toBeTruthy()
     const exportSelected = screen.getByRole('button', { name: 'Export Selected' })
     expect(exportSelected).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Clear selection' })).toBeTruthy()
 
     fireEvent.click(exportSelected)
 
@@ -456,6 +460,7 @@ describe('HistoryPage', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select file file-archive' }))
     expect(screen.getByText('1 selected')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Delete selected coming soon' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Clear selection' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete file' }))
     expect(screen.getByText('Delete archive.wav and its associated data?')).toBeTruthy()
