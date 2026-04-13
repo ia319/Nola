@@ -393,7 +393,7 @@ export function TaskWorkbenchSessionConfig({
                 onValueChange={(value) => setLanguage(value === '__auto__' ? undefined : value)}
                 disabled={controlsDisabled}
               >
-                <SelectTrigger id="task-workbench-language-select" aria-label="Language">
+                <SelectTrigger id="task-workbench-language-select">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -419,7 +419,7 @@ export function TaskWorkbenchSessionConfig({
                 }}
                 disabled={controlsDisabled}
               >
-                <SelectTrigger id="task-workbench-task-select" aria-label="Task">
+                <SelectTrigger id="task-workbench-task-select">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -453,7 +453,7 @@ export function TaskWorkbenchSessionConfig({
                 </span>
               </div>
               <Select value={selectedModelValue} disabled>
-                <SelectTrigger id="task-workbench-model-select" aria-label="Model">
+                <SelectTrigger id="task-workbench-model-select">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
