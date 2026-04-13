@@ -168,7 +168,7 @@ describe('useHistoryTasks', () => {
     })
 
     await waitFor(() => {
-      expect(listTasksMock).toHaveBeenCalledTimes(2)
+      expect(result.current.tasks.map((task) => task.task_id)).toEqual(['task-2'])
     })
 
     expect(listTasksMock).toHaveBeenNthCalledWith(
@@ -195,7 +195,6 @@ describe('useHistoryTasks', () => {
       },
       expect.any(AbortSignal),
     )
-    expect(result.current.tasks.map((task) => task.task_id)).toEqual(['task-2'])
     expect(result.current.isLoading).toBe(false)
     expect(listTasksMock).toHaveBeenCalledTimes(2)
   })

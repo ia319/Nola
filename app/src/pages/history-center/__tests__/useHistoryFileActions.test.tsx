@@ -49,6 +49,7 @@ vi.mock('@/features/upload/api', () => ({
   deleteFile: historyFileActionMocks.deleteFile,
 }))
 
+import { queryKeys } from '@/shared/lib/query-keys'
 import { useHistoryFileActions } from '../useHistoryFileActions'
 
 function createWrapper(queryClient: QueryClient) {
@@ -64,6 +65,43 @@ describe('useHistoryFileActions', () => {
     historyFileActionMocks.toast.error.mockReset()
     historyFileActionMocks.deleteFile.mockReset()
     historyFileActionMocks.requestTaskRefresh.mockReset()
+  })
+
+  it('refreshes related history queries after a successful delete', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    })
+    const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    historyFileActionMocks.deleteFile.mockResolvedValueOnce(undefined)
+
+    const { result } = renderHook(() => useHistoryFileActions(), {
+      wrapper: createWrapper(queryClient),
+    })
+
+    await act(async () => {
+      await result.current.deleteHistoryFile({
+        file_id: 'file-0',
+        filename: 'meeting.wav',
+        size: 4096,
+        content_type: 'audio/wav',
+        created_at: '2026-04-12T09:00:00.000Z',
+      })
+    })
+
+    expect(historyFileActionMocks.requestTaskRefresh).toHaveBeenCalledTimes(1)
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: queryKeys.files.lists() }),
+    )
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: queryKeys.files.details() }),
+    )
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: queryKeys.tasks.lists() }),
+    )
+    expect(historyFileActionMocks.toast.success).toHaveBeenCalledWith('File deleted: meeting.wav')
   })
 
   it('logs delete failures before showing the generic file delete toast', async () => {
