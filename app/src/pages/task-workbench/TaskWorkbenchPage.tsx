@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -15,7 +15,7 @@ import {
 import type { TaskCreateResult } from '@/features/transcription-options'
 import { useFileUpload } from '@/features/upload'
 import { ContentCanvas, TwoColumnLayout } from '@/layouts'
-import type { TaskSummary } from '@/shared/types'
+import type { AppError, TaskSummary } from '@/shared/types'
 import { TaskWorkbenchActivityMonitor } from './TaskWorkbenchActivityMonitor'
 import { buildTaskWorkbenchSummary } from './task-workbench-summary'
 import { TaskWorkbenchSessionConfig } from './TaskWorkbenchSessionConfig'
@@ -24,6 +24,7 @@ import { TaskWorkbenchUploadQueue } from './TaskWorkbenchUploadQueue'
 export function TaskWorkbenchPage() {
   const { t } = useTranslation()
   const { fileValidationConfig, isLoading: isConfigLoading } = useAppConfig()
+  const displayedBatchErrorRef = useRef<AppError | null>(null)
   const addCreatedTask = useSessionTasksStore((state) => state.addCreatedTask)
   const sessionTaskOrder = useSessionTasksStore((state) => state.order)
   const sessionTaskById = useSessionTasksStore((state) => state.byId)
@@ -41,7 +42,6 @@ export function TaskWorkbenchPage() {
     isUploading,
     availableFileIds,
     batchError,
-    clearBatchError,
   } = useFileUpload(fileValidationConfig)
 
   const hasPending = uploads.some((upload) => upload.status === 'pending')
@@ -138,10 +138,16 @@ export function TaskWorkbenchPage() {
 
   // Surface batch-level errors such as duplicate file skips as toast feedback.
   useEffect(() => {
-    if (!batchError) return
+    if (!batchError) {
+      displayedBatchErrorRef.current = null
+      return
+    }
+
+    if (displayedBatchErrorRef.current === batchError) return
+
+    displayedBatchErrorRef.current = batchError
     toast.warning(t(batchError.i18nKey, batchError.params ?? {}))
-    clearBatchError()
-  }, [batchError, clearBatchError, t])
+  }, [batchError, t])
 
   return (
     <ContentCanvas

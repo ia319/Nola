@@ -330,4 +330,40 @@ describe('TaskWorkbenchPage', () => {
     )
     expect(taskWorkbenchMocks.toast.error).toHaveBeenCalledWith('Task action failed, please retry')
   })
+
+  it('shows each batch warning once without clearing the upload hook state', () => {
+    const clearBatchError = vi.fn()
+    const duplicateBatchError = {
+      code: 'VALIDATION_DUPLICATE',
+      i18nKey: 'upload.error.duplicateFiles',
+      retriable: false,
+      params: { count: 2 },
+    }
+
+    taskWorkbenchMocks.useFileUpload.mockReturnValue({
+      uploads: [],
+      addFiles: vi.fn(),
+      removeFile: vi.fn(),
+      startUpload: vi.fn(),
+      cancelUpload: vi.fn(),
+      retryUpload: vi.fn(),
+      markTaskCreated: vi.fn(),
+      reset: vi.fn(),
+      isUploading: false,
+      availableFileIds: [],
+      batchError: duplicateBatchError,
+      clearBatchError,
+    })
+
+    const { rerender } = render(<TaskWorkbenchPage />)
+
+    expect(taskWorkbenchMocks.toast.warning).toHaveBeenCalledTimes(1)
+    expect(taskWorkbenchMocks.toast.warning).toHaveBeenCalledWith('upload.error.duplicateFiles')
+    expect(clearBatchError).not.toHaveBeenCalled()
+
+    rerender(<TaskWorkbenchPage />)
+
+    expect(taskWorkbenchMocks.toast.warning).toHaveBeenCalledTimes(1)
+    expect(clearBatchError).not.toHaveBeenCalled()
+  })
 })
