@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ListTodo } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -29,24 +29,31 @@ export function TaskWorkbenchActivityMonitor({
 }: TaskWorkbenchActivityMonitorProps) {
   const { t } = useTranslation()
   const [runningTaskIds, setRunningTaskIds] = useState<string[]>([])
+  const runningTaskIdsRef = useRef<Set<string>>(new Set())
   const runningTaskIdSet = useMemo(() => new Set(runningTaskIds), [runningTaskIds])
   const hasActiveTasks = tasks.some((task) => ACTIVE_TASK_STATUSES.has(task.status))
   const canCancelTasks = Boolean(onCancelTask)
+
+  useEffect(() => {
+    runningTaskIdsRef.current = new Set(runningTaskIds)
+  }, [runningTaskIds])
 
   const handleCancel = useCallback(
     async (task: TaskSummary): Promise<void> => {
       if (!onCancelTask) return
       if (!ACTIVE_TASK_STATUSES.has(task.status)) return
-      if (runningTaskIdSet.has(task.task_id)) return
+      if (runningTaskIdsRef.current.has(task.task_id)) return
 
+      runningTaskIdsRef.current.add(task.task_id)
       setRunningTaskIds((previous) => [...previous, task.task_id])
       try {
         await onCancelTask(task)
       } finally {
+        runningTaskIdsRef.current.delete(task.task_id)
         setRunningTaskIds((previous) => previous.filter((taskId) => taskId !== task.task_id))
       }
     },
-    [onCancelTask, runningTaskIdSet],
+    [onCancelTask],
   )
 
   const columns = useMemo<readonly DataTableColumn<TaskSummary>[]>(() => {

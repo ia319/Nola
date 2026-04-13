@@ -122,4 +122,40 @@ describe('TaskWorkbenchActivityMonitor', () => {
       expect(onCancelTask).toHaveBeenCalledWith(task)
     })
   })
+
+  it('deduplicates rapid cancel clicks for the same task', async () => {
+    let resolveCancel: (() => void) | undefined
+    const onCancelTask = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCancel = resolve
+        }),
+    )
+    const task = createTask({
+      task_id: 'task-processing',
+      file_id: 'file-processing',
+      filename: 'processing.wav',
+      status: 'processing',
+      progress: 42,
+    })
+
+    render(<TaskWorkbenchActivityMonitor tasks={[task]} onCancelTask={onCancelTask} />)
+
+    const cancelButton = screen.getByRole('button', { name: 'Cancel' })
+    fireEvent.click(cancelButton)
+    fireEvent.click(cancelButton)
+
+    await waitFor(() => {
+      expect(onCancelTask).toHaveBeenCalledTimes(1)
+    })
+
+    if (!resolveCancel) {
+      throw new Error('Expected cancel promise resolver to be assigned')
+    }
+    resolveCancel()
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy()
+    })
+  })
 })
