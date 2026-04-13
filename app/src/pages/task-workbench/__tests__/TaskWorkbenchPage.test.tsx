@@ -305,8 +305,13 @@ describe('TaskWorkbenchPage', () => {
 
     const monitorProps = taskWorkbenchMocks.taskWorkbenchActivityMonitor.mock.calls[0]?.[0]
     expect(monitorProps).toBeTruthy()
+    const onCancelTask = monitorProps?.onCancelTask
+    expect(onCancelTask).toBeTypeOf('function')
+    if (!onCancelTask) {
+      throw new Error('Expected onCancelTask to be defined')
+    }
 
-    await monitorProps.onCancelTask({
+    await onCancelTask({
       task_id: 'task-processing',
       file_id: 'file-processing',
       filename: 'processing.wav',
