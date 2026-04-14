@@ -7,7 +7,7 @@ export function SettingsPlaceholder({ title, description }: SettingsPlaceholderP
   return (
     <section
       data-slot="settings-placeholder"
-      className="bg-card border-border rounded-xl border p-6 shadow-sm"
+      className="bg-card border-border flex min-h-[320px] flex-1 flex-col rounded-xl border p-6 shadow-sm"
     >
       <div className="space-y-2">
         <h2 className="text-foreground text-lg font-semibold tracking-tight">{title}</h2>

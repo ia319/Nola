@@ -44,6 +44,20 @@ describe('ContentCanvas', () => {
     expect(canvas).toHaveClass('custom-canvas')
     expect(screen.getByText('Canvas body')).toBeTruthy()
   })
+
+  it('supports explicit workspace width and height variants', () => {
+    render(
+      <ContentCanvas as="section" width="full" height="fill">
+        <div>Wide canvas body</div>
+      </ContentCanvas>,
+    )
+
+    const canvas = screen.getByText('Wide canvas body').parentElement
+
+    expect(canvas).toHaveClass('max-w-none')
+    expect(canvas).toHaveClass('flex-1')
+    expect(canvas).toHaveClass('min-h-0')
+  })
 })
 
 describe('PageHeader', () => {

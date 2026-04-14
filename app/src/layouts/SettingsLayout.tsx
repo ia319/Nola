@@ -73,9 +73,13 @@ export function SettingsLayout({
   const content = children ?? <Outlet />
 
   return (
-    <div data-slot="settings-layout" className={cn('min-w-0', className)} {...props}>
+    <div
+      data-slot="settings-layout"
+      className={cn('flex min-h-0 min-w-0 flex-1 flex-col', className)}
+      {...props}
+    >
       <div className="border-outline-variant/70 bg-background/95 border-b">
-        <ContentCanvas className="gap-4 py-5">
+        <ContentCanvas width="full" className="gap-4 py-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="space-y-1">
               <h1 className="text-foreground text-xl font-semibold tracking-tight">Settings</h1>
@@ -145,7 +149,9 @@ export function SettingsLayout({
         </ContentCanvas>
       </div>
 
-      <ContentCanvas className={cn('min-w-0', contentClassName)}>{content}</ContentCanvas>
+      <ContentCanvas width="full" height="fill" className={cn('min-w-0', contentClassName)}>
+        <div className="flex min-h-0 flex-1 flex-col">{content}</div>
+      </ContentCanvas>
     </div>
   )
 }

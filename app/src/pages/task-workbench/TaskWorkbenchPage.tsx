@@ -152,8 +152,9 @@ export function TaskWorkbenchPage() {
   return (
     <ContentCanvas
       as="main"
+      width="full"
       data-slot="task-workbench-page"
-      className="max-w-[1400px] gap-8 px-0 py-0"
+      className="gap-8 px-0 py-0"
     >
       <h1 className="sr-only">{t('shell.navigation.tasks')}</h1>
 
