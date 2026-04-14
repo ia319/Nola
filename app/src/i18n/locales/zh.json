@@ -657,7 +657,33 @@
           "actions": "操作"
         },
         "actions": {
-          "delete": "删除文件"
+          "delete": "删除文件",
+          "openDetail": "打开 {{filename}} 的详情"
+        }
+      },
+      "detail": {
+        "eyebrow": "文件详情",
+        "description": "查看文件元数据和当前已知的关联任务。",
+        "close": "关闭文件详情",
+        "taskCreatedAt": "创建于 {{value}}",
+        "sections": {
+          "metadata": "元数据",
+          "waveform": "波形预览",
+          "associatedTasks": "关联任务"
+        },
+        "waveformDescription": "当前版本中的波形预览仅作装饰展示。",
+        "waveformPlaceholder": "波形预览即将支持",
+        "associatedTasksDescription": "仅展示当前历史上下文中已经掌握的任务。",
+        "associatedTasksUnavailable": {
+          "title": "关联任务暂不可用",
+          "description": "当前文件 API 响应还不提供关联任务信息。"
+        },
+        "associatedTasksEmpty": {
+          "title": "未找到关联任务",
+          "description": "当前历史上下文中还没有该文件的已知任务。"
+        },
+        "actions": {
+          "reprocess": "重新处理"
         }
       },
       "empty": {
@@ -675,6 +701,35 @@
       "toast": {
         "deleted": "文件已删除: {{filename}}",
         "deleteFailed": "文件删除失败，请重试"
+      }
+    },
+    "taskDetail": {
+      "eyebrow": "任务详情",
+      "close": "关闭任务详情",
+      "copyTaskId": "复制任务 ID",
+      "loading": "正在加载任务详情...",
+      "sections": {
+        "transcriptionResult": "转写结果",
+        "taskMetadata": "任务元数据",
+        "technicalProperties": "技术属性"
+      },
+      "fields": {
+        "duration": "时长",
+        "model": "模型",
+        "error": "错误"
+      },
+      "segments": {
+        "empty": {
+          "title": "暂无分段结果",
+          "description": "当前任务还没有可展示的转写分段。"
+        }
+      },
+      "technicalUnavailable": {
+        "title": "技术属性暂不可用",
+        "description": "当前任务详情响应还没有暴露更多媒体技术属性。"
+      },
+      "toast": {
+        "taskIdCopied": "任务 ID 已复制"
       }
     }
   }

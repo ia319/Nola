@@ -658,7 +658,33 @@
           "actions": "Actions"
         },
         "actions": {
-          "delete": "Delete file"
+          "delete": "Delete file",
+          "openDetail": "Open details for {{filename}}"
+        }
+      },
+      "detail": {
+        "eyebrow": "File detail",
+        "description": "Review file metadata and known associated tasks.",
+        "close": "Close file detail",
+        "taskCreatedAt": "Created {{value}}",
+        "sections": {
+          "metadata": "Metadata",
+          "waveform": "Waveform Preview",
+          "associatedTasks": "Associated Tasks"
+        },
+        "waveformDescription": "Waveform preview is decorative in this release.",
+        "waveformPlaceholder": "Waveform preview coming soon",
+        "associatedTasksDescription": "Show tasks already known in the current history context.",
+        "associatedTasksUnavailable": {
+          "title": "Associated tasks unavailable",
+          "description": "Task links are not available from the current file API response."
+        },
+        "associatedTasksEmpty": {
+          "title": "No associated tasks found",
+          "description": "This file has no known tasks in the current history context."
+        },
+        "actions": {
+          "reprocess": "Re-process"
         }
       },
       "empty": {
@@ -676,6 +702,35 @@
       "toast": {
         "deleted": "File deleted: {{filename}}",
         "deleteFailed": "File delete failed, please retry"
+      }
+    },
+    "taskDetail": {
+      "eyebrow": "Task detail",
+      "close": "Close task detail",
+      "copyTaskId": "Copy task ID",
+      "loading": "Loading task detail...",
+      "sections": {
+        "transcriptionResult": "Transcription Result",
+        "taskMetadata": "Task Metadata",
+        "technicalProperties": "Technical Properties"
+      },
+      "fields": {
+        "duration": "Duration",
+        "model": "Model",
+        "error": "Error"
+      },
+      "segments": {
+        "empty": {
+          "title": "No segments available",
+          "description": "This task does not include transcription segments yet."
+        }
+      },
+      "technicalUnavailable": {
+        "title": "Technical properties unavailable",
+        "description": "Additional media properties are not exposed in the current task detail response."
+      },
+      "toast": {
+        "taskIdCopied": "Task ID copied"
       }
     }
   }
