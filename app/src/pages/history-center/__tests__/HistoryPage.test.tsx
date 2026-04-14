@@ -2,11 +2,12 @@
 
 import type { ReactNode } from 'react'
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { ExportDialogValue, ExportRequestOptions } from '@/features/export'
-import type { FileInfo, TaskSummary } from '@/shared/types'
+import type { FileInfo, TaskDetail, TaskSummary } from '@/shared/types'
 
 const historyPageMocks = vi.hoisted(() => ({
   logger: {
@@ -16,6 +17,8 @@ const historyPageMocks = vi.hoisted(() => ({
   search: {} as Record<string, unknown>,
   useHistoryTasks: vi.fn(),
   useHistoryFiles: vi.fn(),
+  useHistoryTaskDetail: vi.fn(),
+  useHistoryFileAssociatedTasks: vi.fn(),
   useHistoryFileTaskCounts: vi.fn(),
   useHistoryFileActions: vi.fn(),
   useHistoryTaskActions: vi.fn(),
@@ -70,12 +73,48 @@ vi.mock('react-i18next', () => ({
         'history.files.table.columns.uploadedAt': 'Uploaded At',
         'history.files.table.columns.actions': 'Actions',
         'history.files.table.actions.delete': 'Delete file',
+        'history.files.table.actions.openDetail': `Open details for ${String(params?.filename)}`,
         'history.files.table.selectAll': 'Select all history files',
         'history.files.empty.title': 'No uploaded files found',
         'history.files.empty.description':
           'Your file archive is empty. Return to the task workbench to add source audio and start new runs.',
         'history.files.empty.action': 'Go to task workbench',
         'history.files.batch.deleteComingSoon': 'Delete selected coming soon',
+        'history.files.detail.eyebrow': 'File detail',
+        'history.files.detail.description': 'Review file metadata and known associated tasks.',
+        'history.files.detail.close': 'Close file detail',
+        'history.files.detail.actions.reprocess': 'Re-process',
+        'history.taskDetail.eyebrow': 'Task detail',
+        'history.taskDetail.close': 'Close task detail',
+        'history.taskDetail.copyTaskId': 'Copy task ID',
+        'history.taskDetail.loading': 'Loading task detail...',
+        'history.taskDetail.sections.transcriptionResult': 'Transcription Result',
+        'history.taskDetail.sections.taskMetadata': 'Task Metadata',
+        'history.taskDetail.sections.technicalProperties': 'Technical Properties',
+        'history.taskDetail.fields.duration': 'Duration',
+        'history.taskDetail.fields.model': 'Model',
+        'history.taskDetail.fields.error': 'Error',
+        'history.taskDetail.segments.empty.title': 'No segments available',
+        'history.taskDetail.segments.empty.description':
+          'This task does not include transcription segments yet.',
+        'history.taskDetail.technicalUnavailable.title': 'Technical properties unavailable',
+        'history.taskDetail.technicalUnavailable.description':
+          'Additional media properties are not exposed in the current task detail response.',
+        'history.taskDetail.toast.taskIdCopied': 'Task ID copied',
+        'history.files.detail.sections.metadata': 'Metadata',
+        'history.files.detail.sections.waveform': 'Waveform Preview',
+        'history.files.detail.sections.associatedTasks': 'Associated Tasks',
+        'history.files.detail.waveformDescription':
+          'Waveform preview is decorative in this release.',
+        'history.files.detail.waveformPlaceholder': 'Waveform preview coming soon',
+        'history.files.detail.associatedTasksDescription':
+          'Show tasks already known in the current history context.',
+        'history.files.detail.associatedTasksUnavailable.title': 'Associated tasks unavailable',
+        'history.files.detail.associatedTasksUnavailable.description':
+          'Task links are not available from the current file API response.',
+        'history.files.detail.associatedTasksEmpty.title': 'No associated tasks found',
+        'history.files.detail.associatedTasksEmpty.description':
+          'This file has no known tasks in the current history context.',
         'history.files.deleteDialog.title': 'Delete file',
         'history.files.deleteDialog.cancel': 'Cancel',
         'history.files.deleteDialog.confirm': 'Delete file',
@@ -141,6 +180,10 @@ vi.mock('react-i18next', () => ({
 
       if (key === 'history.files.table.tasksCount') {
         return `${String(params?.count)} tasks`
+      }
+
+      if (key === 'history.files.detail.taskCreatedAt') {
+        return `Created ${String(params?.value)}`
       }
 
       if (key === 'history.files.deleteDialog.description') {
@@ -217,6 +260,14 @@ vi.mock('../useHistoryFiles', () => ({
   useHistoryFiles: historyPageMocks.useHistoryFiles,
 }))
 
+vi.mock('../useHistoryTaskDetail', () => ({
+  useHistoryTaskDetail: historyPageMocks.useHistoryTaskDetail,
+}))
+
+vi.mock('../useHistoryFileAssociatedTasks', () => ({
+  useHistoryFileAssociatedTasks: historyPageMocks.useHistoryFileAssociatedTasks,
+}))
+
 vi.mock('../useHistoryFileTaskCounts', () => ({
   useHistoryFileTaskCounts: historyPageMocks.useHistoryFileTaskCounts,
 }))
@@ -226,6 +277,25 @@ vi.mock('../useHistoryFileActions', () => ({
 }))
 
 import { HistoryPage } from '../HistoryPage'
+
+function renderHistoryPage() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+      mutations: {
+        retry: false,
+      },
+    },
+  })
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <HistoryPage />
+    </QueryClientProvider>,
+  )
+}
 
 function createTask(overrides: Partial<TaskSummary>): TaskSummary {
   return {
@@ -252,6 +322,29 @@ function createFile(overrides: Partial<FileInfo>): FileInfo {
   }
 }
 
+function createTaskDetail(overrides: Partial<TaskDetail> = {}) {
+  return {
+    task_id: 'task-completed',
+    file_id: 'file-1',
+    filename: 'briefing.wav',
+    model_id: 'large-v3',
+    status: 'completed',
+    progress: 100,
+    created_at: '2026-04-11T10:00:00.000Z',
+    completed_at: '2026-04-11T10:05:00.000Z',
+    duration: 300.5,
+    segments: [
+      {
+        start: 0,
+        end: 12,
+        text: 'Welcome to the archive review.',
+      },
+    ],
+    error: null,
+    ...overrides,
+  }
+}
+
 describe('HistoryPage', () => {
   beforeEach(() => {
     historyPageMocks.logger.error.mockReset()
@@ -259,6 +352,8 @@ describe('HistoryPage', () => {
     historyPageMocks.search = {}
     historyPageMocks.useHistoryTasks.mockReset()
     historyPageMocks.useHistoryFiles.mockReset()
+    historyPageMocks.useHistoryTaskDetail.mockReset()
+    historyPageMocks.useHistoryFileAssociatedTasks.mockReset()
     historyPageMocks.useHistoryFileTaskCounts.mockReset()
     historyPageMocks.useHistoryFileActions.mockReset()
     historyPageMocks.useHistoryTaskActions.mockReset()
@@ -293,6 +388,12 @@ describe('HistoryPage', () => {
       exportTask: vi.fn(),
       exportTasks: vi.fn(),
     })
+    historyPageMocks.useHistoryTaskDetail.mockReturnValue({
+      task: createTaskDetail(),
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(),
+    })
 
     historyPageMocks.useHistoryFiles.mockReturnValue({
       files: [createFile({ file_id: 'file-archive', filename: 'archive.wav' })],
@@ -302,6 +403,14 @@ describe('HistoryPage', () => {
       refresh: vi.fn(),
     })
     historyPageMocks.useHistoryFileTaskCounts.mockReturnValue(new Map([['file-archive', 3]]))
+    historyPageMocks.useHistoryFileAssociatedTasks.mockReturnValue([
+      createTask({
+        task_id: 'task-file-1',
+        file_id: 'file-archive',
+        filename: 'archive.wav',
+        status: 'completed',
+      }),
+    ])
     historyPageMocks.useHistoryFileActions.mockReturnValue({
       deletingFileId: null,
       deleteHistoryFile: vi.fn(),
@@ -320,7 +429,7 @@ describe('HistoryPage', () => {
   })
 
   it('renders the planned history skeleton with toolbar, table, and pagination', () => {
-    render(<HistoryPage />)
+    renderHistoryPage()
 
     const page = screen.getByRole('main')
     expect(page).toHaveAttribute('data-slot', 'history-page')
@@ -349,7 +458,7 @@ describe('HistoryPage', () => {
       status: 'processing',
     }
 
-    render(<HistoryPage />)
+    renderHistoryPage()
 
     fireEvent.click(screen.getByRole('button', { name: 'Filename' }))
 
@@ -369,7 +478,7 @@ describe('HistoryPage', () => {
   })
 
   it('shows batch actions after selecting a row and opens the export dialog', async () => {
-    render(<HistoryPage />)
+    renderHistoryPage()
 
     const table = screen.getByRole('table')
     const selectCompleted = within(table).getByRole('checkbox', {
@@ -404,7 +513,7 @@ describe('HistoryPage', () => {
       refresh: vi.fn(),
     })
 
-    render(<HistoryPage />)
+    renderHistoryPage()
 
     expect(screen.getByText('No transcription records found')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Create transcription task' }))
@@ -418,7 +527,7 @@ describe('HistoryPage', () => {
       page_size: 50,
     }
 
-    render(<HistoryPage />)
+    renderHistoryPage()
 
     expect(historyPageMocks.useHistoryTasks).not.toHaveBeenCalled()
     expect(historyPageMocks.useHistoryFiles).toHaveBeenCalledWith({
@@ -438,6 +547,33 @@ describe('HistoryPage', () => {
     expect(screen.getByRole('button', { name: 'Delete file' })).toBeTruthy()
   })
 
+  it('opens the task detail dialog from a task row', () => {
+    renderHistoryPage()
+
+    fireEvent.click(screen.getByText('task-completed'))
+
+    expect(screen.getByText('Task detail')).toBeTruthy()
+    expect(screen.getByText('Transcription Result')).toBeTruthy()
+    expect(screen.getByText('Task Metadata')).toBeTruthy()
+    expect(screen.getByText('Welcome to the archive review.')).toBeTruthy()
+  })
+
+  it('opens the file detail dialog from a filename row', () => {
+    historyPageMocks.search = {
+      mode: 'files',
+    }
+
+    renderHistoryPage()
+
+    fireEvent.click(screen.getByText('archive.wav'))
+
+    expect(screen.getByText('File detail')).toBeTruthy()
+    expect(screen.getByText('Review file metadata and known associated tasks.')).toBeTruthy()
+    expect(screen.getByText('Associated Tasks')).toBeTruthy()
+    expect(screen.getByText('task-file-1')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Re-process' })).toBeTruthy()
+  })
+
   it('shows the file selection placeholder and file delete confirmation in filename mode', async () => {
     const deleteHistoryFile = vi.fn().mockResolvedValue(undefined)
     historyPageMocks.search = {
@@ -455,7 +591,7 @@ describe('HistoryPage', () => {
       deleteHistoryFile,
     })
 
-    render(<HistoryPage />)
+    renderHistoryPage()
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select file file-archive' }))
     expect(screen.getByText('1 selected')).toBeTruthy()

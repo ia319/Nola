@@ -27,6 +27,7 @@ export interface HistoryFileRecordsViewProps {
   onPageSizeChange: (value: HistoryPageSize) => void
   onModeChange?: (mode: HistoryRecordsMode) => void
   onCreateTask?: () => void
+  onOpenFileDetail?: (file: FileInfo) => void
   onRequestDeleteFile?: (file: FileInfo) => void
 }
 
@@ -75,6 +76,7 @@ export function HistoryFileRecordsView({
   onPageSizeChange,
   onModeChange,
   onCreateTask,
+  onOpenFileDetail,
   onRequestDeleteFile,
 }: HistoryFileRecordsViewProps) {
   const { t } = useTranslation()
@@ -131,13 +133,34 @@ export function HistoryFileRecordsView({
       key: 'tasks',
       header: t('history.files.table.columns.tasks'),
       className: 'min-w-[140px]',
-      cell: ({ knownTaskCount }) => (
-        <span className="text-sm font-medium">
-          {knownTaskCount === null
+      cell: ({ file, knownTaskCount }) => {
+        const label =
+          knownTaskCount === null
             ? t('history.files.table.tasksUnavailable')
-            : t('history.files.table.tasksCount', { count: knownTaskCount })}
-        </span>
-      ),
+            : t('history.files.table.tasksCount', { count: knownTaskCount })
+
+        if (!onOpenFileDetail) {
+          return <span className="text-sm font-medium">{label}</span>
+        }
+
+        return (
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            className="h-auto px-0 py-0 text-sm font-medium"
+            aria-label={t('history.files.table.actions.openDetail', {
+              filename: file.filename,
+            })}
+            onClick={(event) => {
+              event.stopPropagation()
+              onOpenFileDetail(file)
+            }}
+          >
+            {label}
+          </Button>
+        )
+      },
     },
     {
       key: 'size',
@@ -248,6 +271,13 @@ export function HistoryFileRecordsView({
         rows={rows}
         getRowId={(row) => row.file.file_id}
         caption={t('history.files.table.caption')}
+        onRowClick={
+          onOpenFileDetail
+            ? (row) => {
+                onOpenFileDetail(row.file)
+              }
+            : undefined
+        }
         scrollAreaClassName="max-h-[56vh] overflow-auto"
         stickyHeader
         selection={{

@@ -58,6 +58,7 @@ export interface HistoryTaskRecordsViewProps {
   onPageSizeChange: (value: HistoryPageSize) => void
   onModeChange?: (mode: HistoryRecordsMode) => void
   onCreateTask?: () => void
+  onOpenTaskDetail?: (task: TaskSummary) => void
   resolveFileName?: (task: TaskSummary) => string | undefined
   onCancelTask?: (task: TaskSummary) => Promise<void>
   onRetryTask?: (task: TaskSummary) => Promise<void>
@@ -135,6 +136,7 @@ export function HistoryTaskRecordsView({
   onPageSizeChange,
   onModeChange,
   onCreateTask,
+  onOpenTaskDetail,
   resolveFileName,
   onCancelTask,
   onRetryTask,
@@ -519,7 +521,8 @@ export function HistoryTaskRecordsView({
                 size="icon-xs"
                 variant="ghost"
                 aria-label={t('history.table.actions.export')}
-                onClick={() => {
+                onClick={(event) => {
+                  event.stopPropagation()
                   void openSingleExportDialog(task)
                 }}
               >
@@ -534,7 +537,8 @@ export function HistoryTaskRecordsView({
                 variant="ghost"
                 aria-label={t('history.table.actions.cancel')}
                 disabled={cancelBusy}
-                onClick={() => {
+                onClick={(event) => {
+                  event.stopPropagation()
                   void runRowAction(task, 'cancel', onCancelTask)
                 }}
               >
@@ -549,7 +553,8 @@ export function HistoryTaskRecordsView({
                 variant="ghost"
                 aria-label={t('history.table.actions.retry')}
                 disabled={retryBusy}
-                onClick={() => {
+                onClick={(event) => {
+                  event.stopPropagation()
                   void runRowAction(task, 'retry', onRetryTask)
                 }}
               >
@@ -564,7 +569,8 @@ export function HistoryTaskRecordsView({
                 variant="ghost"
                 aria-label={t('history.table.actions.deleteRecord')}
                 disabled={deleteBusy}
-                onClick={() => {
+                onClick={(event) => {
+                  event.stopPropagation()
                   void runRowAction(task, 'delete', onDeleteTaskRecord)
                 }}
               >
@@ -705,6 +711,7 @@ export function HistoryTaskRecordsView({
         rows={tasks}
         getRowId={(task) => task.task_id}
         caption={t('history.table.caption')}
+        onRowClick={onOpenTaskDetail}
         scrollAreaClassName="max-h-[56vh] overflow-auto"
         stickyHeader
         selection={{
