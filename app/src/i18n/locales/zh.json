@@ -495,8 +495,8 @@
     }
   },
   "models": {
-    "title": "模型管理",
-    "description": "管理 Whisper 模型",
+    "title": "模型",
+    "description": "管理本地转录模型、下载状态和默认项。",
     "empty": "暂无可用模型",
     "loading": "加载模型中...",
     "configured": "默认",

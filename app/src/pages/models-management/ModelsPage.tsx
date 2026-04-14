@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
+import { ContentCanvas, PageHeader } from '@/layouts'
 import {
   deleteModel,
   ModelList,
@@ -91,11 +92,8 @@ export function ModelsPage() {
 
   return (
     <ErrorBoundary>
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-lg font-semibold">{t('models.title')}</h1>
-          <p className="text-muted-foreground text-sm">{t('models.description')}</p>
-        </div>
+      <ContentCanvas as="main" width="full" height="fill" className="gap-6" data-slot="models-page">
+        <PageHeader title={t('models.title')} description={t('models.description')} />
 
         <ModelList
           models={models}
@@ -105,7 +103,7 @@ export function ModelsPage() {
           onDelete={handleDelete}
           onSelect={handleSelect}
         />
-      </div>
+      </ContentCanvas>
     </ErrorBoundary>
   )
 }

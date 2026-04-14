@@ -497,7 +497,7 @@
   },
   "models": {
     "title": "Models",
-    "description": "Manage Whisper models",
+    "description": "Manage local transcription models, downloads, and defaults.",
     "empty": "No models available",
     "loading": "Loading models...",
     "configured": "Default",
