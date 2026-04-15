@@ -499,6 +499,27 @@
     "description": "管理本地转录模型、下载状态和默认项。",
     "empty": "暂无可用模型",
     "loading": "加载模型中...",
+    "overview": {
+      "region": "模型概览",
+      "activeEngine": {
+        "title": "当前引擎",
+        "empty": "当前没有活动引擎",
+        "emptyDescription": "当前还没有已加载的模型。",
+        "meta": "当前运行：{{modelId}}"
+      },
+      "defaultModel": {
+        "title": "默认模型",
+        "empty": "当前没有默认模型",
+        "emptyDescription": "将已下载模型设为默认项。",
+        "meta": "当前默认：{{modelId}}"
+      },
+      "storagePath": {
+        "title": "存储路径",
+        "empty": "路径不可用",
+        "placeholder": "暂时隐藏",
+        "meta": "当前暂不显示真实路径。"
+      }
+    },
     "configured": "默认",
     "lastLoaded": "运行中",
     "restartRequired": "需要重启以应用模型更改",

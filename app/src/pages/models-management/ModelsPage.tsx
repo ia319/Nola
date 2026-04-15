@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
+import { MetricCard } from '@/components/ui'
 import { ContentCanvas, PageHeader } from '@/layouts'
 import {
   deleteModel,
@@ -26,7 +27,15 @@ function toastError(t: TFunction, err: unknown) {
 
 export function ModelsPage() {
   const { t } = useTranslation()
-  const { models, isLoading, error, refresh } = useModels()
+  const { models, configuredModelId, lastLoadedModelId, isLoading, error, refresh } = useModels()
+  const activeModel = useMemo(
+    () => models.find((model) => model.model_id === lastLoadedModelId) ?? null,
+    [lastLoadedModelId, models],
+  )
+  const configuredModel = useMemo(
+    () => models.find((model) => model.model_id === configuredModelId) ?? null,
+    [configuredModelId, models],
+  )
 
   // Build a seed map so in-flight downloads survive a page reload.
   const initialDownloads = useMemo(() => {
@@ -94,6 +103,46 @@ export function ModelsPage() {
     <ErrorBoundary>
       <ContentCanvas as="main" width="full" height="fill" className="gap-6" data-slot="models-page">
         <PageHeader title={t('models.title')} description={t('models.description')} />
+
+        <section
+          data-slot="models-overview"
+          aria-label={t('models.overview.region')}
+          className="grid grid-cols-1 gap-4 md:grid-cols-3"
+        >
+          <MetricCard
+            title={t('models.overview.activeEngine.title')}
+            value={activeModel?.name ?? t('models.overview.activeEngine.empty')}
+            description={
+              activeModel
+                ? t('models.overview.activeEngine.meta', { modelId: activeModel.model_id })
+                : t('models.overview.activeEngine.emptyDescription')
+            }
+            className="h-full"
+          />
+
+          <MetricCard
+            title={t('models.overview.defaultModel.title')}
+            value={configuredModel?.name ?? t('models.overview.defaultModel.empty')}
+            description={
+              configuredModel
+                ? t('models.overview.defaultModel.meta', { modelId: configuredModel.model_id })
+                : t('models.overview.defaultModel.emptyDescription')
+            }
+            className="h-full"
+          />
+
+          <MetricCard
+            title={t('models.overview.storagePath.title')}
+            value={
+              <span className="block font-mono text-base leading-6 break-all">
+                {/* TODO(backend): stop exposing absolute model directories in the API, then render a safe display path here [2026-04-15] */}
+                {t('models.overview.storagePath.placeholder')}
+              </span>
+            }
+            description={t('models.overview.storagePath.meta')}
+            className="h-full"
+          />
+        </section>
 
         <ModelList
           models={models}

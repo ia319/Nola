@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { DownloadState } from '@/features/models'
@@ -28,6 +28,18 @@ vi.mock('react-i18next', () => ({
         'models.title': 'Models',
         'models.description': 'Manage local transcription models, downloads, and defaults.',
         'models.loading': 'Loading models...',
+        'models.overview.region': 'Models overview',
+        'models.overview.activeEngine.title': 'Active Engine',
+        'models.overview.activeEngine.empty': 'No active engine',
+        'models.overview.activeEngine.emptyDescription': 'No model has been loaded yet.',
+        'models.overview.defaultModel.title': 'Default Model',
+        'models.overview.defaultModel.empty': 'No default model',
+        'models.overview.defaultModel.emptyDescription':
+          'Select a downloaded model as the default.',
+        'models.overview.storagePath.title': 'Storage Path',
+        'models.overview.storagePath.empty': 'Path unavailable',
+        'models.overview.storagePath.placeholder': 'Hidden for now',
+        'models.overview.storagePath.meta': 'Path display is temporarily hidden.',
         'models.toast.actionFailed': 'Model action failed, please retry',
         'error.api.serverError': 'Server error',
       }
@@ -46,6 +58,14 @@ vi.mock('react-i18next', () => ({
 
       if (key === 'models.toast.selected') {
         return `Default model set to ${String(params?.modelId)}`
+      }
+
+      if (key === 'models.overview.activeEngine.meta') {
+        return `Current runtime: ${String(params?.modelId)}`
+      }
+
+      if (key === 'models.overview.defaultModel.meta') {
+        return `Configured as ${String(params?.modelId)}`
       }
 
       return messages[key] ?? key
@@ -85,6 +105,14 @@ vi.mock('@/features/models', () => ({
 }))
 
 import { ModelsPage } from '../ModelsPage'
+
+function getCardFromHeading(text: string): HTMLElement {
+  const card = screen.getByText(text).closest('[data-slot="card"]')
+  if (!(card instanceof HTMLElement)) {
+    throw new Error(`${text} card not found`)
+  }
+  return card
+}
 
 describe('ModelsPage', () => {
   beforeEach(() => {
@@ -143,6 +171,18 @@ describe('ModelsPage', () => {
     expect(
       screen.getByText('Manage local transcription models, downloads, and defaults.'),
     ).toBeTruthy()
+
+    const activeEngineCard = getCardFromHeading('Active Engine')
+    expect(within(activeEngineCard).getByText('Nola Large V3')).toBeTruthy()
+    expect(within(activeEngineCard).getByText('Current runtime: nola-large-v3')).toBeTruthy()
+
+    const defaultModelCard = getCardFromHeading('Default Model')
+    expect(within(defaultModelCard).getByText('Nola Large V3')).toBeTruthy()
+    expect(within(defaultModelCard).getByText('Configured as nola-large-v3')).toBeTruthy()
+
+    const storagePathCard = getCardFromHeading('Storage Path')
+    expect(within(storagePathCard).getByText('Hidden for now')).toBeTruthy()
+    expect(within(storagePathCard).getByText('Path display is temporarily hidden.')).toBeTruthy()
     expect(screen.getByText('model list')).toBeTruthy()
   })
 

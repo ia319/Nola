@@ -500,6 +500,27 @@
     "description": "Manage local transcription models, downloads, and defaults.",
     "empty": "No models available",
     "loading": "Loading models...",
+    "overview": {
+      "region": "Models overview",
+      "activeEngine": {
+        "title": "Active Engine",
+        "empty": "No active engine",
+        "emptyDescription": "No model has been loaded yet.",
+        "meta": "Current runtime: {{modelId}}"
+      },
+      "defaultModel": {
+        "title": "Default Model",
+        "empty": "No default model",
+        "emptyDescription": "Select a downloaded model as the default.",
+        "meta": "Configured as {{modelId}}"
+      },
+      "storagePath": {
+        "title": "Storage Path",
+        "empty": "Path unavailable",
+        "placeholder": "Hidden for now",
+        "meta": "Path display is temporarily hidden."
+      }
+    },
     "configured": "Default",
     "lastLoaded": "Running",
     "restartRequired": "Restart required to apply model change",
