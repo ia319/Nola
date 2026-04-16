@@ -34,6 +34,7 @@ const TASK_STATUS_STYLES: Record<TaskBadgeStatus, string> = {
 const MODEL_STATUS_STYLES: Record<ModelBadgeStatus, string> = {
   not_downloaded: 'border-outline-variant bg-surface-container text-on-surface-variant',
   downloading: 'border-border bg-secondary text-secondary-foreground',
+  partial_download: 'border-warning/15 bg-warning-container text-on-warning-container',
   downloaded: 'border-success/15 bg-success-container text-on-success-container',
 }
 
@@ -53,6 +54,7 @@ const TASK_STATUS_ICONS: Record<TaskBadgeStatus, typeof Clock3> = {
 const MODEL_STATUS_ICONS: Record<ModelBadgeStatus, typeof Clock3> = {
   not_downloaded: Download,
   downloading: LoaderCircle,
+  partial_download: AlertCircle,
   downloaded: CheckCircle2,
 }
 

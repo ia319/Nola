@@ -520,32 +520,53 @@
         "meta": "当前暂不显示真实路径。"
       }
     },
+    "table": {
+      "caption": "模型列表",
+      "downloadSnapshot": "已有进度：{{progress}}%",
+      "diskUsage": "磁盘占用：{{value}}",
+      "profileValue": "精度 {{accuracy}} · 速度 {{speed}}",
+      "columns": {
+        "name": "名称",
+        "languages": "支持语言",
+        "size": "大小",
+        "status": "状态",
+        "profile": "特征",
+        "actions": "操作"
+      },
+      "empty": {
+        "title": "暂无可用模型",
+        "description": "先下载模型，再开始配置本地转写。"
+      }
+    },
     "configured": "默认",
     "lastLoaded": "运行中",
     "restartRequired": "需要重启以应用模型更改",
-    "status": {
-      "not_downloaded": "未下载",
-      "downloading": "下载中",
-      "downloaded": "已下载"
-    },
+      "status": {
+        "not_downloaded": "未下载",
+        "downloading": "下载中",
+        "partial_download": "部分下载",
+        "downloaded": "已下载"
+      },
     "fields": {
       "size": "大小",
       "diskUsage": "占用空间",
       "languages": "语言",
+      "unavailable": "—",
       "speed": "速度",
       "accuracy": "精度"
     },
-    "actions": {
-      "download": "下载",
-      "cancel": "取消",
-      "delete": "删除",
-      "select": "设为默认",
-      "downloading": "下载中..."
-    },
+      "actions": {
+        "download": "下载",
+        "cancel": "取消",
+        "delete": "删除",
+        "select": "设为默认",
+        "downloading": "下载中..."
+      },
     "toast": {
       "downloadStarted": "开始下载: {{modelId}}",
       "downloadCancelled": "已取消下载: {{modelId}}",
       "downloadCompleted": "下载完成: {{modelId}}",
+      "downloadFailed": "下载失败: {{modelId}}",
       "deleted": "模型已删除: {{modelId}}",
       "selected": "默认模型已设为 {{modelId}}",
       "actionFailed": "模型操作失败，请重试"

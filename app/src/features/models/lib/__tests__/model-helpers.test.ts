@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatBytes, formatPercent, formatSpeed, sortModelsForDisplay } from '../model-helpers'
+import {
+  formatBytes,
+  formatMegabytes,
+  formatMegabytesPerSecond,
+  formatPercent,
+  formatSpeed,
+  sortModelsForDisplay,
+} from '../model-helpers'
 
 describe('model helpers', () => {
   it('formats sizes, speeds, and percentages', () => {
@@ -8,7 +15,10 @@ describe('model helpers', () => {
     expect(formatBytes(-1)).toBe('0 B')
     expect(formatBytes(Number.NaN)).toBe('0 B')
     expect(formatBytes(1_536)).toBe('1.5 KB')
+    expect(formatMegabytes(0)).toBe('0.0 MB')
+    expect(formatMegabytes(1_536)).toBe('0.0 MB')
     expect(formatSpeed(2_048)).toBe('2.0 KB/s')
+    expect(formatMegabytesPerSecond(2_048)).toBe('0.0 MB/s')
     expect(formatPercent(12.34)).toBe('12.3%')
   })
 

@@ -1,7 +1,11 @@
 import { useTranslation } from 'react-i18next'
 
 import { Progress } from '@/components/ui/progress'
-import { formatBytes, formatPercent, formatSpeed } from '@/features/models/lib/model-helpers'
+import {
+  formatMegabytes,
+  formatMegabytesPerSecond,
+  formatPercent,
+} from '@/features/models/lib/model-helpers'
 import type { DownloadState } from '@/features/models/hooks/useModelDownload'
 
 export interface DownloadProgressProps {
@@ -20,12 +24,15 @@ export function DownloadProgress({ state }: DownloadProgressProps) {
           {state.totalBytes > 0 && (
             <>
               {' '}
-              &middot; {formatBytes(state.downloadedBytes)} / {formatBytes(state.totalBytes)}
+              &middot; {formatMegabytes(state.downloadedBytes)} /{' '}
+              {formatMegabytes(state.totalBytes)}
             </>
           )}
         </span>
         <span>
-          {state.speedBps > 0 ? formatSpeed(state.speedBps) : t('models.actions.downloading')}
+          {state.speedBps > 0
+            ? formatMegabytesPerSecond(state.speedBps)
+            : t('models.actions.downloading')}
         </span>
       </div>
     </div>

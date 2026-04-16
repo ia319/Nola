@@ -521,32 +521,53 @@
         "meta": "Path display is temporarily hidden."
       }
     },
+    "table": {
+      "caption": "Models table",
+      "downloadSnapshot": "Existing progress: {{progress}}%",
+      "diskUsage": "Disk usage: {{value}}",
+      "profileValue": "Accuracy {{accuracy}} · Speed {{speed}}",
+      "columns": {
+        "name": "Name",
+        "languages": "Supported Languages",
+        "size": "Size",
+        "status": "Status",
+        "profile": "Profile",
+        "actions": "Actions"
+      },
+      "empty": {
+        "title": "No models available",
+        "description": "Download a model to start configuring local runs."
+      }
+    },
     "configured": "Default",
     "lastLoaded": "Running",
     "restartRequired": "Restart required to apply model change",
-    "status": {
-      "not_downloaded": "Not Downloaded",
-      "downloading": "Downloading",
-      "downloaded": "Downloaded"
-    },
+      "status": {
+        "not_downloaded": "Not Downloaded",
+        "downloading": "Downloading",
+        "partial_download": "Partial Download",
+        "downloaded": "Downloaded"
+      },
     "fields": {
       "size": "Size",
       "diskUsage": "Disk Usage",
       "languages": "Languages",
+      "unavailable": "—",
       "speed": "Speed",
       "accuracy": "Accuracy"
     },
-    "actions": {
-      "download": "Download",
-      "cancel": "Cancel",
-      "delete": "Delete",
-      "select": "Set as Default",
-      "downloading": "Downloading..."
-    },
+      "actions": {
+        "download": "Download",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "select": "Set as Default",
+        "downloading": "Downloading..."
+      },
     "toast": {
       "downloadStarted": "Download started: {{modelId}}",
       "downloadCancelled": "Download cancelled: {{modelId}}",
       "downloadCompleted": "Download completed: {{modelId}}",
+      "downloadFailed": "Download failed: {{modelId}}",
       "deleted": "Model deleted: {{modelId}}",
       "selected": "Default model set to {{modelId}}",
       "actionFailed": "Model action failed, please retry"

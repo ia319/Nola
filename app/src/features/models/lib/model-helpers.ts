@@ -10,9 +10,20 @@ export function formatBytes(bytes: number, decimals = 1): string {
   return `${value.toFixed(precision)} ${units[unitIndex]}`
 }
 
+export function formatMegabytes(bytes: number, decimals = 1): string {
+  const precision = Number.isFinite(decimals) ? Math.max(0, Math.trunc(decimals)) : 1
+  if (!Number.isFinite(bytes) || bytes <= 0) return `0.${'0'.repeat(precision)} MB`
+
+  return `${(bytes / 1024 ** 2).toFixed(precision)} MB`
+}
+
 export function formatSpeed(bps: number): string {
   if (bps <= 0) return '0 B/s'
   return `${formatBytes(bps)}/s`
+}
+
+export function formatMegabytesPerSecond(bps: number, decimals = 1): string {
+  return `${formatMegabytes(bps, decimals)}/s`
 }
 
 export function formatPercent(percent: number): string {
