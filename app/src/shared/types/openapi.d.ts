@@ -565,7 +565,7 @@ export interface paths {
     post?: never
     /**
      * Delete a file
-     * @description Delete file and associated data.
+     * @description Delete file metadata when no task records still reference it.
      *
      *     Args:
      *         file_id: File identifier
@@ -1078,7 +1078,7 @@ export interface components {
        * Status
        * @enum {string}
        */
-      status: 'not_downloaded' | 'downloading' | 'downloaded'
+      status: 'not_downloaded' | 'downloading' | 'partial_download' | 'downloaded'
       /** Disk Usage */
       disk_usage?: number | null
       /**
@@ -1105,7 +1105,7 @@ export interface components {
        * @default downloading
        * @enum {string}
        */
-      status: 'not_downloaded' | 'downloading' | 'downloaded'
+      status: 'not_downloaded' | 'downloading' | 'partial_download' | 'downloaded'
       /** Message */
       message: string
     }
@@ -1148,7 +1148,7 @@ export interface components {
        * Status
        * @enum {string}
        */
-      status: 'not_downloaded' | 'downloading' | 'downloaded'
+      status: 'not_downloaded' | 'downloading' | 'partial_download' | 'downloaded'
       /** Disk Usage */
       disk_usage?: number | null
       /**

@@ -102,6 +102,15 @@ class FileDatabase:
         file = self.get_file(file_id)
         return file["path"] if file else None
 
+    def count_linked_tasks(self, file_id: str) -> int:
+        """Return how many transcription tasks still reference one file."""
+        with closing(self._connect()) as conn:
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM transcription_tasks WHERE file_id = ?",
+                (file_id,),
+            )
+            return int(cursor.fetchone()[0])
+
     def delete_file(self, file_id: str) -> bool:
         """Delete file metadata (not the actual file).
 

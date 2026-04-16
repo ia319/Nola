@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import logger from '@/config/logger'
 import { requestTaskRefresh } from '@/features/tasks'
 import { deleteFile } from '@/features/upload/api'
+import { isAppError } from '@/shared/lib/error-factory'
 import { queryKeys } from '@/shared/lib/query-keys'
 import type { FileInfo } from '@/shared/types'
 
@@ -35,6 +36,12 @@ export function useHistoryFileActions(): UseHistoryFileActionsResult {
     },
     onError: (error, file) => {
       logger.error('history.deleteFileFailed', { error, fileId: file.file_id })
+      const detail = isAppError(error) ? error.params?.detail : null
+      if (typeof detail === 'string' && detail.trim()) {
+        toast.error(detail)
+        return
+      }
+
       toast.error(t('history.files.toast.deleteFailed'))
     },
     onSettled: () => {
