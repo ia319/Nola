@@ -6,7 +6,12 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-ModelStatusLiteral = Literal["not_downloaded", "downloading", "downloaded"]
+ModelStatusLiteral = Literal[
+    "not_downloaded",
+    "downloading",
+    "partial_download",
+    "downloaded",
+]
 ModelDirSourceLiteral = Literal["environment", "database", "default"]
 DownloadStatusLiteral = Literal["downloading", "completed", "failed", "cancelled"]
 

@@ -10,6 +10,7 @@ from typing import Literal, Protocol
 ModelLanguageCategory = Literal["english-only", "multilingual"]
 ModelRuntime = Literal["faster-whisper"]
 ModelDirSource = Literal["environment", "database", "default"]
+ModelCacheState = Literal["not_downloaded", "partial_download", "downloaded"]
 DownloadStatus = Literal["downloading", "completed", "failed", "cancelled"]
 
 
@@ -69,8 +70,11 @@ class ModelStoragePort(Protocol):
 
     cache_dir: Path
 
+    def get_cache_state(self, repo_id: str) -> ModelCacheState:
+        """Return one repository cache state for model-management flows."""
+
     def is_downloaded(self, repo_id: str) -> bool:
-        """Return whether one repository is cached locally."""
+        """Return whether one repository is fully cached locally."""
 
     def get_downloaded_models(self) -> list[str]:
         """Return cached repository ids."""

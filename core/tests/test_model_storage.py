@@ -110,6 +110,33 @@ def test_model_storage_reads_download_status_and_disk_usage(
     assert storage.get_disk_usage("repo/missing") is None
 
 
+def test_model_storage_prefers_downloaded_when_revisions_and_stale_artifacts_coexist(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Treat one repo with tracked revisions as downloaded despite stale leftovers."""
+    cache_info = _FakeCacheInfo(
+        repos=(
+            _FakeRepo(
+                repo_id="org/repo-a",
+                size_on_disk=10,
+                revisions=(_FakeRevision("rev-a"),),
+            ),
+        )
+    )
+    storage = ModelStorage(tmp_path / "model-cache")
+    monkeypatch.setattr(storage, "_scan_cache_info", lambda: cache_info)
+
+    repo_dir = storage.cache_dir / "models--org--repo-a"
+    lock_dir = storage.cache_dir / ".locks" / "models--org--repo-a"
+    (repo_dir / "blobs").mkdir(parents=True)
+    (repo_dir / "blobs" / "etag.incomplete").write_text("partial", encoding="utf-8")
+    lock_dir.mkdir(parents=True)
+    (lock_dir / "etag.lock").write_text("", encoding="utf-8")
+
+    assert storage.get_cache_state("org/repo-a") == "downloaded"
+
+
 def test_model_storage_deletes_revisions_via_cache_metadata(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -165,6 +192,26 @@ def test_model_storage_deletes_partial_cache_and_lock_dirs(
     assert not lock_dir.exists()
     assert cache_info.deleted_revisions == ()
     assert cache_info.delete_strategy.executed is False
+
+
+def test_model_storage_cleanup_stale_artifacts_keeps_completed_repo(
+    tmp_path: Path,
+) -> None:
+    """Remove stale leftovers without deleting one repo that still has revisions."""
+    storage = ModelStorage(tmp_path / "model-cache")
+    repo_dir = storage.cache_dir / "models--org--repo-a"
+    lock_dir = storage.cache_dir / ".locks" / "models--org--repo-a"
+    (repo_dir / "snapshots" / "rev-a").mkdir(parents=True)
+    incomplete_file = repo_dir / "blobs" / "etag.incomplete"
+    incomplete_file.parent.mkdir(parents=True)
+    incomplete_file.write_text("partial", encoding="utf-8")
+    lock_dir.mkdir(parents=True)
+    (lock_dir / "etag.lock").write_text("", encoding="utf-8")
+
+    assert storage.cleanup_stale_artifacts("org/repo-a") is True
+    assert repo_dir.exists()
+    assert not incomplete_file.exists()
+    assert not lock_dir.exists()
 
 
 def test_model_storage_rejects_deletion_when_repo_is_missing(

@@ -11,7 +11,7 @@ from nola.model_hub._hf_api import (
     scan_cache_dir,
     serialize_repo_folder_name,
 )
-from nola.model_hub.contracts import ModelDirSource
+from nola.model_hub.contracts import ModelCacheState, ModelDirSource
 from nola.model_hub.errors import InvalidModelDirectoryError, ModelNotDownloadedError
 
 
@@ -45,10 +45,25 @@ class ModelStorage:
         """Resolve and store one cache root path."""
         self.cache_dir = Path(cache_dir).expanduser().resolve(strict=False)
 
-    def is_downloaded(self, repo_id: str) -> bool:
-        """Return whether one repository has at least one cached revision."""
+    def get_cache_state(self, repo_id: str) -> ModelCacheState:
+        """Return one repository cache state for model-management decisions."""
         repo = self._get_repo(repo_id)
-        return repo is not None and bool(repo.revisions)
+        has_revisions = repo is not None and bool(repo.revisions)
+        has_partial_artifacts = self._has_partial_artifacts(repo_id, repo)
+
+        # Treat one repo with tracked revisions as downloaded even when stale
+        # lock or incomplete artifacts remain from an older interrupted run.
+        if has_revisions:
+            return "downloaded"
+
+        if has_partial_artifacts:
+            return "partial_download"
+
+        return "not_downloaded"
+
+    def is_downloaded(self, repo_id: str) -> bool:
+        """Return whether one repository is fully cached locally."""
+        return self.get_cache_state(repo_id) == "downloaded"
 
     def get_downloaded_models(self) -> list[str]:
         """Return cached repository ids in stable order."""
@@ -92,6 +107,18 @@ class ModelStorage:
 
         raise ModelNotDownloadedError(repo_id)
 
+    def cleanup_stale_artifacts(self, repo_id: str) -> bool:
+        """Delete stale lock and incomplete files without touching cached revisions."""
+        removed_locks = self._delete_tree_if_present(self._repo_lock_dir(repo_id))
+        removed_incomplete = False
+
+        for incomplete_file in self._iter_incomplete_files(repo_id):
+            self._assert_within_cache_dir(incomplete_file)
+            incomplete_file.unlink(missing_ok=True)
+            removed_incomplete = True
+
+        return removed_locks or removed_incomplete
+
     def _get_repo(self, repo_id: str) -> CacheRepoInfo | None:
         """Return one cached repo entry when present."""
         cache_info = self._scan_cache_info()
@@ -110,6 +137,33 @@ class ModelStorage:
         removed_cache = self._delete_tree_if_present(self._repo_cache_dir(repo_id))
         removed_locks = self._delete_tree_if_present(self._repo_lock_dir(repo_id))
         return removed_cache or removed_locks
+
+    def _iter_incomplete_files(self, repo_id: str) -> list[Path]:
+        """Return repo-scoped incomplete files left by interrupted downloads."""
+        repo_cache_dir = self._repo_cache_dir(repo_id)
+        if not repo_cache_dir.exists():
+            return []
+        return list(repo_cache_dir.rglob("*.incomplete"))
+
+    def _has_partial_artifacts(
+        self,
+        repo_id: str,
+        repo: CacheRepoInfo | None,
+    ) -> bool:
+        """Return whether one repo still has incomplete or lock artifacts."""
+        repo_cache_dir = self._repo_cache_dir(repo_id)
+        if self._repo_lock_dir(repo_id).exists():
+            return True
+
+        if not repo_cache_dir.exists():
+            return False
+
+        # Treat unfinished files or metadata-only repo directories as partial
+        # cache states until the downloader finishes or cleanup runs.
+        if next(iter(self._iter_incomplete_files(repo_id)), None) is not None:
+            return True
+
+        return repo is None or not bool(repo.revisions)
 
     def _repo_cache_dir(self, repo_id: str) -> Path:
         """Return the on-disk cache directory for one model repo."""

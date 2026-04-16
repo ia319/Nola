@@ -144,13 +144,12 @@ def _build_model_response(
 
     for info in list_models():
         download = downloader.get_download(info.model_id)
+        cache_state = storage.get_cache_state(info.repo_id)
         model_status: ModelStatusLiteral
         if download is not None:
             model_status = "downloading"
-        elif storage.is_downloaded(info.repo_id):
-            model_status = "downloaded"
         else:
-            model_status = "not_downloaded"
+            model_status = cache_state
 
         progress_resp = None
         if download is not None:
@@ -338,14 +337,13 @@ def get_model_detail(model_id: str) -> ModelDetailResponse:
     storage = get_model_storage()
     downloader = get_model_downloader()
     download = downloader.get_download(info.model_id)
+    cache_state = storage.get_cache_state(info.repo_id)
 
     model_status: ModelStatusLiteral
     if download is not None:
         model_status = "downloading"
-    elif storage.is_downloaded(info.repo_id):
-        model_status = "downloaded"
     else:
-        model_status = "not_downloaded"
+        model_status = cache_state
 
     progress_resp = None
     if download is not None:
@@ -386,6 +384,14 @@ def start_download(model_id: str) -> ModelDownloadStartedResponse | Response:
         return Response(
             content=json.dumps({"detail": f"Unknown model id: {model_id}"}),
             status_code=status.HTTP_404_NOT_FOUND,
+            media_type="application/json",
+        )
+
+    storage = get_model_storage()
+    if storage.get_cache_state(info.repo_id) == "downloaded":
+        return Response(
+            content=json.dumps({"detail": f"Model already downloaded: {model_id}"}),
+            status_code=status.HTTP_409_CONFLICT,
             media_type="application/json",
         )
 
@@ -522,7 +528,7 @@ def select_model(model_id: str) -> ModelSelectResponse | Response:
         )
 
     storage = get_model_storage()
-    if not storage.is_downloaded(info.repo_id):
+    if storage.get_cache_state(info.repo_id) != "downloaded":
         return Response(
             content=json.dumps({"detail": f"Model not downloaded: {model_id}"}),
             status_code=status.HTTP_409_CONFLICT,

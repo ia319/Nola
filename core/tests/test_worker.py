@@ -243,7 +243,7 @@ class TestWorkerStartup:
         task_db = Mock()
         task_db.dequeue.side_effect = KeyboardInterrupt
         storage = Mock()
-        storage.is_downloaded.return_value = True
+        storage.get_cache_state.return_value = "downloaded"
         model_info = ModelInfo(
             model_id="large-v3",
             name="Large V3",
@@ -310,7 +310,7 @@ class TestWorkerStartup:
         task_db = Mock()
         task_db.dequeue.side_effect = KeyboardInterrupt
         storage = Mock()
-        storage.is_downloaded.return_value = True
+        storage.get_cache_state.return_value = "downloaded"
         model_info = ModelInfo(
             model_id="large-v3",
             name="Large V3",
