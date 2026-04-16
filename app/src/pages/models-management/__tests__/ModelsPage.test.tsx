@@ -148,8 +148,11 @@ describe('ModelsPage', () => {
       lastLoadedModelId: 'nola-large-v3',
       effectiveModelDir: '/models',
       isLoading: false,
+      isRefreshing: false,
+      hasLoaded: true,
       error: null,
       refresh: vi.fn(),
+      updateSnapshot: vi.fn(),
     })
 
     modelsPageMocks.useModelDownload.mockReturnValue({
@@ -193,8 +196,11 @@ describe('ModelsPage', () => {
       lastLoadedModelId: null,
       effectiveModelDir: '',
       isLoading: true,
+      isRefreshing: false,
+      hasLoaded: false,
       error: null,
       refresh: vi.fn(),
+      updateSnapshot: vi.fn(),
     })
 
     render(<ModelsPage />)
@@ -209,12 +215,15 @@ describe('ModelsPage', () => {
       lastLoadedModelId: null,
       effectiveModelDir: '',
       isLoading: false,
+      isRefreshing: false,
+      hasLoaded: false,
       error: {
         code: 'API_SERVER_UNKNOWN',
         i18nKey: 'error.api.serverError',
         retriable: true,
       },
       refresh: vi.fn(),
+      updateSnapshot: vi.fn(),
     })
 
     render(<ModelsPage />)

@@ -15,7 +15,11 @@ export type { ModelCardProps } from './components/ModelCard'
 export { ModelList } from './components/ModelList'
 export type { ModelListProps } from './components/ModelList'
 export { useModelDownload, toDownloadState } from './hooks/useModelDownload'
-export type { DownloadState, UseModelDownloadResult } from './hooks/useModelDownload'
+export type {
+  DownloadState,
+  DownloadTerminalEvent,
+  UseModelDownloadResult,
+} from './hooks/useModelDownload'
 export { useModels } from './hooks/useModels'
 export type { UseModelsResult } from './hooks/useModels'
 export { formatBytes, formatPercent, formatSpeed, sortModelsForDisplay } from './lib/model-helpers'

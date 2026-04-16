@@ -121,7 +121,11 @@ describe('useModelDownload', () => {
     })
 
     await waitFor(() => {
-      expect(onTerminal).toHaveBeenCalledTimes(1)
+      expect(onTerminal).toHaveBeenCalledWith({
+        modelId: 'small',
+        status: 'completed',
+        error: null,
+      })
     })
     expect(result.current.downloads.has('small')).toBe(false)
     expect(result.current.downloads.get('large-v3')?.percent).toBe(10)

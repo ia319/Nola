@@ -52,6 +52,8 @@ describe('useModels', () => {
     expect(result.current.lastLoadedModelId).toBe('small')
     expect(result.current.effectiveModelDir).toBe('D:/models')
     expect(result.current.error).toBeNull()
+    expect(result.current.hasLoaded).toBe(true)
+    expect(result.current.isRefreshing).toBe(false)
   })
 
   it('preserves AppError semantics when requests fail', async () => {
@@ -71,9 +73,19 @@ describe('useModels', () => {
 
     expect(result.current.models).toEqual([])
     expect(result.current.isLoading).toBe(false)
+    expect(result.current.hasLoaded).toBe(false)
   })
 
-  it('refreshes the list on demand', async () => {
+  it('refreshes the list in the background when data already exists', async () => {
+    let resolveRefresh:
+      | ((value: {
+          models: []
+          configured_model_id: 'large-v3'
+          last_loaded_model_id: 'large-v3'
+          effective_model_dir: 'D:/models-b'
+        }) => void)
+      | null = null
+
     listModelsMock
       .mockResolvedValueOnce({
         models: [],
@@ -81,12 +93,12 @@ describe('useModels', () => {
         last_loaded_model_id: null,
         effective_model_dir: 'D:/models-a',
       })
-      .mockResolvedValueOnce({
-        models: [],
-        configured_model_id: 'large-v3',
-        last_loaded_model_id: 'large-v3',
-        effective_model_dir: 'D:/models-b',
-      })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveRefresh = resolve
+          }),
+      )
 
     const { result } = renderHook(() => useModels())
 
@@ -94,12 +106,27 @@ describe('useModels', () => {
       expect(result.current.isLoading).toBe(false)
     })
 
+    let refreshPromise: Promise<void> | null = null
+    act(() => {
+      refreshPromise = result.current.refresh()
+    })
+
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.isRefreshing).toBe(true)
+
     await act(async () => {
-      await result.current.refresh()
+      resolveRefresh?.({
+        models: [],
+        configured_model_id: 'large-v3',
+        last_loaded_model_id: 'large-v3',
+        effective_model_dir: 'D:/models-b',
+      })
+      await refreshPromise
     })
 
     expect(listModelsMock).toHaveBeenCalledTimes(2)
     expect(result.current.configuredModelId).toBe('large-v3')
     expect(result.current.effectiveModelDir).toBe('D:/models-b')
+    expect(result.current.isRefreshing).toBe(false)
   })
 })

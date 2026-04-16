@@ -8,6 +8,7 @@ import { MetricCard } from '@/components/ui'
 import { ContentCanvas, PageHeader } from '@/layouts'
 import {
   deleteModel,
+  type DownloadTerminalEvent,
   ModelList,
   selectModel,
   toDownloadState,
@@ -19,6 +20,12 @@ import { isAppError } from '@/shared/lib/error-factory'
 
 function toastError(t: TFunction, err: unknown) {
   if (isAppError(err)) {
+    const detail = err.params?.detail
+    if (typeof detail === 'string' && detail.trim()) {
+      toast.error(detail)
+      return
+    }
+
     toast.error(t(err.i18nKey, err.params ?? {}))
   } else {
     toast.error(t('models.toast.actionFailed'))
@@ -27,7 +34,16 @@ function toastError(t: TFunction, err: unknown) {
 
 export function ModelsPage() {
   const { t } = useTranslation()
-  const { models, configuredModelId, lastLoadedModelId, isLoading, error, refresh } = useModels()
+  const {
+    models,
+    configuredModelId,
+    lastLoadedModelId,
+    isLoading,
+    hasLoaded,
+    error,
+    refresh,
+    updateSnapshot,
+  } = useModels()
   const activeModel = useMemo(
     () => models.find((model) => model.model_id === lastLoadedModelId) ?? null,
     [lastLoadedModelId, models],
@@ -48,7 +64,23 @@ export function ModelsPage() {
     return map
   }, [models])
 
-  const { downloads, download, cancel } = useModelDownload(initialDownloads, refresh)
+  function handleTerminalDownload(event: DownloadTerminalEvent) {
+    if (event.status === 'completed') {
+      toast.success(t('models.toast.downloadCompleted', { modelId: event.modelId }))
+    } else if (event.status === 'failed') {
+      if (event.error) {
+        toast.error(event.error)
+      } else {
+        toast.error(t('models.toast.downloadFailed', { modelId: event.modelId }))
+      }
+    } else {
+      toast.success(t('models.toast.downloadCancelled', { modelId: event.modelId }))
+    }
+
+    void refresh()
+  }
+
+  const { downloads, download, cancel } = useModelDownload(initialDownloads, handleTerminalDownload)
 
   async function handleDownload(modelId: string) {
     try {
@@ -62,7 +94,6 @@ export function ModelsPage() {
   async function handleCancel(modelId: string) {
     try {
       await cancel(modelId)
-      toast.success(t('models.toast.downloadCancelled', { modelId }))
     } catch (err) {
       toastError(t, err)
     }
@@ -71,6 +102,10 @@ export function ModelsPage() {
   async function handleDelete(modelId: string) {
     try {
       await deleteModel(modelId)
+      updateSnapshot((current) => ({
+        ...current,
+        models: current.models.filter((model) => model.model_id !== modelId),
+      }))
       toast.success(t('models.toast.deleted', { modelId }))
       await refresh()
     } catch (err) {
@@ -81,6 +116,14 @@ export function ModelsPage() {
   async function handleSelect(modelId: string) {
     try {
       const result = await selectModel(modelId)
+      updateSnapshot((current) => ({
+        ...current,
+        configured_model_id: modelId,
+        models: current.models.map((model) => ({
+          ...model,
+          is_configured: model.model_id === modelId,
+        })),
+      }))
       toast.success(t('models.toast.selected', { modelId }))
       if (result.restart_required) {
         toast.warning(t('models.restartRequired'))
@@ -91,11 +134,11 @@ export function ModelsPage() {
     }
   }
 
-  if (isLoading) {
+  if (!hasLoaded && isLoading) {
     return <p className="text-muted-foreground text-center">{t('models.loading')}</p>
   }
 
-  if (error) {
+  if (!hasLoaded && error) {
     return <p className="text-destructive text-center">{t(error.i18nKey, error.params ?? {})}</p>
   }
 
