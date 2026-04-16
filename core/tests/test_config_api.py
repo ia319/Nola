@@ -69,7 +69,7 @@ class TestConfigAPI:
         data = response.json()
 
         assert data["engine"]["model_size"] == "small"
-        assert data["engine"]["device"] == "cpu"
+        assert data["engine"]["device"] == settings.device
         assert data["engine"]["compute_type"] == "default"
         assert data["engine"]["is_multilingual"] is True
         assert data["transcription"]["defaults"]["beam_size"] == 5
