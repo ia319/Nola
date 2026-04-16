@@ -233,12 +233,14 @@ export function TaskWorkbenchSessionConfig({
   }, [config?.engine.model_size, isModelsLoading, models, t])
 
   const selectedModelValue = useMemo(() => {
-    if (modelOptions.some((option) => option.value === configuredModelId)) {
-      return configuredModelId as string
-    }
-
     if (modelOptions.some((option) => option.value === lastLoadedModelId)) {
       return lastLoadedModelId as string
+    }
+
+    // Prefer the currently loaded runtime model. A newly configured default
+    // can differ until the backend applies it and clears restart_required.
+    if (modelOptions.some((option) => option.value === configuredModelId)) {
+      return configuredModelId as string
     }
 
     return modelOptions[0]?.value ?? MODEL_EMPTY_VALUE

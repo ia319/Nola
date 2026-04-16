@@ -179,8 +179,11 @@ function buildModelsReturn(): UseModelsResult {
     lastLoadedModelId: 'large-v3',
     effectiveModelDir: 'D:/models',
     isLoading: false,
+    isRefreshing: false,
+    hasLoaded: true,
     error: null,
     refresh: vi.fn(),
+    updateSnapshot: vi.fn(),
   }
 }
 
