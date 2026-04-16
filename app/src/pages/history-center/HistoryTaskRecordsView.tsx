@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Download, FileText, RotateCcw, SquareSlash, Trash2, X } from 'lucide-react'
+import { Download, FileText, RotateCcw, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -542,7 +542,7 @@ export function HistoryTaskRecordsView({
                   void runRowAction(task, 'cancel', onCancelTask)
                 }}
               >
-                <SquareSlash />
+                <X />
               </Button>
             ) : null}
 
@@ -631,7 +631,7 @@ export function HistoryTaskRecordsView({
                   void runBatchAction('cancel', cancellableTaskIds, onBatchCancelTasks)
                 }}
               >
-                <SquareSlash />
+                <X />
                 {t('tasks.history.batchActions.cancel', { count: cancellableTaskIds.length })}
               </Button>
               <Button
