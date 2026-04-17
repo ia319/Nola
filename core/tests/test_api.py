@@ -302,6 +302,25 @@ class TestTranscriptionsAPI:
 class TestModelsAPI:
     """Test model-management endpoints."""
 
+    def test_model_responses_expose_description_keys(self, client: TestClient) -> None:
+        """Expose stable i18n keys for list and detail model descriptions."""
+        list_response = client.get("/api/models")
+        assert list_response.status_code == 200
+
+        list_item = next(
+            item
+            for item in list_response.json()["models"]
+            if item["model_id"] == "large-v3"
+        )
+        assert list_item["description_key"] == "models.catalog.largeV3.description"
+
+        detail_response = client.get("/api/models/large-v3")
+        assert detail_response.status_code == 200
+        assert (
+            detail_response.json()["description_key"]
+            == "models.catalog.largeV3.description"
+        )
+
     def test_start_download_rejects_models_already_cached(
         self, client: TestClient
     ) -> None:

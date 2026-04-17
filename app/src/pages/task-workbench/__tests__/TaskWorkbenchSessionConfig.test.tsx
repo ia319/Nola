@@ -168,6 +168,7 @@ function buildModelsReturn(): UseModelsResult {
         speed_rank: 5,
         accuracy_rank: 9,
         description: 'desc',
+        description_key: 'models.catalog.largeV3.description',
         status: 'downloaded',
         disk_usage: 1,
         is_configured: true,

@@ -34,6 +34,7 @@ def _make_model(
         speed_rank=1,
         accuracy_rank=1,
         description="test entry",
+        description_key=f"tests.models.{model_id}.description",
         aliases=aliases,
     )
 

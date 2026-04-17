@@ -254,6 +254,7 @@ class TestWorkerStartup:
             speed_rank=1,
             accuracy_rank=1,
             description="test model",
+            description_key="tests.models.large-v3.description",
         )
 
         with (
@@ -321,6 +322,7 @@ class TestWorkerStartup:
             speed_rank=1,
             accuracy_rank=1,
             description="test model",
+            description_key="tests.models.large-v3.description",
         )
         config_store.set_many = Mock(side_effect=RuntimeError("db busy"))
 

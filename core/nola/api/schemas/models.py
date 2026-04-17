@@ -58,6 +58,7 @@ class ModelResponse(BaseModel):
     speed_rank: int
     accuracy_rank: int
     description: str
+    description_key: str
     status: ModelStatusLiteral
     disk_usage: int | None = None
     is_configured: bool = False

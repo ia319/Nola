@@ -46,6 +46,7 @@ class ModelInfo:
     speed_rank: int
     accuracy_rank: int
     description: str
+    description_key: str
     aliases: tuple[str, ...] = field(default_factory=tuple)
 
 

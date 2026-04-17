@@ -1074,6 +1074,8 @@ export interface components {
       accuracy_rank: number
       /** Description */
       description: string
+      /** Description Key */
+      description_key: string
       /**
        * Status
        * @enum {string}
@@ -1144,6 +1146,8 @@ export interface components {
       accuracy_rank: number
       /** Description */
       description: string
+      /** Description Key */
+      description_key: string
       /**
        * Status
        * @enum {string}

@@ -77,6 +77,7 @@ function createModel(overrides: Partial<ModelResponse> = {}): ModelResponse {
     speed_rank: 2,
     accuracy_rank: 5,
     description: 'Large multilingual engine',
+    description_key: 'models.catalog.largeV3.description',
     status: 'downloaded',
     disk_usage: 3_100_000_000,
     is_configured: false,

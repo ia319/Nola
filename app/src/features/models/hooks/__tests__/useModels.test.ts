@@ -28,6 +28,7 @@ describe('useModels', () => {
           speed_rank: 2,
           accuracy_rank: 2,
           description: 'Small model',
+          description_key: 'models.catalog.small.description',
           status: 'downloaded',
           disk_usage: 1_000,
           is_configured: true,

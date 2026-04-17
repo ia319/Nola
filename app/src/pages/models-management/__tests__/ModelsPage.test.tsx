@@ -132,6 +132,7 @@ describe('ModelsPage', () => {
           model_id: 'nola-large-v3',
           name: 'Nola Large V3',
           description: 'Large multilingual engine',
+          description_key: 'models.catalog.largeV3.description',
           repo_id: 'nola/large-v3',
           size_bytes: 3_100_000_000,
           disk_usage: 3_100_000_000,
