@@ -3,6 +3,7 @@ import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/
 import { HistoryPage } from '@/pages/history-center/HistoryPage'
 import { ModelsPage } from '@/pages/models-management/ModelsPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
+import { SettingsTabPage } from '@/pages/settings/SettingsTabPage'
 import { DEFAULT_SETTINGS_TAB, isSettingsTabKey } from '@/pages/settings/settings-tabs'
 import { TaskWorkbenchPage } from '@/pages/task-workbench/TaskWorkbenchPage'
 import { normalizeHistorySearch } from '@/routes/history-search'
@@ -34,20 +35,8 @@ const modelsRoute = createRoute({
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings',
-  beforeLoad: () => {
-    throw redirect({
-      to: '/settings/$tab',
-      params: { tab: DEFAULT_SETTINGS_TAB },
-      replace: true,
-    })
-  },
-})
-
-const settingsTabRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/settings/$tab',
-  beforeLoad: ({ params }) => {
-    if (!isSettingsTabKey(params.tab)) {
+  beforeLoad: ({ location }) => {
+    if (location.pathname === '/settings') {
       throw redirect({
         to: '/settings/$tab',
         params: { tab: DEFAULT_SETTINGS_TAB },
@@ -58,12 +47,26 @@ const settingsTabRoute = createRoute({
   component: SettingsPage,
 })
 
+const settingsTabRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '$tab',
+  beforeLoad: ({ params }) => {
+    if (!isSettingsTabKey(params.tab)) {
+      throw redirect({
+        to: '/settings/$tab',
+        params: { tab: DEFAULT_SETTINGS_TAB },
+        replace: true,
+      })
+    }
+  },
+  component: SettingsTabPage,
+})
+
 const routeTree = rootRoute.addChildren([
   homeRoute,
   historyRoute,
   modelsRoute,
-  settingsRoute,
-  settingsTabRoute,
+  settingsRoute.addChildren([settingsTabRoute]),
 ])
 
 export const router = createRouter({

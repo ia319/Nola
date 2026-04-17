@@ -694,7 +694,16 @@
     }
   },
   "settings": {
-    "title": "Settings"
+    "title": "Settings",
+    "description": "Review and adjust product-level configuration.",
+    "navigationLabel": "Settings sections",
+    "tabs": {
+      "general": "General",
+      "transcription": "Transcription",
+      "export": "Export",
+      "modelStorage": "Model Storage",
+      "systemInfo": "System Info"
+    }
   },
   "history": {
     "title": "History",

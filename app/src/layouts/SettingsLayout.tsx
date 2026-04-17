@@ -1,75 +1,30 @@
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
-import { Link, Outlet } from '@tanstack/react-router'
+import { Link, Outlet, useLocation } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils'
+import { SETTINGS_TABS } from '@/pages/settings/settings-tabs'
 import { ContentCanvas } from './ContentCanvas'
 
-export const SETTINGS_TABS = [
-  {
-    key: 'general',
-    label: 'General',
-    href: '/settings/general',
-  },
-  {
-    key: 'transcription',
-    label: 'Transcription',
-    href: '/settings/transcription',
-  },
-  {
-    key: 'export',
-    label: 'Export',
-    href: '/settings/export',
-  },
-  {
-    key: 'model-storage',
-    label: 'Model Storage',
-    href: '/settings/model-storage',
-  },
-  {
-    key: 'system-info',
-    label: 'System Info',
-    href: '/settings/system-info',
-  },
-] as const
-
-export type SettingsTabKey = (typeof SETTINGS_TABS)[number]['key']
-
-export type SettingsTabItem = {
-  key: string
-  label: string
-  href?: string
-  disabled?: boolean
-}
-
-function isSettingsTabKey(value: string): value is SettingsTabKey {
-  return SETTINGS_TABS.some((tab) => tab.key === value)
-}
-
 export type SettingsLayoutProps = ComponentPropsWithoutRef<'div'> & {
-  activeTab?: string
-  currentPath?: string
-  tabs?: readonly SettingsTabItem[]
   children?: ReactNode
-  navClassName?: string
   contentClassName?: string
 }
 
-function isTabActive(tab: SettingsTabItem, activeTab?: string, currentPath?: string) {
-  if (activeTab) return tab.key === activeTab
-  if (!currentPath || !tab.href) return false
-  return currentPath === tab.href || currentPath.startsWith(`${tab.href}/`)
+function isTabActive(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`)
 }
 
 export function SettingsLayout({
-  activeTab,
-  currentPath,
-  tabs = SETTINGS_TABS,
   className,
   children,
-  navClassName,
   contentClassName,
   ...props
 }: SettingsLayoutProps) {
+  const { t } = useTranslation()
+  const pathname = useLocation({
+    select: (location) => location.pathname,
+  })
   const content = children ?? <Outlet />
 
   return (
@@ -82,66 +37,34 @@ export function SettingsLayout({
         <ContentCanvas width="full" className="gap-4 py-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="space-y-1">
-              <h1 className="text-foreground text-xl font-semibold tracking-tight">Settings</h1>
-              <p className="text-muted-foreground text-sm">
-                Review and adjust product-level configuration.
-              </p>
+              <h1 className="text-foreground text-xl font-semibold tracking-tight">
+                {t('settings.title')}
+              </h1>
+              <p className="text-muted-foreground text-sm">{t('settings.description')}</p>
             </div>
 
             <nav
-              aria-label="Settings sections"
-              className={cn('-mx-1 flex items-center gap-1 overflow-x-auto px-1', navClassName)}
+              aria-label={t('settings.navigationLabel')}
+              className="-mx-1 flex items-center gap-1 overflow-x-auto px-1"
             >
-              {tabs.map((tab) => {
-                const active = isTabActive(tab, activeTab, currentPath)
-
-                const tabClassName = cn(
-                  'inline-flex h-10 items-center border-b-2 px-3 text-sm font-medium whitespace-nowrap transition-colors',
-                  active
-                    ? 'border-foreground text-foreground'
-                    : 'border-transparent text-muted-foreground hover:text-foreground',
-                  tab.disabled && 'pointer-events-none opacity-50',
-                )
-
-                if (tab.href && !tab.disabled) {
-                  const canUseClientLink = isSettingsTabKey(tab.key)
-
-                  if (canUseClientLink) {
-                    return (
-                      <Link
-                        key={tab.key}
-                        to="/settings/$tab"
-                        params={{ tab: tab.key }}
-                        aria-current={active ? 'page' : undefined}
-                        className={tabClassName}
-                      >
-                        {tab.label}
-                      </Link>
-                    )
-                  }
-
-                  return (
-                    <a
-                      key={tab.key}
-                      href={tab.href}
-                      aria-current={active ? 'page' : undefined}
-                      className={tabClassName}
-                    >
-                      {tab.label}
-                    </a>
-                  )
-                }
+              {SETTINGS_TABS.map((tab) => {
+                const active = isTabActive(pathname, tab.href)
 
                 return (
-                  <button
+                  <Link
                     key={tab.key}
-                    type="button"
-                    disabled={tab.disabled}
+                    to="/settings/$tab"
+                    params={{ tab: tab.key }}
                     aria-current={active ? 'page' : undefined}
-                    className={tabClassName}
+                    className={cn(
+                      'inline-flex h-10 items-center border-b-2 px-3 text-sm font-medium whitespace-nowrap transition-colors',
+                      active
+                        ? 'border-foreground text-foreground'
+                        : 'text-muted-foreground hover:text-foreground border-transparent',
+                    )}
                   >
-                    {tab.label}
-                  </button>
+                    {t(tab.labelKey)}
+                  </Link>
                 )
               })}
             </nav>

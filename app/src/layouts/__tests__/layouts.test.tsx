@@ -1,27 +1,53 @@
 // @vitest-environment jsdom
 
-import type { ReactNode } from 'react'
-
 import { render, screen } from '@testing-library/react'
 import { BellDot } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+
+const layoutMocks = vi.hoisted(() => ({
+  pathname: '/settings/export',
+}))
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({
     to,
+    params,
     className,
     children,
     ...props
   }: {
     to: string
+    params?: { tab?: string }
     className?: string
     children: ReactNode
   }) => (
-    <a href={to} className={className} {...props}>
+    <a href={params?.tab ? to.replace('$tab', params.tab) : to} className={className} {...props}>
       {children}
     </a>
   ),
-  Outlet: () => <div data-slot="mock-outlet" />,
+  Outlet: () => <div data-testid="mock-outlet" data-slot="mock-outlet" />,
+  useLocation: ({ select }: { select?: (location: { pathname: string }) => string } = {}) =>
+    select ? select({ pathname: layoutMocks.pathname }) : { pathname: layoutMocks.pathname },
+}))
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const messages: Record<string, string> = {
+        'settings.title': 'Settings',
+        'settings.description': 'Review and adjust product-level configuration.',
+        'settings.navigationLabel': 'Settings sections',
+        'settings.tabs.general': 'General',
+        'settings.tabs.transcription': 'Transcription',
+        'settings.tabs.export': 'Export',
+        'settings.tabs.modelStorage': 'Model Storage',
+        'settings.tabs.systemInfo': 'System Info',
+      }
+
+      return messages[key] ?? key
+    },
+  }),
 }))
 
 import { ContentCanvas } from '../ContentCanvas'
@@ -121,63 +147,33 @@ describe('TwoColumnLayout', () => {
 })
 
 describe('SettingsLayout', () => {
-  it('renders the default settings tab navigation and highlights the active section', () => {
+  it('renders the settings page header copy and custom child content', () => {
+    layoutMocks.pathname = '/settings/export'
+
     render(
-      <SettingsLayout activeTab="export">
+      <SettingsLayout>
         <div>Export body</div>
       </SettingsLayout>,
     )
 
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy()
+    expect(screen.getByText('Review and adjust product-level configuration.')).toBeTruthy()
     expect(screen.getByRole('navigation', { name: 'Settings sections' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Export' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByText('Export body')).toBeTruthy()
   })
 
-  it('can resolve the active tab from the current path when no explicit key is provided', () => {
-    render(
-      <SettingsLayout currentPath="/settings/model-storage">
-        <div>Storage body</div>
-      </SettingsLayout>,
-    )
+  it('renders the nested settings outlet when no explicit children are provided', () => {
+    layoutMocks.pathname = '/settings/system-info'
 
-    expect(screen.getByRole('link', { name: 'Model Storage' })).toHaveAttribute(
+    render(<SettingsLayout />)
+
+    expect(screen.getByText('Settings')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'System Info' })).toHaveAttribute(
       'aria-current',
       'page',
     )
-  })
-
-  it('keeps a tab active for nested settings paths', () => {
-    render(
-      <SettingsLayout currentPath="/settings/model-storage/cache">
-        <div>Storage body</div>
-      </SettingsLayout>,
-    )
-
-    expect(screen.getByRole('link', { name: 'Model Storage' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    )
-  })
-
-  it('renders disabled settings destinations as disabled buttons', () => {
-    render(
-      <SettingsLayout
-        tabs={[
-          {
-            key: 'system-info',
-            label: 'System Info',
-            href: '/settings/system-info',
-            disabled: true,
-          },
-        ]}
-      >
-        <div>Disabled body</div>
-      </SettingsLayout>,
-    )
-
-    expect(screen.queryByRole('link', { name: 'System Info' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'System Info' })).toBeDisabled()
+    expect(screen.getByTestId('mock-outlet')).toBeTruthy()
   })
 })
 
