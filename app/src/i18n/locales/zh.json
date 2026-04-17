@@ -555,6 +555,59 @@
       "speed": "速度",
       "accuracy": "精度"
     },
+    "catalog": {
+      "tiny": {
+        "description": "优先选择体积最小、启动最快的模型。"
+      },
+      "base": {
+        "description": "优先选择资源占用更低且语言覆盖更广的模型。"
+      },
+      "small": {
+        "description": "在延迟、精度和体积之间保持平衡，适合通用转写。"
+      },
+      "medium": {
+        "description": "在硬件允许时优先选择更高多语种精度。"
+      },
+      "largeV1": {
+        "description": "优先选择上下文能力更强且兼容旧版 large 系列的模型。"
+      },
+      "largeV2": {
+        "description": "在硬件充足时优先选择高质量多语种模型。"
+      },
+      "largeV3": {
+        "description": "优先选择 Whisper 系列中质量最强的配置。"
+      },
+      "largeV3Turbo": {
+        "description": "优先选择吞吐更高的 large 多语种模型。"
+      },
+      "tinyEnglish": {
+        "description": "优先选择体积最小的英文专用模型。"
+      },
+      "baseEnglish": {
+        "description": "优先选择适合中低配硬件的轻量英文转写模型。"
+      },
+      "smallEnglish": {
+        "description": "在英文转写质量和吞吐之间保持平衡。"
+      },
+      "mediumEnglish": {
+        "description": "优先选择精度更强且无需 large 完整成本的英文模型。"
+      },
+      "distilSmallEnglish": {
+        "description": "优先选择适合快速处理的蒸馏英文模型。"
+      },
+      "distilMediumEnglish": {
+        "description": "优先选择质量更强的蒸馏英文模型。"
+      },
+      "distilLargeV2": {
+        "description": "优先选择运行更快的蒸馏 large 英文模型。"
+      },
+      "distilLargeV3": {
+        "description": "优先选择延迟更低的蒸馏 large 英文高质量模型。"
+      },
+      "distilLargeV35": {
+        "description": "优先选择最新发布的蒸馏 large 英文模型。"
+      }
+    },
       "actions": {
         "download": "下载",
         "cancel": "取消",
@@ -562,6 +615,43 @@
         "select": "设为默认",
         "downloading": "下载中..."
       },
+    "detail": {
+      "eyebrow": "模型详情",
+      "close": "关闭模型详情",
+      "loading": "正在加载模型详情...",
+      "errorTitle": "模型详情暂不可用",
+      "activeDownload": "当前下载",
+      "activeDownloadDescription": "显示这个模型当前的实时下载状态。",
+      "sections": {
+        "performance": "性能指标",
+        "information": "模型信息",
+        "description": "说明"
+      },
+      "localState": {
+        "status": "状态",
+        "selection": "选择状态",
+        "runtime": "运行状态",
+        "selectionConfigured": "当前默认模型",
+        "selectionAvailable": "可设为默认",
+        "runtimeLoaded": "已加载到运行时",
+        "runtimeIdle": "尚未加载"
+      },
+      "fields": {
+        "repoId": "仓库 ID",
+        "runtime": "运行时"
+      },
+      "performanceHint": "后端当前只提供相对等级提示，不代表精确基准成绩。",
+      "actions": {
+        "copyRepoId": "复制仓库 ID",
+        "currentDefault": "当前默认模型",
+        "deleteCache": "删除本地缓存"
+      },
+      "defaultLocked": "这个模型当前是默认模型，因此相关动作已禁用。",
+      "toast": {
+        "repoIdCopied": "仓库 ID 已复制",
+        "repoIdCopyFailed": "复制仓库 ID 失败"
+      }
+    },
     "toast": {
       "downloadStarted": "开始下载: {{modelId}}",
       "downloadCancelled": "已取消下载: {{modelId}}",

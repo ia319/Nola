@@ -4,7 +4,12 @@ import { useTranslation } from 'react-i18next'
 
 import { Button, DataTable, EmptyState, StatusBadge } from '@/components/ui'
 import type { DownloadState } from '@/features/models/hooks/useModelDownload'
-import { formatMegabytes, sortModelsForDisplay } from '@/features/models/lib/model-helpers'
+import {
+  formatMegabytes,
+  getModelActionState,
+  resolveModelDescription,
+  sortModelsForDisplay,
+} from '@/features/models/lib/model-helpers'
 import { cn } from '@/lib/utils'
 
 import type { ModelResponse } from '../types'
@@ -17,6 +22,7 @@ export interface ModelListProps {
   onCancel: (modelId: string) => void
   onDelete: (modelId: string) => void
   onSelect: (modelId: string) => void
+  onOpenDetail: (modelId: string) => void
 }
 
 type ModelTableRow = {
@@ -31,6 +37,7 @@ export function ModelList({
   onCancel,
   onDelete,
   onSelect,
+  onOpenDetail,
 }: ModelListProps) {
   const { t } = useTranslation()
 
@@ -64,7 +71,7 @@ export function ModelList({
                 ) : null}
               </div>
               <p className="text-muted-foreground line-clamp-2 text-sm leading-6">
-                {model.description}
+                {resolveModelDescription(t, model)}
               </p>
               {model.download_progress ? (
                 <p className="text-muted-foreground text-xs">
@@ -108,11 +115,11 @@ export function ModelList({
           header: t('models.table.columns.status'),
           className: 'min-w-[200px]',
           cell: ({ model, downloadState }) => {
-            const resolvedStatus = downloadState?.status ?? model.status
+            const actionState = getModelActionState(model, downloadState)
 
             return (
               <div className="space-y-2">
-                <StatusBadge status={resolvedStatus} />
+                <StatusBadge status={actionState.status} />
                 {downloadState ? <DownloadProgress state={downloadState} /> : null}
               </div>
             )
@@ -139,19 +146,14 @@ export function ModelList({
           className: 'w-[190px]',
           headerClassName: 'text-right',
           cell: ({ model, downloadState }) => {
-            const hasLiveDownload = downloadState != null
-            const isDownloading = downloadState?.status === 'downloading'
-            const isDownloaded = model.status === 'downloaded' && !hasLiveDownload
-            const isPartialDownload = model.status === 'partial_download' && !hasLiveDownload
-            const canDownload = !hasLiveDownload && !isDownloaded
-            const canDelete = !hasLiveDownload && (isDownloaded || isPartialDownload)
+            const actionState = getModelActionState(model, downloadState)
 
             return (
               <div
                 className="flex flex-wrap items-center justify-end gap-1"
                 onClick={(event) => event.stopPropagation()}
               >
-                {canDownload ? (
+                {actionState.canDownload ? (
                   <Button
                     type="button"
                     size="icon-xs"
@@ -163,7 +165,7 @@ export function ModelList({
                   </Button>
                 ) : null}
 
-                {isDownloading ? (
+                {actionState.isDownloading ? (
                   <Button
                     type="button"
                     size="icon-xs"
@@ -175,7 +177,7 @@ export function ModelList({
                   </Button>
                 ) : null}
 
-                {isDownloaded && !model.is_configured ? (
+                {actionState.isDownloaded && !model.is_configured ? (
                   <>
                     <Button type="button" size="xs" onClick={() => onSelect(model.model_id)}>
                       {t('models.actions.select')}
@@ -192,7 +194,7 @@ export function ModelList({
                   </>
                 ) : null}
 
-                {canDelete && !isDownloaded && !model.is_configured ? (
+                {actionState.canDelete && !actionState.isDownloaded && !model.is_configured ? (
                   <Button
                     type="button"
                     size="icon-xs"
@@ -204,7 +206,7 @@ export function ModelList({
                   </Button>
                 ) : null}
 
-                {canDelete && model.is_configured ? (
+                {actionState.canDelete && model.is_configured ? (
                   <>
                     <span
                       className={cn(
@@ -232,6 +234,7 @@ export function ModelList({
       rows={rows}
       getRowId={(row) => row.model.model_id}
       caption={t('models.table.caption')}
+      onRowClick={({ model }) => onOpenDetail(model.model_id)}
       stickyHeader
       emptyState={
         <EmptyState

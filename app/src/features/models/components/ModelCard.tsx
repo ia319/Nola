@@ -3,7 +3,11 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { DownloadState } from '@/features/models/hooks/useModelDownload'
-import { formatMegabytes } from '@/features/models/lib/model-helpers'
+import {
+  formatMegabytes,
+  getModelActionState,
+  resolveModelDescription,
+} from '@/features/models/lib/model-helpers'
 import type { ModelResponse } from '@/features/models/types'
 
 import { DownloadProgress } from './DownloadProgress'
@@ -26,13 +30,7 @@ export function ModelCard({
   onSelect,
 }: ModelCardProps) {
   const { t } = useTranslation()
-
-  // SSE-driven downloadState is the authority on active downloads.
-  // model.status may be stale between terminal SSE event and list refresh.
-  const hasLiveDownload = downloadState != null
-  const isDownloading = downloadState?.status === 'downloading'
-  const isDownloaded = model.status === 'downloaded' && !hasLiveDownload
-  const isPartialDownload = model.status === 'partial_download' && !hasLiveDownload
+  const actionState = getModelActionState(model, downloadState)
 
   return (
     <Card
@@ -56,7 +54,7 @@ export function ModelCard({
       </CardHeader>
 
       <CardContent className="space-y-3">
-        <p className="text-muted-foreground text-sm">{model.description}</p>
+        <p className="text-muted-foreground text-sm">{resolveModelDescription(t, model)}</p>
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
           <div>
@@ -82,20 +80,19 @@ export function ModelCard({
         {downloadState && <DownloadProgress state={downloadState} />}
 
         <div className="flex gap-2 pt-1">
-          {(model.status === 'not_downloaded' || model.status === 'partial_download') &&
-            !hasLiveDownload && (
-              <Button size="sm" onClick={() => onDownload(model.model_id)}>
-                {t('models.actions.download')}
-              </Button>
-            )}
+          {actionState.canDownload ? (
+            <Button size="sm" onClick={() => onDownload(model.model_id)}>
+              {t('models.actions.download')}
+            </Button>
+          ) : null}
 
-          {isDownloading && (
+          {actionState.isDownloading && (
             <Button size="sm" variant="outline" onClick={() => onCancel(model.model_id)}>
               {t('models.actions.cancel')}
             </Button>
           )}
 
-          {isDownloaded && !model.is_configured && (
+          {actionState.isDownloaded && !model.is_configured && (
             <>
               <Button size="sm" onClick={() => onSelect(model.model_id)}>
                 {t('models.actions.select')}
@@ -106,13 +103,13 @@ export function ModelCard({
             </>
           )}
 
-          {isPartialDownload && !model.is_configured && (
+          {actionState.canDelete && actionState.isPartialDownload && !model.is_configured && (
             <Button size="sm" variant="outline" onClick={() => onDelete(model.model_id)}>
               {t('models.actions.delete')}
             </Button>
           )}
 
-          {isDownloaded && model.is_configured && (
+          {actionState.isDownloaded && model.is_configured && (
             <span className="text-muted-foreground self-center text-xs">
               {t('models.configured')}
             </span>

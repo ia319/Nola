@@ -548,13 +548,103 @@
         "partial_download": "Partial Download",
         "downloaded": "Downloaded"
       },
-    "fields": {
-      "size": "Size",
-      "diskUsage": "Disk Usage",
-      "languages": "Languages",
-      "unavailable": "—",
-      "speed": "Speed",
-      "accuracy": "Accuracy"
+      "fields": {
+        "size": "Size",
+        "diskUsage": "Disk Usage",
+        "languages": "Languages",
+        "unavailable": "—",
+        "speed": "Speed",
+        "accuracy": "Accuracy"
+      },
+      "catalog": {
+        "tiny": {
+          "description": "Prefer the smallest download and the fastest startup time."
+        },
+        "base": {
+          "description": "Prefer low resource usage while keeping broad language coverage."
+        },
+        "small": {
+          "description": "Balance latency, accuracy, and footprint for general transcription."
+        },
+        "medium": {
+          "description": "Prefer stronger multilingual accuracy when hardware allows."
+        },
+        "largeV1": {
+          "description": "Prefer maximum context with legacy large-model compatibility."
+        },
+        "largeV2": {
+          "description": "Prefer high multilingual quality on capable hardware."
+        },
+        "largeV3": {
+          "description": "Prefer the strongest Whisper-family quality profile."
+        },
+        "largeV3Turbo": {
+          "description": "Prefer faster large-model throughput with multilingual support."
+        },
+        "tinyEnglish": {
+          "description": "Prefer the smallest English-only footprint."
+        },
+        "baseEnglish": {
+          "description": "Prefer lightweight English transcription on modest hardware."
+        },
+        "smallEnglish": {
+          "description": "Balance English quality and throughput."
+        },
+        "mediumEnglish": {
+          "description": "Prefer stronger English accuracy without the full large-model cost."
+        },
+        "distilSmallEnglish": {
+          "description": "Prefer a distilled English model for quick turnarounds."
+        },
+        "distilMediumEnglish": {
+          "description": "Prefer a distilled English model with stronger quality."
+        },
+        "distilLargeV2": {
+          "description": "Prefer a distilled English large model for faster runs."
+        },
+        "distilLargeV3": {
+          "description": "Prefer distilled English large-model quality with lower latency."
+        },
+        "distilLargeV35": {
+          "description": "Prefer the latest distilled English large-model release."
+        }
+      },
+      "detail": {
+        "eyebrow": "Model detail",
+        "close": "Close model detail",
+      "loading": "Loading model detail...",
+      "errorTitle": "Model detail unavailable",
+      "activeDownload": "Active download",
+      "activeDownloadDescription": "Show the current live transfer state for this model.",
+      "sections": {
+        "performance": "Performance Metrics",
+        "information": "Model Information",
+        "description": "Description"
+      },
+      "localState": {
+        "status": "Status",
+        "selection": "Selection",
+        "runtime": "Runtime",
+        "selectionConfigured": "Current default model",
+        "selectionAvailable": "Available to select",
+        "runtimeLoaded": "Loaded in runtime",
+        "runtimeIdle": "Not loaded"
+      },
+      "fields": {
+        "repoId": "Repository ID",
+        "runtime": "Runtime"
+      },
+      "performanceHint": "Backend ranks are relative hints, not benchmark scores.",
+      "actions": {
+        "copyRepoId": "Copy repository ID",
+        "currentDefault": "Current Default Model",
+        "deleteCache": "Delete Local Cache"
+      },
+      "defaultLocked": "Actions disabled because this model is the current default.",
+      "toast": {
+        "repoIdCopied": "Repository ID copied",
+        "repoIdCopyFailed": "Repository ID copy failed"
+      }
     },
       "actions": {
         "download": "Download",

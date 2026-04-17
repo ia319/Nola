@@ -99,10 +99,11 @@ export function useModelDownload(
             state.status === 'failed' ||
             state.status === 'cancelled'
           ) {
+            const terminalStatus: DownloadTerminalEvent['status'] = state.status
             queueMicrotask(() =>
               onTerminalRef.current?.({
                 modelId: data.model_id,
-                status: state.status,
+                status: terminalStatus,
                 error: state.error,
               }),
             )

@@ -1,3 +1,8 @@
+import type { TFunction } from 'i18next'
+
+import type { DownloadState } from '@/features/models/hooks/useModelDownload'
+import type { ModelStatus } from '@/features/models/types'
+
 export function formatBytes(bytes: number, decimals = 1): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
 
@@ -28,6 +33,74 @@ export function formatMegabytesPerSecond(bps: number, decimals = 1): string {
 
 export function formatPercent(percent: number): string {
   return `${percent.toFixed(1)}%`
+}
+
+export interface ModelActionState {
+  status: ModelStatus
+  hasLiveDownload: boolean
+  isDownloading: boolean
+  isDownloaded: boolean
+  isPartialDownload: boolean
+  canDownload: boolean
+  canDelete: boolean
+}
+
+type ModelAvailabilityLike = {
+  status: ModelStatus
+}
+
+export function getModelActionState<T extends ModelAvailabilityLike>(
+  model: T,
+  downloadState?: DownloadState,
+): ModelActionState {
+  const hasLiveDownload = downloadState != null
+  const status = downloadState?.status === 'downloading' ? 'downloading' : model.status
+  const isDownloading = downloadState?.status === 'downloading'
+  const isDownloaded = status === 'downloaded' && !hasLiveDownload
+  const isPartialDownload = status === 'partial_download' && !hasLiveDownload
+  const canDownload = !hasLiveDownload && !isDownloaded
+  const canDelete = !hasLiveDownload && (isDownloaded || isPartialDownload)
+
+  return {
+    status,
+    hasLiveDownload,
+    isDownloading,
+    isDownloaded,
+    isPartialDownload,
+    canDownload,
+    canDelete,
+  }
+}
+
+export function splitModelLanguages(value: string): string[] {
+  return value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+}
+
+type ModelDescriptionLike = {
+  description: string
+  description_key: string
+}
+
+export function resolveModelDescription<T extends ModelDescriptionLike>(
+  t: TFunction,
+  model: T,
+): string {
+  const fallback = model.description.trim()
+  const key = model.description_key.trim()
+
+  if (!key) {
+    return fallback
+  }
+
+  const translated = t(key, { defaultValue: fallback }).trim()
+  if (translated && translated != key) {
+    return translated
+  }
+
+  return fallback
 }
 
 /**

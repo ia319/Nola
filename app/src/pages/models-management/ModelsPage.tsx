@@ -1,15 +1,21 @@
 import type { TFunction } from 'i18next'
-import { useMemo } from 'react'
+import { CheckCircle2, Download, Trash2, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
-import { MetricCard } from '@/components/ui'
+import { Button, DetailSheet, EmptyState, MetricCard, StatusBadge } from '@/components/ui'
 import { ContentCanvas, PageHeader } from '@/layouts'
 import {
   deleteModel,
   type DownloadTerminalEvent,
+  getModelActionState,
+  getModelDetail,
+  ModelDetailContent,
   ModelList,
+  type ModelDetailResponse,
+  resolveModelDescription,
   selectModel,
   toDownloadState,
   useModelDownload,
@@ -17,6 +23,7 @@ import {
 } from '@/features/models'
 import type { DownloadState } from '@/features/models'
 import { isAppError } from '@/shared/lib/error-factory'
+import type { AppError } from '@/shared/types'
 
 function toastError(t: TFunction, err: unknown) {
   if (isAppError(err)) {
@@ -32,6 +39,15 @@ function toastError(t: TFunction, err: unknown) {
   }
 }
 
+function toAppError(error: unknown): AppError {
+  if (isAppError(error)) return error
+  return {
+    code: 'API_SERVER_UNKNOWN',
+    i18nKey: 'error.api.serverError',
+    retriable: true,
+  }
+}
+
 export function ModelsPage() {
   const { t } = useTranslation()
   const {
@@ -44,6 +60,17 @@ export function ModelsPage() {
     refresh,
     updateSnapshot,
   } = useModels()
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
+  const [detail, setDetail] = useState<ModelDetailResponse | null>(null)
+  const [isDetailLoading, setIsDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<AppError | null>(null)
+  const detailControllerRef = useRef<AbortController | null>(null)
+  const selectedModelIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    selectedModelIdRef.current = selectedModelId
+  }, [selectedModelId])
+
   const activeModel = useMemo(
     () => models.find((model) => model.model_id === lastLoadedModelId) ?? null,
     [lastLoadedModelId, models],
@@ -51,6 +78,10 @@ export function ModelsPage() {
   const configuredModel = useMemo(
     () => models.find((model) => model.model_id === configuredModelId) ?? null,
     [configuredModelId, models],
+  )
+  const selectedListModel = useMemo(
+    () => models.find((model) => model.model_id === selectedModelId) ?? null,
+    [models, selectedModelId],
   )
 
   // Build a seed map so in-flight downloads survive a page reload.
@@ -63,6 +94,60 @@ export function ModelsPage() {
     }
     return map
   }, [models])
+
+  const loadModelDetail = useCallback(async (modelId: string) => {
+    detailControllerRef.current?.abort()
+    const controller = new AbortController()
+    detailControllerRef.current = controller
+
+    setIsDetailLoading(true)
+    setDetailError(null)
+    setDetail((current) => (current?.model_id === modelId ? current : null))
+
+    try {
+      const response = await getModelDetail(modelId, controller.signal)
+      if (!controller.signal.aborted) {
+        setDetail(response)
+      }
+    } catch (err) {
+      if (controller.signal.aborted) {
+        return
+      }
+
+      setDetailError(toAppError(err))
+    } finally {
+      if (!controller.signal.aborted) {
+        setIsDetailLoading(false)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!selectedModelId) {
+      detailControllerRef.current?.abort()
+      setDetail(null)
+      setDetailError(null)
+      setIsDetailLoading(false)
+      return
+    }
+
+    void loadModelDetail(selectedModelId)
+  }, [loadModelDetail, selectedModelId])
+
+  useEffect(() => {
+    return () => {
+      detailControllerRef.current?.abort()
+    }
+  }, [])
+
+  async function handleCopyRepoId(repoId: string) {
+    try {
+      await navigator.clipboard.writeText(repoId)
+      toast.success(t('models.detail.toast.repoIdCopied'))
+    } catch {
+      toast.error(t('models.detail.toast.repoIdCopyFailed'))
+    }
+  }
 
   function handleTerminalDownload(event: DownloadTerminalEvent) {
     if (event.status === 'completed') {
@@ -78,9 +163,17 @@ export function ModelsPage() {
     }
 
     void refresh()
+
+    if (selectedModelIdRef.current === event.modelId) {
+      void loadModelDetail(event.modelId)
+    }
   }
 
   const { downloads, download, cancel } = useModelDownload(initialDownloads, handleTerminalDownload)
+  const selectedDownloadState = useMemo(
+    () => (selectedModelId ? downloads.get(selectedModelId) : undefined),
+    [downloads, selectedModelId],
+  )
 
   async function handleDownload(modelId: string) {
     try {
@@ -106,6 +199,9 @@ export function ModelsPage() {
         ...current,
         models: current.models.filter((model) => model.model_id !== modelId),
       }))
+      if (selectedModelIdRef.current === modelId) {
+        setSelectedModelId(null)
+      }
       toast.success(t('models.toast.deleted', { modelId }))
       await refresh()
     } catch (err) {
@@ -124,6 +220,14 @@ export function ModelsPage() {
           is_configured: model.model_id === modelId,
         })),
       }))
+      setDetail((current) =>
+        current === null
+          ? current
+          : {
+              ...current,
+              is_configured: current.model_id === modelId,
+            },
+      )
       toast.success(t('models.toast.selected', { modelId }))
       if (result.restart_required) {
         toast.warning(t('models.restartRequired'))
@@ -132,6 +236,100 @@ export function ModelsPage() {
     } catch (err) {
       toastError(t, err)
     }
+  }
+
+  const detailModel = detail ?? selectedListModel
+  const detailActionState =
+    detailModel == null ? null : getModelActionState(detailModel, selectedDownloadState)
+
+  function renderDetailFooter() {
+    if (!detailModel || !detailActionState) {
+      return null
+    }
+
+    if (detailActionState.isDownloading) {
+      return (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full justify-center"
+          onClick={() => void handleCancel(detailModel.model_id)}
+        >
+          <X />
+          {t('models.actions.cancel')}
+        </Button>
+      )
+    }
+
+    if (detailModel.is_configured) {
+      return (
+        <div className="space-y-3">
+          <Button type="button" className="w-full justify-center" disabled>
+            <CheckCircle2 />
+            {t('models.detail.actions.currentDefault')}
+          </Button>
+          <Button type="button" variant="outline" className="w-full justify-center" disabled>
+            <Trash2 />
+            {t('models.detail.actions.deleteCache')}
+          </Button>
+          <p className="text-muted-foreground text-center text-xs leading-5">
+            {t('models.detail.defaultLocked')}
+          </p>
+        </div>
+      )
+    }
+
+    if (detailActionState.canDownload) {
+      return (
+        <div className="space-y-3">
+          <Button
+            type="button"
+            className="w-full justify-center"
+            onClick={() => void handleDownload(detailModel.model_id)}
+          >
+            <Download />
+            {t('models.actions.download')}
+          </Button>
+          {detailActionState.canDelete && detailActionState.isPartialDownload ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full justify-center"
+              onClick={() => void handleDelete(detailModel.model_id)}
+            >
+              <Trash2 />
+              {t('models.detail.actions.deleteCache')}
+            </Button>
+          ) : null}
+        </div>
+      )
+    }
+
+    if (detailActionState.canDelete) {
+      return (
+        <div className="space-y-3">
+          <Button
+            type="button"
+            className="w-full justify-center"
+            onClick={() => void handleSelect(detailModel.model_id)}
+          >
+            <CheckCircle2 />
+            {t('models.actions.select')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full justify-center"
+            onClick={() => void handleDelete(detailModel.model_id)}
+          >
+            <Trash2 />
+            {t('models.detail.actions.deleteCache')}
+          </Button>
+        </div>
+      )
+    }
+
+    return null
   }
 
   if (!hasLoaded && isLoading) {
@@ -194,7 +392,57 @@ export function ModelsPage() {
           onCancel={handleCancel}
           onDelete={handleDelete}
           onSelect={handleSelect}
+          onOpenDetail={setSelectedModelId}
         />
+
+        <DetailSheet
+          open={selectedModelId !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedModelId(null)
+            }
+          }}
+          mode="sheet"
+          size="wide"
+          eyebrow={t('models.detail.eyebrow')}
+          title={detailModel?.name ?? selectedListModel?.name ?? t('models.title')}
+          description={
+            detailModel
+              ? resolveModelDescription(t, detailModel)
+              : selectedListModel
+                ? resolveModelDescription(t, selectedListModel)
+                : undefined
+          }
+          closeLabel={t('models.detail.close')}
+          headerAdornment={
+            detailActionState ? <StatusBadge status={detailActionState.status} /> : undefined
+          }
+          footer={renderDetailFooter()}
+          bodyClassName="bg-surface-container-low/20"
+        >
+          {detailModel && !isDetailLoading && !detailError ? (
+            <ModelDetailContent
+              model={detailModel}
+              downloadState={selectedDownloadState}
+              onCopyRepoId={handleCopyRepoId}
+            />
+          ) : null}
+
+          {isDetailLoading ? (
+            <div className="flex min-h-[320px] items-center justify-center">
+              <p className="text-muted-foreground text-sm">{t('models.detail.loading')}</p>
+            </div>
+          ) : null}
+
+          {detailError ? (
+            <div className="flex min-h-[320px] items-center justify-center">
+              <EmptyState
+                title={t('models.detail.errorTitle')}
+                description={t(detailError.i18nKey, detailError.params ?? {})}
+              />
+            </div>
+          ) : null}
+        </DetailSheet>
       </ContentCanvas>
     </ErrorBoundary>
   )

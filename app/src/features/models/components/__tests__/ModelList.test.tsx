@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { DownloadState } from '@/features/models'
@@ -32,6 +32,7 @@ vi.mock('react-i18next', () => ({
         'models.table.columns.actions': 'Actions',
         'models.table.empty.title': 'No models available',
         'models.table.empty.description': 'Download a model to start configuring local runs.',
+        'models.catalog.largeV3.description': 'Localized large multilingual engine',
       }
 
       if (key === 'models.table.diskUsage') {
@@ -109,6 +110,7 @@ describe('ModelList', () => {
         onCancel={vi.fn()}
         onDelete={vi.fn()}
         onSelect={vi.fn()}
+        onOpenDetail={vi.fn()}
       />,
     )
 
@@ -121,6 +123,7 @@ describe('ModelList', () => {
     const onCancel = vi.fn()
     const onDelete = vi.fn()
     const onSelect = vi.fn()
+    const onOpenDetail = vi.fn()
     const downloadingModel = createModel({
       model_id: 'nola-medium-v3',
       name: 'Nola Medium V3',
@@ -159,6 +162,7 @@ describe('ModelList', () => {
         onCancel={onCancel}
         onDelete={onDelete}
         onSelect={onSelect}
+        onOpenDetail={onOpenDetail}
       />,
     )
 
@@ -173,6 +177,7 @@ describe('ModelList', () => {
     expect(within(configuredRow).getAllByText('Default')).toHaveLength(2)
     expect(within(configuredRow).getByText('Running')).toBeTruthy()
     expect(within(configuredRow).getByText('en')).toBeTruthy()
+    expect(within(configuredRow).getByText('Localized large multilingual engine')).toBeTruthy()
     expect(within(configuredRow).getByText('Accuracy 5 · Speed 2')).toBeTruthy()
     expect(within(configuredRow).getByRole('button', { name: 'Delete' })).toBeDisabled()
 
@@ -192,5 +197,30 @@ describe('ModelList', () => {
     const selectableRow = screen.getByRole('row', { name: /Nola Base V3/i })
     expect(within(selectableRow).getByRole('button', { name: 'Set as Default' })).toBeTruthy()
     expect(within(selectableRow).getByRole('button', { name: 'Delete' })).toBeTruthy()
+  })
+
+  it('opens detail on row click without hijacking action buttons', () => {
+    const onOpenDetail = vi.fn()
+    const onSelect = vi.fn()
+
+    render(
+      <ModelList
+        models={[createModel({ model_id: 'nola-base-v3', name: 'Nola Base V3' })]}
+        downloads={new Map()}
+        onDownload={vi.fn()}
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+        onSelect={onSelect}
+        onOpenDetail={onOpenDetail}
+      />,
+    )
+
+    const row = screen.getByRole('row', { name: /Nola Base V3/i })
+    fireEvent.click(row)
+    expect(onOpenDetail).toHaveBeenCalledWith('nola-base-v3')
+
+    fireEvent.click(within(row).getByRole('button', { name: 'Set as Default' }))
+    expect(onSelect).toHaveBeenCalledWith('nola-base-v3')
+    expect(onOpenDetail).toHaveBeenCalledTimes(1)
   })
 })
