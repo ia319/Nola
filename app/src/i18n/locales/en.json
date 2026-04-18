@@ -703,6 +703,51 @@
       "export": "Export",
       "modelStorage": "Model Storage",
       "systemInfo": "System Info"
+    },
+    "general": {
+      "eyebrow": "Workspace Configuration",
+      "title": "General",
+      "description": "Manage how the Nola interface appears and interacts with your local system environment.",
+      "sections": {
+        "interface": {
+          "label": "Interface",
+          "title": "Interface Preferences",
+          "description": "Control language and appearance for this browser session."
+        },
+        "regional": {
+          "label": "Regional & Time",
+          "title": "Regional Preferences",
+          "description": "Review browser-derived time context and choose how measurements appear."
+        }
+      },
+      "fields": {
+        "language": {
+          "label": "Interface Language",
+          "description": "Select the default language for application menus and notifications."
+        },
+        "appearance": {
+          "label": "Appearance",
+          "description": "Choose how Nola appears on this screen. System follows the operating system theme.",
+          "system": "System",
+          "light": "Light",
+          "dark": "Dark"
+        },
+        "timezone": {
+          "label": "Timezone",
+          "description": "Read the local timezone from the current browser environment."
+        },
+        "units": {
+          "label": "Measurement Units",
+          "description": "Display file sizes and processing speeds in metric or imperial units.",
+          "metric": "Metric",
+          "imperial": "Imperial"
+        }
+      },
+      "localOnly": {
+        "title": "Keep these preferences local",
+        "description": "Store language, appearance, and units in this browser only.",
+        "detail": "Configure the same preferences again when you switch to another browser profile or machine."
+      }
     }
   },
   "history": {

@@ -702,6 +702,51 @@
       "export": "导出",
       "modelStorage": "模型存储",
       "systemInfo": "系统信息"
+    },
+    "general": {
+      "eyebrow": "工作区配置",
+      "title": "常规",
+      "description": "管理 Nola 界面的显示方式，以及它与当前本地环境的交互方式。",
+      "sections": {
+        "interface": {
+          "label": "界面",
+          "title": "界面偏好",
+          "description": "控制当前浏览器中的语言和外观。"
+        },
+        "regional": {
+          "label": "区域与时间",
+          "title": "区域偏好",
+          "description": "查看浏览器提供的时区信息，并选择界面的单位显示方式。"
+        }
+      },
+      "fields": {
+        "language": {
+          "label": "界面语言",
+          "description": "为应用菜单和通知选择默认语言。"
+        },
+        "appearance": {
+          "label": "外观",
+          "description": "选择 Nola 在当前屏幕上的显示方式。系统模式会跟随操作系统主题。",
+          "system": "系统",
+          "light": "浅色",
+          "dark": "深色"
+        },
+        "timezone": {
+          "label": "时区",
+          "description": "从当前浏览器环境读取本地时区。"
+        },
+        "units": {
+          "label": "计量单位",
+          "description": "用公制或英制显示文件大小和处理速度。",
+          "metric": "公制",
+          "imperial": "英制"
+        }
+      },
+      "localOnly": {
+        "title": "将这些偏好保留在本地",
+        "description": "只在当前浏览器中存储语言、外观和单位设置。",
+        "detail": "切换到其他浏览器配置文件或设备后，请重新配置相同的偏好。"
+      }
     }
   },
   "history": {
