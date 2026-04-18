@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { isSameHistorySearch, normalizeHistorySearch } from '@/routes/history-search'
 import type { ExportDialogValue, ExportRequestOptions } from '@/features/export'
 import type { FileInfo, TaskDetail, TaskSummary } from '@/shared/types'
 
@@ -221,7 +222,10 @@ vi.mock('@/config/logger', () => ({
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => historyPageMocks.navigate,
-  useSearch: () => historyPageMocks.search,
+}))
+
+vi.mock('@/app/locale/use-active-locale', () => ({
+  useActiveLocale: () => null,
 }))
 
 vi.mock('@/components/common', () => ({
@@ -278,6 +282,18 @@ vi.mock('../useHistoryFileActions', () => ({
 
 import { HistoryPage } from '../HistoryPage'
 
+function buildHistoryUpdater() {
+  return (patch: Record<string, unknown>, replace: boolean) => {
+    historyPageMocks.navigate({
+      replace,
+      search: (previous: Record<string, unknown>) => {
+        const next = normalizeHistorySearch({ ...previous, ...patch })
+        return isSameHistorySearch(normalizeHistorySearch(previous), next) ? previous : next
+      },
+    })
+  }
+}
+
 function renderHistoryPage() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -292,7 +308,10 @@ function renderHistoryPage() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <HistoryPage />
+      <HistoryPage
+        search={normalizeHistorySearch(historyPageMocks.search)}
+        updateSearch={buildHistoryUpdater()}
+      />
     </QueryClientProvider>,
   )
 }
@@ -615,7 +634,12 @@ describe('HistoryPage', () => {
     const { toast } = await import('sonner')
     historyPageMocks.deleteTaskRecordAction.mockRejectedValueOnce(new Error('delete failed'))
 
-    render(<HistoryPage />)
+    render(
+      <HistoryPage
+        search={normalizeHistorySearch(historyPageMocks.search)}
+        updateSearch={buildHistoryUpdater()}
+      />,
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete record' }))
 

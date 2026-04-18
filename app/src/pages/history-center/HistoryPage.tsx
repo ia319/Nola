@@ -1,15 +1,15 @@
 import { useCallback, useMemo } from 'react'
-import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
+import { localizePath } from '@/app/locale/locale-routing'
+import { useActiveLocale } from '@/app/locale/use-active-locale'
 import { ErrorBoundary } from '@/components/common'
 import { HISTORY_PAGE_SIZE } from '@/config/constants'
 import { ContentCanvas } from '@/layouts'
 import {
   buildHistoryFileQuery,
   buildHistoryTaskQuery,
-  isSameHistorySearch,
-  normalizeHistorySearch,
   type HistoryRecordsMode,
   type HistoryPageSize,
   type HistoryRouteSearch,
@@ -18,26 +18,18 @@ import type { SortOrder, TaskFilterStatus, TaskSortBy } from '@/shared/types'
 import { HistoryFileModeView } from './HistoryFileModeView'
 import { HistoryTaskModeView } from './HistoryTaskModeView'
 
-export function HistoryPage() {
+interface HistoryPageProps {
+  search: HistoryRouteSearch
+  updateSearch: (patch: Partial<HistoryRouteSearch>, replace: boolean) => void
+}
+
+export function HistoryPage({ search, updateSearch }: HistoryPageProps) {
   const { t } = useTranslation()
-  const navigate = useNavigate({ from: '/history' })
-  const search = useSearch({ from: '/history' })
+  const navigate = useNavigate()
+  const activeLocale = useActiveLocale()
   const mode = search.mode ?? 'tasks'
   const taskQuery = useMemo(() => buildHistoryTaskQuery(search), [search])
   const fileQuery = useMemo(() => buildHistoryFileQuery(search), [search])
-
-  const updateSearch = useCallback(
-    (patch: Partial<HistoryRouteSearch>, replace: boolean) => {
-      void navigate({
-        replace,
-        search: (previous) => {
-          const next = normalizeHistorySearch({ ...previous, ...patch })
-          return isSameHistorySearch(previous, next) ? previous : next
-        },
-      })
-    },
-    [navigate],
-  )
 
   const handleSearchChange = useCallback(
     (value: string) => {
@@ -152,7 +144,7 @@ export function HistoryPage() {
             onPageClamp={handlePageClamp}
             onModeChange={handleModeChange}
             onCreateTask={() => {
-              void navigate({ to: '/' })
+              void navigate({ to: localizePath('/', activeLocale) })
             }}
           />
         ) : (
@@ -163,7 +155,7 @@ export function HistoryPage() {
             onPageSizeChange={handlePageSizeChange}
             onModeChange={handleModeChange}
             onCreateTask={() => {
-              void navigate({ to: '/' })
+              void navigate({ to: localizePath('/', activeLocale) })
             }}
           />
         )}
