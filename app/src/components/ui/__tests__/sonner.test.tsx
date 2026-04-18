@@ -10,7 +10,7 @@ const toasterMocks = vi.hoisted(() => ({
   sonner: vi.fn((_: Record<string, unknown>) => <div data-slot="mock-sonner" />),
 }))
 
-vi.mock('next-themes', () => ({
+vi.mock('@/components/use-theme', () => ({
   useTheme: toasterMocks.useTheme,
 }))
 

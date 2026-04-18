@@ -1,37 +1,60 @@
 // @vitest-environment jsdom
 
-import type { ReactNode } from 'react'
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
+import { useUiPreferencesStore } from '@/app/locale/ui-preferences-store'
+import { DEFAULT_UI_PREFERENCES } from '@/config/ui-preferences'
 import { ThemeProvider } from '../theme-provider'
+import { useTheme } from '../use-theme'
 
-const nextThemesMocks = vi.hoisted(() => ({
-  themeProvider: vi.fn(({ children }: { children: ReactNode }) => (
-    <div data-slot="next-themes-provider">{children}</div>
-  )),
-}))
+function ThemeProbe() {
+  const { resolvedTheme, theme } = useTheme()
 
-vi.mock('next-themes', () => ({
-  ThemeProvider: nextThemesMocks.themeProvider,
-}))
+  return (
+    <div>
+      <span>{theme}</span>
+      <span>{resolvedTheme}</span>
+    </div>
+  )
+}
 
 describe('ThemeProvider', () => {
-  it('applies the shared theme defaults for the whole app shell', () => {
+  beforeEach(() => {
+    useUiPreferencesStore.setState({
+      preferences: DEFAULT_UI_PREFERENCES,
+      isHydrated: true,
+    })
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: () => ({
+        matches: false,
+        media: '(prefers-color-scheme: dark)',
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      }),
+    })
+    document.documentElement.className = ''
+    document.documentElement.style.colorScheme = ''
+  })
+
+  it('applies the resolved theme class from the stored preference', () => {
+    useUiPreferencesStore.setState((state) => ({
+      ...state,
+      preferences: {
+        ...state.preferences,
+        theme: 'dark',
+      },
+    }))
+
     render(
       <ThemeProvider>
-        <div>Theme content</div>
+        <ThemeProbe />
       </ThemeProvider>,
     )
 
-    expect(screen.getByText('Theme content')).toBeTruthy()
-    expect(nextThemesMocks.themeProvider).toHaveBeenCalledTimes(1)
-    expect(nextThemesMocks.themeProvider.mock.calls[0]?.[0]).toMatchObject({
-      attribute: 'class',
-      defaultTheme: 'system',
-      enableSystem: true,
-      storageKey: 'nola-theme',
-      disableTransitionOnChange: true,
-    })
+    expect(screen.getAllByText('dark')).toHaveLength(2)
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+    expect(document.documentElement.style.colorScheme).toBe('dark')
   })
 })
