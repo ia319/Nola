@@ -2,6 +2,8 @@ import { Link, useLocation } from '@tanstack/react-router'
 import { AudioLines, Boxes, Settings2, TimerReset, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { localizePath, stripLocalePrefix } from '@/app/locale/locale-routing'
+import { useActiveLocale } from '@/app/locale/use-active-locale'
 import nolaLogoMark from '@/assets/brand/nola-logo-mark.svg'
 import { cn } from '@/lib/utils'
 import { useBreakpoint } from '@/shared/responsive'
@@ -42,14 +44,17 @@ const SIDEBAR_NAV_ITEMS: readonly SidebarNavItem[] = [
 ] as const
 
 function isSidebarItemActive(pathname: string, href?: string): boolean {
+  const normalizedPathname = stripLocalePrefix(pathname)
+
   if (!href) return false
-  if (href === '/') return pathname === href
-  return pathname === href || pathname.startsWith(`${href}/`)
+  if (href === '/') return normalizedPathname === href
+  return normalizedPathname === href || normalizedPathname.startsWith(`${href}/`)
 }
 
 export function AppSidebar() {
   const { t } = useTranslation()
   const breakpoint = useBreakpoint()
+  const activeLocale = useActiveLocale()
   const pathname = useLocation({
     select: (location) => location.pathname,
   })
@@ -94,10 +99,12 @@ export function AppSidebar() {
             )
 
             if (item.href && !item.disabled) {
+              const localizedHref = localizePath(item.href, activeLocale)
+
               return (
                 <Link
                   key={item.key}
-                  to={item.href}
+                  to={localizedHref}
                   aria-current={active ? 'page' : undefined}
                   className={itemClassName}
                 >

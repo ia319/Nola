@@ -33,6 +33,10 @@ vi.mock('@/features/tasks', () => ({
   useTaskPolling: appShellMocks.taskPolling,
 }))
 
+vi.mock('../AppLocaleController', () => ({
+  AppLocaleController: () => null,
+}))
+
 vi.mock('@tanstack/react-router', () => ({
   Outlet: appShellMocks.outlet,
 }))

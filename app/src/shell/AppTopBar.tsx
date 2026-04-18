@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
 
 import { useLocation } from '@tanstack/react-router'
-import { useTheme } from 'next-themes'
 import { useTranslation } from 'react-i18next'
 
+import { stripLocalePrefix } from '@/app/locale/locale-routing'
 import { Button } from '@/components/ui/button'
+import { useTheme } from '@/components/use-theme'
 import { cn } from '@/lib/utils'
 import { appIcons } from '@/shared/lib/icons'
 import { useBreakpoint } from '@/shared/responsive'
@@ -18,15 +19,17 @@ type AppTopBarProps = {
 }
 
 function getTopBarTitleKey(pathname: string): string {
-  if (pathname === '/history' || pathname.startsWith('/history/')) {
+  const normalizedPathname = stripLocalePrefix(pathname)
+
+  if (normalizedPathname === '/history' || normalizedPathname.startsWith('/history/')) {
     return 'shell.navigation.history'
   }
 
-  if (pathname === '/models' || pathname.startsWith('/models/')) {
+  if (normalizedPathname === '/models' || normalizedPathname.startsWith('/models/')) {
     return 'shell.navigation.models'
   }
 
-  if (pathname === '/settings' || pathname.startsWith('/settings/')) {
+  if (normalizedPathname === '/settings' || normalizedPathname.startsWith('/settings/')) {
     return 'shell.navigation.settings'
   }
 
@@ -42,15 +45,16 @@ function formatActivityCount(activityCount: number): string {
 
 function formatActivityLabel(
   activityCount: number,
-  t: (key: string, options?: Record<string, unknown>) => string,
+  activityLabel: string,
+  activityWithCountLabel: string,
 ): string {
   const normalizedCount = Math.max(0, activityCount)
 
   if (normalizedCount === 0) {
-    return t('shell.topBar.actions.activity')
+    return activityLabel
   }
 
-  return t('shell.topBar.actions.activityWithCount', { count: normalizedCount })
+  return activityWithCountLabel
 }
 
 export function AppTopBar({
@@ -74,10 +78,16 @@ export function AppTopBar({
   const activeTheme = theme === 'system' ? (resolvedTheme ?? 'light') : theme
   const nextTheme = activeTheme === 'dark' ? 'light' : 'dark'
   const badgeLabel = formatActivityCount(activityCount)
-  const activityLabel = formatActivityLabel(activityCount, t)
+  const activityLabel = formatActivityLabel(
+    activityCount,
+    t('shell.topBar.actions.activity'),
+    t('shell.topBar.actions.activityWithCount', { count: Math.max(0, activityCount) }),
+  )
   const hasActivity = activityCount > 0
+  const normalizedPathname = stripLocalePrefix(pathname)
   const showSettingsTabs = Boolean(
-    settingsTabs && (pathname === '/settings' || pathname.startsWith('/settings/')),
+    settingsTabs &&
+    (normalizedPathname === '/settings' || normalizedPathname.startsWith('/settings/')),
   )
 
   return (

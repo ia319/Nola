@@ -2,6 +2,8 @@ import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 import { Link, Outlet, useLocation } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
+import { localizePath, stripLocalePrefix } from '@/app/locale/locale-routing'
+import { useActiveLocale } from '@/app/locale/use-active-locale'
 import { cn } from '@/lib/utils'
 import { SETTINGS_TABS } from '@/pages/settings/settings-tabs'
 import { ContentCanvas } from './ContentCanvas'
@@ -12,7 +14,8 @@ export type SettingsLayoutProps = ComponentPropsWithoutRef<'div'> & {
 }
 
 function isTabActive(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`)
+  const normalizedPathname = stripLocalePrefix(pathname)
+  return normalizedPathname === href || normalizedPathname.startsWith(`${href}/`)
 }
 
 export function SettingsLayout({
@@ -22,6 +25,7 @@ export function SettingsLayout({
   ...props
 }: SettingsLayoutProps) {
   const { t } = useTranslation()
+  const activeLocale = useActiveLocale()
   const pathname = useLocation({
     select: (location) => location.pathname,
   })
@@ -53,8 +57,7 @@ export function SettingsLayout({
                 return (
                   <Link
                     key={tab.key}
-                    to="/settings/$tab"
-                    params={{ tab: tab.key }}
+                    to={localizePath(tab.href, activeLocale)}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
                       'inline-flex h-10 items-center border-b-2 px-3 text-sm font-medium whitespace-nowrap transition-colors',

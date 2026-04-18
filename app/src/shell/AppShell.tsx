@@ -5,6 +5,7 @@ import { Outlet } from '@tanstack/react-router'
 import { Toaster } from '@/components/ui/sonner'
 import { useTaskPolling } from '@/features/tasks'
 
+import { AppLocaleController } from './AppLocaleController'
 import { AppSidebar } from './AppSidebar'
 import { AppTopBar } from './AppTopBar'
 
@@ -17,6 +18,7 @@ export function AppShell({ settingsTabs }: AppShellProps = {}) {
 
   return (
     <div data-slot="app-shell" className="bg-background text-foreground min-h-screen">
+      <AppLocaleController />
       <AppSidebar />
       <div
         data-slot="app-shell-workspace"

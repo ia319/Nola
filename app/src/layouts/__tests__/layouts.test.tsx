@@ -5,6 +5,9 @@ import { BellDot } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
+import { useUiPreferencesStore } from '@/app/locale/ui-preferences-store'
+import { DEFAULT_UI_PREFERENCES } from '@/config/ui-preferences'
+
 const layoutMocks = vi.hoisted(() => ({
   pathname: '/settings/export',
 }))
@@ -148,6 +151,10 @@ describe('TwoColumnLayout', () => {
 
 describe('SettingsLayout', () => {
   it('renders the settings page header copy and custom child content', () => {
+    useUiPreferencesStore.setState({
+      preferences: DEFAULT_UI_PREFERENCES,
+      isHydrated: true,
+    })
     layoutMocks.pathname = '/settings/export'
 
     render(
@@ -164,6 +171,10 @@ describe('SettingsLayout', () => {
   })
 
   it('renders the nested settings outlet when no explicit children are provided', () => {
+    useUiPreferencesStore.setState({
+      preferences: DEFAULT_UI_PREFERENCES,
+      isHydrated: true,
+    })
     layoutMocks.pathname = '/settings/system-info'
 
     render(<SettingsLayout />)

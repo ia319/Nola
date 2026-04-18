@@ -44,7 +44,7 @@ vi.mock('@tanstack/react-router', () => ({
     select ? select({ pathname: topBarMocks.pathname }) : { pathname: topBarMocks.pathname },
 }))
 
-vi.mock('next-themes', () => ({
+vi.mock('@/components/use-theme', () => ({
   useTheme: () => ({
     resolvedTheme: topBarMocks.resolvedTheme,
     setTheme: topBarMocks.setTheme,

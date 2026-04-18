@@ -4,6 +4,8 @@ import type { ReactNode } from 'react'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { useUiPreferencesStore } from '@/app/locale/ui-preferences-store'
+import { DEFAULT_UI_PREFERENCES } from '@/config/ui-preferences'
 import { AppSidebar } from '../AppSidebar'
 
 const sidebarMocks = vi.hoisted(() => ({
@@ -50,6 +52,10 @@ vi.mock('@tanstack/react-router', () => ({
 
 describe('AppSidebar', () => {
   beforeEach(() => {
+    useUiPreferencesStore.setState({
+      preferences: DEFAULT_UI_PREFERENCES,
+      isHydrated: true,
+    })
     sidebarMocks.breakpoint = 'lg'
     sidebarMocks.pathname = '/'
   })
