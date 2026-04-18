@@ -3,6 +3,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
+import { localizePath } from '@/app/locale/locale-routing'
+import { useActiveLocale } from '@/app/locale/use-active-locale'
 import { Button } from '@/components/ui/button'
 import { DetailSheet } from '@/components/ui/DetailSheet'
 import {
@@ -42,7 +44,8 @@ export function HistoryFileModeView({
   onCreateTask,
 }: HistoryFileModeViewProps) {
   const { t } = useTranslation()
-  const navigate = useNavigate({ from: '/history' })
+  const navigate = useNavigate()
+  const activeLocale = useActiveLocale()
   const queryClient = useQueryClient()
   const exportDefaults = useExportDefaults()
   const addCreatedTask = useSessionTasksStore((state) => state.addCreatedTask)
@@ -191,7 +194,7 @@ export function HistoryFileModeView({
                     return
                   }
 
-                  void navigate({ to: '/' })
+                  void navigate({ to: localizePath('/', activeLocale) })
                 }}
               >
                 {t('history.files.detail.actions.reprocess')}
