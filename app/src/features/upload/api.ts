@@ -1,5 +1,6 @@
 import apiClient from '@/shared/lib/api-client'
 import type {
+  CleanupResponse,
   DeleteResponse,
   FileInfo,
   FileListResponse,
@@ -66,5 +67,11 @@ export async function deleteFile(fileId: string): Promise<DeleteResponse> {
 /** Check database-file consistency. */
 export async function checkIntegrity(): Promise<IntegrityCheckResponse> {
   const { data } = await apiClient.get<IntegrityCheckResponse>(BASE + '/check-integrity')
+  return data
+}
+
+/** Remove orphaned file records whose backing files are missing. */
+export async function cleanupOrphans(): Promise<CleanupResponse> {
+  const { data } = await apiClient.post<CleanupResponse>(BASE + '/cleanup')
   return data
 }
