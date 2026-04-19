@@ -747,6 +747,138 @@
         "description": "只在当前浏览器中存储语言、外观和单位设置。",
         "detail": "切换到其他浏览器配置文件或设备后，请重新配置相同的偏好。"
       }
+    },
+    "transcription": {
+      "loading": "正在加载转写默认值...",
+      "unavailable": "当前无法获取转写默认值。",
+      "sections": {
+        "basic": {
+          "label": "基础默认值"
+        },
+        "advanced": {
+          "label": "高级默认值"
+        },
+        "engineDefaults": {
+          "label": "引擎默认值",
+          "show": "显示引擎默认值",
+          "hide": "隐藏引擎默认值",
+          "closedNote": "查看当前应用默认值相对引擎基线的覆盖情况。",
+          "loading": "正在加载引擎默认值...",
+          "noOverrides": "当前默认值已经与引擎基线一致。",
+          "columns": {
+            "field": "字段",
+            "current": "当前默认值",
+            "engine": "引擎默认值"
+          }
+        },
+        "resources": {
+          "label": "资源分配"
+        }
+      },
+      "fields": {
+        "language": {
+          "description": "选择新建转写任务时默认使用的语言。"
+        },
+        "task": {
+          "description": "选择新建转写任务时默认使用的任务模式。"
+        },
+        "initialPrompt": {
+          "description": "提供在解码开始前默认注入的提示上下文。"
+        }
+      },
+      "resources": {
+        "modelProfile": {
+          "label": "模型档位",
+          "description": "以只读方式查看当前引擎使用的模型档位。"
+        },
+        "device": {
+          "label": "设备",
+          "description": "查看当前引擎实际使用的执行设备。"
+        },
+        "computeType": {
+          "label": "计算类型",
+          "description": "查看当前引擎执行时使用的数值精度。"
+        },
+        "languageMode": {
+          "label": "语言模式",
+          "description": "查看当前引擎是否支持多语言解码。"
+        }
+      },
+      "values": {
+        "empty": "未设置",
+        "enabled": "已启用",
+        "disabled": "已禁用",
+        "multilingual": "多语言",
+        "englishOnly": "仅英语"
+      }
+    },
+    "export": {
+      "loading": "正在加载导出默认值...",
+      "unavailable": "当前无法获取导出默认值。",
+      "sections": {
+        "defaults": {
+          "label": "导出默认值"
+        },
+        "future": {
+          "label": "计划能力"
+        }
+      },
+      "fields": {
+        "format": {
+          "label": "默认导出格式",
+          "description": "选择一键导出和批量导出默认使用的文件格式。"
+        },
+        "includeTimestamps": {
+          "label": "TXT 包含时间戳",
+          "description": "为 TXT 导出添加时间前缀。其他格式保留自身的时间结构。"
+        },
+        "futureFormats": {
+          "label": "未来格式",
+          "description": "在后端导出契约支持前，仅保留 JSON 和 TSV 作为计划格式展示。"
+        },
+        "metadata": {
+          "label": "元数据包含",
+          "description": "等待后端支持后，再把系统和模型元数据加入导出文件。"
+        },
+        "archivePath": {
+          "label": "归档路径",
+          "description": "等待 API 暴露后，再以只读方式显示服务端导出归档位置。"
+        }
+      },
+      "formats": {
+        "srt": {
+          "label": "SubRip (.srt)",
+          "detail": "用于常见播放器和字幕编辑器。"
+        },
+        "vtt": {
+          "label": "WebVTT (.vtt)",
+          "detail": "用于浏览器播放场景的 Web 字幕格式。"
+        },
+        "txt": {
+          "label": "纯文本 (.txt)",
+          "detail": "用于可读转写文本；是否带时间前缀由 TXT 时间戳设置决定。"
+        },
+        "ass": {
+          "label": "Advanced SubStation Alpha (.ass)",
+          "detail": "用于需要样式控制的高级字幕流程。"
+        }
+      },
+      "values": {
+        "comingSoon": "即将支持",
+        "futureFormat": "{{format}} 即将支持",
+        "unavailable": "未暴露"
+      },
+      "actions": {
+        "retry": "重试",
+        "reset": "重置为默认值",
+        "resetting": "重置中...",
+        "save": "保存更改",
+        "saving": "保存中..."
+      },
+      "toast": {
+        "saved": "导出默认值已更新",
+        "reset": "导出默认值已重置"
+      }
     }
   },
   "history": {

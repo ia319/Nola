@@ -748,6 +748,138 @@
         "description": "Store language, appearance, and units in this browser only.",
         "detail": "Configure the same preferences again when you switch to another browser profile or machine."
       }
+    },
+    "transcription": {
+      "loading": "Load transcription defaults...",
+      "unavailable": "Transcription defaults are not available.",
+      "sections": {
+        "basic": {
+          "label": "Basic Defaults"
+        },
+        "advanced": {
+          "label": "Advanced Defaults"
+        },
+        "engineDefaults": {
+          "label": "Engine Defaults",
+          "show": "Show Engine Defaults",
+          "hide": "Hide Engine Defaults",
+          "closedNote": "Review overridden values against the engine baseline.",
+          "loading": "Load engine defaults...",
+          "noOverrides": "Current defaults already match the engine baseline.",
+          "columns": {
+            "field": "Field",
+            "current": "Current Default",
+            "engine": "Engine Default"
+          }
+        },
+        "resources": {
+          "label": "Resource Allocation"
+        }
+      },
+      "fields": {
+        "language": {
+          "description": "Choose the default language for new transcription tasks."
+        },
+        "task": {
+          "description": "Choose the default task mode for new transcription tasks."
+        },
+        "initialPrompt": {
+          "description": "Provide the default prompt context applied before decoding starts."
+        }
+      },
+      "resources": {
+        "modelProfile": {
+          "label": "Model Profile",
+          "description": "Review the current engine model profile in read-only form."
+        },
+        "device": {
+          "label": "Device",
+          "description": "Review which execution device the engine currently targets."
+        },
+        "computeType": {
+          "label": "Compute Type",
+          "description": "Review the active numeric precision for engine execution."
+        },
+        "languageMode": {
+          "label": "Language Mode",
+          "description": "Review whether the current engine build supports multilingual decoding."
+        }
+      },
+      "values": {
+        "empty": "Not set",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "multilingual": "Multilingual",
+        "englishOnly": "English-only"
+      }
+    },
+    "export": {
+      "loading": "Load export defaults...",
+      "unavailable": "Export defaults are not available.",
+      "sections": {
+        "defaults": {
+          "label": "Export Defaults"
+        },
+        "future": {
+          "label": "Planned Capabilities"
+        }
+      },
+      "fields": {
+        "format": {
+          "label": "Default Export Format",
+          "description": "Choose the file format used by one-click and batch exports."
+        },
+        "includeTimestamps": {
+          "label": "Include Timestamps for TXT",
+          "description": "Add time prefixes to TXT exports. Other formats keep their native timing structure."
+        },
+        "futureFormats": {
+          "label": "Future Formats",
+          "description": "Keep JSON and TSV visible as planned formats until the backend export contract supports them."
+        },
+        "metadata": {
+          "label": "Metadata Inclusion",
+          "description": "Wait for backend support before adding system and model metadata to exported files."
+        },
+        "archivePath": {
+          "label": "Archive Path",
+          "description": "Review the server-side export archive location when the API exposes it."
+        }
+      },
+      "formats": {
+        "srt": {
+          "label": "SubRip (.srt)",
+          "detail": "Use the common subtitle format for players and editors."
+        },
+        "vtt": {
+          "label": "WebVTT (.vtt)",
+          "detail": "Use the web subtitle format for browser playback."
+        },
+        "txt": {
+          "label": "Plain Text (.txt)",
+          "detail": "Use a readable transcript file; timestamp prefixes depend on the TXT timestamp setting."
+        },
+        "ass": {
+          "label": "Advanced SubStation Alpha (.ass)",
+          "detail": "Use the styled subtitle format for advanced subtitle workflows."
+        }
+      },
+      "values": {
+        "comingSoon": "Coming soon",
+        "futureFormat": "{{format}} coming soon",
+        "unavailable": "Not exposed"
+      },
+      "actions": {
+        "retry": "Retry",
+        "reset": "Reset to Defaults",
+        "resetting": "Resetting...",
+        "save": "Save Changes",
+        "saving": "Saving..."
+      },
+      "toast": {
+        "saved": "Export defaults updated",
+        "reset": "Export defaults reset"
+      }
     }
   },
   "history": {

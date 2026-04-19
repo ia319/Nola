@@ -275,6 +275,8 @@ export interface AdvancedOptionsProps {
   defaultOpen?: boolean
   showToggle?: boolean
   showReset?: boolean
+  containerClassName?: string
+  groupLabelClassName?: string
 }
 
 function resolveSliderDisplayValue(value: unknown, fallback: unknown): number | undefined {
@@ -305,6 +307,8 @@ function AdvancedOptionsInner({
   defaultOpen = false,
   showToggle = true,
   showReset = true,
+  containerClassName,
+  groupLabelClassName,
 }: AdvancedOptionsProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(defaultOpen)
@@ -333,11 +337,16 @@ function AdvancedOptionsInner({
   }
 
   const content = (
-    <div className="space-y-5 rounded-md border p-4">
+    <div className={cn('space-y-5 rounded-md border p-4', containerClassName)}>
       {schema.map((group, gi) => (
         <div key={group.group}>
           {gi > 0 && <Separator className="mb-4" />}
-          <h4 className="text-muted-foreground mb-3 text-xs font-medium tracking-wide uppercase">
+          <h4
+            className={cn(
+              'text-muted-foreground mb-3 text-xs font-medium tracking-wide uppercase',
+              groupLabelClassName,
+            )}
+          >
             {t(group.group_label_key)}
           </h4>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
