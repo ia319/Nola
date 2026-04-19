@@ -942,6 +942,69 @@
         "retry": "重试",
         "save": "保存更改"
       }
+    },
+    "systemInfo": {
+      "sections": {
+        "architecture": {
+          "label": "系统架构"
+        },
+        "integrity": {
+          "label": "文件完整性"
+        },
+        "maintenance": {
+          "label": "维护"
+        }
+      },
+      "fields": {
+        "runtimeBoundary": {
+          "label": "运行边界",
+          "description": "通过本地 API 服务运行浏览器界面。"
+        },
+        "fileIndex": {
+          "label": "文件索引",
+          "description": "在数据库中保存上传文件记录，并与磁盘文件做一致性检查。"
+        },
+        "modelStorage": {
+          "label": "模型存储",
+          "description": "把模型存储控制与系统维护操作分开处理。"
+        },
+        "integrityCheck": {
+          "label": "完整性检查",
+          "description": "检查数据库文件记录是否仍指向磁盘上存在的文件。"
+        },
+        "cleanupOrphans": {
+          "label": "清理孤立记录",
+          "description": "查看完整性检查结果后，删除已缺失文件对应的数据库记录。"
+        }
+      },
+      "values": {
+        "localApi": "本地 API 服务",
+        "databaseAndDisk": "数据库记录 + 磁盘文件",
+        "separateSettingsPage": "模型存储页面",
+        "notChecked": "未检查",
+        "checking": "检查中...",
+        "clean": "没有缺失文件",
+        "missingCount": "{{count}} 个缺失文件",
+        "cleanupReady": "完整性检查后可用",
+        "cleanupBlocked": "先运行完整性检查",
+        "deletedCount": "已删除 {{count}} 条孤立记录"
+      },
+      "actions": {
+        "check": "检查",
+        "checking": "检查中...",
+        "cleanup": "清理",
+        "cleaning": "清理中...",
+        "cancel": "取消",
+        "confirmCleanup": "清理孤立记录"
+      },
+      "confirm": {
+        "title": "清理孤立记录？",
+        "description": "删除磁盘文件已经缺失的数据库记录。此操作不能恢复文件。"
+      },
+      "toast": {
+        "integrityChecked": "文件完整性检查完成",
+        "cleanupDone": "孤立记录已清理"
+      }
     }
   },
   "history": {

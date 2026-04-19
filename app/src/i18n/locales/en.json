@@ -943,6 +943,69 @@
         "retry": "Retry",
         "save": "Save Changes"
       }
+    },
+    "systemInfo": {
+      "sections": {
+        "architecture": {
+          "label": "System Architecture"
+        },
+        "integrity": {
+          "label": "File Integrity"
+        },
+        "maintenance": {
+          "label": "Maintenance"
+        }
+      },
+      "fields": {
+        "runtimeBoundary": {
+          "label": "Runtime Boundary",
+          "description": "Run the browser interface against the local API service."
+        },
+        "fileIndex": {
+          "label": "File Index",
+          "description": "Keep uploaded file records in the database and verify them against files on disk."
+        },
+        "modelStorage": {
+          "label": "Model Storage",
+          "description": "Keep model storage controls separate from system maintenance actions."
+        },
+        "integrityCheck": {
+          "label": "Integrity Check",
+          "description": "Check whether database file records still point to files available on disk."
+        },
+        "cleanupOrphans": {
+          "label": "Cleanup Orphans",
+          "description": "Delete orphaned database records after reviewing the integrity check result."
+        }
+      },
+      "values": {
+        "localApi": "Local API service",
+        "databaseAndDisk": "Database records + disk files",
+        "separateSettingsPage": "Model Storage page",
+        "notChecked": "Not checked",
+        "checking": "Checking...",
+        "clean": "No missing files",
+        "missingCount": "{{count}} missing file(s)",
+        "cleanupReady": "Ready after integrity check",
+        "cleanupBlocked": "Run integrity check first",
+        "deletedCount": "{{count}} orphan record(s) deleted"
+      },
+      "actions": {
+        "check": "Check",
+        "checking": "Checking...",
+        "cleanup": "Cleanup",
+        "cleaning": "Cleaning...",
+        "cancel": "Cancel",
+        "confirmCleanup": "Cleanup Orphans"
+      },
+      "confirm": {
+        "title": "Cleanup orphan records?",
+        "description": "Delete database records for files that are already missing on disk. This action cannot restore files."
+      },
+      "toast": {
+        "integrityChecked": "File integrity checked",
+        "cleanupDone": "Orphan records cleaned up"
+      }
     }
   },
   "history": {
