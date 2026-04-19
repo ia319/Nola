@@ -880,6 +880,69 @@
         "saved": "Export defaults updated",
         "reset": "Export defaults reset"
       }
+    },
+    "modelStorage": {
+      "loading": "Load model storage settings...",
+      "unavailable": "Model storage settings are not available.",
+      "sections": {
+        "current": {
+          "label": "Current State"
+        },
+        "directory": {
+          "label": "Model Cache Directory"
+        }
+      },
+      "fields": {
+        "configuredModel": {
+          "label": "Configured Model",
+          "description": "Review the model selected as the default for new transcription tasks."
+        },
+        "lastLoadedModel": {
+          "label": "Last Loaded Model",
+          "description": "Review the model most recently loaded by the worker process."
+        },
+        "effectiveDirectory": {
+          "label": "Effective Model Directory",
+          "description": "Reserve this position for the resolved cache location after the API stops returning absolute paths."
+        },
+        "overrideSource": {
+          "label": "Override Source",
+          "description": "Review which configuration layer currently controls model storage."
+        },
+        "restartStatus": {
+          "label": "Restart Status",
+          "description": "Review whether the running worker needs a restart before changes apply."
+        },
+        "configuredDirectory": {
+          "label": "Configured Cache Directory",
+          "description": "Reserve this control for model cache changes after the API returns a safe editable value.",
+          "current": "Current configured value: {{path}}"
+        },
+        "environmentOverride": {
+          "label": "Environment Override",
+          "description": "An environment variable controls the model cache directory before stored settings."
+        },
+        "restartRequired": {
+          "label": "Restart Required",
+          "description": "Restart the local service to apply pending model storage changes."
+        }
+      },
+      "values": {
+        "empty": "Not set",
+        "directoryUnavailable": "Hidden until backend returns a safe display path",
+        "environmentOverrideActive": "Environment override active",
+        "restartRequired": "Restart required",
+        "restartNotRequired": "No restart required",
+        "overrideSource": {
+          "environment": "Environment",
+          "database": "Stored setting",
+          "default": "Default"
+        }
+      },
+      "actions": {
+        "retry": "Retry",
+        "save": "Save Changes"
+      }
     }
   },
   "history": {
