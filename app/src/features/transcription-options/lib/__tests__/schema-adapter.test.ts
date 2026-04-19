@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildTranscriptionSchemaUiModel } from '../schema-adapter'
+import { AUTO_DETECT_LANGUAGE_VALUE, buildTranscriptionSchemaUiModel } from '../schema-adapter'
 import type { LanguageOption, TranscriptionOptionGroup } from '@/shared/types'
 
 describe('buildTranscriptionSchemaUiModel', () => {
@@ -57,7 +57,7 @@ describe('buildTranscriptionSchemaUiModel', () => {
     const result = buildTranscriptionSchemaUiModel({ schema, effectiveLanguages })
 
     expect(result.languageControl.options.map((option) => option.value)).toEqual([
-      '__auto__',
+      AUTO_DETECT_LANGUAGE_VALUE,
       'en',
       'zh',
     ])
@@ -90,7 +90,10 @@ describe('buildTranscriptionSchemaUiModel', () => {
 
     const result = buildTranscriptionSchemaUiModel({ schema, effectiveLanguages })
 
-    expect(result.languageControl.options.map((option) => option.value)).toEqual(['__auto__', 'en'])
+    expect(result.languageControl.options.map((option) => option.value)).toEqual([
+      AUTO_DETECT_LANGUAGE_VALUE,
+      'en',
+    ])
     expect(result.taskControl.options.map((option) => option.value)).toEqual([
       'transcribe',
       'translate',
