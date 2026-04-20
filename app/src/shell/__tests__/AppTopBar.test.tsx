@@ -65,8 +65,10 @@ describe('AppTopBar', () => {
     render(<AppTopBar activityCount={2} />)
 
     const topBar = screen.getByText('Tasks').closest('[data-slot="app-topbar"]')
+    const activityButton = screen.getByRole('button', { name: 'Activity (2)' })
+
     expect(topBar).toHaveAttribute('data-breakpoint', 'lg')
-    expect(screen.getByRole('button', { name: 'Activity (2)' })).toBeTruthy()
+    expect(activityButton).toHaveClass('text-destructive')
     expect(screen.getByRole('button', { name: 'Toggle theme' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Help' })).toBeTruthy()
     expect(screen.getByText('2')).toBeTruthy()

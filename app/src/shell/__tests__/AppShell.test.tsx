@@ -6,6 +6,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { ActivityRouteTarget } from '@/features/activity'
+import { useActivityStore } from '@/features/activity'
 
 import { AppShell } from '../AppShell'
 
@@ -29,13 +30,15 @@ const appShellMocks = vi.hoisted(() => ({
   ),
   appTopBar: vi.fn(
     ({
+      activityCount,
       onActivityClick,
       settingsTabs,
     }: {
+      activityCount?: number
       onActivityClick?: () => void
       settingsTabs?: ReactNode
     }) => (
-      <div data-slot="mock-app-topbar">
+      <div data-slot="mock-app-topbar" data-activity-count={String(activityCount ?? 0)}>
         <button type="button" onClick={onActivityClick}>
           topbar
         </button>
@@ -100,6 +103,7 @@ describe('AppShell', () => {
     appShellMocks.requestCloseDetailOverlays.mockClear()
     appShellMocks.taskPolling.mockClear()
     appShellMocks.toaster.mockClear()
+    useActivityStore.getState().clearActivity()
   })
 
   it('composes the shell chrome, outlet area, polling, and toaster', () => {
@@ -133,6 +137,24 @@ describe('AppShell', () => {
 
     expect(appShellMocks.requestCloseDetailOverlays).toHaveBeenCalledTimes(1)
     expect(screen.getByText('activity center')).toHaveAttribute('data-open', 'true')
+  })
+
+  it('passes the activity badge count to the top bar', () => {
+    useActivityStore.getState().setModelSettings({
+      configured_model_id: 'large-v3',
+      last_loaded_model_id: 'small',
+      configured_model_dir: null,
+      effective_model_dir: 'models',
+      override_source: 'database',
+      restart_required: true,
+    })
+
+    render(<AppShell />)
+
+    expect(screen.getByText('topbar').closest('[data-slot="mock-app-topbar"]')).toHaveAttribute(
+      'data-activity-count',
+      '1',
+    )
   })
 
   it('navigates activity routes with the active locale and closes the activity center', () => {

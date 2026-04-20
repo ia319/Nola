@@ -7,6 +7,7 @@ import { localizePath } from '@/app/locale/locale-routing'
 import { useActiveLocale } from '@/app/locale/use-active-locale'
 import { Toaster } from '@/components/ui/sonner'
 import type { ActivityRouteTarget } from '@/features/activity'
+import { selectActivityBadgeCount, useActivityStore } from '@/features/activity'
 import { useTaskPolling } from '@/features/tasks'
 import { requestCloseDetailOverlays } from '@/shared/lib/overlay-events'
 
@@ -23,6 +24,7 @@ export function AppShell({ settingsTabs }: AppShellProps = {}) {
   useTaskPolling()
   const navigate = useNavigate()
   const activeLocale = useActiveLocale()
+  const activityCount = useActivityStore(selectActivityBadgeCount)
   const [isActivityCenterOpen, setIsActivityCenterOpen] = useState(false)
 
   const handleActivityCenterOpenChange = useCallback((open: boolean) => {
@@ -56,7 +58,11 @@ export function AppShell({ settingsTabs }: AppShellProps = {}) {
         data-slot="app-shell-workspace"
         className="flex min-h-screen min-w-0 flex-col lg:ml-[var(--sidebar-width)]"
       >
-        <AppTopBar settingsTabs={settingsTabs} onActivityClick={handleActivityClick} />
+        <AppTopBar
+          activityCount={activityCount}
+          settingsTabs={settingsTabs}
+          onActivityClick={handleActivityClick}
+        />
 
         <main
           data-slot="app-shell-main"

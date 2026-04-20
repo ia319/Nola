@@ -118,7 +118,12 @@ export function AppTopBar({
           variant="ghost"
           size="icon-sm"
           aria-label={activityLabel}
-          className="text-muted-foreground hover:bg-surface-container-low hover:text-foreground relative"
+          className={cn(
+            'hover:bg-surface-container-low relative',
+            hasActivity
+              ? 'bg-destructive-container/35 text-destructive hover:bg-destructive-container/50 hover:text-destructive'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
           onClick={onActivityClick}
         >
           <ActivityIcon className="size-4" />
