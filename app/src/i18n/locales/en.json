@@ -718,7 +718,8 @@
       "actions": {
         "dismiss": "Dismiss {{label}}",
         "dismissAll": "Dismiss all",
-        "clearRecent": "Clear Recent History"
+        "clearRecent": "Clear Recent History",
+        "openRoute": "Open {{route}}"
       },
       "route": {
         "history": "History",

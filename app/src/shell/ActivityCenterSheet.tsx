@@ -18,6 +18,7 @@ import { formatFileSize } from '@/shared/lib/format'
 export interface ActivityCenterSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onNavigate: (route: ActivityRouteTarget) => void
 }
 
 const ACTIVITY_ROUTE_LABEL_KEYS: Record<ActivityRouteTarget, string> = {
@@ -81,13 +82,27 @@ function EmptyActivityBlock({ title, description }: { title: ReactNode; descript
   )
 }
 
-function RoutePill({ route }: { route: ActivityRouteTarget }) {
+function RouteButton({
+  route,
+  onNavigate,
+}: {
+  route: ActivityRouteTarget
+  onNavigate: (route: ActivityRouteTarget) => void
+}) {
   const { t } = useTranslation()
+  const label = t(ACTIVITY_ROUTE_LABEL_KEYS[route])
 
   return (
-    <span className="text-muted-foreground bg-surface-container-low rounded-full px-2 py-1 text-[10px] font-bold tracking-[0.12em] uppercase">
-      {t(ACTIVITY_ROUTE_LABEL_KEYS[route])}
-    </span>
+    <Button
+      type="button"
+      variant="ghost"
+      size="xs"
+      className="bg-surface-container-low text-muted-foreground hover:text-foreground h-6 rounded-full px-2 text-[10px] font-bold tracking-[0.12em] uppercase"
+      aria-label={t('shell.activityCenter.actions.openRoute', { route: label })}
+      onClick={() => onNavigate(route)}
+    >
+      {label}
+    </Button>
   )
 }
 
@@ -118,9 +133,11 @@ function formatTaskIdentity(
 function AttentionItemCard({
   item,
   onDismiss,
+  onNavigate,
 }: {
   item: ActivityAttentionItem
   onDismiss: (activityId: string) => void
+  onNavigate: (route: ActivityRouteTarget) => void
 }) {
   const { t } = useTranslation()
 
@@ -142,7 +159,7 @@ function AttentionItemCard({
             </div>
             <div className="flex items-center justify-between gap-3">
               <StatusBadge status={item.task.status} />
-              <RoutePill route={item.route} />
+              <RouteButton route={item.route} onNavigate={onNavigate} />
             </div>
           </div>
         </div>
@@ -174,7 +191,7 @@ function AttentionItemCard({
             <span className="text-muted-foreground text-xs">
               {t(MODEL_OVERRIDE_SOURCE_LABEL_KEYS[item.model.overrideSource])}
             </span>
-            <RoutePill route={item.route} />
+            <RouteButton route={item.route} onNavigate={onNavigate} />
           </div>
         </div>
       </div>
@@ -182,7 +199,13 @@ function AttentionItemCard({
   )
 }
 
-function InProgressItemCard({ item }: { item: ActivityInProgressItem }) {
+function InProgressItemCard({
+  item,
+  onNavigate,
+}: {
+  item: ActivityInProgressItem
+  onNavigate: (route: ActivityRouteTarget) => void
+}) {
   const { t } = useTranslation()
 
   if (item.kind === 'task_in_progress') {
@@ -198,7 +221,7 @@ function InProgressItemCard({ item }: { item: ActivityInProgressItem }) {
           percent={item.task.progress}
           showValue
           label={t('shell.activityCenter.items.taskInProgress')}
-          meta={<RoutePill route={item.route} />}
+          meta={<RouteButton route={item.route} onNavigate={onNavigate} />}
         />
       </div>
     )
@@ -227,7 +250,7 @@ function InProgressItemCard({ item }: { item: ActivityInProgressItem }) {
             valueLabel={`${Math.round(item.download.percent)}%`}
           />
           <div className="flex justify-end">
-            <RoutePill route={item.route} />
+            <RouteButton route={item.route} onNavigate={onNavigate} />
           </div>
         </div>
       </div>
@@ -238,9 +261,11 @@ function InProgressItemCard({ item }: { item: ActivityInProgressItem }) {
 function RecentItemRow({
   item,
   onDismiss,
+  onNavigate,
 }: {
   item: ActivityRecentItem
   onDismiss: (activityId: string) => void
+  onNavigate: (route: ActivityRouteTarget) => void
 }) {
   const { t } = useTranslation()
 
@@ -281,14 +306,14 @@ function RecentItemRow({
           <DismissButton label={title} onDismiss={() => onDismiss(item.id)} />
         </div>
         <div className="mt-2">
-          <RoutePill route={item.route} />
+          <RouteButton route={item.route} onNavigate={onNavigate} />
         </div>
       </div>
     </div>
   )
 }
 
-export function ActivityCenterSheet({ open, onOpenChange }: ActivityCenterSheetProps) {
+export function ActivityCenterSheet({ open, onOpenChange, onNavigate }: ActivityCenterSheetProps) {
   const { t } = useTranslation()
   const needsAttention = useActivityStore((state) => state.needsAttention)
   const inProgress = useActivityStore((state) => state.inProgress)
@@ -333,7 +358,12 @@ export function ActivityCenterSheet({ open, onOpenChange }: ActivityCenterSheetP
         {needsAttention.length > 0 ? (
           <div className="space-y-3">
             {needsAttention.map((item) => (
-              <AttentionItemCard key={item.id} item={item} onDismiss={dismissActivity} />
+              <AttentionItemCard
+                key={item.id}
+                item={item}
+                onDismiss={dismissActivity}
+                onNavigate={onNavigate}
+              />
             ))}
           </div>
         ) : (
@@ -348,7 +378,7 @@ export function ActivityCenterSheet({ open, onOpenChange }: ActivityCenterSheetP
         {inProgress.length > 0 ? (
           <div className="space-y-4">
             {inProgress.map((item) => (
-              <InProgressItemCard key={item.id} item={item} />
+              <InProgressItemCard key={item.id} item={item} onNavigate={onNavigate} />
             ))}
           </div>
         ) : (
@@ -363,7 +393,12 @@ export function ActivityCenterSheet({ open, onOpenChange }: ActivityCenterSheetP
         {recent.length > 0 ? (
           <div className="space-y-4">
             {recent.map((item) => (
-              <RecentItemRow key={item.id} item={item} onDismiss={dismissActivity} />
+              <RecentItemRow
+                key={item.id}
+                item={item}
+                onDismiss={dismissActivity}
+                onNavigate={onNavigate}
+              />
             ))}
           </div>
         ) : (

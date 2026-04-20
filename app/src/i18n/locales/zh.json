@@ -717,7 +717,8 @@
       "actions": {
         "dismiss": "忽略 {{label}}",
         "dismissAll": "全部忽略",
-        "clearRecent": "清空最近活动"
+        "clearRecent": "清空最近活动",
+        "openRoute": "打开{{route}}"
       },
       "route": {
         "history": "历史",

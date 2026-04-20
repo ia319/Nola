@@ -5,13 +5,25 @@ import type { ReactNode } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { ActivityRouteTarget } from '@/features/activity'
+
 import { AppShell } from '../AppShell'
 
 const appShellMocks = vi.hoisted(() => ({
   activityCenterSheet: vi.fn(
-    ({ open }: { open: boolean; onOpenChange: (open: boolean) => void }) => (
+    ({
+      onNavigate,
+      open,
+    }: {
+      onNavigate: (route: ActivityRouteTarget) => void
+      open: boolean
+      onOpenChange: (open: boolean) => void
+    }) => (
       <div data-slot="mock-activity-center" data-open={String(open)}>
         activity center
+        <button type="button" onClick={() => onNavigate('/models')}>
+          go models
+        </button>
       </div>
     ),
   ),
@@ -33,6 +45,8 @@ const appShellMocks = vi.hoisted(() => ({
   ),
   appSidebar: vi.fn(() => <div data-slot="mock-app-sidebar">sidebar</div>),
   outlet: vi.fn(() => <div data-slot="mock-outlet">outlet</div>),
+  activeLocale: 'zh' as 'zh' | 'en' | null,
+  navigate: vi.fn(),
   requestCloseDetailOverlays: vi.fn(),
   taskPolling: vi.fn(),
   toaster: vi.fn(() => <div data-slot="mock-toaster">toaster</div>),
@@ -54,6 +68,10 @@ vi.mock('@/components/ui/sonner', () => ({
   Toaster: appShellMocks.toaster,
 }))
 
+vi.mock('@/app/locale/use-active-locale', () => ({
+  useActiveLocale: () => appShellMocks.activeLocale,
+}))
+
 vi.mock('@/features/tasks', () => ({
   useTaskPolling: appShellMocks.taskPolling,
 }))
@@ -68,6 +86,7 @@ vi.mock('../AppLocaleController', () => ({
 
 vi.mock('@tanstack/react-router', () => ({
   Outlet: appShellMocks.outlet,
+  useNavigate: () => appShellMocks.navigate,
 }))
 
 describe('AppShell', () => {
@@ -76,6 +95,8 @@ describe('AppShell', () => {
     appShellMocks.appTopBar.mockClear()
     appShellMocks.appSidebar.mockClear()
     appShellMocks.outlet.mockClear()
+    appShellMocks.activeLocale = 'zh'
+    appShellMocks.navigate.mockClear()
     appShellMocks.requestCloseDetailOverlays.mockClear()
     appShellMocks.taskPolling.mockClear()
     appShellMocks.toaster.mockClear()
@@ -112,5 +133,15 @@ describe('AppShell', () => {
 
     expect(appShellMocks.requestCloseDetailOverlays).toHaveBeenCalledTimes(1)
     expect(screen.getByText('activity center')).toHaveAttribute('data-open', 'true')
+  })
+
+  it('navigates activity routes with the active locale and closes the activity center', () => {
+    render(<AppShell />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'topbar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'go models' }))
+
+    expect(appShellMocks.navigate).toHaveBeenCalledWith({ to: '/zh/models' })
+    expect(screen.getByText('activity center')).toHaveAttribute('data-open', 'false')
   })
 })

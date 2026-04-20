@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react'
 import { useCallback, useState } from 'react'
 
-import { Outlet } from '@tanstack/react-router'
+import { Outlet, useNavigate } from '@tanstack/react-router'
 
+import { localizePath } from '@/app/locale/locale-routing'
+import { useActiveLocale } from '@/app/locale/use-active-locale'
 import { Toaster } from '@/components/ui/sonner'
+import type { ActivityRouteTarget } from '@/features/activity'
 import { useTaskPolling } from '@/features/tasks'
 import { requestCloseDetailOverlays } from '@/shared/lib/overlay-events'
 
@@ -18,6 +21,8 @@ type AppShellProps = {
 
 export function AppShell({ settingsTabs }: AppShellProps = {}) {
   useTaskPolling()
+  const navigate = useNavigate()
+  const activeLocale = useActiveLocale()
   const [isActivityCenterOpen, setIsActivityCenterOpen] = useState(false)
 
   const handleActivityCenterOpenChange = useCallback((open: boolean) => {
@@ -34,6 +39,14 @@ export function AppShell({ settingsTabs }: AppShellProps = {}) {
     }
     setIsActivityCenterOpen(nextOpen)
   }, [isActivityCenterOpen])
+
+  const handleActivityNavigate = useCallback(
+    (route: ActivityRouteTarget) => {
+      void navigate({ to: localizePath(route, activeLocale) })
+      setIsActivityCenterOpen(false)
+    },
+    [activeLocale, navigate],
+  )
 
   return (
     <div data-slot="app-shell" className="bg-background text-foreground min-h-screen">
@@ -58,6 +71,7 @@ export function AppShell({ settingsTabs }: AppShellProps = {}) {
       <ActivityCenterSheet
         open={isActivityCenterOpen}
         onOpenChange={handleActivityCenterOpenChange}
+        onNavigate={handleActivityNavigate}
       />
       <Toaster />
     </div>

@@ -29,6 +29,7 @@ const messages: Record<string, string> = {
   'shell.activityCenter.actions.dismiss': 'Dismiss {{label}}',
   'shell.activityCenter.actions.dismissAll': 'Dismiss all',
   'shell.activityCenter.actions.clearRecent': 'Clear Recent History',
+  'shell.activityCenter.actions.openRoute': 'Open {{route}}',
   'shell.activityCenter.route.history': 'History',
   'shell.activityCenter.route.models': 'Models',
   'shell.activityCenter.route.systemInfo': 'System Info',
@@ -134,7 +135,7 @@ describe('ActivityCenterSheet', () => {
   it('renders attention, progress, and recent activity sections', () => {
     seedActivityStore()
 
-    render(<ActivityCenterSheet open onOpenChange={vi.fn()} />)
+    render(<ActivityCenterSheet open onOpenChange={vi.fn()} onNavigate={vi.fn()} />)
 
     expect(screen.getByText('Activity Center')).toBeTruthy()
     expect(screen.getByText('Needs Attention')).toBeTruthy()
@@ -150,7 +151,7 @@ describe('ActivityCenterSheet', () => {
   it('dismisses individual activity and clears recent events', () => {
     seedActivityStore()
 
-    render(<ActivityCenterSheet open onOpenChange={vi.fn()} />)
+    render(<ActivityCenterSheet open onOpenChange={vi.fn()} onNavigate={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss Failed task' }))
     expect(screen.queryByText('failed-task.wav')).toBeNull()
@@ -159,5 +160,24 @@ describe('ActivityCenterSheet', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear Recent History' }))
     expect(screen.queryByText('Model download finished')).toBeNull()
     expect(screen.getByText('No recent activity')).toBeTruthy()
+  })
+
+  it('emits route navigation requests from activity rows', () => {
+    const onNavigate = vi.fn()
+    useActivityStore.getState().setTasks([
+      buildTask('failed-task', {
+        filename: 'failed-task.wav',
+        status: 'failed',
+        progress: 20,
+        completed_at: '2026-04-20T10:05:00.000Z',
+      }),
+    ])
+
+    render(<ActivityCenterSheet open onOpenChange={vi.fn()} onNavigate={onNavigate} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open History' }))
+
+    expect(onNavigate).toHaveBeenCalledTimes(1)
+    expect(onNavigate).toHaveBeenCalledWith('/history')
   })
 })
