@@ -17,6 +17,7 @@ import {
 import { useExportDefaults } from '@/features/export'
 import { requestTaskRefresh, useHistoryTaskActions, useSessionTasksStore } from '@/features/tasks'
 import { FileDetailContent } from '@/features/upload'
+import { useDetailOverlayCloseRequest } from '@/shared/lib/overlay-events'
 import { queryKeys } from '@/shared/lib/query-keys'
 import { HistoryFileRecordsView } from './HistoryFileRecordsView'
 import { useHistoryFileAssociatedTasks } from './useHistoryFileAssociatedTasks'
@@ -52,6 +53,12 @@ export function HistoryFileModeView({
   const upsertSessionTask = useSessionTasksStore((state) => state.upsertSessionTask)
   const [pendingDeleteFile, setPendingDeleteFile] = useState<FileInfo | null>(null)
   const [selectedDetailFile, setSelectedDetailFile] = useState<FileInfo | null>(null)
+  const closeFileDetail = useCallback(() => {
+    setSelectedDetailFile(null)
+  }, [])
+
+  useDetailOverlayCloseRequest(closeFileDetail)
+
   const historyFiles = useHistoryFiles({
     query,
     onPageClamp,

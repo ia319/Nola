@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Copy } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -27,6 +27,7 @@ import type {
   TaskSortBy,
   TaskSummary,
 } from '@/shared/types'
+import { useDetailOverlayCloseRequest } from '@/shared/lib/overlay-events'
 
 export interface HistoryTaskModeViewProps {
   query: TaskQueryModel
@@ -62,6 +63,12 @@ export function HistoryTaskModeView({
   const [runningDetailAction, setRunningDetailAction] = useState<
     'cancel' | 'delete' | 'export' | 'retry' | null
   >(null)
+  const closeTaskDetail = useCallback(() => {
+    setSelectedDetailTask(null)
+  }, [])
+
+  useDetailOverlayCloseRequest(closeTaskDetail)
+
   const historyTasks = useHistoryTasks({
     query,
     onPageClamp,

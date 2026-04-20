@@ -23,6 +23,7 @@ import {
 } from '@/features/models'
 import type { DownloadState } from '@/features/models'
 import { isAppError } from '@/shared/lib/error-factory'
+import { useDetailOverlayCloseRequest } from '@/shared/lib/overlay-events'
 import type { AppError } from '@/shared/types'
 
 function toastError(t: TFunction, err: unknown) {
@@ -70,6 +71,12 @@ export function ModelsPage() {
   useEffect(() => {
     selectedModelIdRef.current = selectedModelId
   }, [selectedModelId])
+
+  const closeModelDetail = useCallback(() => {
+    setSelectedModelId(null)
+  }, [])
+
+  useDetailOverlayCloseRequest(closeModelDetail)
 
   const activeModel = useMemo(
     () => models.find((model) => model.model_id === lastLoadedModelId) ?? null,
