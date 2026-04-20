@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react'
+import { useCallback, useState } from 'react'
 
 import { Outlet } from '@tanstack/react-router'
 
 import { Toaster } from '@/components/ui/sonner'
 import { useTaskPolling } from '@/features/tasks'
+import { requestCloseDetailOverlays } from '@/shared/lib/overlay-events'
 
+import { ActivityCenterSheet } from './ActivityCenterSheet'
 import { AppLocaleController } from './AppLocaleController'
 import { AppSidebar } from './AppSidebar'
 import { AppTopBar } from './AppTopBar'
@@ -15,6 +18,22 @@ type AppShellProps = {
 
 export function AppShell({ settingsTabs }: AppShellProps = {}) {
   useTaskPolling()
+  const [isActivityCenterOpen, setIsActivityCenterOpen] = useState(false)
+
+  const handleActivityCenterOpenChange = useCallback((open: boolean) => {
+    if (open) {
+      requestCloseDetailOverlays()
+    }
+    setIsActivityCenterOpen(open)
+  }, [])
+
+  const handleActivityClick = useCallback(() => {
+    const nextOpen = !isActivityCenterOpen
+    if (nextOpen) {
+      requestCloseDetailOverlays()
+    }
+    setIsActivityCenterOpen(nextOpen)
+  }, [isActivityCenterOpen])
 
   return (
     <div data-slot="app-shell" className="bg-background text-foreground min-h-screen">
@@ -24,7 +43,7 @@ export function AppShell({ settingsTabs }: AppShellProps = {}) {
         data-slot="app-shell-workspace"
         className="flex min-h-screen min-w-0 flex-col lg:ml-[var(--sidebar-width)]"
       >
-        <AppTopBar settingsTabs={settingsTabs} />
+        <AppTopBar settingsTabs={settingsTabs} onActivityClick={handleActivityClick} />
 
         <main
           data-slot="app-shell-main"
@@ -36,6 +55,10 @@ export function AppShell({ settingsTabs }: AppShellProps = {}) {
         </main>
       </div>
 
+      <ActivityCenterSheet
+        open={isActivityCenterOpen}
+        onOpenChange={handleActivityCenterOpenChange}
+      />
       <Toaster />
     </div>
   )
