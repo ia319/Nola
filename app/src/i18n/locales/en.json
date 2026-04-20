@@ -542,76 +542,76 @@
     "configured": "Default",
     "lastLoaded": "Running",
     "restartRequired": "Restart required to apply model change",
-      "status": {
-        "not_downloaded": "Not Downloaded",
-        "downloading": "Downloading",
-        "partial_download": "Partial Download",
-        "downloaded": "Downloaded"
+    "status": {
+      "not_downloaded": "Not Downloaded",
+      "downloading": "Downloading",
+      "partial_download": "Partial Download",
+      "downloaded": "Downloaded"
+    },
+    "fields": {
+      "size": "Size",
+      "diskUsage": "Disk Usage",
+      "languages": "Languages",
+      "unavailable": "—",
+      "speed": "Speed",
+      "accuracy": "Accuracy"
+    },
+    "catalog": {
+      "tiny": {
+        "description": "Prefer the smallest download and the fastest startup time."
       },
-      "fields": {
-        "size": "Size",
-        "diskUsage": "Disk Usage",
-        "languages": "Languages",
-        "unavailable": "—",
-        "speed": "Speed",
-        "accuracy": "Accuracy"
+      "base": {
+        "description": "Prefer low resource usage while keeping broad language coverage."
       },
-      "catalog": {
-        "tiny": {
-          "description": "Prefer the smallest download and the fastest startup time."
-        },
-        "base": {
-          "description": "Prefer low resource usage while keeping broad language coverage."
-        },
-        "small": {
-          "description": "Balance latency, accuracy, and footprint for general transcription."
-        },
-        "medium": {
-          "description": "Prefer stronger multilingual accuracy when hardware allows."
-        },
-        "largeV1": {
-          "description": "Prefer maximum context with legacy large-model compatibility."
-        },
-        "largeV2": {
-          "description": "Prefer high multilingual quality on capable hardware."
-        },
-        "largeV3": {
-          "description": "Prefer the strongest Whisper-family quality profile."
-        },
-        "largeV3Turbo": {
-          "description": "Prefer faster large-model throughput with multilingual support."
-        },
-        "tinyEnglish": {
-          "description": "Prefer the smallest English-only footprint."
-        },
-        "baseEnglish": {
-          "description": "Prefer lightweight English transcription on modest hardware."
-        },
-        "smallEnglish": {
-          "description": "Balance English quality and throughput."
-        },
-        "mediumEnglish": {
-          "description": "Prefer stronger English accuracy without the full large-model cost."
-        },
-        "distilSmallEnglish": {
-          "description": "Prefer a distilled English model for quick turnarounds."
-        },
-        "distilMediumEnglish": {
-          "description": "Prefer a distilled English model with stronger quality."
-        },
-        "distilLargeV2": {
-          "description": "Prefer a distilled English large model for faster runs."
-        },
-        "distilLargeV3": {
-          "description": "Prefer distilled English large-model quality with lower latency."
-        },
-        "distilLargeV35": {
-          "description": "Prefer the latest distilled English large-model release."
-        }
+      "small": {
+        "description": "Balance latency, accuracy, and footprint for general transcription."
       },
-      "detail": {
-        "eyebrow": "Model detail",
-        "close": "Close model detail",
+      "medium": {
+        "description": "Prefer stronger multilingual accuracy when hardware allows."
+      },
+      "largeV1": {
+        "description": "Prefer maximum context with legacy large-model compatibility."
+      },
+      "largeV2": {
+        "description": "Prefer high multilingual quality on capable hardware."
+      },
+      "largeV3": {
+        "description": "Prefer the strongest Whisper-family quality profile."
+      },
+      "largeV3Turbo": {
+        "description": "Prefer faster large-model throughput with multilingual support."
+      },
+      "tinyEnglish": {
+        "description": "Prefer the smallest English-only footprint."
+      },
+      "baseEnglish": {
+        "description": "Prefer lightweight English transcription on modest hardware."
+      },
+      "smallEnglish": {
+        "description": "Balance English quality and throughput."
+      },
+      "mediumEnglish": {
+        "description": "Prefer stronger English accuracy without the full large-model cost."
+      },
+      "distilSmallEnglish": {
+        "description": "Prefer a distilled English model for quick turnarounds."
+      },
+      "distilMediumEnglish": {
+        "description": "Prefer a distilled English model with stronger quality."
+      },
+      "distilLargeV2": {
+        "description": "Prefer a distilled English large model for faster runs."
+      },
+      "distilLargeV3": {
+        "description": "Prefer distilled English large-model quality with lower latency."
+      },
+      "distilLargeV35": {
+        "description": "Prefer the latest distilled English large-model release."
+      }
+    },
+    "detail": {
+      "eyebrow": "Model detail",
+      "close": "Close model detail",
       "loading": "Loading model detail...",
       "errorTitle": "Model detail unavailable",
       "activeDownload": "Active download",
@@ -646,13 +646,13 @@
         "repoIdCopyFailed": "Repository ID copy failed"
       }
     },
-      "actions": {
-        "download": "Download",
-        "cancel": "Cancel",
-        "delete": "Delete",
-        "select": "Set as Default",
-        "downloading": "Downloading..."
-      },
+    "actions": {
+      "download": "Download",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "select": "Set as Default",
+      "downloading": "Downloading..."
+    },
     "toast": {
       "downloadStarted": "Download started: {{modelId}}",
       "downloadCancelled": "Download cancelled: {{modelId}}",
@@ -690,6 +690,53 @@
         "activityWithCount": "Activity ({{count}})",
         "toggleTheme": "Toggle theme",
         "help": "Help"
+      }
+    },
+    "activityCenter": {
+      "title": "Activity Center",
+      "description": "System status and operational log.",
+      "close": "Close activity center",
+      "sections": {
+        "needsAttention": "Needs Attention",
+        "inProgress": "In Progress",
+        "recent": "Recent"
+      },
+      "empty": {
+        "needsAttention": {
+          "title": "No attention needed",
+          "description": "Failed tasks and restart requirements appear here."
+        },
+        "inProgress": {
+          "title": "No active work",
+          "description": "Running tasks and model downloads appear here."
+        },
+        "recent": {
+          "title": "No recent activity",
+          "description": "Completed tasks and maintenance events appear here."
+        }
+      },
+      "actions": {
+        "dismiss": "Dismiss {{label}}",
+        "dismissAll": "Dismiss all",
+        "clearRecent": "Clear Recent History"
+      },
+      "route": {
+        "history": "History",
+        "models": "Models",
+        "systemInfo": "System Info"
+      },
+      "items": {
+        "failedTask": "Failed task",
+        "restartRequired": "Restart required",
+        "taskInProgress": "Processing transcription",
+        "modelDownload": "Active model download",
+        "taskCompleted": "Completed transcription",
+        "modelDownloadCompleted": "Model download finished",
+        "fileIntegrityChecked": "File integrity checked",
+        "orphanCleanupCompleted": "Orphan cleanup completed",
+        "taskId": "Task {{taskId}}",
+        "configuredModel": "Configured model: {{modelId}}",
+        "affectedCount": "{{count}} affected"
       }
     }
   },

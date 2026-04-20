@@ -541,12 +541,12 @@
     "configured": "默认",
     "lastLoaded": "运行中",
     "restartRequired": "需要重启以应用模型更改",
-      "status": {
-        "not_downloaded": "未下载",
-        "downloading": "下载中",
-        "partial_download": "部分下载",
-        "downloaded": "已下载"
-      },
+    "status": {
+      "not_downloaded": "未下载",
+      "downloading": "下载中",
+      "partial_download": "部分下载",
+      "downloaded": "已下载"
+    },
     "fields": {
       "size": "大小",
       "diskUsage": "占用空间",
@@ -608,13 +608,13 @@
         "description": "优先选择最新发布的蒸馏 large 英文模型。"
       }
     },
-      "actions": {
-        "download": "下载",
-        "cancel": "取消",
-        "delete": "删除",
-        "select": "设为默认",
-        "downloading": "下载中..."
-      },
+    "actions": {
+      "download": "下载",
+      "cancel": "取消",
+      "delete": "删除",
+      "select": "设为默认",
+      "downloading": "下载中..."
+    },
     "detail": {
       "eyebrow": "模型详情",
       "close": "关闭模型详情",
@@ -689,6 +689,53 @@
         "activityWithCount": "活动中心（{{count}}）",
         "toggleTheme": "切换主题",
         "help": "帮助"
+      }
+    },
+    "activityCenter": {
+      "title": "活动中心",
+      "description": "查看系统状态和运行日志。",
+      "close": "关闭活动中心",
+      "sections": {
+        "needsAttention": "需要关注",
+        "inProgress": "进行中",
+        "recent": "最近活动"
+      },
+      "empty": {
+        "needsAttention": {
+          "title": "暂无需要关注的事项",
+          "description": "失败任务和需要重启的模型变更会显示在这里。"
+        },
+        "inProgress": {
+          "title": "暂无进行中的工作",
+          "description": "运行中的任务和模型下载会显示在这里。"
+        },
+        "recent": {
+          "title": "暂无最近活动",
+          "description": "已完成任务和维护事件会显示在这里。"
+        }
+      },
+      "actions": {
+        "dismiss": "忽略 {{label}}",
+        "dismissAll": "全部忽略",
+        "clearRecent": "清空最近活动"
+      },
+      "route": {
+        "history": "历史",
+        "models": "模型",
+        "systemInfo": "系统信息"
+      },
+      "items": {
+        "failedTask": "失败任务",
+        "restartRequired": "需要重启",
+        "taskInProgress": "正在转写",
+        "modelDownload": "模型下载中",
+        "taskCompleted": "转写已完成",
+        "modelDownloadCompleted": "模型下载完成",
+        "fileIntegrityChecked": "文件完整性检查完成",
+        "orphanCleanupCompleted": "孤立记录清理完成",
+        "taskId": "任务 {{taskId}}",
+        "configuredModel": "已配置模型：{{modelId}}",
+        "affectedCount": "影响 {{count}} 项"
       }
     }
   },
