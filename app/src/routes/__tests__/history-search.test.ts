@@ -86,6 +86,12 @@ describe('history-search', () => {
     ).toBe(true)
     expect(
       isSameHistorySearch(
+        normalizeHistorySearch({ page: 2, page_size: 50 }),
+        normalizeHistorySearch({ mode: 'tasks', page: 2, page_size: 50 }),
+      ),
+    ).toBe(true)
+    expect(
+      isSameHistorySearch(
         {
           mode: 'files',
           q: 'alpha',
