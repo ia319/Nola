@@ -25,9 +25,11 @@ const modelsPageMocks = vi.hoisted(() => ({
   toDownloadState: vi.fn(),
 }))
 
+type TranslationParams = Record<string, string | number | boolean | null | undefined>
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, params?: Record<string, unknown>) => {
+    t: (key: string, params?: TranslationParams) => {
       const messages: Record<string, string> = {
         'models.title': 'Models',
         'models.description': 'Manage local transcription models, downloads, and defaults.',
@@ -45,6 +47,8 @@ vi.mock('react-i18next', () => ({
         'models.overview.storagePath.placeholder': 'Hidden for now',
         'models.overview.storagePath.meta': 'Path display is temporarily hidden.',
         'models.toast.actionFailed': 'Model action failed, please retry',
+        'error.generic': 'An error occurred',
+        'error.boundary.retry': 'Try Again',
         'error.api.serverError': 'Server error',
       }
 
@@ -91,7 +95,10 @@ vi.mock('@/features/models', () => ({
   ModelList: (props: {
     models: Array<{ model_id: string }>
     downloads: Map<string, DownloadState>
+    errorMessage?: string | null
+    isLoading?: boolean
     onOpenDetail?: (modelId: string) => void
+    onRetry?: () => void | Promise<void>
   }) => {
     modelsPageMocks.modelList(props)
     return (
@@ -99,8 +106,9 @@ vi.mock('@/features/models', () => ({
         data-slot="mock-model-list"
         data-count={String(props.models.length)}
         data-downloads={String(props.downloads.size)}
+        data-loading={String(Boolean(props.isLoading))}
       >
-        model list
+        {props.errorMessage ?? (props.isLoading ? 'Loading models...' : 'model list')}
       </div>
     )
   },

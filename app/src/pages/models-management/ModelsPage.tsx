@@ -65,6 +65,7 @@ export function ModelsPage() {
     isLoading,
     hasLoaded,
     error,
+    refresh,
     updateSnapshot,
   } = useModels()
   const setActivityModelSettings = useActivityStore((state) => state.setModelSettings)
@@ -283,6 +284,8 @@ export function ModelsPage() {
   const detailModel = detail ?? selectedListModel
   const detailActionState =
     detailModel == null ? null : getModelActionState(detailModel, selectedDownloadState)
+  const isInitialLoading = !hasLoaded && isLoading
+  const initialErrorMessage = !hasLoaded && error ? t(error.i18nKey, error.params ?? {}) : null
 
   function renderDetailFooter() {
     if (!detailModel || !detailActionState) {
@@ -374,67 +377,94 @@ export function ModelsPage() {
     return null
   }
 
-  if (!hasLoaded && isLoading) {
-    return <p className="text-muted-foreground text-center">{t('models.loading')}</p>
-  }
-
-  if (!hasLoaded && error) {
-    return <p className="text-destructive text-center">{t(error.i18nKey, error.params ?? {})}</p>
-  }
-
   return (
     <ErrorBoundary>
       <ContentCanvas as="main" width="full" height="fill" className="gap-6" data-slot="models-page">
         <PageHeader title={t('models.title')} description={t('models.description')} />
 
-        <section
-          data-slot="models-overview"
-          aria-label={t('models.overview.region')}
-          className="grid grid-cols-1 gap-4 md:grid-cols-3"
-        >
-          <MetricCard
-            title={t('models.overview.activeEngine.title')}
-            value={activeModel?.name ?? t('models.overview.activeEngine.empty')}
-            description={
-              activeModel
-                ? t('models.overview.activeEngine.meta', { modelId: activeModel.model_id })
-                : t('models.overview.activeEngine.emptyDescription')
-            }
-            className="h-full"
-          />
+        {!initialErrorMessage ? (
+          <section
+            data-slot="models-overview"
+            aria-label={t('models.overview.region')}
+            className="grid grid-cols-1 gap-4 md:grid-cols-3"
+          >
+            <MetricCard
+              title={t('models.overview.activeEngine.title')}
+              value={
+                isInitialLoading ? (
+                  <span className="bg-surface-container-high block h-8 w-40 rounded-full motion-safe:animate-pulse" />
+                ) : (
+                  (activeModel?.name ?? t('models.overview.activeEngine.empty'))
+                )
+              }
+              description={
+                isInitialLoading ? (
+                  <span className="bg-surface-container-high block h-4 w-48 rounded-full motion-safe:animate-pulse" />
+                ) : activeModel ? (
+                  t('models.overview.activeEngine.meta', { modelId: activeModel.model_id })
+                ) : (
+                  t('models.overview.activeEngine.emptyDescription')
+                )
+              }
+              className="h-full"
+            />
 
-          <MetricCard
-            title={t('models.overview.defaultModel.title')}
-            value={configuredModel?.name ?? t('models.overview.defaultModel.empty')}
-            description={
-              configuredModel
-                ? t('models.overview.defaultModel.meta', { modelId: configuredModel.model_id })
-                : t('models.overview.defaultModel.emptyDescription')
-            }
-            className="h-full"
-          />
+            <MetricCard
+              title={t('models.overview.defaultModel.title')}
+              value={
+                isInitialLoading ? (
+                  <span className="bg-surface-container-high block h-8 w-36 rounded-full motion-safe:animate-pulse" />
+                ) : (
+                  (configuredModel?.name ?? t('models.overview.defaultModel.empty'))
+                )
+              }
+              description={
+                isInitialLoading ? (
+                  <span className="bg-surface-container-high block h-4 w-52 rounded-full motion-safe:animate-pulse" />
+                ) : configuredModel ? (
+                  t('models.overview.defaultModel.meta', { modelId: configuredModel.model_id })
+                ) : (
+                  t('models.overview.defaultModel.emptyDescription')
+                )
+              }
+              className="h-full"
+            />
 
-          <MetricCard
-            title={t('models.overview.storagePath.title')}
-            value={
-              <span className="block font-mono text-base leading-6 break-all">
-                {/* TODO(backend): stop exposing absolute model directories in the API, then render a safe display path here [2026-04-15] */}
-                {t('models.overview.storagePath.placeholder')}
-              </span>
-            }
-            description={t('models.overview.storagePath.meta')}
-            className="h-full"
-          />
-        </section>
+            <MetricCard
+              title={t('models.overview.storagePath.title')}
+              value={
+                isInitialLoading ? (
+                  <span className="bg-surface-container-high block h-8 w-32 rounded-full motion-safe:animate-pulse" />
+                ) : (
+                  <span className="block font-mono text-base leading-6 break-all">
+                    {/* TODO(backend): stop exposing absolute model directories in the API, then render a safe display path here [2026-04-15] */}
+                    {t('models.overview.storagePath.placeholder')}
+                  </span>
+                )
+              }
+              description={
+                isInitialLoading ? (
+                  <span className="bg-surface-container-high block h-4 w-44 rounded-full motion-safe:animate-pulse" />
+                ) : (
+                  t('models.overview.storagePath.meta')
+                )
+              }
+              className="h-full"
+            />
+          </section>
+        ) : null}
 
         <ModelList
           models={models}
           downloads={downloads}
+          errorMessage={initialErrorMessage}
+          isLoading={isInitialLoading}
           onDownload={handleDownload}
           onCancel={handleCancel}
           onDelete={handleDelete}
           onSelect={handleSelect}
           onOpenDetail={setSelectedModelId}
+          onRetry={refresh}
         />
 
         <DetailSheet
