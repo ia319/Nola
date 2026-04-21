@@ -8,9 +8,11 @@ import type { ModelResponse } from '@/shared/types'
 
 import { ModelList } from '../ModelList'
 
+type TranslationParams = Record<string, string | number | boolean | null | undefined>
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, params?: Record<string, unknown>) => {
+    t: (key: string, params?: TranslationParams) => {
       const messages: Record<string, string> = {
         'models.empty': 'No models available',
         'models.configured': 'Default',
@@ -33,6 +35,8 @@ vi.mock('react-i18next', () => ({
         'models.table.empty.title': 'No models available',
         'models.table.empty.description': 'Download a model to start configuring local runs.',
         'models.catalog.largeV3.description': 'Localized large multilingual engine',
+        'error.generic': 'An error occurred',
+        'error.boundary.retry': 'Try Again',
       }
 
       if (key === 'models.table.diskUsage') {
@@ -116,6 +120,47 @@ describe('ModelList', () => {
 
     expect(screen.getByText('No models available')).toBeTruthy()
     expect(screen.getByText('Download a model to start configuring local runs.')).toBeTruthy()
+  })
+
+  it('renders table skeleton rows while models load', () => {
+    render(
+      <ModelList
+        models={[]}
+        downloads={new Map()}
+        isLoading
+        onDownload={vi.fn()}
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+        onSelect={vi.fn()}
+        onOpenDetail={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('table')).toBeTruthy()
+    expect(screen.queryByText('No models available')).toBeNull()
+  })
+
+  it('renders a retryable error state when models fail to load', () => {
+    const onRetry = vi.fn()
+
+    render(
+      <ModelList
+        models={[]}
+        downloads={new Map()}
+        errorMessage="Server error"
+        onDownload={vi.fn()}
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+        onSelect={vi.fn()}
+        onOpenDetail={vi.fn()}
+        onRetry={onRetry}
+      />,
+    )
+
+    expect(screen.getByText('An error occurred')).toBeTruthy()
+    expect(screen.getByText('Server error')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Try Again' }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
   })
 
   it('renders model rows with table columns and action variants', () => {

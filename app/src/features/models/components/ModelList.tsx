@@ -18,11 +18,14 @@ import { DownloadProgress } from './DownloadProgress'
 export interface ModelListProps {
   models: ModelResponse[]
   downloads: Map<string, DownloadState>
+  errorMessage?: string | null
+  isLoading?: boolean
   onDownload: (modelId: string) => void
   onCancel: (modelId: string) => void
   onDelete: (modelId: string) => void
   onSelect: (modelId: string) => void
   onOpenDetail: (modelId: string) => void
+  onRetry?: () => void | Promise<void>
 }
 
 type ModelTableRow = {
@@ -33,11 +36,14 @@ type ModelTableRow = {
 export function ModelList({
   models,
   downloads,
+  errorMessage,
+  isLoading = false,
   onDownload,
   onCancel,
   onDelete,
   onSelect,
   onOpenDetail,
+  onRetry,
 }: ModelListProps) {
   const { t } = useTranslation()
 
@@ -234,6 +240,26 @@ export function ModelList({
       rows={rows}
       getRowId={(row) => row.model.model_id}
       caption={t('models.table.caption')}
+      isLoading={isLoading}
+      errorState={
+        errorMessage
+          ? {
+              title: t('error.generic'),
+              description: errorMessage,
+              action: onRetry ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    void onRetry()
+                  }}
+                >
+                  {t('error.boundary.retry')}
+                </Button>
+              ) : null,
+            }
+          : null
+      }
       onRowClick={({ model }) => onOpenDetail(model.model_id)}
       stickyHeader
       emptyState={
