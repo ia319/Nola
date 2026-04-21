@@ -46,14 +46,21 @@ function createTask(overrides: Partial<TaskSummary>): TaskSummary {
   }
 }
 
+function requireHtmlElement(value: Element | null, label: string): HTMLElement {
+  if (value instanceof HTMLElement) return value
+  throw new Error(`Expected ${label} to exist`)
+}
+
 describe('TaskWorkbenchActivityMonitor', () => {
   it('renders the empty state and idle indicator when the session has no tasks', () => {
     render(<TaskWorkbenchActivityMonitor tasks={[]} />)
 
-    expect(screen.getByRole('heading', { name: 'Session Activity Monitor', level: 2 })).toBeTruthy()
-    expect(screen.getByText('System idle')).toBeTruthy()
-    expect(screen.getByText('No tasks in this session yet')).toBeTruthy()
-    expect(screen.getByText('Waiting for input...')).toBeTruthy()
+    expect(
+      screen.getByRole('heading', { name: 'Session Activity Monitor', level: 2 }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('System idle')).toBeInTheDocument()
+    expect(screen.getByText('No tasks in this session yet')).toBeInTheDocument()
+    expect(screen.getByText('Waiting for input...')).toBeInTheDocument()
   })
 
   it('renders the planned columns and only exposes cancel for active tasks', () => {
@@ -82,25 +89,27 @@ describe('TaskWorkbenchActivityMonitor', () => {
       />,
     )
 
-    expect(screen.getByText('Processing active')).toBeTruthy()
-    expect(screen.getByRole('columnheader', { name: 'Filename' })).toBeTruthy()
-    expect(screen.getByRole('columnheader', { name: 'Status' })).toBeTruthy()
-    expect(screen.getByRole('columnheader', { name: 'Progress' })).toBeTruthy()
-    expect(screen.getByRole('columnheader', { name: 'Action' })).toBeTruthy()
-    expect(screen.getByText('processing.wav')).toBeTruthy()
-    expect(screen.getByText('completed.wav')).toBeTruthy()
-    expect(screen.getByText('82%')).toBeTruthy()
-    expect(screen.getByText('100%')).toBeTruthy()
+    expect(screen.getByText('Processing active')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Filename' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Status' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Progress' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Action' })).toBeInTheDocument()
+    expect(screen.getByText('processing.wav')).toBeInTheDocument()
+    expect(screen.getByText('completed.wav')).toBeInTheDocument()
+    expect(screen.getByText('82%')).toBeInTheDocument()
+    expect(screen.getByText('100%')).toBeInTheDocument()
 
-    const processingRow = screen.getByText('processing.wav').closest('tr')
-    const completedRow = screen.getByText('completed.wav').closest('tr')
+    const processingRow = requireHtmlElement(
+      screen.getByText('processing.wav').closest('tr'),
+      'processing row',
+    )
+    const completedRow = requireHtmlElement(
+      screen.getByText('completed.wav').closest('tr'),
+      'completed row',
+    )
 
-    expect(processingRow).toBeTruthy()
-    expect(completedRow).toBeTruthy()
-    expect(
-      within(processingRow as HTMLElement).getByRole('button', { name: 'Cancel' }),
-    ).toBeTruthy()
-    expect(within(completedRow as HTMLElement).queryByRole('button', { name: 'Cancel' })).toBeNull()
+    expect(within(processingRow).getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    expect(within(completedRow).queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
   })
 
   it('runs the cancel handler for active tasks', async () => {
@@ -155,7 +164,7 @@ describe('TaskWorkbenchActivityMonitor', () => {
     resolveCancel()
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
     })
   })
 })
