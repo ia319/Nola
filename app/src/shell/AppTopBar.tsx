@@ -132,7 +132,7 @@ export function AppTopBar({
             className={cn(
               'absolute -top-0.5 right-0 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none font-semibold shadow-sm',
               hasActivity
-                ? 'bg-destructive text-white'
+                ? 'border-destructive/20 bg-destructive-container text-on-destructive-container border'
                 : 'border-border bg-surface-container-high text-muted-foreground border',
             )}
           >

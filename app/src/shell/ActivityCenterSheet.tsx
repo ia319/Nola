@@ -55,7 +55,7 @@ function ActivitySection({ title, count, isLive = false, action, children }: Act
               className={cn(
                 'flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none font-bold',
                 count > 0
-                  ? 'bg-destructive text-white'
+                  ? 'border-destructive/20 bg-destructive-container text-on-destructive-container border'
                   : 'bg-surface-container-high text-muted-foreground',
               )}
             >

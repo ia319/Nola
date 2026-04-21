@@ -1,17 +1,27 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 import { AppTopBar } from '../AppTopBar'
 
-const topBarMocks = vi.hoisted(() => ({
-  breakpoint: 'lg' as 'lg' | 'md' | 'sm',
+type TopBarMocks = {
+  breakpoint: 'lg' | 'md' | 'sm'
+  pathname: string
+  resolvedTheme: 'light' | 'dark'
+  setTheme: Mock<(theme: string) => void>
+  theme: 'system' | 'light' | 'dark'
+}
+
+const topBarMocks = vi.hoisted<TopBarMocks>(() => ({
+  breakpoint: 'lg',
   pathname: '/',
-  resolvedTheme: 'light' as 'light' | 'dark',
+  resolvedTheme: 'light',
   setTheme: vi.fn<(theme: string) => void>(),
-  theme: 'system' as 'system' | 'light' | 'dark',
+  theme: 'system',
 }))
+
+type TranslationParams = Record<string, string | number | boolean | null | undefined>
 
 vi.mock('@/shared/responsive', () => ({
   useBreakpoint: () => topBarMocks.breakpoint,
@@ -19,7 +29,7 @@ vi.mock('@/shared/responsive', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, params?: Record<string, unknown>) => {
+    t: (key: string, params?: TranslationParams) => {
       const messages: Record<string, string> = {
         'shell.navigation.tasks': 'Tasks',
         'shell.navigation.history': 'History',
@@ -71,7 +81,7 @@ describe('AppTopBar', () => {
     expect(activityButton).toHaveClass('text-destructive')
     expect(screen.getByRole('button', { name: 'Toggle theme' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Help' })).toBeTruthy()
-    expect(screen.getByText('2')).toBeTruthy()
+    expect(screen.getByText('2')).toHaveClass('bg-destructive-container')
   })
 
   it('maps the current route to the matching shell title', () => {
