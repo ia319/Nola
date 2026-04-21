@@ -1,3 +1,4 @@
+export { ActivityDataBridge } from './ActivityDataBridge'
 export { ACTIVITY_RECENT_LIMIT, selectActivityBadgeCount, useActivityStore } from './store'
 export type {
   ActivityAttentionItem,

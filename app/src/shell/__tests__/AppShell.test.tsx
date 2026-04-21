@@ -5,10 +5,17 @@ import type { ReactNode } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ActivityRouteTarget } from '@/features/activity'
+import type { ActivityRouteTarget, ActivityStoreState } from '@/features/activity'
 import { useActivityStore } from '@/features/activity'
 
 import { AppShell } from '../AppShell'
+
+type ActivityRuntimeModule = {
+  ACTIVITY_RECENT_LIMIT: number
+  ActivityDataBridge: () => ReactNode
+  selectActivityBadgeCount: (state: Pick<ActivityStoreState, 'needsAttention'>) => number
+  useActivityStore: typeof useActivityStore
+}
 
 const appShellMocks = vi.hoisted(() => ({
   activityCenterSheet: vi.fn(
@@ -79,6 +86,14 @@ vi.mock('@/features/tasks', () => ({
   useTaskPolling: appShellMocks.taskPolling,
 }))
 
+vi.mock('@/features/activity', async (importOriginal) => {
+  const actual = await importOriginal<ActivityRuntimeModule>()
+  return {
+    ...actual,
+    ActivityDataBridge: () => <div data-slot="mock-activity-data-bridge" />,
+  }
+})
+
 vi.mock('@/shared/lib/overlay-events', () => ({
   requestCloseDetailOverlays: appShellMocks.requestCloseDetailOverlays,
 }))
@@ -114,6 +129,7 @@ describe('AppShell', () => {
     expect(screen.getByText('topbar')).toBeTruthy()
     expect(screen.getByText('outlet').closest('[data-slot="app-shell-content"]')).toBeTruthy()
     expect(screen.getByText('activity center')).toHaveAttribute('data-open', 'false')
+    expect(document.querySelector('[data-slot="mock-activity-data-bridge"]')).toBeTruthy()
     expect(screen.getByText('toaster')).toBeTruthy()
     expect(screen.getByText('topbar').closest('[data-slot="app-shell-workspace"]')).toHaveClass(
       'lg:ml-[var(--sidebar-width)]',

@@ -7,7 +7,7 @@ import { localizePath } from '@/app/locale/locale-routing'
 import { useActiveLocale } from '@/app/locale/use-active-locale'
 import { Toaster } from '@/components/ui/sonner'
 import type { ActivityRouteTarget } from '@/features/activity'
-import { selectActivityBadgeCount, useActivityStore } from '@/features/activity'
+import { ActivityDataBridge, selectActivityBadgeCount, useActivityStore } from '@/features/activity'
 import { useTaskPolling } from '@/features/tasks'
 import { requestCloseDetailOverlays } from '@/shared/lib/overlay-events'
 
@@ -53,6 +53,7 @@ export function AppShell({ settingsTabs }: AppShellProps = {}) {
   return (
     <div data-slot="app-shell" className="bg-background text-foreground min-h-screen">
       <AppLocaleController />
+      <ActivityDataBridge />
       <AppSidebar />
       <div
         data-slot="app-shell-workspace"
