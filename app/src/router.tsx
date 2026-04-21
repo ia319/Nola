@@ -2,16 +2,16 @@ import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/
 
 import { stripLocalePrefix } from '@/app/locale/locale-routing'
 import { isUiLanguage } from '@/config/ui-preferences'
-import { ModelsPage } from '@/pages/models-management/ModelsPage'
-import { SettingsPage } from '@/pages/settings/SettingsPage'
 import { DEFAULT_SETTINGS_TAB, isSettingsTabKey } from '@/pages/settings/settings-tabs'
 import {
   HistoryRoutePage,
   LocalizedHistoryRoutePage,
   LocalizedSettingsTabRoutePage,
+  ModelsRoutePage,
+  SettingsRoutePage,
   SettingsTabRoutePage,
+  TaskWorkbenchRoutePage,
 } from '@/routes/route-pages'
-import { TaskWorkbenchPage } from '@/pages/task-workbench/TaskWorkbenchPage'
 import { normalizeHistorySearch } from '@/routes/history-search'
 import { AppShell } from '@/shell/AppShell'
 
@@ -22,7 +22,7 @@ const rootRoute = createRootRoute({
 const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: TaskWorkbenchPage,
+  component: TaskWorkbenchRoutePage,
 })
 
 const historyRoute = createRoute({
@@ -35,7 +35,7 @@ const historyRoute = createRoute({
 const modelsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/models',
-  component: ModelsPage,
+  component: ModelsRoutePage,
 })
 
 const settingsRoute = createRoute({
@@ -50,7 +50,7 @@ const settingsRoute = createRoute({
       })
     }
   },
-  component: SettingsPage,
+  component: SettingsRoutePage,
 })
 
 const localizedHomeRoute = createRoute({
@@ -64,7 +64,7 @@ const localizedHomeRoute = createRoute({
       })
     }
   },
-  component: TaskWorkbenchPage,
+  component: TaskWorkbenchRoutePage,
 })
 
 const localizedHistoryRoute = createRoute({
@@ -93,7 +93,7 @@ const localizedModelsRoute = createRoute({
       })
     }
   },
-  component: ModelsPage,
+  component: ModelsRoutePage,
 })
 
 const localizedSettingsRoute = createRoute({
@@ -115,7 +115,7 @@ const localizedSettingsRoute = createRoute({
       })
     }
   },
-  component: SettingsPage,
+  component: SettingsRoutePage,
 })
 
 const settingsTabRoute = createRoute({

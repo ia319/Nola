@@ -479,6 +479,27 @@
       }
     }
   },
+  "components": {
+    "dataTable": {
+      "empty": {
+        "title": "No items found",
+        "description": "Add records or adjust the current filters."
+      },
+      "selectAll": "Select all rows",
+      "selectRow": "Select row {{rowId}}"
+    },
+    "detailSheet": {
+      "close": "Close"
+    }
+  },
+  "routes": {
+    "loading": {
+      "tasks": "Loading task workbench...",
+      "history": "Loading history...",
+      "models": "Loading models...",
+      "settings": "Loading settings..."
+    }
+  },
   "error": {
     "generic": "An error occurred",
     "api": {
@@ -679,6 +700,7 @@
   },
   "shell": {
     "navigation": {
+      "label": "Primary navigation",
       "tasks": "Tasks",
       "history": "History",
       "models": "Models",
@@ -1158,6 +1180,7 @@
         "eyebrow": "File detail",
         "description": "Review file metadata and known associated tasks.",
         "close": "Close file detail",
+        "loading": "Loading file detail...",
         "taskCreatedAt": "Created {{value}}",
         "sections": {
           "metadata": "Metadata",
