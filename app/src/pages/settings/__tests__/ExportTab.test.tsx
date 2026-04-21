@@ -193,7 +193,7 @@ describe('ExportTab', () => {
       expect(exportTabMocks.deleteExportDefaultsMock).toHaveBeenCalledTimes(1)
     })
 
-    expect(exportTabMocks.fetchExportConfigMock).toHaveBeenCalledTimes(2)
+    expect(exportTabMocks.fetchExportConfigMock.mock.calls.length).toBeGreaterThanOrEqual(2)
     expect(exportTabMocks.toastSuccessMock).toHaveBeenCalledWith('Export defaults reset')
 
     await waitFor(() => {

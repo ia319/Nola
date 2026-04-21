@@ -106,6 +106,7 @@ export function ExportTab() {
     mutationFn: (payload: ExportDefaultsUpdateRequest) => patchExportDefaults(payload),
     onSuccess: (response) => {
       queryClient.setQueryData<ExportConfig>(queryKeys.config.export(), response)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.config.export() })
       setDraftDefaults({})
       toast.success(t('settings.export.toast.saved'))
     },
@@ -123,6 +124,7 @@ export function ExportTab() {
     },
     onSuccess: (response) => {
       queryClient.setQueryData<ExportConfig>(queryKeys.config.export(), response)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.config.export() })
       setDraftDefaults({})
       toast.success(t('settings.export.toast.reset'))
     },

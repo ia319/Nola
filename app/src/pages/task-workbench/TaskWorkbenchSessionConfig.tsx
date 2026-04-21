@@ -15,9 +15,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { refreshConfigCaches } from '@/config/cache-invalidation'
 import { fetchEngineDefaults, patchTranscriptionDefaults } from '@/config/api'
 import logger from '@/config/logger'
-import { refreshAppConfig, useAppConfig } from '@/config/use-app-config'
+import { useAppConfig } from '@/config/use-app-config'
 import { AdvancedOptions, useTranscriptionOptions } from '@/features/transcription-options'
 import type { TaskCreateResult } from '@/features/transcription-options'
 import type {
@@ -324,7 +325,7 @@ export function TaskWorkbenchSessionConfig({
 
   async function refreshDefaultsView(): Promise<boolean> {
     try {
-      await refreshAppConfig()
+      await refreshConfigCaches()
       return true
     } catch (error: unknown) {
       logger.error('config.defaults.refreshFailed', { context: 'save', error })
