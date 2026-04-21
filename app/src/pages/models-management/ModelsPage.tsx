@@ -60,6 +60,14 @@ function toAppError(error: unknown): AppError {
   }
 }
 
+async function runModelAction(t: TFunction, action: () => Promise<void>): Promise<void> {
+  try {
+    await action()
+  } catch (err: unknown) {
+    toastError(t, err)
+  }
+}
+
 export function ModelsPage() {
   const { t } = useTranslation()
   const {
@@ -204,26 +212,22 @@ export function ModelsPage() {
   )
 
   async function handleDownload(modelId: string) {
-    try {
+    await runModelAction(t, async () => {
       await download(modelId)
       void queryClient.invalidateQueries({ queryKey: queryKeys.models.downloads() })
       toast.success(t('models.toast.downloadStarted', { modelId }))
-    } catch (err) {
-      toastError(t, err)
-    }
+    })
   }
 
   async function handleCancel(modelId: string) {
-    try {
+    await runModelAction(t, async () => {
       await cancel(modelId)
       void queryClient.invalidateQueries({ queryKey: queryKeys.models.downloads() })
-    } catch (err) {
-      toastError(t, err)
-    }
+    })
   }
 
   async function handleDelete(modelId: string) {
-    try {
+    await runModelAction(t, async () => {
       await deleteModel(modelId)
       updateSnapshot((current) => ({
         ...current,
@@ -236,13 +240,11 @@ export function ModelsPage() {
       requestModelRefresh()
       void queryClient.invalidateQueries({ queryKey: queryKeys.models.list() })
       void queryClient.invalidateQueries({ queryKey: queryKeys.models.detail(modelId) })
-    } catch (err) {
-      toastError(t, err)
-    }
+    })
   }
 
   async function handleSelect(modelId: string) {
-    try {
+    await runModelAction(t, async () => {
       const result = await selectModel(modelId)
       updateSnapshot((current) => ({
         ...current,
@@ -280,9 +282,7 @@ export function ModelsPage() {
       } catch (error: unknown) {
         logger.error('models.select.settingsRefreshFailed', { error, modelId })
       }
-    } catch (err) {
-      toastError(t, err)
-    }
+    })
   }
 
   const detailModel = detail ?? selectedListModel
