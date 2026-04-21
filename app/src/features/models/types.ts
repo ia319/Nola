@@ -1,4 +1,5 @@
 import type {
+  ActiveModelDownloadsResponse,
   DownloadProgressResponse,
   ModelCancelResponse,
   ModelDeleteResponse,
@@ -15,6 +16,7 @@ import type {
 } from '@/shared/types'
 
 export type {
+  ActiveModelDownloadsResponse,
   DownloadProgressResponse,
   ModelCancelResponse,
   ModelDeleteResponse,

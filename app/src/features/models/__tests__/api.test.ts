@@ -5,6 +5,7 @@ import {
   deleteModel,
   getModelDetail,
   getModelSettings,
+  listActiveModelDownloads,
   listModels,
   patchModelSettings,
   selectModel,
@@ -37,14 +38,17 @@ describe('models api', () => {
     apiClientMocks.get.mockResolvedValueOnce({ data: { models: [] } })
     apiClientMocks.get.mockResolvedValueOnce({ data: { model_id: 'small' } })
     apiClientMocks.get.mockResolvedValueOnce({ data: { effective_model_dir: 'D:/models' } })
+    apiClientMocks.get.mockResolvedValueOnce({ data: { downloads: [] } })
 
     await listModels(signal)
     await getModelDetail('small', signal)
     await getModelSettings(signal)
+    await listActiveModelDownloads(signal)
 
     expect(apiClientMocks.get).toHaveBeenNthCalledWith(1, '/api/models', { signal })
     expect(apiClientMocks.get).toHaveBeenNthCalledWith(2, '/api/models/small', { signal })
     expect(apiClientMocks.get).toHaveBeenNthCalledWith(3, '/api/models/settings', { signal })
+    expect(apiClientMocks.get).toHaveBeenNthCalledWith(4, '/api/models/downloads', { signal })
   })
 
   it('uses model mutation endpoints', async () => {

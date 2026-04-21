@@ -29,6 +29,9 @@ export type ModelSettingsResponse = Schemas['ModelSettingsResponse']
 /** PATCH /api/models/settings request body. */
 export type ModelSettingsUpdateRequest = Schemas['ModelSettingsUpdateRequest']
 
+/** GET /api/models/downloads response. */
+export type ActiveModelDownloadsResponse = Schemas['ActiveModelDownloadsResponse']
+
 /** Active download item exposed by GET /api/models/downloads. */
 export type ActiveModelDownload = Schemas['ActiveModelDownloadResponse']
 

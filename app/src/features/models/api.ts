@@ -1,6 +1,7 @@
 import apiClient from '@/shared/lib/api-client'
 
 import type {
+  ActiveModelDownloadsResponse,
   ModelCancelResponse,
   ModelDeleteResponse,
   ModelDetailResponse,
@@ -15,6 +16,15 @@ const BASE = '/api/models'
 
 export async function listModels(signal?: AbortSignal): Promise<ModelListResponse> {
   const { data } = await apiClient.get<ModelListResponse>(BASE, { signal })
+  return data
+}
+
+export async function listActiveModelDownloads(
+  signal?: AbortSignal,
+): Promise<ActiveModelDownloadsResponse> {
+  const { data } = await apiClient.get<ActiveModelDownloadsResponse>(`${BASE}/downloads`, {
+    signal,
+  })
   return data
 }
 

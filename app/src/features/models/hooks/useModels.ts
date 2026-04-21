@@ -4,6 +4,7 @@ import { isAppError } from '@/shared/lib/error-factory'
 import type { AppError } from '@/shared/types'
 
 import { listModels } from '../api'
+import { subscribeModelRefresh } from '../lib/model-refresh'
 import type { ModelListResponse, ModelResponse } from '../types'
 
 function toAppError(error: unknown): AppError {
@@ -88,6 +89,12 @@ export function useModels(): UseModelsResult {
     return () => {
       controllerRef.current?.abort()
     }
+  }, [refresh])
+
+  useEffect(() => {
+    return subscribeModelRefresh(() => {
+      void refresh()
+    })
   }, [refresh])
 
   return {

@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { listModels } from '../../api'
+import { requestModelRefresh } from '../../lib/model-refresh'
 import { useModels } from '../useModels'
 
 vi.mock('../../api', () => ({
@@ -129,5 +130,37 @@ describe('useModels', () => {
     expect(result.current.configuredModelId).toBe('large-v3')
     expect(result.current.effectiveModelDir).toBe('D:/models-b')
     expect(result.current.isRefreshing).toBe(false)
+  })
+
+  it('refreshes when the global model refresh event fires', async () => {
+    listModelsMock
+      .mockResolvedValueOnce({
+        models: [],
+        configured_model_id: null,
+        last_loaded_model_id: null,
+        effective_model_dir: 'D:/models-a',
+      })
+      .mockResolvedValueOnce({
+        models: [],
+        configured_model_id: 'small',
+        last_loaded_model_id: 'small',
+        effective_model_dir: 'D:/models-b',
+      })
+
+    const { result } = renderHook(() => useModels())
+
+    await waitFor(() => {
+      expect(result.current.effectiveModelDir).toBe('D:/models-a')
+    })
+
+    await act(async () => {
+      requestModelRefresh()
+    })
+
+    await waitFor(() => {
+      expect(result.current.effectiveModelDir).toBe('D:/models-b')
+    })
+
+    expect(listModelsMock).toHaveBeenCalledTimes(2)
   })
 })

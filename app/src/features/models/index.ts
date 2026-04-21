@@ -3,6 +3,7 @@ export {
   deleteModel,
   getModelDetail,
   getModelSettings,
+  listActiveModelDownloads,
   listModels,
   patchModelSettings,
   selectModel,
@@ -24,6 +25,7 @@ export type {
 } from './hooks/useModelDownload'
 export { useModels } from './hooks/useModels'
 export type { UseModelsResult } from './hooks/useModels'
+export { requestModelRefresh, subscribeModelRefresh } from './lib/model-refresh'
 export {
   formatBytes,
   formatPercent,
@@ -34,6 +36,7 @@ export {
   splitModelLanguages,
 } from './lib/model-helpers'
 export type {
+  ActiveModelDownloadsResponse,
   DownloadProgressResponse,
   ModelCancelResponse,
   ModelDownloadStatus,
