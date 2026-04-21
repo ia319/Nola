@@ -10,7 +10,7 @@ describe('buildTranscriptionDefaults', () => {
     expect(defaults.append_punctuations).toBe(`"'.。,，!！?？:：”)]}、`)
   })
 
-  it('deep-merges vad parameter overrides', () => {
+  it('preserves vad defaults when overriding one parameter', () => {
     const defaults = buildTranscriptionDefaults({
       vad_parameters: {
         threshold: 0.7,
