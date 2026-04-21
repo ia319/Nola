@@ -21,6 +21,9 @@ const PAGE_SIZE_SET = new Set<number>(HISTORY_PAGE_SIZE_OPTIONS)
 
 export type HistoryPageSize = (typeof HISTORY_PAGE_SIZE_OPTIONS)[number]
 export type HistoryRecordsMode = 'files' | 'tasks'
+export type HistoryTaskQuery = TaskQueryModel & {
+  page_size: HistoryPageSize
+}
 
 const MODE_OPTIONS: readonly HistoryRecordsMode[] = ['tasks', 'files']
 const MODE_SET = new Set(MODE_OPTIONS)
@@ -118,7 +121,7 @@ export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
 }
 
 /** Convert normalized route search params into backend query model. */
-export function buildHistoryTaskQuery(search: HistoryRouteSearch): TaskQueryModel {
+export function buildHistoryTaskQuery(search: HistoryRouteSearch): HistoryTaskQuery {
   return {
     q: search.q ?? '',
     status: search.status ?? 'all',

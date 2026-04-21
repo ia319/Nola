@@ -21,11 +21,10 @@ import type {
   BatchTaskActionResponse,
   SortOrder,
   TaskFilterStatus,
-  TaskQueryModel,
   TaskSortBy,
   TaskSummary,
 } from '@/shared/types'
-import type { HistoryPageSize, HistoryRecordsMode } from '@/routes/history-search'
+import type { HistoryPageSize, HistoryRecordsMode, HistoryTaskQuery } from '@/routes/history-search'
 import { HistoryPagination } from './HistoryPagination'
 import { HistoryToolbar } from './HistoryToolbar'
 
@@ -45,7 +44,7 @@ interface ExportDialogState {
 
 export interface HistoryTaskRecordsViewProps {
   tasks: TaskSummary[]
-  query: TaskQueryModel
+  query: HistoryTaskQuery
   total: number
   isLoading?: boolean
   errorMessage?: string | null
@@ -58,6 +57,7 @@ export interface HistoryTaskRecordsViewProps {
   onPageSizeChange: (value: HistoryPageSize) => void
   onModeChange?: (mode: HistoryRecordsMode) => void
   onCreateTask?: () => void
+  onRetry?: () => void | Promise<void>
   onOpenTaskDetail?: (task: TaskSummary) => void
   resolveFileName?: (task: TaskSummary) => string | undefined
   onCancelTask?: (task: TaskSummary) => Promise<void>
@@ -136,6 +136,7 @@ export function HistoryTaskRecordsView({
   onPageSizeChange,
   onModeChange,
   onCreateTask,
+  onRetry,
   onOpenTaskDetail,
   resolveFileName,
   onCancelTask,
@@ -699,18 +700,32 @@ export function HistoryTaskRecordsView({
         </div>
       ) : null}
 
-      {errorMessage ? (
-        <div className="border-b px-4 py-3">
-          <p className="text-destructive text-sm">{errorMessage}</p>
-        </div>
-      ) : null}
-
       <DataTable
         className="rounded-none border-0 shadow-none"
         columns={columns}
         rows={tasks}
         getRowId={(task) => task.task_id}
         caption={t('history.table.caption')}
+        isLoading={isLoading}
+        errorState={
+          errorMessage
+            ? {
+                title: t('error.generic'),
+                description: errorMessage,
+                action: onRetry ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      void onRetry()
+                    }}
+                  >
+                    {t('error.boundary.retry')}
+                  </Button>
+                ) : null,
+              }
+            : null
+        }
         onRowClick={onOpenTaskDetail}
         scrollAreaClassName="max-h-[56vh] overflow-auto"
         stickyHeader
@@ -743,7 +758,7 @@ export function HistoryTaskRecordsView({
 
       <HistoryPagination
         page={query.page}
-        pageSize={query.page_size as HistoryPageSize}
+        pageSize={query.page_size}
         total={total}
         isLoading={isLoading}
         onPageChange={onPageChange}

@@ -168,6 +168,7 @@ export function HistoryFileModeView({
         onPageSizeChange={onPageSizeChange}
         onModeChange={onModeChange}
         onCreateTask={onCreateTask}
+        onRetry={historyFiles.refresh}
         onOpenFileDetail={openFileDetail}
         onRequestDeleteFile={(file) => {
           setSelectedDetailFile((current) => (current?.file_id === file.file_id ? null : current))

@@ -27,6 +27,7 @@ export interface HistoryFileRecordsViewProps {
   onPageSizeChange: (value: HistoryPageSize) => void
   onModeChange?: (mode: HistoryRecordsMode) => void
   onCreateTask?: () => void
+  onRetry?: () => void | Promise<void>
   onOpenFileDetail?: (file: FileInfo) => void
   onRequestDeleteFile?: (file: FileInfo) => void
 }
@@ -76,6 +77,7 @@ export function HistoryFileRecordsView({
   onPageSizeChange,
   onModeChange,
   onCreateTask,
+  onRetry,
   onOpenFileDetail,
   onRequestDeleteFile,
 }: HistoryFileRecordsViewProps) {
@@ -231,12 +233,6 @@ export function HistoryFileRecordsView({
         onModeChange={onModeChange}
       />
 
-      {errorMessage ? (
-        <div className="border-b px-4 py-3">
-          <p className="text-destructive text-sm">{errorMessage}</p>
-        </div>
-      ) : null}
-
       {selectedFileIds.length > 0 ? (
         <div
           data-slot="history-file-selection-bar"
@@ -271,6 +267,26 @@ export function HistoryFileRecordsView({
         rows={rows}
         getRowId={(row) => row.file.file_id}
         caption={t('history.files.table.caption')}
+        isLoading={isLoading}
+        errorState={
+          errorMessage
+            ? {
+                title: t('error.generic'),
+                description: errorMessage,
+                action: onRetry ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      void onRetry()
+                    }}
+                  >
+                    {t('error.boundary.retry')}
+                  </Button>
+                ) : null,
+              }
+            : null
+        }
         onRowClick={
           onOpenFileDetail
             ? (row) => {

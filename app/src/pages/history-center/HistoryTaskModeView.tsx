@@ -19,18 +19,12 @@ import {
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { HistoryTaskRecordsView } from './HistoryTaskRecordsView'
 import { useHistoryTaskDetail } from './useHistoryTaskDetail'
-import type { HistoryPageSize, HistoryRecordsMode } from '@/routes/history-search'
-import type {
-  SortOrder,
-  TaskFilterStatus,
-  TaskQueryModel,
-  TaskSortBy,
-  TaskSummary,
-} from '@/shared/types'
+import type { HistoryPageSize, HistoryRecordsMode, HistoryTaskQuery } from '@/routes/history-search'
+import type { SortOrder, TaskFilterStatus, TaskSortBy, TaskSummary } from '@/shared/types'
 import { useDetailOverlayCloseRequest } from '@/shared/lib/overlay-events'
 
 export interface HistoryTaskModeViewProps {
-  query: TaskQueryModel
+  query: HistoryTaskQuery
   onSearchChange: (value: string) => void
   onStatusChange: (value: TaskFilterStatus) => void
   onSortByChange: (value: TaskSortBy) => void
@@ -205,6 +199,7 @@ export function HistoryTaskModeView({
         onPageSizeChange={onPageSizeChange}
         onModeChange={onModeChange}
         onCreateTask={onCreateTask}
+        onRetry={historyTasks.refresh}
         onOpenTaskDetail={setSelectedDetailTask}
         onCancelTask={handleCancelHistoryTask}
         onRetryTask={handleRetryHistoryTask}

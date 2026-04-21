@@ -49,9 +49,11 @@ const historyPageMocks = vi.hoisted(() => ({
   ),
 }))
 
+type TranslationParams = Record<string, string | number | boolean | null | undefined>
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, params?: Record<string, unknown>) => {
+    t: (key: string, params?: TranslationParams) => {
       const messages: Record<string, string> = {
         'history.title': 'History',
         'history.description': 'Review archived task records and recent execution output.',
@@ -76,6 +78,9 @@ vi.mock('react-i18next', () => ({
         'history.files.table.actions.delete': 'Delete file',
         'history.files.table.actions.openDetail': `Open details for ${String(params?.filename)}`,
         'history.files.table.selectAll': 'Select all history files',
+        'error.generic': 'An error occurred',
+        'error.boundary.retry': 'Try Again',
+        'error.api.serverError': 'Server error',
         'history.files.empty.title': 'No uploaded files found',
         'history.files.empty.description':
           'Your file archive is empty. Return to the task workbench to add source audio and start new runs.',
@@ -539,6 +544,43 @@ describe('HistoryPage', () => {
     expect(historyPageMocks.navigate).toHaveBeenCalledWith({ to: '/' })
   })
 
+  it('renders a task table skeleton while the first page is loading', () => {
+    historyPageMocks.useHistoryTasks.mockReturnValue({
+      tasks: [],
+      total: 0,
+      isLoading: true,
+      error: null,
+      refresh: vi.fn(),
+    })
+
+    renderHistoryPage()
+
+    expect(screen.getByRole('table')).toBeTruthy()
+    expect(screen.queryByText('No transcription records found')).toBeNull()
+  })
+
+  it('renders a retryable task table error state', () => {
+    const refresh = vi.fn()
+    historyPageMocks.useHistoryTasks.mockReturnValue({
+      tasks: [],
+      total: 0,
+      isLoading: false,
+      error: {
+        code: 'API_SERVER_UNKNOWN',
+        i18nKey: 'error.api.serverError',
+        retriable: true,
+      },
+      refresh,
+    })
+
+    renderHistoryPage()
+
+    expect(screen.getByText('An error occurred')).toBeTruthy()
+    expect(screen.getByText('Server error')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Try Again' }))
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
   it('renders the filename mode with the files data source', () => {
     historyPageMocks.search = {
       mode: 'files',
@@ -564,6 +606,31 @@ describe('HistoryPage', () => {
     expect(screen.getByText('archive.wav')).toBeTruthy()
     expect(screen.getByText('3 tasks')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Delete file' })).toBeTruthy()
+  })
+
+  it('renders a retryable filename table error state', () => {
+    const refresh = vi.fn()
+    historyPageMocks.search = {
+      mode: 'files',
+    }
+    historyPageMocks.useHistoryFiles.mockReturnValue({
+      files: [],
+      total: 0,
+      isLoading: false,
+      error: {
+        code: 'API_SERVER_UNKNOWN',
+        i18nKey: 'error.api.serverError',
+        retriable: true,
+      },
+      refresh,
+    })
+
+    renderHistoryPage()
+
+    expect(screen.getByText('An error occurred')).toBeTruthy()
+    expect(screen.getByText('Server error')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Try Again' }))
+    expect(refresh).toHaveBeenCalledTimes(1)
   })
 
   it('opens the task detail dialog from a task row', () => {
