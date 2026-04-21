@@ -361,6 +361,9 @@ export function TaskWorkbenchSessionConfig({
         resetOptionOverrides()
         setDraftAdvancedOptions({})
         setDraftInitialPrompt(nextEffectiveDefaults.initial_prompt)
+      } else {
+        toast.warning(t('options.defaults.savedRefreshFailed'))
+        return
       }
 
       toast.success(t('options.defaults.saved'))

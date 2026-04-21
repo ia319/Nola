@@ -148,6 +148,7 @@
       "resetEngine": "Reset to Engine Defaults",
       "resetting": "Resetting...",
       "saved": "Defaults saved",
+      "savedRefreshFailed": "Defaults saved. Refresh the page to load the latest values.",
       "resetDone": "Defaults reset to engine values"
     },
     "advanced": {

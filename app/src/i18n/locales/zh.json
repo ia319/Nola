@@ -147,6 +147,7 @@
       "resetEngine": "重置为引擎默认",
       "resetting": "重置中...",
       "saved": "已保存默认值",
+      "savedRefreshFailed": "默认值已保存。刷新页面以加载最新值。",
       "resetDone": "已重置为引擎默认"
     },
     "advanced": {

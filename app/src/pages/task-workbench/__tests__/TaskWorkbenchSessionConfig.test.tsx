@@ -10,19 +10,30 @@ import type {
   AdvancedOptionValue,
   AdvancedTranscriptionOptions,
 } from '@/features/transcription-options'
-import type { AppError, TranscriptionDefaults } from '@/shared/types'
+import type {
+  AppConfig,
+  AppError,
+  EngineDefaults,
+  TranscriptionDefaults,
+  TranscriptionDefaultsPatchResponse,
+  TranscriptionDefaultsUpdateRequest,
+} from '@/shared/types'
 import { buildTranscriptionDefaults } from '@/test-utils/transcription-defaults'
 import { TaskWorkbenchSessionConfig } from '../TaskWorkbenchSessionConfig'
 
 const taskWorkbenchSessionConfigMocks = vi.hoisted(() => ({
   useAppConfigMock: vi.fn<() => UseAppConfigReturn>(),
-  refreshAppConfigMock: vi.fn(),
+  refreshConfigCachesMock: vi.fn<() => Promise<AppConfig>>(),
   useModelsMock: vi.fn<() => UseModelsResult>(),
   useTranscriptionOptionsMock: vi.fn<() => UseTranscriptionOptionsReturn>(),
-  fetchEngineDefaultsMock: vi.fn(),
-  patchTranscriptionDefaultsMock: vi.fn(),
+  fetchEngineDefaultsMock: vi.fn<() => Promise<EngineDefaults>>(),
+  patchTranscriptionDefaultsMock:
+    vi.fn<
+      (payload: TranscriptionDefaultsUpdateRequest) => Promise<TranscriptionDefaultsPatchResponse>
+    >(),
   toastSuccessMock: vi.fn(),
   toastErrorMock: vi.fn(),
+  toastWarningMock: vi.fn(),
   onCreateTaskMock: vi.fn(),
   onTasksCreatedMock: vi.fn(),
   buildRequestMock: vi.fn(),
@@ -48,6 +59,8 @@ vi.mock('react-i18next', () => ({
         'options.creating': 'Creating',
         'options.startDisabled': 'Start Transcription',
         'options.defaults.saved': 'Defaults saved',
+        'options.defaults.savedRefreshFailed':
+          'Defaults saved. Refresh the page to load the latest values.',
         'tasks.workbench.sections.sessionConfig.title': 'Session Configuration',
         'tasks.workbench.sessionConfig.globalSettings': 'Global Settings',
         'tasks.workbench.sessionConfig.executionEngine': 'Execution Engine',
@@ -88,6 +101,7 @@ vi.mock('sonner', () => ({
   toast: {
     success: taskWorkbenchSessionConfigMocks.toastSuccessMock,
     error: taskWorkbenchSessionConfigMocks.toastErrorMock,
+    warning: taskWorkbenchSessionConfigMocks.toastWarningMock,
   },
 }))
 
@@ -96,26 +110,24 @@ vi.mock('@/config/logger', () => ({
 }))
 
 vi.mock('@/config/api', () => ({
-  fetchEngineDefaults: (...args: unknown[]) =>
-    taskWorkbenchSessionConfigMocks.fetchEngineDefaultsMock(...(args as [])),
-  patchTranscriptionDefaults: (...args: unknown[]) =>
-    taskWorkbenchSessionConfigMocks.patchTranscriptionDefaultsMock(...(args as [])),
+  fetchEngineDefaults: taskWorkbenchSessionConfigMocks.fetchEngineDefaultsMock,
+  patchTranscriptionDefaults: taskWorkbenchSessionConfigMocks.patchTranscriptionDefaultsMock,
+}))
+
+vi.mock('@/config/cache-invalidation', () => ({
+  refreshConfigCaches: () => taskWorkbenchSessionConfigMocks.refreshConfigCachesMock(),
 }))
 
 vi.mock('@/config/use-app-config', () => ({
-  useAppConfig: (...args: unknown[]) =>
-    taskWorkbenchSessionConfigMocks.useAppConfigMock(...(args as [])),
-  refreshAppConfig: (...args: unknown[]) =>
-    taskWorkbenchSessionConfigMocks.refreshAppConfigMock(...(args as [])),
+  useAppConfig: taskWorkbenchSessionConfigMocks.useAppConfigMock,
 }))
 
 vi.mock('@/features/models', () => ({
-  useModels: (...args: unknown[]) => taskWorkbenchSessionConfigMocks.useModelsMock(...(args as [])),
+  useModels: taskWorkbenchSessionConfigMocks.useModelsMock,
 }))
 
 vi.mock('@/features/transcription-options', () => ({
-  useTranscriptionOptions: (...args: unknown[]) =>
-    taskWorkbenchSessionConfigMocks.useTranscriptionOptionsMock(...(args as [])),
+  useTranscriptionOptions: taskWorkbenchSessionConfigMocks.useTranscriptionOptionsMock,
   AdvancedOptions: ({
     advancedOptions,
     onOptionChange,
@@ -136,8 +148,8 @@ function buildDefaults(overrides: Partial<TranscriptionDefaults> = {}): Transcri
 }
 
 function buildAppConfigReturn(
-  overrides: Partial<UseAppConfigReturn['config']> = {},
-): UseAppConfigReturn {
+  overrides: Partial<AppConfig> = {},
+): UseAppConfigReturn & { config: AppConfig } {
   return {
     config: {
       engine: {
@@ -208,6 +220,11 @@ function buildTranscriptionOptionsReturn(
   }
 }
 
+function requireTextAreaElement(value: HTMLElement, label: string): HTMLTextAreaElement {
+  if (value instanceof HTMLTextAreaElement) return value
+  throw new Error(`Expected ${label} to be a textarea`)
+}
+
 describe('TaskWorkbenchSessionConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -225,7 +242,7 @@ describe('TaskWorkbenchSessionConfig', () => {
     taskWorkbenchSessionConfigMocks.patchTranscriptionDefaultsMock.mockResolvedValue({
       defaults: buildDefaults(),
     })
-    taskWorkbenchSessionConfigMocks.refreshAppConfigMock.mockResolvedValue(
+    taskWorkbenchSessionConfigMocks.refreshConfigCachesMock.mockResolvedValue(
       buildAppConfigReturn().config,
     )
   })
@@ -355,7 +372,10 @@ describe('TaskWorkbenchSessionConfig', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Advanced Parameters' }))
 
-    const initialPromptInput = screen.getByLabelText('Initial Prompt') as HTMLTextAreaElement
+    const initialPromptInput = requireTextAreaElement(
+      screen.getByLabelText('Initial Prompt'),
+      'initial prompt input',
+    )
     expect(initialPromptInput.value).toBe('Session prompt')
 
     fireEvent.change(initialPromptInput, { target: { value: 'Temporary prompt' } })
@@ -366,9 +386,10 @@ describe('TaskWorkbenchSessionConfig', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reset to Defaults' }))
 
     await waitFor(() => {
-      expect((screen.getByLabelText('Initial Prompt') as HTMLTextAreaElement).value).toBe(
-        'Default prompt',
-      )
+      expect(
+        requireTextAreaElement(screen.getByLabelText('Initial Prompt'), 'initial prompt input')
+          .value,
+      ).toBe('Default prompt')
       expect(screen.getByTestId('advanced-options').getAttribute('data-beam-size')).toBe('')
     })
   })
@@ -426,10 +447,38 @@ describe('TaskWorkbenchSessionConfig', () => {
         beam_size: 9,
         initial_prompt: 'Keep names consistent',
       })
-      expect(taskWorkbenchSessionConfigMocks.refreshAppConfigMock).toHaveBeenCalledTimes(1)
+      expect(taskWorkbenchSessionConfigMocks.refreshConfigCachesMock).toHaveBeenCalledTimes(1)
       expect(taskWorkbenchSessionConfigMocks.resetOptionOverridesMock).toHaveBeenCalledTimes(1)
       expect(taskWorkbenchSessionConfigMocks.toastSuccessMock).toHaveBeenCalledWith(
         'Defaults saved',
+      )
+    })
+  })
+
+  it('warns when defaults save succeeds but shared config refresh fails', async () => {
+    taskWorkbenchSessionConfigMocks.refreshConfigCachesMock.mockRejectedValueOnce(
+      new Error('refresh failed'),
+    )
+
+    render(
+      <TaskWorkbenchSessionConfig
+        fileIds={['file-1']}
+        onCreateTask={taskWorkbenchSessionConfigMocks.onCreateTaskMock}
+        onTasksCreated={taskWorkbenchSessionConfigMocks.onTasksCreatedMock}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced Parameters' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save as Default' }))
+
+    await waitFor(() => {
+      expect(taskWorkbenchSessionConfigMocks.patchTranscriptionDefaultsMock).toHaveBeenCalledTimes(
+        1,
+      )
+      expect(taskWorkbenchSessionConfigMocks.resetOptionOverridesMock).not.toHaveBeenCalled()
+      expect(taskWorkbenchSessionConfigMocks.toastSuccessMock).not.toHaveBeenCalled()
+      expect(taskWorkbenchSessionConfigMocks.toastWarningMock).toHaveBeenCalledWith(
+        'Defaults saved. Refresh the page to load the latest values.',
       )
     })
   })
