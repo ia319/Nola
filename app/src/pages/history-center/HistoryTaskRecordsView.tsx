@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Download, FileText, RotateCcw, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -9,7 +9,6 @@ import { DataTable, type DataTableColumn } from '@/components/ui/DataTable'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import {
-  ExportDialog,
   buildSingleExportFilename,
   type ExportDialogValue,
   type ExportRequestOptions,
@@ -76,6 +75,10 @@ const FALLBACK_EXPORT_OPTIONS: ExportRequestOptions = {
   format: 'srt',
   include_timestamps: true,
 }
+const LazyExportDialog = lazy(async () => {
+  const module = await import('@/features/export')
+  return { default: module.ExportDialog }
+})
 
 function formatDuration(
   createdAt: string,
@@ -765,24 +768,28 @@ export function HistoryTaskRecordsView({
         onPageSizeChange={onPageSizeChange}
       />
 
-      <ExportDialog
-        open={exportDialog.open}
-        mode={exportDialog.mode}
-        taskCount={exportDialog.mode === 'single' ? 1 : exportDialog.taskIds.length}
-        defaultFilename={singleDefaultFilename}
-        value={exportValue}
-        isLoadingDefaults={exportDefaults.isLoading}
-        isSubmitting={isSubmittingExport}
-        isUpdatingDefaults={isUpdatingDefaults}
-        onChange={setExportValue}
-        onConfirm={() => {
-          void handleConfirmExport()
-        }}
-        onCancel={closeExportDialog}
-        onResetDefaults={() => {
-          void handleResetExportDefaults()
-        }}
-      />
+      {exportDialog.open ? (
+        <Suspense fallback={null}>
+          <LazyExportDialog
+            open={exportDialog.open}
+            mode={exportDialog.mode}
+            taskCount={exportDialog.mode === 'single' ? 1 : exportDialog.taskIds.length}
+            defaultFilename={singleDefaultFilename}
+            value={exportValue}
+            isLoadingDefaults={exportDefaults.isLoading}
+            isSubmitting={isSubmittingExport}
+            isUpdatingDefaults={isUpdatingDefaults}
+            onChange={setExportValue}
+            onConfirm={() => {
+              void handleConfirmExport()
+            }}
+            onCancel={closeExportDialog}
+            onResetDefaults={() => {
+              void handleResetExportDefaults()
+            }}
+          />
+        </Suspense>
+      ) : null}
     </section>
   )
 }

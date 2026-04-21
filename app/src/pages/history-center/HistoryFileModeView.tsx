@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/dialog'
 import { useExportDefaults } from '@/features/export'
 import { requestTaskRefresh, useHistoryTaskActions, useSessionTasksStore } from '@/features/tasks'
-import { FileDetailContent } from '@/features/upload'
 import { useDetailOverlayCloseRequest } from '@/shared/lib/overlay-events'
 import { queryKeys } from '@/shared/lib/query-keys'
 import { HistoryFileRecordsView } from './HistoryFileRecordsView'
@@ -26,6 +25,11 @@ import { useHistoryFileTaskCounts } from './useHistoryFileTaskCounts'
 import { useHistoryFiles } from './useHistoryFiles'
 import type { HistoryFileQuery, HistoryPageSize, HistoryRecordsMode } from '@/routes/history-search'
 import type { FileInfo, TaskSummary } from '@/shared/types'
+
+const LazyFileDetailContent = lazy(async () => {
+  const module = await import('@/features/upload/components/FileDetailContent')
+  return { default: module.FileDetailContent }
+})
 
 export interface HistoryFileModeViewProps {
   query: HistoryFileQuery
@@ -223,14 +227,22 @@ export function HistoryFileModeView({
         }
       >
         {selectedDetailRow ? (
-          <FileDetailContent
-            file={selectedDetailRow.file}
-            taskAvailability={selectedTaskAvailability}
-            associatedTasks={associatedTasks}
-            onExportTask={handleExportAssociatedTask}
-            onRetryTask={handleRetryAssociatedTask}
-            onCancelTask={handleCancelAssociatedTask}
-          />
+          <Suspense
+            fallback={
+              <div className="px-6 py-8">
+                <p className="text-muted-foreground text-sm">{t('history.files.detail.loading')}</p>
+              </div>
+            }
+          >
+            <LazyFileDetailContent
+              file={selectedDetailRow.file}
+              taskAvailability={selectedTaskAvailability}
+              associatedTasks={associatedTasks}
+              onExportTask={handleExportAssociatedTask}
+              onRetryTask={handleRetryAssociatedTask}
+              onCancelTask={handleCancelAssociatedTask}
+            />
+          </Suspense>
         ) : null}
       </DetailSheet>
 

@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next'
 import { CheckCircle2, Download, Trash2, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -16,7 +16,6 @@ import {
   getModelActionState,
   getModelDetail,
   getModelSettings,
-  ModelDetailContent,
   ModelList,
   type ModelDetailResponse,
   requestModelRefresh,
@@ -32,6 +31,11 @@ import { useDetailOverlayCloseRequest } from '@/shared/lib/overlay-events'
 import { queryClient } from '@/shared/lib/query-client'
 import { queryKeys } from '@/shared/lib/query-keys'
 import type { AppError } from '@/shared/types'
+
+const LazyModelDetailContent = lazy(async () => {
+  const module = await import('@/features/models/components/ModelDetailContent')
+  return { default: module.ModelDetailContent }
+})
 
 function toastError(t: TFunction, err: unknown) {
   if (isAppError(err)) {
@@ -493,11 +497,19 @@ export function ModelsPage() {
           bodyClassName="bg-surface-container-low/20"
         >
           {detailModel && !isDetailLoading && !detailError ? (
-            <ModelDetailContent
-              model={detailModel}
-              downloadState={selectedDownloadState}
-              onCopyRepoId={handleCopyRepoId}
-            />
+            <Suspense
+              fallback={
+                <div className="flex min-h-[320px] items-center justify-center">
+                  <p className="text-muted-foreground text-sm">{t('models.detail.loading')}</p>
+                </div>
+              }
+            >
+              <LazyModelDetailContent
+                model={detailModel}
+                downloadState={selectedDownloadState}
+                onCopyRepoId={handleCopyRepoId}
+              />
+            </Suspense>
           ) : null}
 
           {isDetailLoading ? (

@@ -89,6 +89,7 @@ vi.mock('react-i18next', () => ({
         'history.files.detail.eyebrow': 'File detail',
         'history.files.detail.description': 'Review file metadata and known associated tasks.',
         'history.files.detail.close': 'Close file detail',
+        'history.files.detail.loading': 'Loading file detail...',
         'history.files.detail.actions.reprocess': 'Re-process',
         'history.taskDetail.eyebrow': 'Task detail',
         'history.taskDetail.close': 'Close task detail',
@@ -633,18 +634,18 @@ describe('HistoryPage', () => {
     expect(refresh).toHaveBeenCalledTimes(1)
   })
 
-  it('opens the task detail dialog from a task row', () => {
+  it('opens the task detail dialog from a task row', async () => {
     renderHistoryPage()
 
     fireEvent.click(screen.getByText('task-completed'))
 
     expect(screen.getByText('Task detail')).toBeTruthy()
-    expect(screen.getByText('Transcription Result')).toBeTruthy()
+    expect(await screen.findByText('Transcription Result')).toBeTruthy()
     expect(screen.getByText('Task Metadata')).toBeTruthy()
     expect(screen.getByText('Welcome to the archive review.')).toBeTruthy()
   })
 
-  it('opens the file detail dialog from a filename row', () => {
+  it('opens the file detail dialog from a filename row', async () => {
     historyPageMocks.search = {
       mode: 'files',
     }
@@ -655,7 +656,7 @@ describe('HistoryPage', () => {
 
     expect(screen.getByText('File detail')).toBeTruthy()
     expect(screen.getByText('Review file metadata and known associated tasks.')).toBeTruthy()
-    expect(screen.getByText('Associated Tasks')).toBeTruthy()
+    expect(await screen.findByText('Associated Tasks')).toBeTruthy()
     expect(screen.getByText('task-file-1')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Re-process' })).toBeTruthy()
   })

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { lazy, Suspense, useCallback, useState } from 'react'
 import { Copy } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -9,7 +9,6 @@ import { DetailSheet } from '@/components/ui/DetailSheet'
 import { useExportDefaults, type ExportRequestOptions } from '@/features/export'
 import type { SingleExportRequestOptions } from '@/features/export'
 import {
-  TaskDetailContent,
   deleteTaskRecordAction,
   requestTaskRefresh,
   useHistoryTaskActions,
@@ -22,6 +21,11 @@ import { useHistoryTaskDetail } from './useHistoryTaskDetail'
 import type { HistoryPageSize, HistoryRecordsMode, HistoryTaskQuery } from '@/routes/history-search'
 import type { SortOrder, TaskFilterStatus, TaskSortBy, TaskSummary } from '@/shared/types'
 import { useDetailOverlayCloseRequest } from '@/shared/lib/overlay-events'
+
+const LazyTaskDetailContent = lazy(async () => {
+  const module = await import('@/features/tasks/components/TaskDetailContent')
+  return { default: module.TaskDetailContent }
+})
 
 export interface HistoryTaskModeViewProps {
   query: HistoryTaskQuery
@@ -331,7 +335,15 @@ export function HistoryTaskModeView({
             </p>
           </div>
         ) : taskDetail.task ? (
-          <TaskDetailContent task={taskDetail.task} />
+          <Suspense
+            fallback={
+              <div className="px-6 py-8">
+                <p className="text-muted-foreground text-sm">{t('history.taskDetail.loading')}</p>
+              </div>
+            }
+          >
+            <LazyTaskDetailContent task={taskDetail.task} />
+          </Suspense>
         ) : (
           <div className="px-6 py-8">
             <p className="text-muted-foreground text-sm">{t('history.taskDetail.loading')}</p>
