@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { ListTodo } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -33,10 +33,6 @@ export function TaskWorkbenchActivityMonitor({
   const runningTaskIdSet = useMemo(() => new Set(runningTaskIds), [runningTaskIds])
   const hasActiveTasks = tasks.some((task) => ACTIVE_TASK_STATUSES.has(task.status))
   const canCancelTasks = Boolean(onCancelTask)
-
-  useEffect(() => {
-    runningTaskIdsRef.current = new Set(runningTaskIds)
-  }, [runningTaskIds])
 
   const handleCancel = useCallback(
     async (task: TaskSummary): Promise<void> => {
