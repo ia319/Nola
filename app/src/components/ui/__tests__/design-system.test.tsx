@@ -16,8 +16,13 @@ import { StatusBadge } from '../StatusBadge'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { defaultValue?: string }) => {
+    t: (key: string, options?: { defaultValue?: string; rowId?: string }) => {
       const dictionary: Record<string, string> = {
+        'components.detailSheet.close': 'Close',
+        'components.dataTable.empty.title': 'No items found',
+        'components.dataTable.empty.description': 'Add records or adjust the current filters.',
+        'components.dataTable.selectAll': 'Select all rows',
+        'components.dataTable.selectRow': `Select row ${String(options?.rowId ?? '')}`,
         'tasks.status.processing': 'Processing',
         'tasks.status.completed': 'Completed',
         'models.status.downloading': 'Downloading',
@@ -220,6 +225,28 @@ describe('DataTable', () => {
 
     const interviewCell = screen.getByText('Interview')
     fireEvent.click(interviewCell)
+    expect(onRowClick).toHaveBeenCalledWith(rows[0])
+  })
+
+  it('opens clickable rows with keyboard activation', () => {
+    const onRowClick = vi.fn()
+
+    render(
+      <DataTable
+        rows={rows}
+        getRowId={(row) => row.id}
+        onRowClick={onRowClick}
+        columns={[{ key: 'name', header: 'Name', cell: (row) => row.name }]}
+      />,
+    )
+
+    const firstRow = screen.getByText('Interview').closest('tr')
+    if (!(firstRow instanceof HTMLElement)) {
+      throw new Error('interactive row not found')
+    }
+
+    expect(firstRow).toHaveAttribute('tabindex', '0')
+    fireEvent.keyDown(firstRow, { key: 'Enter' })
     expect(onRowClick).toHaveBeenCalledWith(rows[0])
   })
 

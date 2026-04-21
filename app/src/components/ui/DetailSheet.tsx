@@ -1,6 +1,7 @@
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -45,12 +46,14 @@ export function DetailSheet({
   children,
   mode = 'sheet',
   size = 'default',
-  closeLabel = 'Close',
+  closeLabel,
   className,
   bodyClassName,
   footerClassName,
   ...props
 }: DetailSheetProps) {
+  const { t } = useTranslation()
+  const resolvedCloseLabel = closeLabel ?? t('components.detailSheet.close')
   const shellClassName =
     mode === 'dialog'
       ? cn(
@@ -63,7 +66,7 @@ export function DetailSheet({
         )
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px]" />
         <DialogPrimitive.Content
@@ -95,7 +98,7 @@ export function DetailSheet({
             </div>
 
             <DialogPrimitive.Close asChild>
-              <Button type="button" size="icon-sm" variant="ghost" aria-label={closeLabel}>
+              <Button type="button" size="icon-sm" variant="ghost" aria-label={resolvedCloseLabel}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>

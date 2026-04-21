@@ -1,4 +1,5 @@
 import { type ComponentPropsWithoutRef, type ReactNode, useEffect, useMemo, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils'
 import { EmptyState, type EmptyStateProps } from './EmptyState'
@@ -60,6 +61,7 @@ export function DataTable<T>({
   className,
   ...props
 }: DataTableProps<T>) {
+  const { t } = useTranslation()
   const headerCheckboxRef = useRef<HTMLInputElement | null>(null)
   const selectedRowIdSet = useMemo(
     () => new Set(selection?.selectedRowIds ?? []),
@@ -88,7 +90,7 @@ export function DataTable<T>({
       {...props}
     >
       <div className={cn('overflow-x-auto', scrollAreaClassName)}>
-        <table className="w-full min-w-full border-collapse text-sm">
+        <table className="w-full min-w-full border-collapse text-sm" aria-busy={isLoading}>
           {caption ? <caption className="sr-only">{caption}</caption> : null}
 
           <thead
@@ -105,7 +107,7 @@ export function DataTable<T>({
                       ref={headerCheckboxRef}
                       type="checkbox"
                       className="border-border h-4 w-4 rounded"
-                      aria-label={selection.selectAllLabel ?? 'Select all rows'}
+                      aria-label={selection.selectAllLabel ?? t('components.dataTable.selectAll')}
                       checked={allRowsSelected}
                       onChange={(event) => {
                         selection.onToggleAllRows?.(event.target.checked, rows)
@@ -173,8 +175,8 @@ export function DataTable<T>({
                   ) : (
                     (emptyState ?? (
                       <EmptyState
-                        title="No items found"
-                        description="Add records or adjust the current filters."
+                        title={t('components.dataTable.empty.title')}
+                        description={t('components.dataTable.empty.description')}
                       />
                     ))
                   )}
@@ -192,6 +194,7 @@ export function DataTable<T>({
                     key={rowId}
                     data-row-id={rowId}
                     aria-selected={isSelected || undefined}
+                    tabIndex={onRowClick ? 0 : undefined}
                     className={cn(
                       'border-outline-variant/70 border-t transition-colors',
                       onRowClick && 'hover:bg-surface-container-low cursor-pointer',
@@ -201,13 +204,23 @@ export function DataTable<T>({
                     onClick={() => {
                       onRowClick?.(row)
                     }}
+                    onKeyDown={(event) => {
+                      if (!onRowClick) return
+                      if (event.target !== event.currentTarget) return
+                      if (event.key !== 'Enter' && event.key !== ' ') return
+                      event.preventDefault()
+                      onRowClick(row)
+                    }}
                   >
                     {selection ? (
                       <td className="px-4 py-4" onClick={(event) => event.stopPropagation()}>
                         <input
                           type="checkbox"
                           className="border-border h-4 w-4 rounded"
-                          aria-label={selection.getRowLabel?.(row) ?? `Select row ${rowId}`}
+                          aria-label={
+                            selection.getRowLabel?.(row) ??
+                            t('components.dataTable.selectRow', { rowId })
+                          }
                           checked={isSelected}
                           onChange={(event) => {
                             selection.onToggleRow(rowId, event.target.checked, row)
