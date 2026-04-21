@@ -26,14 +26,18 @@ export type DataTableProps<T> = Omit<ComponentPropsWithoutRef<'div'>, 'children'
   caption?: string
   selection?: DataTableSelection<T>
   emptyState?: EmptyStateProps | ReactNode
+  errorState?: EmptyStateProps | ReactNode | null
+  isLoading?: boolean
+  loadingRowCount?: number
+  loadingState?: ReactNode
   onRowClick?: (row: T) => void
   rowClassName?: string | ((row: T) => string | undefined)
   scrollAreaClassName?: string
   stickyHeader?: boolean
 }
 
-function isEmptyStateConfig(
-  value: DataTableProps<unknown>['emptyState'],
+function isStateConfig(
+  value: EmptyStateProps | ReactNode | null | undefined,
 ): value is EmptyStateProps {
   return Boolean(value && typeof value === 'object' && 'title' in value)
 }
@@ -45,6 +49,10 @@ export function DataTable<T>({
   caption,
   selection,
   emptyState,
+  errorState,
+  isLoading = false,
+  loadingRowCount = 6,
+  loadingState,
   onRowClick,
   rowClassName,
   scrollAreaClassName,
@@ -62,6 +70,11 @@ export function DataTable<T>({
   const allRowsSelected = selectableRows > 0 && selectedCount === selectableRows
   const partiallySelected = selectedCount > 0 && selectedCount < selectableRows
   const columnCount = columns.length + (selection ? 1 : 0)
+  const resolvedLoadingRowCount = Number.isFinite(loadingRowCount)
+    ? Math.max(1, Math.floor(loadingRowCount))
+    : 1
+  const skeletonRows = Array.from({ length: resolvedLoadingRowCount })
+  const skeletonWidths = ['w-3/4', 'w-1/2', 'w-2/3', 'w-full'] as const
 
   useEffect(() => {
     if (!headerCheckboxRef.current) return
@@ -117,10 +130,45 @@ export function DataTable<T>({
           </thead>
 
           <tbody>
-            {rows.length === 0 ? (
+            {isLoading ? (
+              loadingState ? (
+                <tr>
+                  <td colSpan={columnCount} className="p-6">
+                    {loadingState}
+                  </td>
+                </tr>
+              ) : (
+                skeletonRows.map((_, rowIndex) => (
+                  <tr key={`loading-${rowIndex}`} className="border-outline-variant/70 border-t">
+                    {selection ? (
+                      <td className="px-4 py-4">
+                        <div className="bg-surface-container-high size-4 rounded motion-safe:animate-pulse" />
+                      </td>
+                    ) : null}
+
+                    {columns.map((column, columnIndex) => (
+                      <td key={column.key} className={cn('px-4 py-4', column.className)}>
+                        <div
+                          className={cn(
+                            'bg-surface-container-high h-4 rounded-full motion-safe:animate-pulse',
+                            skeletonWidths[(rowIndex + columnIndex) % skeletonWidths.length],
+                          )}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )
+            ) : errorState ? (
               <tr>
                 <td colSpan={columnCount} className="p-6">
-                  {isEmptyStateConfig(emptyState) ? (
+                  {isStateConfig(errorState) ? <EmptyState {...errorState} /> : errorState}
+                </td>
+              </tr>
+            ) : rows.length === 0 ? (
+              <tr>
+                <td colSpan={columnCount} className="p-6">
+                  {isStateConfig(emptyState) ? (
                     <EmptyState {...emptyState} />
                   ) : (
                     (emptyState ?? (

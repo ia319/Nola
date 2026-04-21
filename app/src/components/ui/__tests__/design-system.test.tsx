@@ -143,6 +143,54 @@ describe('DataTable', () => {
     expect(screen.getByText('Upload a file to populate this table.')).toBeTruthy()
   })
 
+  it('renders loading skeleton rows without falling back to the empty state', () => {
+    render(
+      <DataTable
+        rows={[]}
+        getRowId={(row: Row) => row.id}
+        isLoading
+        loadingRowCount={2}
+        columns={[
+          { key: 'name', header: 'Name', cell: (row) => row.name },
+          { key: 'status', header: 'Status', cell: (row) => row.status },
+        ]}
+        emptyState={{
+          title: 'No files found',
+          description: 'Upload a file to populate this table.',
+        }}
+      />,
+    )
+
+    expect(screen.queryByText('No files found')).toBeNull()
+    expect(screen.getAllByRole('row')).toHaveLength(3)
+  })
+
+  it('renders an error state with the provided recovery action', () => {
+    const onRetry = vi.fn()
+
+    render(
+      <DataTable
+        rows={[]}
+        getRowId={(row: Row) => row.id}
+        columns={[{ key: 'name', header: 'Name', cell: (row) => row.name }]}
+        errorState={{
+          title: 'Could not load records',
+          description: 'The API returned an error.',
+          action: (
+            <Button type="button" onClick={onRetry}>
+              Retry
+            </Button>
+          ),
+        }}
+      />,
+    )
+
+    expect(screen.getByText('Could not load records')).toBeTruthy()
+    expect(screen.getByText('The API returned an error.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+
   it('supports row selection and row-click handling together', () => {
     const onToggleRow = vi.fn()
     const onToggleAllRows = vi.fn()
@@ -225,8 +273,12 @@ describe('DetailSheet', () => {
     render(<DetailSheetHarness mode="sheet" />)
 
     const sheet = screen.getByText('Task Detail').closest('[data-slot="detail-sheet"]')
+    if (!(sheet instanceof HTMLElement)) {
+      throw new Error('detail sheet not found')
+    }
+
     expect(sheet).toHaveAttribute('data-mode', 'sheet')
-    expect(within(sheet as HTMLElement).getByText('Detail body')).toBeTruthy()
+    expect(within(sheet).getByText('Detail body')).toBeTruthy()
   })
 
   it('keeps shell and body class names on separate elements', () => {
