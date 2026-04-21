@@ -15,6 +15,8 @@ import {
 import type { TaskCreateResult } from '@/features/transcription-options'
 import { useFileUpload } from '@/features/upload'
 import { ContentCanvas, TwoColumnLayout } from '@/layouts'
+import { queryClient } from '@/shared/lib/query-client'
+import { queryKeys } from '@/shared/lib/query-keys'
 import type { AppError, TaskSummary } from '@/shared/types'
 import { TaskWorkbenchActivityMonitor } from './TaskWorkbenchActivityMonitor'
 import { buildTaskWorkbenchSummary } from './task-workbench-summary'
@@ -117,6 +119,7 @@ export function TaskWorkbenchPage() {
     }
 
     if (hasNewTask) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.lists() })
       requestTaskRefresh()
     }
   }
