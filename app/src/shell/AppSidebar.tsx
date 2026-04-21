@@ -86,7 +86,7 @@ export function AppSidebar() {
           </div>
         </div>
 
-        <nav className="mt-8 flex flex-1 flex-col gap-1">
+        <nav className="mt-8 flex flex-1 flex-col gap-1" aria-label={t('shell.navigation.label')}>
           {SIDEBAR_NAV_ITEMS.map((item) => {
             const Icon = item.icon
             const active = isSidebarItemActive(pathname, item.href)
@@ -108,7 +108,7 @@ export function AppSidebar() {
                   aria-current={active ? 'page' : undefined}
                   className={itemClassName}
                 >
-                  <Icon className="size-4" />
+                  <Icon className="size-4" aria-hidden="true" />
                   <span>{t(item.labelKey)}</span>
                 </Link>
               )
@@ -116,7 +116,7 @@ export function AppSidebar() {
 
             return (
               <button key={item.key} type="button" disabled className={itemClassName}>
-                <Icon className="size-4" />
+                <Icon className="size-4" aria-hidden="true" />
                 <span>{t(item.labelKey)}</span>
               </button>
             )

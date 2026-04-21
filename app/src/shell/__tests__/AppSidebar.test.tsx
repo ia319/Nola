@@ -22,6 +22,7 @@ vi.mock('react-i18next', () => ({
     t: (key: string) =>
       (
         ({
+          'shell.navigation.label': 'Primary navigation',
           'shell.navigation.tasks': 'Tasks',
           'shell.navigation.history': 'History',
           'shell.navigation.models': 'Models',
@@ -67,6 +68,7 @@ describe('AppSidebar', () => {
     expect(sidebar).toHaveAttribute('data-breakpoint', 'lg')
     expect(sidebar).toHaveStyle({ width: 'var(--sidebar-width)' })
     expect(screen.getByText('v3.0')).toBeTruthy()
+    expect(screen.getByRole('navigation', { name: 'Primary navigation' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Tasks' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: 'History' })).toHaveAttribute('href', '/history')
     expect(screen.getByRole('link', { name: 'Models' })).toHaveAttribute('href', '/models')
