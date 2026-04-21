@@ -17,9 +17,11 @@ const modelsPageMocks = vi.hoisted(() => ({
   useModels: vi.fn(),
   useModelDownload: vi.fn(),
   deleteModel: vi.fn(),
+  getModelSettings: vi.fn(),
   selectModel: vi.fn(),
   getModelDetail: vi.fn(),
   getModelActionState: vi.fn(),
+  requestModelRefresh: vi.fn(),
   toDownloadState: vi.fn(),
 }))
 
@@ -85,6 +87,7 @@ vi.mock('@/components/common', () => ({
 
 vi.mock('@/features/models', () => ({
   deleteModel: modelsPageMocks.deleteModel,
+  getModelSettings: modelsPageMocks.getModelSettings,
   ModelList: (props: {
     models: Array<{ model_id: string }>
     downloads: Map<string, DownloadState>
@@ -101,6 +104,7 @@ vi.mock('@/features/models', () => ({
       </div>
     )
   },
+  requestModelRefresh: modelsPageMocks.requestModelRefresh,
   selectModel: modelsPageMocks.selectModel,
   getModelDetail: modelsPageMocks.getModelDetail,
   getModelActionState: modelsPageMocks.getModelActionState,
@@ -129,9 +133,11 @@ describe('ModelsPage', () => {
     modelsPageMocks.useModels.mockReset()
     modelsPageMocks.useModelDownload.mockReset()
     modelsPageMocks.deleteModel.mockReset()
+    modelsPageMocks.getModelSettings.mockReset()
     modelsPageMocks.selectModel.mockReset()
     modelsPageMocks.getModelDetail.mockReset()
     modelsPageMocks.getModelActionState.mockReset()
+    modelsPageMocks.requestModelRefresh.mockReset()
     modelsPageMocks.toDownloadState.mockReset()
 
     modelsPageMocks.useModels.mockReturnValue({

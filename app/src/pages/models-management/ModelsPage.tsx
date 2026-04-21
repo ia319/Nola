@@ -6,15 +6,20 @@ import { toast } from 'sonner'
 
 import { ErrorBoundary } from '@/components/common'
 import { Button, DetailSheet, EmptyState, MetricCard, StatusBadge } from '@/components/ui'
+import { refreshConfigCaches } from '@/config/cache-invalidation'
+import logger from '@/config/logger'
+import { useActivityStore } from '@/features/activity'
 import { ContentCanvas, PageHeader } from '@/layouts'
 import {
   deleteModel,
   type DownloadTerminalEvent,
   getModelActionState,
   getModelDetail,
+  getModelSettings,
   ModelDetailContent,
   ModelList,
   type ModelDetailResponse,
+  requestModelRefresh,
   resolveModelDescription,
   selectModel,
   toDownloadState,
@@ -24,6 +29,8 @@ import {
 import type { DownloadState } from '@/features/models'
 import { isAppError } from '@/shared/lib/error-factory'
 import { useDetailOverlayCloseRequest } from '@/shared/lib/overlay-events'
+import { queryClient } from '@/shared/lib/query-client'
+import { queryKeys } from '@/shared/lib/query-keys'
 import type { AppError } from '@/shared/types'
 
 function toastError(t: TFunction, err: unknown) {
@@ -58,9 +65,9 @@ export function ModelsPage() {
     isLoading,
     hasLoaded,
     error,
-    refresh,
     updateSnapshot,
   } = useModels()
+  const setActivityModelSettings = useActivityStore((state) => state.setModelSettings)
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
   const [detail, setDetail] = useState<ModelDetailResponse | null>(null)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
@@ -169,7 +176,16 @@ export function ModelsPage() {
       toast.success(t('models.toast.downloadCancelled', { modelId: event.modelId }))
     }
 
-    void refresh()
+    requestModelRefresh()
+    void queryClient.invalidateQueries({ queryKey: queryKeys.models.downloads() })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.models.list() })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.models.detail(event.modelId) })
+
+    if (event.status === 'completed') {
+      void refreshConfigCaches().catch((error: unknown) => {
+        logger.error('models.download.configRefreshFailed', { error, modelId: event.modelId })
+      })
+    }
 
     if (selectedModelIdRef.current === event.modelId) {
       void loadModelDetail(event.modelId)
@@ -185,6 +201,7 @@ export function ModelsPage() {
   async function handleDownload(modelId: string) {
     try {
       await download(modelId)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.models.downloads() })
       toast.success(t('models.toast.downloadStarted', { modelId }))
     } catch (err) {
       toastError(t, err)
@@ -194,6 +211,7 @@ export function ModelsPage() {
   async function handleCancel(modelId: string) {
     try {
       await cancel(modelId)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.models.downloads() })
     } catch (err) {
       toastError(t, err)
     }
@@ -210,7 +228,9 @@ export function ModelsPage() {
         setSelectedModelId(null)
       }
       toast.success(t('models.toast.deleted', { modelId }))
-      await refresh()
+      requestModelRefresh()
+      void queryClient.invalidateQueries({ queryKey: queryKeys.models.list() })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.models.detail(modelId) })
     } catch (err) {
       toastError(t, err)
     }
@@ -239,7 +259,22 @@ export function ModelsPage() {
       if (result.restart_required) {
         toast.warning(t('models.restartRequired'))
       }
-      await refresh()
+
+      requestModelRefresh()
+      void queryClient.invalidateQueries({ queryKey: queryKeys.models.list() })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.models.settings() })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.models.detail(modelId) })
+      void refreshConfigCaches().catch((error: unknown) => {
+        logger.error('models.select.configRefreshFailed', { error, modelId })
+      })
+
+      try {
+        const settings = await getModelSettings()
+        queryClient.setQueryData(queryKeys.models.settings(), settings)
+        setActivityModelSettings(settings)
+      } catch (error: unknown) {
+        logger.error('models.select.settingsRefreshFailed', { error, modelId })
+      }
     } catch (err) {
       toastError(t, err)
     }
