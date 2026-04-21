@@ -115,6 +115,11 @@ vi.mock('../TaskWorkbenchActivityMonitor', () => ({
 
 import { TaskWorkbenchPage } from '../TaskWorkbenchPage'
 
+function requireHtmlElement(value: Element | null, label: string): HTMLElement {
+  if (value instanceof HTMLElement) return value
+  throw new Error(`Expected ${label} to exist`)
+}
+
 describe('TaskWorkbenchPage', () => {
   beforeEach(() => {
     taskWorkbenchMocks.logger.error.mockReset()
@@ -232,15 +237,27 @@ describe('TaskWorkbenchPage', () => {
     const summary = screen.getByText('Uploaded').closest('[data-slot="task-workbench-summary"]')
     expect(summary).toBeTruthy()
 
-    const uploadedCard = screen.getByText('Uploaded').closest('[data-slot="card"]')
-    const readyCard = screen.getByText('Ready').closest('[data-slot="card"]')
-    const processingCard = screen.getByText('Processing').closest('[data-slot="card"]')
-    const completedCard = screen.getByText('Completed').closest('[data-slot="card"]')
+    const uploadedCard = requireHtmlElement(
+      screen.getByText('Uploaded').closest('[data-slot="card"]'),
+      'uploaded summary card',
+    )
+    const readyCard = requireHtmlElement(
+      screen.getByText('Ready').closest('[data-slot="card"]'),
+      'ready summary card',
+    )
+    const processingCard = requireHtmlElement(
+      screen.getByText('Processing').closest('[data-slot="card"]'),
+      'processing summary card',
+    )
+    const completedCard = requireHtmlElement(
+      screen.getByText('Completed').closest('[data-slot="card"]'),
+      'completed summary card',
+    )
 
-    expect(within(uploadedCard as HTMLElement).getByText('3')).toBeTruthy()
-    expect(within(readyCard as HTMLElement).getByText('1')).toBeTruthy()
-    expect(within(processingCard as HTMLElement).getByText('2')).toBeTruthy()
-    expect(within(completedCard as HTMLElement).getByText('1')).toBeTruthy()
+    expect(within(uploadedCard).getByText('3')).toBeTruthy()
+    expect(within(readyCard).getByText('1')).toBeTruthy()
+    expect(within(processingCard).getByText('2')).toBeTruthy()
+    expect(within(completedCard).getByText('1')).toBeTruthy()
 
     expect(screen.getByRole('heading', { name: 'Session Configuration', level: 2 })).toBeTruthy()
     expect(screen.getByText('upload queue')).toBeTruthy()
