@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -6,7 +6,6 @@ import { ListToolbar, TaskListPanel } from '@/components/common'
 import type { TaskActionHandler } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import {
-  ExportDialog,
   buildSingleExportFilename,
   type ExportDialogValue,
   useExportDefaults,
@@ -63,6 +62,10 @@ const FALLBACK_EXPORT_OPTIONS: ExportRequestOptions = {
   format: 'srt',
   include_timestamps: true,
 }
+const LazyExportDialog = lazy(async () => {
+  const module = await import('@/features/export')
+  return { default: module.ExportDialog }
+})
 
 function createExportDialogValue(defaults: ExportRequestOptions): ExportDialogValue {
   return {
@@ -437,24 +440,28 @@ export function TaskHistoryPanel({
             : undefined
         }
       />
-      <ExportDialog
-        open={exportDialog.open}
-        mode={exportDialog.mode}
-        taskCount={exportDialog.mode === 'single' ? 1 : exportDialog.taskIds.length}
-        defaultFilename={singleDefaultFilename}
-        value={exportValue}
-        isLoadingDefaults={exportDefaults.isLoading}
-        isSubmitting={isSubmittingExport}
-        isUpdatingDefaults={isUpdatingDefaults}
-        onChange={setExportValue}
-        onConfirm={() => {
-          void handleConfirmExport()
-        }}
-        onCancel={closeExportDialog}
-        onResetDefaults={() => {
-          void handleResetExportDefaults()
-        }}
-      />
+      {exportDialog.open ? (
+        <Suspense fallback={null}>
+          <LazyExportDialog
+            open={exportDialog.open}
+            mode={exportDialog.mode}
+            taskCount={exportDialog.mode === 'single' ? 1 : exportDialog.taskIds.length}
+            defaultFilename={singleDefaultFilename}
+            value={exportValue}
+            isLoadingDefaults={exportDefaults.isLoading}
+            isSubmitting={isSubmittingExport}
+            isUpdatingDefaults={isUpdatingDefaults}
+            onChange={setExportValue}
+            onConfirm={() => {
+              void handleConfirmExport()
+            }}
+            onCancel={closeExportDialog}
+            onResetDefaults={() => {
+              void handleResetExportDefaults()
+            }}
+          />
+        </Suspense>
+      ) : null}
     </>
   )
 }
