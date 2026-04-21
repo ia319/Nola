@@ -120,6 +120,9 @@ export function HistoryPage({ search, updateSearch }: HistoryPageProps) {
     },
     [updateSearch],
   )
+  const handleCreateTask = useCallback(() => {
+    void navigate({ to: localizePath('/', activeLocale) })
+  }, [activeLocale, navigate])
 
   return (
     <ErrorBoundary>
@@ -143,9 +146,7 @@ export function HistoryPage({ search, updateSearch }: HistoryPageProps) {
             onPageSizeChange={handlePageSizeChange}
             onPageClamp={handlePageClamp}
             onModeChange={handleModeChange}
-            onCreateTask={() => {
-              void navigate({ to: localizePath('/', activeLocale) })
-            }}
+            onCreateTask={handleCreateTask}
           />
         ) : (
           <HistoryFileModeView
@@ -154,9 +155,7 @@ export function HistoryPage({ search, updateSearch }: HistoryPageProps) {
             onPageChange={handlePageChange}
             onPageSizeChange={handlePageSizeChange}
             onModeChange={handleModeChange}
-            onCreateTask={() => {
-              void navigate({ to: localizePath('/', activeLocale) })
-            }}
+            onCreateTask={handleCreateTask}
           />
         )}
       </ContentCanvas>

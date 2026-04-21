@@ -49,18 +49,11 @@ function formatFileSize(sizeInBytes: number): string {
   return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`
 }
 
-function formatTimestamp(value: string): string {
+function formatTimestamp(value: string, formatter: Intl.DateTimeFormat): string {
   const timestamp = Date.parse(value)
   if (Number.isNaN(timestamp)) return value
 
-  return new Intl.DateTimeFormat(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(new Date(timestamp))
+  return formatter.format(new Date(timestamp))
 }
 
 const NOOP = () => {}
@@ -104,6 +97,18 @@ export function HistoryFileRecordsView({
   const selectedFileIdSet = useMemo(() => new Set(selectedFileIds), [selectedFileIds])
   const allCurrentPageSelected =
     rows.length > 0 && rows.every((row) => selectedFileIdSet.has(row.file.file_id))
+  const timestampFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
+    [],
+  )
 
   function getScopedSelectedIds(previous: { resetToken: string; ids: string[] }): string[] {
     const previousIds = previous.resetToken === selectionResetToken ? previous.ids : []
@@ -117,99 +122,103 @@ export function HistoryFileRecordsView({
     })
   }
 
-  const columns: readonly DataTableColumn<HistoryFileRecordRow>[] = [
-    {
-      key: 'file',
-      header: t('history.files.table.columns.file'),
-      className: 'min-w-[280px]',
-      cell: ({ file }) => (
-        <div className="min-w-0 space-y-1">
-          <p className="truncate text-sm font-semibold">{file.filename}</p>
-          <p className="text-muted-foreground font-mono text-[11px] tracking-tight">
-            {file.file_id}
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: 'tasks',
-      header: t('history.files.table.columns.tasks'),
-      className: 'min-w-[140px]',
-      cell: ({ file, knownTaskCount }) => {
-        const label =
-          knownTaskCount === null
-            ? t('history.files.table.tasksUnavailable')
-            : t('history.files.table.tasksCount', { count: knownTaskCount })
-
-        if (!onOpenFileDetail) {
-          return <span className="text-sm font-medium">{label}</span>
-        }
-
-        return (
-          <Button
-            type="button"
-            size="xs"
-            variant="ghost"
-            className="h-auto px-0 py-0 text-sm font-medium"
-            aria-label={t('history.files.table.actions.openDetail', {
-              filename: file.filename,
-            })}
-            onClick={(event) => {
-              event.stopPropagation()
-              onOpenFileDetail(file)
-            }}
-          >
-            {label}
-          </Button>
-        )
+  const columns = useMemo<readonly DataTableColumn<HistoryFileRecordRow>[]>(() => {
+    return [
+      {
+        key: 'file',
+        header: t('history.files.table.columns.file'),
+        className: 'min-w-[280px]',
+        cell: ({ file }) => (
+          <div className="min-w-0 space-y-1">
+            <p className="truncate text-sm font-semibold">{file.filename}</p>
+            <p className="text-muted-foreground font-mono text-[11px] tracking-tight">
+              {file.file_id}
+            </p>
+          </div>
+        ),
       },
-    },
-    {
-      key: 'size',
-      header: t('history.files.table.columns.size'),
-      className: 'min-w-[120px]',
-      cell: ({ file }) => <span className="text-sm">{formatFileSize(file.size)}</span>,
-    },
-    {
-      key: 'contentType',
-      header: t('history.files.table.columns.contentType'),
-      className: 'min-w-[180px]',
-      cell: ({ file }) => (
-        <span className="text-sm">
-          {file.content_type ?? t('history.files.table.typeFallback')}
-        </span>
-      ),
-    },
-    {
-      key: 'uploadedAt',
-      header: t('history.files.table.columns.uploadedAt'),
-      className: 'min-w-[220px]',
-      cell: ({ file }) => <span className="text-sm">{formatTimestamp(file.created_at)}</span>,
-    },
-    {
-      key: 'actions',
-      header: t('history.files.table.columns.actions'),
-      className: 'w-[96px]',
-      headerClassName: 'text-right',
-      cell: ({ file }) => (
-        <div className="flex justify-end">
-          <Button
-            type="button"
-            size="icon-xs"
-            variant="ghost"
-            aria-label={t('history.files.table.actions.delete')}
-            disabled={deletingFileId === file.file_id || !onRequestDeleteFile}
-            onClick={(event) => {
-              event.stopPropagation()
-              onRequestDeleteFile?.(file)
-            }}
-          >
-            <Trash2 />
-          </Button>
-        </div>
-      ),
-    },
-  ]
+      {
+        key: 'tasks',
+        header: t('history.files.table.columns.tasks'),
+        className: 'min-w-[140px]',
+        cell: ({ file, knownTaskCount }) => {
+          const label =
+            knownTaskCount === null
+              ? t('history.files.table.tasksUnavailable')
+              : t('history.files.table.tasksCount', { count: knownTaskCount })
+
+          if (!onOpenFileDetail) {
+            return <span className="text-sm font-medium">{label}</span>
+          }
+
+          return (
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              className="h-auto px-0 py-0 text-sm font-medium"
+              aria-label={t('history.files.table.actions.openDetail', {
+                filename: file.filename,
+              })}
+              onClick={(event) => {
+                event.stopPropagation()
+                onOpenFileDetail(file)
+              }}
+            >
+              {label}
+            </Button>
+          )
+        },
+      },
+      {
+        key: 'size',
+        header: t('history.files.table.columns.size'),
+        className: 'min-w-[120px]',
+        cell: ({ file }) => <span className="text-sm">{formatFileSize(file.size)}</span>,
+      },
+      {
+        key: 'contentType',
+        header: t('history.files.table.columns.contentType'),
+        className: 'min-w-[180px]',
+        cell: ({ file }) => (
+          <span className="text-sm">
+            {file.content_type ?? t('history.files.table.typeFallback')}
+          </span>
+        ),
+      },
+      {
+        key: 'uploadedAt',
+        header: t('history.files.table.columns.uploadedAt'),
+        className: 'min-w-[220px]',
+        cell: ({ file }) => (
+          <span className="text-sm">{formatTimestamp(file.created_at, timestampFormatter)}</span>
+        ),
+      },
+      {
+        key: 'actions',
+        header: t('history.files.table.columns.actions'),
+        className: 'w-[96px]',
+        headerClassName: 'text-right',
+        cell: ({ file }) => (
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              size="icon-xs"
+              variant="ghost"
+              aria-label={t('history.files.table.actions.delete')}
+              disabled={deletingFileId === file.file_id || !onRequestDeleteFile}
+              onClick={(event) => {
+                event.stopPropagation()
+                onRequestDeleteFile?.(file)
+              }}
+            >
+              <Trash2 />
+            </Button>
+          </div>
+        ),
+      },
+    ]
+  }, [deletingFileId, onOpenFileDetail, onRequestDeleteFile, t, timestampFormatter])
 
   return (
     <section
