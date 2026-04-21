@@ -388,6 +388,8 @@ export function HistoryTaskRecordsView({
           const result = await onExportTask(exportDialog.task, buildSingleExportOptions())
           if (result.mode === 'save') {
             setLastSavedPath(result.savedPath)
+          } else {
+            setLastSavedPath(null)
           }
         } else {
           if (!onBatchExportTasks || exportDialog.taskIds.length === 0) {
@@ -398,6 +400,7 @@ export function HistoryTaskRecordsView({
             ...options,
             zip_name: exportValue.zipName.trim() || undefined,
           })
+          setLastSavedPath(null)
           clearSelection()
         }
       } catch {

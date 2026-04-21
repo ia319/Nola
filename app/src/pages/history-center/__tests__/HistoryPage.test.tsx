@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { isSameHistorySearch, normalizeHistorySearch } from '@/routes/history-search'
 import type { ExportDialogValue, ExportRequestOptions } from '@/features/export'
+import type { UseHistoryTaskActionsResult } from '@/features/tasks'
 import type { FileInfo, TaskDetail, TaskSummary } from '@/shared/types'
 
 const historyPageMocks = vi.hoisted(() => ({
@@ -34,17 +35,47 @@ const historyPageMocks = vi.hoisted(() => ({
       open,
       taskCount,
       value,
+      onChange,
+      onConfirm,
     }: {
       open: boolean
       taskCount: number
       value: ExportDialogValue
+      onChange: (next: ExportDialogValue) => void
+      onConfirm: () => void
     }) => (
       <div
         data-slot="mock-export-dialog"
         data-open={String(open)}
         data-task-count={String(taskCount)}
         data-format={value.format}
-      />
+      >
+        <button
+          type="button"
+          onClick={() => {
+            onChange({
+              ...value,
+              target: 'save',
+            })
+          }}
+        >
+          Use save target
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onChange({
+              ...value,
+              target: 'download',
+            })
+          }}
+        >
+          Use download target
+        </button>
+        <button type="button" onClick={onConfirm}>
+          Confirm export
+        </button>
+      </div>
     ),
   ),
 }))
@@ -527,6 +558,44 @@ describe('HistoryPage', () => {
     })
 
     expect(screen.getByText('Export selected (1)')).toBeTruthy()
+  })
+
+  it('clears stale saved paths after a later download export', async () => {
+    const exportTask = vi
+      .fn<UseHistoryTaskActionsResult['exportTask']>()
+      .mockResolvedValueOnce({ mode: 'save', savedPath: 'D:/exports/task-completed.srt' })
+      .mockResolvedValueOnce({ mode: 'download' })
+
+    historyPageMocks.useHistoryTaskActions.mockReturnValue({
+      cancelTasks: vi.fn(),
+      retryTasks: vi.fn(),
+      exportTask,
+      exportTasks: vi.fn(),
+    })
+
+    renderHistoryPage()
+
+    const completedRow = screen.getByRole('row', { name: /task-completed/i })
+    const refreshedCompletedRow = screen.getByRole('row', { name: /task-completed/i })
+    fireEvent.click(within(refreshedCompletedRow).getByRole('button', { name: 'Export record' }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Use save target' }))
+    await waitFor(() => {
+      expect(historyPageMocks.exportDialog.mock.calls.at(-1)?.[0].value.target).toBe('save')
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm export' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Last saved path: D:/exports/task-completed.srt')).toBeTruthy()
+    })
+
+    fireEvent.click(within(completedRow).getByRole('button', { name: 'Export record' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm export' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('Last saved path: D:/exports/task-completed.srt')).toBeNull()
+    })
+    expect(exportTask).toHaveBeenCalledTimes(2)
   })
 
   it('renders the history empty state and navigates back to tasks', () => {
