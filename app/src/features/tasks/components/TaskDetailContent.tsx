@@ -30,22 +30,30 @@ function formatTimestamp(value: string | null): string {
 }
 
 function formatDurationSeconds(value: number | null): string {
-  if (!Number.isFinite(value) || value === null || value < 0) {
+  if (value === null || !Number.isFinite(value) || value < 0) {
     return '—'
   }
 
-  const totalSeconds = Number(value)
+  const totalCentiseconds = Math.round(value * 100)
+  const totalSeconds = Math.floor(totalCentiseconds / 100)
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = totalSeconds % 60
+  const centiseconds = totalCentiseconds % 100
+  const secondsLabel = `${String(seconds).padStart(2, '0')}.${String(centiseconds).padStart(2, '0')}`
 
   if (hours > 0) {
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${seconds
-      .toFixed(2)
-      .padStart(5, '0')}`
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${secondsLabel}`
   }
 
-  return `${String(minutes).padStart(2, '0')}:${seconds.toFixed(2).padStart(5, '0')}`
+  return `${String(minutes).padStart(2, '0')}:${secondsLabel}`
+}
+
+function clampProgress(progress: number): number {
+  if (!Number.isFinite(progress)) return 0
+  if (progress <= 0) return 0
+  if (progress >= 100) return 100
+  return progress
 }
 
 function formatSegmentTimestamp(secondsValue: number): string {
@@ -68,6 +76,7 @@ function buildSegmentRange(segment: Segment): string {
 export function TaskDetailContent({ task }: TaskDetailContentProps) {
   const { t } = useTranslation()
   const segments = task.segments ?? []
+  const progress = clampProgress(task.progress)
 
   return (
     <div
@@ -115,9 +124,9 @@ export function TaskDetailContent({ task }: TaskDetailContentProps) {
               <span className="text-muted-foreground text-[11px] font-semibold tracking-[0.18em] uppercase">
                 {t('tasks.fields.progress')}
               </span>
-              <span className="text-sm font-semibold">{Math.round(task.progress)}%</span>
+              <span className="text-sm font-semibold">{Math.round(progress)}%</span>
             </div>
-            <ProgressBar percent={task.progress} showValue={false} />
+            <ProgressBar percent={progress} showValue={false} />
           </div>
 
           <dl className="space-y-4">
