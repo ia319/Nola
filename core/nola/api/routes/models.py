@@ -375,7 +375,9 @@ def get_model_detail(model_id: str) -> ModelDetailResponse:
     status_code=status.HTTP_202_ACCEPTED,
     responses={
         404: {"description": "Unknown model id"},
-        409: {"description": "Download already in progress"},
+        409: {
+            "description": "Download already in progress or model already downloaded"
+        },
     },
 )
 def start_download(model_id: str) -> ModelDownloadStartedResponse | Response:

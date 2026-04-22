@@ -113,6 +113,25 @@ class TestFilesAPI:
         )
         assert file_db.get_file("linked-file") is not None
 
+    def test_delete_file_returns_404_when_row_disappears_before_delete(self, client):
+        """Return not found when a concurrent request already removed the row."""
+        file_db = get_file_db()
+        file_db.create_file(
+            file_id="lost-delete-file",
+            filename="lost.mp3",
+            path="/tmp/lost.mp3",
+            size=1000,
+        )
+
+        with (
+            patch("nola.api.routes.files.get_file_db", return_value=file_db),
+            patch.object(file_db, "delete_file", return_value=False),
+        ):
+            response = client.delete("/api/files/lost-delete-file")
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "File not found"
+
 
 class TestTranscriptionsAPI:
     """Test transcription endpoints."""
@@ -343,6 +362,20 @@ class TestModelsAPI:
         assert response.status_code == 409
         assert response.json()["detail"] == "Model already downloaded: small"
         get_downloader.assert_not_called()
+
+    def test_start_download_openapi_declares_all_conflict_reasons(
+        self, client: TestClient
+    ) -> None:
+        """OpenAPI should document both model download conflict states."""
+        response = client.get("/openapi.json")
+        assert response.status_code == 200
+        schema = response.json()
+
+        download_post = schema["paths"]["/api/models/{model_id}/download"]["post"]
+        assert (
+            download_post["responses"]["409"]["description"]
+            == "Download already in progress or model already downloaded"
+        )
 
     def test_list_active_model_downloads_reports_real_speed(
         self, client: TestClient

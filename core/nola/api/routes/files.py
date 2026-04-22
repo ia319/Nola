@@ -226,7 +226,7 @@ async def delete_file(file_id: str) -> dict[str, str]:
 
     # DB first: orphan file is safer than orphan DB record
     try:
-        file_db.delete_file(file_id)
+        deleted = file_db.delete_file(file_id)
     except sqlite3.IntegrityError as exc:
         linked_task_count = max(1, file_db.count_linked_tasks(file_id))
         raise HTTPException(
@@ -236,6 +236,9 @@ async def delete_file(file_id: str) -> dict[str, str]:
                 f"{linked_task_count} transcription task(s) still reference it"
             ),
         ) from exc
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="File not found")
 
     file_path.unlink(missing_ok=True)
 
