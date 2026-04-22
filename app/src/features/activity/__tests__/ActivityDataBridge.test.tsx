@@ -12,17 +12,23 @@ import type { ActiveModelDownload, ModelSettingsResponse, TaskSummary } from '@/
 import { useActivityStore } from '../store'
 import { ActivityDataBridge } from '../ActivityDataBridge'
 
-const activityBridgeMocks = vi.hoisted(() => ({
-  getModelSettings: vi.fn(),
-  listActiveModelDownloads: vi.fn(),
-  requestModelRefresh: vi.fn(),
-  refreshConfigCaches: vi.fn(),
-  createSSEConnection: vi.fn(),
-  sseOptions: null as {
-    onMessage: (event: { data: ModelDownloadSSEPayload }) => void
-    onError?: (error: Event) => void
-  } | null,
-}))
+interface CapturedModelDownloadSseOptions {
+  onMessage: (event: { data: ModelDownloadSSEPayload }) => void
+  onError?: (error: Event) => void
+}
+
+const activityBridgeMocks = vi.hoisted(() => {
+  const sseOptions: CapturedModelDownloadSseOptions | null = null
+
+  return {
+    getModelSettings: vi.fn(),
+    listActiveModelDownloads: vi.fn(),
+    requestModelRefresh: vi.fn(),
+    refreshConfigCaches: vi.fn(),
+    createSSEConnection: vi.fn(),
+    sseOptions,
+  }
+})
 
 vi.mock('@/features/models', () => ({
   getModelSettings: activityBridgeMocks.getModelSettings,
@@ -56,6 +62,14 @@ function renderBridge(queryClient = createQueryClient()) {
       </QueryClientProvider>,
     ),
   }
+}
+
+function getCapturedSseOptions(): CapturedModelDownloadSseOptions {
+  if (!activityBridgeMocks.sseOptions) {
+    throw new Error('Expected activity SSE connection options')
+  }
+
+  return activityBridgeMocks.sseOptions
 }
 
 function buildTask(
@@ -174,8 +188,10 @@ describe('ActivityDataBridge', () => {
       )
     })
 
+    const sseOptions = getCapturedSseOptions()
+
     act(() => {
-      activityBridgeMocks.sseOptions?.onMessage({
+      sseOptions.onMessage({
         data: {
           model_id: 'small',
           status: 'completed',
@@ -198,5 +214,34 @@ describe('ActivityDataBridge', () => {
     expect(activityBridgeMocks.requestModelRefresh).toHaveBeenCalledTimes(1)
     expect(activityBridgeMocks.refreshConfigCaches).toHaveBeenCalledTimes(1)
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: queryKeys.models.downloads() })
+  })
+
+  it('records failed terminal model download events as recent activity', async () => {
+    renderBridge()
+
+    await waitFor(() => {
+      expect(activityBridgeMocks.sseOptions).not.toBeNull()
+    })
+
+    const sseOptions = getCapturedSseOptions()
+
+    act(() => {
+      sseOptions.onMessage({
+        data: {
+          model_id: 'small',
+          status: 'failed',
+          percent: 40,
+          downloaded_bytes: 40,
+          total_bytes: 100,
+          speed_bps: 0,
+          error: 'Network failed',
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(useActivityStore.getState().recent[0]).toHaveProperty('kind', 'model_download_failed')
+    })
+    expect(useActivityStore.getState().recent[0]).toHaveProperty('model.error', 'Network failed')
   })
 })

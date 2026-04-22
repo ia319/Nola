@@ -104,7 +104,7 @@ describe('activity store', () => {
     const store = useActivityStore.getState()
     const failedTask = buildTask('task-1', {
       status: 'failed',
-      completed_at: '2026-04-20T10:10:00.000Z',
+      completed_at: null,
     })
 
     store.setTasks([failedTask])
@@ -114,7 +114,12 @@ describe('activity store', () => {
     }
 
     store.dismissActivity(failedActivityId)
-    store.setTasks([failedTask])
+    store.setTasks([
+      {
+        ...failedTask,
+        completed_at: '2026-04-20T10:10:00.000Z',
+      },
+    ])
 
     const snapshot = useActivityStore.getState()
     expect(snapshot.needsAttention).toEqual([])
@@ -132,10 +137,16 @@ describe('activity store', () => {
         occurredAt: `2026-04-20T10:${String(index).padStart(2, '0')}:00.000Z`,
       })
     }
+    store.addRecent({
+      kind: 'model_download_completed',
+      modelId: 'older-model',
+      name: 'Older Model',
+      occurredAt: '2026-04-20T09:00:00.000Z',
+    })
 
     const snapshot = useActivityStore.getState()
     expect(snapshot.recent).toHaveLength(ACTIVITY_RECENT_LIMIT)
-    expect(snapshot.recent[0]).toHaveProperty('model.modelId', 'model-11')
+    expect(snapshot.recent[0]).toHaveProperty('model.modelId', `model-${ACTIVITY_RECENT_LIMIT + 1}`)
     expect(snapshot.recent.at(-1)).toHaveProperty('model.modelId', 'model-2')
   })
 

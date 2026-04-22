@@ -95,6 +95,21 @@ export interface ModelDownloadCompletedRecentInput {
   occurredAt?: string
 }
 
+export interface ModelDownloadFailedRecentInput {
+  kind: 'model_download_failed'
+  modelId: string
+  name: string
+  error?: string | null
+  occurredAt?: string
+}
+
+export interface ModelDownloadCancelledRecentInput {
+  kind: 'model_download_cancelled'
+  modelId: string
+  name: string
+  occurredAt?: string
+}
+
 export type SystemMaintenanceActivityEvent = 'file_integrity_checked' | 'orphan_cleanup_completed'
 
 export interface SystemMaintenanceRecentInput {
@@ -107,6 +122,8 @@ export interface SystemMaintenanceRecentInput {
 export type ActivityRecentInput =
   | TaskCompletedRecentInput
   | ModelDownloadCompletedRecentInput
+  | ModelDownloadFailedRecentInput
+  | ModelDownloadCancelledRecentInput
   | SystemMaintenanceRecentInput
 
 export interface TaskCompletedRecentActivityItem extends BaseActivityItem {
@@ -126,6 +143,27 @@ export interface ModelDownloadCompletedRecentActivityItem extends BaseActivityIt
   }
 }
 
+export interface ModelDownloadFailedRecentActivityItem extends BaseActivityItem {
+  kind: 'model_download_failed'
+  source: 'model'
+  route: '/models'
+  model: {
+    modelId: string
+    name: string
+    error: string | null
+  }
+}
+
+export interface ModelDownloadCancelledRecentActivityItem extends BaseActivityItem {
+  kind: 'model_download_cancelled'
+  source: 'model'
+  route: '/models'
+  model: {
+    modelId: string
+    name: string
+  }
+}
+
 export interface SystemMaintenanceRecentActivityItem extends BaseActivityItem {
   kind: 'system_maintenance_completed'
   source: 'system'
@@ -137,6 +175,8 @@ export interface SystemMaintenanceRecentActivityItem extends BaseActivityItem {
 export type ActivityRecentItem =
   | TaskCompletedRecentActivityItem
   | ModelDownloadCompletedRecentActivityItem
+  | ModelDownloadFailedRecentActivityItem
+  | ModelDownloadCancelledRecentActivityItem
   | SystemMaintenanceRecentActivityItem
 
 export interface ActivityStoreState {
@@ -199,7 +239,7 @@ function createFailedTaskItem(task: TaskSummary): TaskFailedActivityItem {
   const occurredAt = task.completed_at ?? task.created_at
 
   return {
-    id: `task:failed:${task.task_id}:${occurredAt}`,
+    id: `task:failed:${task.task_id}`,
     kind: 'task_failed',
     source: 'task',
     route: '/history',
@@ -277,6 +317,35 @@ function createRecentItem(input: ActivityRecentInput): ActivityRecentItem {
     return {
       id: `recent:model-download-completed:${input.modelId}:${occurredAt}`,
       kind: 'model_download_completed',
+      source: 'model',
+      route: '/models',
+      occurredAt,
+      model: {
+        modelId: input.modelId,
+        name: input.name,
+      },
+    }
+  }
+
+  if (input.kind === 'model_download_failed') {
+    return {
+      id: `recent:model-download-failed:${input.modelId}:${occurredAt}`,
+      kind: 'model_download_failed',
+      source: 'model',
+      route: '/models',
+      occurredAt,
+      model: {
+        modelId: input.modelId,
+        name: input.name,
+        error: input.error ?? null,
+      },
+    }
+  }
+
+  if (input.kind === 'model_download_cancelled') {
+    return {
+      id: `recent:model-download-cancelled:${input.modelId}:${occurredAt}`,
+      kind: 'model_download_cancelled',
       source: 'model',
       route: '/models',
       occurredAt,
@@ -373,13 +442,13 @@ export const useActivityStore = create<ActivityStoreState>((set) => ({
   addRecent: (input) =>
     set((state) => {
       const item = createRecentItem(input)
-      const nextRecent = [item, ...state.recent.filter((entry) => entry.id !== item.id)].slice(
-        0,
-        ACTIVITY_RECENT_LIMIT,
-      )
+      const visibleRecent = removeDismissedItems(
+        sortByRecency([item, ...state.recent.filter((entry) => entry.id !== item.id)]),
+        state.dismissedIds,
+      ).slice(0, ACTIVITY_RECENT_LIMIT)
 
       return {
-        recent: removeDismissedItems(nextRecent, state.dismissedIds),
+        recent: visibleRecent,
       }
     }),
 

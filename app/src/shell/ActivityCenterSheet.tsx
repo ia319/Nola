@@ -282,6 +282,14 @@ function RecentItemRow({
     title = t('shell.activityCenter.items.modelDownloadCompleted')
     detail = item.model.name
     icon = <Download className="size-4" />
+  } else if (item.kind === 'model_download_failed') {
+    title = t('shell.activityCenter.items.modelDownloadFailed')
+    detail = item.model.error?.trim() || item.model.name
+    icon = <AlertTriangle className="size-4" />
+  } else if (item.kind === 'model_download_cancelled') {
+    title = t('shell.activityCenter.items.modelDownloadCancelled')
+    detail = item.model.name
+    icon = <Download className="size-4" />
   } else {
     title =
       item.event === 'file_integrity_checked'

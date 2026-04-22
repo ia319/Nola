@@ -39,6 +39,8 @@ const messages: Record<string, string> = {
   'shell.activityCenter.items.modelDownload': 'Active model download',
   'shell.activityCenter.items.taskCompleted': 'Completed transcription',
   'shell.activityCenter.items.modelDownloadCompleted': 'Model download finished',
+  'shell.activityCenter.items.modelDownloadFailed': 'Model download failed',
+  'shell.activityCenter.items.modelDownloadCancelled': 'Model download cancelled',
   'shell.activityCenter.items.fileIntegrityChecked': 'File integrity checked',
   'shell.activityCenter.items.orphanCleanupCompleted': 'Orphan cleanup completed',
   'shell.activityCenter.items.taskId': 'Task {{taskId}}',

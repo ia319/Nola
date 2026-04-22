@@ -124,11 +124,11 @@ function useModelActivitySync(): void {
 
         activeDownloadsRef.current.delete(data.model_id)
         setModelDownloads(Array.from(activeDownloadsRef.current.values()))
-        requestModelRefresh()
 
         void queryClient.invalidateQueries({ queryKey: queryKeys.models.downloads() })
         void queryClient.invalidateQueries({ queryKey: queryKeys.models.list() })
         void queryClient.invalidateQueries({ queryKey: queryKeys.models.detail(data.model_id) })
+        requestModelRefresh()
 
         if (data.status === 'completed') {
           addRecent({
@@ -142,6 +142,19 @@ function useModelActivitySync(): void {
               error,
               modelId: data.model_id,
             })
+          })
+        } else if (data.status === 'failed') {
+          addRecent({
+            kind: 'model_download_failed',
+            modelId: data.model_id,
+            name: previousDownload?.name ?? data.model_id,
+            error: data.error ?? null,
+          })
+        } else if (data.status === 'cancelled') {
+          addRecent({
+            kind: 'model_download_cancelled',
+            modelId: data.model_id,
+            name: previousDownload?.name ?? data.model_id,
           })
         }
       },
