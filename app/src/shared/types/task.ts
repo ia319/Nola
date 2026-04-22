@@ -17,6 +17,7 @@ export type Segment = Schemas['SegmentResponse']
 
 /** Task status derived from OpenAPI enum constraint. */
 export type TaskStatus = Schemas['TaskSummaryResponse']['status']
+// NOTE: Keep local aliases here. Avoid coupling shared query types to generated operation paths.
 export type TaskSortBy = 'created_at' | 'completed_at' | 'status' | 'progress' | 'filename'
 export type SortOrder = 'asc' | 'desc'
 

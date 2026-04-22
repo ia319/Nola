@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 
 import { listHistoryTasks } from '@/features/tasks/history/api'
 import { isAppError } from '@/shared/lib/error-factory'
+import { queryKeys } from '@/shared/lib/query-keys'
 import type { AppError, TaskQueryModel, TaskSummary } from '@/shared/types'
 
 export interface UseHistoryTasksResult {
@@ -31,105 +33,41 @@ export function useHistoryTasks({
   query,
   onPageClamp,
 }: UseHistoryTasksOptions): UseHistoryTasksResult {
-  const [tasks, setTasks] = useState<TaskSummary[]>([])
-  const [total, setTotal] = useState(0)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<AppError | null>(null)
-  const abortRef = useRef<AbortController | null>(null)
-  const skipQuerySignatureRef = useRef<string | null>(null)
+  const limit = query.page_size
+  const offset = (query.page - 1) * query.page_size
+  const params = {
+    q: query.q.trim() === '' ? undefined : query.q.trim(),
+    status: query.status === 'all' ? undefined : query.status,
+    sort_by: query.sort_by,
+    order: query.order,
+    limit,
+    offset,
+  }
 
-  const querySignature = useMemo(() => {
-    return `${query.q}|${query.status}|${query.sort_by}|${query.order}|${query.page}|${query.page_size}`
-  }, [query.order, query.page, query.page_size, query.q, query.sort_by, query.status])
-
-  const refresh = useCallback(async () => {
-    if (abortRef.current) {
-      abortRef.current.abort()
-    }
-
-    const controller = new AbortController()
-    abortRef.current = controller
-    setIsLoading(true)
-    setError(null)
-
-    const baseParams = {
-      q: query.q.trim() === '' ? undefined : query.q.trim(),
-      status: query.status === 'all' ? undefined : query.status,
-      sort_by: query.sort_by,
-      order: query.order,
-      limit: query.page_size,
-    }
-
-    try {
-      const response = await listHistoryTasks(
-        {
-          ...baseParams,
-          offset: (query.page - 1) * query.page_size,
-        },
-        controller.signal,
-      )
-
-      if (controller.signal.aborted) return
-
-      const totalPages = Math.max(1, Math.ceil(response.total / Math.max(query.page_size, 1)))
-      if (query.page > totalPages) {
-        const clampedResponse = await listHistoryTasks(
-          {
-            ...baseParams,
-            offset: (totalPages - 1) * query.page_size,
-          },
-          controller.signal,
-        )
-
-        if (controller.signal.aborted) return
-
-        // Skip one follow-up request when route state catches up to clamped page.
-        skipQuerySignatureRef.current = `${query.q}|${query.status}|${query.sort_by}|${query.order}|${totalPages}|${query.page_size}`
-        setTasks(clampedResponse.tasks)
-        setTotal(clampedResponse.total)
-        onPageClamp?.(totalPages)
-        return
-      }
-
-      setTasks(response.tasks)
-      setTotal(response.total)
-    } catch (err: unknown) {
-      if (controller.signal.aborted) return
-      setError(toAppError(err))
-      setTasks([])
-      setTotal(0)
-    } finally {
-      if (abortRef.current === controller) {
-        abortRef.current = null
-      }
-      if (!controller.signal.aborted) {
-        setIsLoading(false)
-      }
-    }
-  }, [onPageClamp, query.order, query.page, query.page_size, query.q, query.sort_by, query.status])
+  const taskListQuery = useQuery({
+    queryKey: queryKeys.tasks.list(params),
+    queryFn: ({ signal }) => listHistoryTasks(params, signal),
+  })
 
   useEffect(() => {
-    if (skipQuerySignatureRef.current === querySignature) {
-      skipQuerySignatureRef.current = null
+    if (!taskListQuery.data) {
       return
     }
-    void refresh()
-  }, [querySignature, refresh])
 
-  useEffect(() => {
-    return () => {
-      if (abortRef.current) {
-        abortRef.current.abort()
-      }
+    const totalPages = Math.max(1, Math.ceil(taskListQuery.data.total / Math.max(limit, 1)))
+    if (query.page > totalPages) {
+      onPageClamp?.(totalPages)
     }
-  }, [])
+  }, [limit, onPageClamp, query.page, taskListQuery.data])
 
   return {
     query,
-    tasks,
-    total,
-    isLoading,
-    error,
-    refresh,
+    tasks: taskListQuery.data?.tasks ?? [],
+    total: taskListQuery.data?.total ?? 0,
+    isLoading: taskListQuery.isPending,
+    error: taskListQuery.error ? toAppError(taskListQuery.error) : null,
+    refresh: async () => {
+      await taskListQuery.refetch()
+    },
   }
 }

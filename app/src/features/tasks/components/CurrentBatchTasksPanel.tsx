@@ -7,20 +7,28 @@ import { Button } from '@/components/ui/button'
 import { useRecentTaskQuery } from '@/features/tasks/hooks/useRecentTaskQuery'
 import { useTaskSelection } from '@/features/tasks/hooks/useTaskSelection'
 import { useSessionTasksStore } from '@/features/tasks/store/session-tasks-store'
-import type { TaskSummary } from '@/shared/types'
+import type { BatchTaskActionResponse, TaskSummary } from '@/shared/types'
 
 import { TaskBatchActionBar } from './TaskBatchActionBar'
 
+type BatchTaskHandler = (taskIds: string[]) => Promise<void | BatchTaskActionResponse>
+
 export interface CurrentBatchTasksPanelProps {
+  title?: string
+  description?: string
+  emptyText?: string
   resolveFileName?: (task: TaskSummary) => string | undefined
   onCancelTask?: TaskActionHandler
   onRetryTask?: TaskActionHandler
-  onBatchCancelTasks?: (taskIds: string[]) => Promise<unknown>
-  onBatchRetryTasks?: (taskIds: string[]) => Promise<unknown>
+  onBatchCancelTasks?: BatchTaskHandler
+  onBatchRetryTasks?: BatchTaskHandler
   pageSize?: number
 }
 
 export function CurrentBatchTasksPanel({
+  title,
+  description,
+  emptyText,
   resolveFileName,
   onCancelTask,
   onRetryTask,
@@ -121,9 +129,9 @@ export function CurrentBatchTasksPanel({
 
   return (
     <TaskListPanel
-      title={t('tasks.currentBatch.title')}
-      description={t('tasks.currentBatch.description')}
-      emptyText={t('tasks.currentBatch.empty')}
+      title={title ?? t('tasks.currentBatch.title')}
+      description={description ?? t('tasks.currentBatch.description')}
+      emptyText={emptyText ?? t('tasks.currentBatch.empty')}
       tasks={pagedTasks}
       resolveFileName={resolveFileName}
       onCancelTask={onCancelTask}

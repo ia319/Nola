@@ -1,5 +1,8 @@
 export { FileUploader } from './components/FileUploader'
+export { FileDetailContent } from './components/FileDetailContent'
 export { UploadProgress } from './components/UploadProgress'
 export { UploadList } from './components/UploadList'
 export { useFileUpload } from './hooks/useFileUpload'
+export type { FileDetailContentProps, FileTaskAvailability } from './components/FileDetailContent'
+export type { FileUploaderProps } from './components/FileUploader'
 export type { UploadItem } from './types'

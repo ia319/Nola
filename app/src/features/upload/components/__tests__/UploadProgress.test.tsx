@@ -1,11 +1,31 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { UploadProgress } from '../UploadProgress'
 
 const { tMock } = vi.hoisted(() => ({
-  tMock: vi.fn((key: string) => key),
+  tMock: vi.fn((key: string, params?: Record<string, unknown>) => {
+    const messages: Record<string, string> = {
+      'tasks.uploadQueue.status.pending': 'Pending',
+      'tasks.uploadQueue.status.uploading': 'Uploading',
+      'tasks.uploadQueue.status.ready': 'Ready',
+      'tasks.uploadQueue.status.failed': 'Failed',
+      'tasks.uploadQueue.status.cancelled': 'Cancelled',
+      'upload.progress.cancel': 'Cancel',
+      'upload.progress.retry': 'Retry',
+      'upload.progress.remove': 'Remove',
+      'upload.progress.cancelled': 'Cancelled',
+      'upload.progress.error': 'Upload failed',
+      'upload.error.fileTooLarge': 'File too large',
+    }
+
+    if (key === 'upload.error.fileTooLarge' && params?.defaultValue) {
+      return messages[key]
+    }
+
+    return messages[key] ?? key
+  }),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -15,6 +35,10 @@ vi.mock('react-i18next', () => ({
 }))
 
 describe('UploadProgress', () => {
+  beforeEach(() => {
+    tMock.mockClear()
+  })
+
   it('passes interpolation params to the translated error message', () => {
     render(
       <UploadProgress
@@ -31,7 +55,7 @@ describe('UploadProgress', () => {
       'upload.error.fileTooLarge',
       expect.objectContaining({
         maxSize: '100 MB',
-        defaultValue: 'upload.progress.error',
+        defaultValue: 'Upload failed',
       }),
     )
   })
@@ -47,9 +71,9 @@ describe('UploadProgress', () => {
       />,
     )
 
-    expect(screen.getByText('42%')).toBeTruthy()
-    expect(screen.getByLabelText('upload.progress.cancel')).toBeTruthy()
-    expect(screen.queryByText('upload.progress.retry')).toBeNull()
+    expect(screen.getByText('42% Uploading')).toBeTruthy()
+    expect(screen.getByLabelText('Cancel')).toBeTruthy()
+    expect(screen.queryByText('Retry')).toBeNull()
   })
 
   it('renders translated error text and recovery actions', () => {
@@ -65,9 +89,10 @@ describe('UploadProgress', () => {
       />,
     )
 
-    expect(screen.getByText('upload.error.fileTooLarge')).toBeTruthy()
-    expect(screen.getByText('upload.progress.retry')).toBeTruthy()
-    expect(screen.getByLabelText('upload.progress.remove')).toBeTruthy()
+    expect(screen.getByText('File too large')).toBeTruthy()
+    expect(screen.getByText('Failed')).toBeTruthy()
+    expect(screen.getByText('Retry')).toBeTruthy()
+    expect(screen.getByLabelText('Remove')).toBeTruthy()
   })
 
   it('renders success and cancelled terminal messages', () => {
@@ -75,10 +100,10 @@ describe('UploadProgress', () => {
       <UploadProgress fileName="done.mp3" fileSize={1024} progress={100} status="success" />,
     )
 
-    expect(screen.getByText('upload.progress.success')).toBeTruthy()
+    expect(screen.getByText('Ready')).toBeTruthy()
 
     rerender(<UploadProgress fileName="done.mp3" fileSize={1024} progress={0} status="cancelled" />)
 
-    expect(screen.getByText('upload.progress.cancelled')).toBeTruthy()
+    expect(screen.getAllByText('Cancelled')).toHaveLength(2)
   })
 })

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { AdvancedOptions } from '../AdvancedOptions'
 import type { TranscriptionOptionGroup } from '@/shared/types'
+import { buildTranscriptionDefaults } from '@/test-utils/transcription-defaults'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -66,7 +67,7 @@ describe('AdvancedOptions', () => {
       <AdvancedOptions
         schema={schema}
         advancedOptions={{}}
-        defaults={{ beam_size: 5 }}
+        defaults={buildTranscriptionDefaults({ beam_size: 5 })}
         onOptionChange={onOptionChange}
         onReset={onReset}
       />,
@@ -225,10 +226,13 @@ describe('AdvancedOptions', () => {
     ]
 
     const { rerender } = renderAdvancedOptions(schema, {
-      defaults: {
+      defaults: buildTranscriptionDefaults({
         vad_filter: false,
-        vad_parameters: { min_speech_duration_ms: 0 },
-      },
+        vad_parameters: {
+          ...buildTranscriptionDefaults().vad_parameters,
+          min_speech_duration_ms: 0,
+        },
+      }),
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'options.advanced.toggle' }))
@@ -240,10 +244,13 @@ describe('AdvancedOptions', () => {
       <AdvancedOptions
         schema={schema}
         advancedOptions={{ vad_filter: true }}
-        defaults={{
+        defaults={buildTranscriptionDefaults({
           vad_filter: false,
-          vad_parameters: { min_speech_duration_ms: 0 },
-        }}
+          vad_parameters: {
+            ...buildTranscriptionDefaults().vad_parameters,
+            min_speech_duration_ms: 0,
+          },
+        })}
         onOptionChange={vi.fn()}
         onReset={vi.fn()}
       />,
@@ -275,7 +282,7 @@ describe('AdvancedOptions', () => {
     ]
 
     renderAdvancedOptions(schema, {
-      defaults: { vad_filter: true },
+      defaults: buildTranscriptionDefaults({ vad_filter: true }),
       onOptionChange,
     })
 
@@ -334,7 +341,7 @@ describe('AdvancedOptions', () => {
 
     renderAdvancedOptions(schema, {
       onOptionChange,
-      defaults: { log_prob_threshold: -1 },
+      defaults: buildTranscriptionDefaults({ log_prob_threshold: -1 }),
     })
     fireEvent.click(screen.getByRole('button', { name: 'options.advanced.toggle' }))
 
@@ -361,7 +368,7 @@ describe('AdvancedOptions', () => {
     ]
 
     renderAdvancedOptions(schema, {
-      defaults: { clip_timestamps: [0, 5, 10] },
+      defaults: buildTranscriptionDefaults({ clip_timestamps: [0, 5, 10] }),
     })
     fireEvent.click(screen.getByRole('button', { name: 'options.advanced.toggle' }))
 

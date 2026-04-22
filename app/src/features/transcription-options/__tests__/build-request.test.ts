@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTranscriptionOptions } from '@/features/transcription-options/hooks/useTranscriptionOptions'
 import type { UseAppConfigReturn } from '@/config/use-app-config'
 import type { TranscriptionDefaults } from '@/shared/types'
+import { buildTranscriptionDefaults } from '@/test-utils/transcription-defaults'
 
 const useAppConfigMock = vi.fn<() => UseAppConfigReturn>()
 
@@ -12,7 +13,9 @@ vi.mock('@/config/use-app-config', () => ({
   useAppConfig: (...args: unknown[]) => useAppConfigMock(...(args as [])),
 }))
 
-function buildAppConfigReturn(defaults: Record<string, unknown> = {}): UseAppConfigReturn {
+function buildAppConfigReturn(overrides: Partial<TranscriptionDefaults> = {}): UseAppConfigReturn {
+  const defaults = buildTranscriptionDefaults(overrides)
+
   return {
     config: {
       engine: {
@@ -21,7 +24,7 @@ function buildAppConfigReturn(defaults: Record<string, unknown> = {}): UseAppCon
         compute_type: 'default',
         is_multilingual: true,
       },
-      transcription: { defaults: defaults as TranscriptionDefaults, schema: [] },
+      transcription: { defaults, schema: [] },
       file: { allowed_extensions: [], allowed_mime_types: [], max_file_size: 0 },
       effective_languages: [],
     },
@@ -30,8 +33,9 @@ function buildAppConfigReturn(defaults: Record<string, unknown> = {}): UseAppCon
   }
 }
 
-async function renderTranscriptionOptions(defaults: Record<string, unknown> = {}) {
-  useAppConfigMock.mockReturnValue(buildAppConfigReturn(defaults))
+async function renderTranscriptionOptions(overrides: Partial<TranscriptionDefaults> = {}) {
+  const defaults = buildTranscriptionDefaults(overrides)
+  useAppConfigMock.mockReturnValue(buildAppConfigReturn(overrides))
 
   const hook = renderHook(() => useTranscriptionOptions())
 

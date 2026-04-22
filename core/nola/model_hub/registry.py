@@ -16,6 +16,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=1,
         accuracy_rank=1,
         description="Favor minimal download size and fastest startup.",
+        description_key="models.catalog.tiny.description",
     ),
     ModelInfo(
         model_id="base",
@@ -27,6 +28,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=2,
         accuracy_rank=2,
         description="Favor low resource usage with broader language support.",
+        description_key="models.catalog.base.description",
     ),
     ModelInfo(
         model_id="small",
@@ -38,6 +40,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=3,
         accuracy_rank=3,
         description="Balance latency, quality, and footprint for general use.",
+        description_key="models.catalog.small.description",
     ),
     ModelInfo(
         model_id="medium",
@@ -49,6 +52,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=4,
         accuracy_rank=4,
         description="Favor higher quality for multilingual transcription.",
+        description_key="models.catalog.medium.description",
     ),
     ModelInfo(
         model_id="large-v1",
@@ -60,6 +64,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=5,
         accuracy_rank=4,
         description="Favor maximum context and legacy large-model compatibility.",
+        description_key="models.catalog.largeV1.description",
     ),
     ModelInfo(
         model_id="large-v2",
@@ -71,6 +76,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=5,
         accuracy_rank=5,
         description="Favor high multilingual quality on capable hardware.",
+        description_key="models.catalog.largeV2.description",
     ),
     ModelInfo(
         model_id="large-v3",
@@ -82,6 +88,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=5,
         accuracy_rank=5,
         description="Favor the strongest Whisper-family quality profile.",
+        description_key="models.catalog.largeV3.description",
         aliases=("large",),
     ),
     ModelInfo(
@@ -94,6 +101,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=4,
         accuracy_rank=4,
         description="Favor faster large-model throughput with multilingual support.",
+        description_key="models.catalog.largeV3Turbo.description",
         aliases=("turbo",),
     ),
     ModelInfo(
@@ -106,6 +114,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=1,
         accuracy_rank=1,
         description="Favor the smallest English-only footprint.",
+        description_key="models.catalog.tinyEnglish.description",
     ),
     ModelInfo(
         model_id="base.en",
@@ -117,6 +126,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=2,
         accuracy_rank=2,
         description="Favor lightweight English transcription for modest hardware.",
+        description_key="models.catalog.baseEnglish.description",
     ),
     ModelInfo(
         model_id="small.en",
@@ -128,6 +138,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=3,
         accuracy_rank=3,
         description="Balance English quality and throughput.",
+        description_key="models.catalog.smallEnglish.description",
     ),
     ModelInfo(
         model_id="medium.en",
@@ -139,6 +150,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=4,
         accuracy_rank=4,
         description="Favor stronger English accuracy without full large-model cost.",
+        description_key="models.catalog.mediumEnglish.description",
     ),
     ModelInfo(
         model_id="distil-small.en",
@@ -150,6 +162,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=2,
         accuracy_rank=2,
         description="Favor a distilled English model for quick turnarounds.",
+        description_key="models.catalog.distilSmallEnglish.description",
     ),
     ModelInfo(
         model_id="distil-medium.en",
@@ -161,6 +174,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=3,
         accuracy_rank=3,
         description="Favor a distilled English model with stronger quality.",
+        description_key="models.catalog.distilMediumEnglish.description",
     ),
     ModelInfo(
         model_id="distil-large-v2",
@@ -172,6 +186,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=4,
         accuracy_rank=4,
         description="Favor a distilled English large model for faster runs.",
+        description_key="models.catalog.distilLargeV2.description",
     ),
     ModelInfo(
         model_id="distil-large-v3",
@@ -183,6 +198,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=4,
         accuracy_rank=4,
         description="Favor distilled English large-model quality with lower latency.",
+        description_key="models.catalog.distilLargeV3.description",
     ),
     ModelInfo(
         model_id="distil-large-v3.5",
@@ -194,6 +210,7 @@ _REGISTERED_MODELS: tuple[ModelInfo, ...] = (
         speed_rank=4,
         accuracy_rank=4,
         description="Favor the latest distilled English large-model release.",
+        description_key="models.catalog.distilLargeV35.description",
     ),
 )
 

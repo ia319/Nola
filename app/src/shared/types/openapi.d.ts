@@ -565,7 +565,7 @@ export interface paths {
     post?: never
     /**
      * Delete a file
-     * @description Delete file and associated data.
+     * @description Delete file metadata when no task records still reference it.
      *
      *     Args:
      *         file_id: File identifier
@@ -1074,11 +1074,13 @@ export interface components {
       accuracy_rank: number
       /** Description */
       description: string
+      /** Description Key */
+      description_key: string
       /**
        * Status
        * @enum {string}
        */
-      status: 'not_downloaded' | 'downloading' | 'downloaded'
+      status: 'not_downloaded' | 'downloading' | 'partial_download' | 'downloaded'
       /** Disk Usage */
       disk_usage?: number | null
       /**
@@ -1105,7 +1107,7 @@ export interface components {
        * @default downloading
        * @enum {string}
        */
-      status: 'not_downloaded' | 'downloading' | 'downloaded'
+      status: 'not_downloaded' | 'downloading' | 'partial_download' | 'downloaded'
       /** Message */
       message: string
     }
@@ -1144,11 +1146,13 @@ export interface components {
       accuracy_rank: number
       /** Description */
       description: string
+      /** Description Key */
+      description_key: string
       /**
        * Status
        * @enum {string}
        */
-      status: 'not_downloaded' | 'downloading' | 'downloaded'
+      status: 'not_downloaded' | 'downloading' | 'partial_download' | 'downloaded'
       /** Disk Usage */
       disk_usage?: number | null
       /**
@@ -2477,7 +2481,7 @@ export interface operations {
         }
         content?: never
       }
-      /** @description Download already in progress */
+      /** @description Download already in progress or model already downloaded */
       409: {
         headers: {
           [name: string]: unknown

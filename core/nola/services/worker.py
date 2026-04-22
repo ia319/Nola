@@ -245,7 +245,7 @@ def worker_loop(db_path: str | Path | None = None) -> bool:
     logger.info(f"Loading model '{configured_model}' from {model_dir}")
 
     storage = ModelStorage(model_dir)
-    if not storage.is_downloaded(model_info.repo_id):
+    if storage.get_cache_state(model_info.repo_id) != "downloaded":
         logger.error(
             f"Model '{configured_model}' is not downloaded in {model_dir}. "
             "Download it via the model management page before starting the Worker."

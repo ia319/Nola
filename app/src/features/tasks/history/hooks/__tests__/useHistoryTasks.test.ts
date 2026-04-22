@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
+import { createElement, type PropsWithChildren } from 'react'
 import { act, renderHook, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { listHistoryTasks } from '@/features/tasks/history/api'
@@ -38,6 +40,23 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+      mutations: {
+        retry: false,
+      },
+    },
+  })
+
+  return function Wrapper({ children }: PropsWithChildren) {
+    return createElement(QueryClientProvider, { client: queryClient }, children)
+  }
+}
+
 describe('useHistoryTasks', () => {
   it('maps route query state to backend list params', async () => {
     listTasksMock.mockResolvedValue(buildResponse([buildTask('task-1', 'pending')], 25))
@@ -66,6 +85,7 @@ describe('useHistoryTasks', () => {
         }),
       {
         initialProps: { query: defaultQuery },
+        wrapper: createWrapper(),
       },
     )
 
@@ -127,13 +147,16 @@ describe('useHistoryTasks', () => {
         }),
       {
         initialProps: { query: initialQuery },
+        wrapper: createWrapper(),
       },
     )
 
     await waitFor(() => {
-      expect(listTasksMock).toHaveBeenCalledTimes(2)
+      expect(listTasksMock).toHaveBeenCalledTimes(1)
     })
-    expect(onPageClamp).toHaveBeenCalledWith(2)
+    await waitFor(() => {
+      expect(onPageClamp).toHaveBeenCalledWith(2)
+    })
 
     await act(async () => {
       rerender({
@@ -144,8 +167,8 @@ describe('useHistoryTasks', () => {
       })
     })
 
-    await act(async () => {
-      await Promise.resolve()
+    await waitFor(() => {
+      expect(result.current.tasks.map((task) => task.task_id)).toEqual(['task-2'])
     })
 
     expect(listTasksMock).toHaveBeenNthCalledWith(
@@ -172,7 +195,6 @@ describe('useHistoryTasks', () => {
       },
       expect.any(AbortSignal),
     )
-    expect(result.current.tasks.map((task) => task.task_id)).toEqual(['task-2'])
     expect(result.current.isLoading).toBe(false)
     expect(listTasksMock).toHaveBeenCalledTimes(2)
   })
@@ -180,17 +202,21 @@ describe('useHistoryTasks', () => {
   it('exposes AppError shape when list request fails', async () => {
     listTasksMock.mockRejectedValue(new Error('boom'))
 
-    const { result } = renderHook(() =>
-      useHistoryTasks({
-        query: {
-          q: '',
-          status: 'all',
-          sort_by: 'created_at',
-          order: 'desc',
-          page: 1,
-          page_size: 20,
-        },
-      }),
+    const { result } = renderHook(
+      () =>
+        useHistoryTasks({
+          query: {
+            q: '',
+            status: 'all',
+            sort_by: 'created_at',
+            order: 'desc',
+            page: 1,
+            page_size: 20,
+          },
+        }),
+      {
+        wrapper: createWrapper(),
+      },
     )
 
     await waitFor(() => {

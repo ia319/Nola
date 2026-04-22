@@ -148,7 +148,10 @@
       "resetEngine": "Reset to Engine Defaults",
       "resetting": "Resetting...",
       "saved": "Defaults saved",
-      "resetDone": "Defaults reset to engine values"
+      "savedRefreshFailed": "Defaults saved. Refresh the page to load the latest values.",
+      "saveRequiresEngineDefaults": "Load engine defaults and retry saving.",
+      "resetDone": "Defaults reset to engine values",
+      "resetRefreshFailed": "Defaults reset. Refresh the page to load the latest values."
     },
     "advanced": {
       "toggle": "Advanced Options",
@@ -235,6 +238,110 @@
         "export_other": "Export selected ({{count}})"
       },
       "backToFirstPage": "Back to first page"
+    },
+    "workbench": {
+      "summary": {
+        "uploaded": {
+          "title": "Uploaded",
+          "description": "Files added to this session"
+        },
+        "ready": {
+          "title": "Ready",
+          "description": "Uploads ready for transcription"
+        },
+        "processing": {
+          "title": "Processing",
+          "description": "Tasks pending or running"
+        },
+        "completed": {
+          "title": "Completed",
+          "description": "Tasks finished in this session"
+        }
+      },
+      "sections": {
+        "uploadQueue": {
+          "title": "Upload Queue",
+          "description": "Add audio files and prepare the current batch.",
+          "maxFileSize": "Max file size: {{maxSize}} per file"
+        },
+        "sessionConfig": {
+          "title": "Session Configuration",
+          "description": "Choose language and task settings before starting transcription."
+        },
+        "activity": {
+          "title": "Session Activity Monitor",
+          "description": "Track tasks created during the current session.",
+          "empty": "No tasks in this session yet",
+          "waiting": "Waiting for input...",
+          "caption": "Current session transcription tasks",
+          "state": {
+            "active": "Processing active",
+            "idle": "System idle"
+          },
+          "columns": {
+            "filename": "Filename",
+            "status": "Status",
+            "progress": "Progress",
+            "action": "Action"
+          }
+        }
+      },
+      "sessionConfig": {
+        "globalSettings": "Global Settings",
+        "executionEngine": "Execution Engine",
+        "sessionOverride": "Session override",
+        "unavailable": "Unavailable",
+        "model": {
+          "label": "Model",
+          "badge": "Coming soon",
+          "loading": "Loading models",
+          "comingSoon": "Coming soon"
+        },
+        "device": {
+          "label": "Device"
+        },
+        "computeType": {
+          "label": "Compute Type"
+        },
+        "advanced": {
+          "button": "Advanced Parameters",
+          "overrides_one": "{{count}} override",
+          "overrides_other": "{{count}} overrides"
+        }
+      },
+      "advancedSheet": {
+        "title": "Advanced Configuration",
+        "description": "Fine-tune session overrides and execution settings.",
+        "close": "Close",
+        "reset": "Reset to Defaults",
+        "cancel": "Cancel",
+        "apply": "Apply Changes",
+        "saveDefault": "Save as Default",
+        "savingDefault": "Saving..."
+      }
+    },
+    "uploadQueue": {
+      "empty": {
+        "title": "No files uploaded yet",
+        "description": "Drag and drop audio or video files here, or click the button below to browse.",
+        "action": "Select Files"
+      },
+      "table": {
+        "fileName": "File Name",
+        "status": "Status",
+        "size": "Size",
+        "action": "Action"
+      },
+      "actions": {
+        "addMoreFiles": "Add More Files"
+      },
+      "status": {
+        "pending": "Pending",
+        "uploading": "Uploading",
+        "ready": "Ready",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      }
     },
     "history": {
       "title": "Task History",
@@ -375,6 +482,27 @@
       }
     }
   },
+  "components": {
+    "dataTable": {
+      "empty": {
+        "title": "No items found",
+        "description": "Add records or adjust the current filters."
+      },
+      "selectAll": "Select all rows",
+      "selectRow": "Select row {{rowId}}"
+    },
+    "detailSheet": {
+      "close": "Close"
+    }
+  },
+  "routes": {
+    "loading": {
+      "tasks": "Loading task workbench...",
+      "history": "Loading history...",
+      "models": "Loading models...",
+      "settings": "Loading settings..."
+    }
+  },
   "error": {
     "generic": "An error occurred",
     "api": {
@@ -393,23 +521,154 @@
   },
   "models": {
     "title": "Models",
-    "description": "Manage Whisper models",
+    "description": "Manage local transcription models, downloads, and defaults.",
     "empty": "No models available",
     "loading": "Loading models...",
+    "overview": {
+      "region": "Models overview",
+      "activeEngine": {
+        "title": "Active Engine",
+        "empty": "No active engine",
+        "emptyDescription": "No model has been loaded yet.",
+        "meta": "Current runtime: {{modelId}}"
+      },
+      "defaultModel": {
+        "title": "Default Model",
+        "empty": "No default model",
+        "emptyDescription": "Select a downloaded model as the default.",
+        "meta": "Configured as {{modelId}}"
+      },
+      "storagePath": {
+        "title": "Storage Path",
+        "empty": "Path unavailable",
+        "placeholder": "Hidden for now",
+        "meta": "Path display is temporarily hidden."
+      }
+    },
+    "table": {
+      "caption": "Models table",
+      "downloadSnapshot": "Existing progress: {{progress}}%",
+      "diskUsage": "Disk usage: {{value}}",
+      "profileValue": "Accuracy {{accuracy}} · Speed {{speed}}",
+      "columns": {
+        "name": "Name",
+        "languages": "Supported Languages",
+        "size": "Size",
+        "status": "Status",
+        "profile": "Profile",
+        "actions": "Actions"
+      },
+      "empty": {
+        "title": "No models available",
+        "description": "Download a model to start configuring local runs."
+      }
+    },
     "configured": "Default",
     "lastLoaded": "Running",
     "restartRequired": "Restart required to apply model change",
     "status": {
       "not_downloaded": "Not Downloaded",
       "downloading": "Downloading",
+      "partial_download": "Partial Download",
       "downloaded": "Downloaded"
     },
     "fields": {
       "size": "Size",
       "diskUsage": "Disk Usage",
       "languages": "Languages",
+      "unavailable": "—",
       "speed": "Speed",
       "accuracy": "Accuracy"
+    },
+    "catalog": {
+      "tiny": {
+        "description": "Prefer the smallest download and the fastest startup time."
+      },
+      "base": {
+        "description": "Prefer low resource usage while keeping broad language coverage."
+      },
+      "small": {
+        "description": "Balance latency, accuracy, and footprint for general transcription."
+      },
+      "medium": {
+        "description": "Prefer stronger multilingual accuracy when hardware allows."
+      },
+      "largeV1": {
+        "description": "Prefer maximum context with legacy large-model compatibility."
+      },
+      "largeV2": {
+        "description": "Prefer high multilingual quality on capable hardware."
+      },
+      "largeV3": {
+        "description": "Prefer the strongest Whisper-family quality profile."
+      },
+      "largeV3Turbo": {
+        "description": "Prefer faster large-model throughput with multilingual support."
+      },
+      "tinyEnglish": {
+        "description": "Prefer the smallest English-only footprint."
+      },
+      "baseEnglish": {
+        "description": "Prefer lightweight English transcription on modest hardware."
+      },
+      "smallEnglish": {
+        "description": "Balance English quality and throughput."
+      },
+      "mediumEnglish": {
+        "description": "Prefer stronger English accuracy without the full large-model cost."
+      },
+      "distilSmallEnglish": {
+        "description": "Prefer a distilled English model for quick turnarounds."
+      },
+      "distilMediumEnglish": {
+        "description": "Prefer a distilled English model with stronger quality."
+      },
+      "distilLargeV2": {
+        "description": "Prefer a distilled English large model for faster runs."
+      },
+      "distilLargeV3": {
+        "description": "Prefer distilled English large-model quality with lower latency."
+      },
+      "distilLargeV35": {
+        "description": "Prefer the latest distilled English large-model release."
+      }
+    },
+    "detail": {
+      "eyebrow": "Model detail",
+      "close": "Close model detail",
+      "loading": "Loading model detail...",
+      "errorTitle": "Model detail unavailable",
+      "activeDownload": "Active download",
+      "activeDownloadDescription": "Show the current live transfer state for this model.",
+      "sections": {
+        "performance": "Performance Metrics",
+        "information": "Model Information",
+        "description": "Description"
+      },
+      "localState": {
+        "status": "Status",
+        "selection": "Selection",
+        "runtime": "Runtime",
+        "selectionConfigured": "Current default model",
+        "selectionAvailable": "Available to select",
+        "runtimeLoaded": "Loaded in runtime",
+        "runtimeIdle": "Not loaded"
+      },
+      "fields": {
+        "repoId": "Repository ID",
+        "runtime": "Runtime"
+      },
+      "performanceHint": "Backend ranks are relative hints, not benchmark scores.",
+      "actions": {
+        "copyRepoId": "Copy repository ID",
+        "currentDefault": "Current Default Model",
+        "deleteCache": "Delete Local Cache"
+      },
+      "defaultLocked": "Actions disabled because this model is the current default.",
+      "toast": {
+        "repoIdCopied": "Repository ID copied",
+        "repoIdCopyFailed": "Repository ID copy failed"
+      }
     },
     "actions": {
       "download": "Download",
@@ -422,6 +681,7 @@
       "downloadStarted": "Download started: {{modelId}}",
       "downloadCancelled": "Download cancelled: {{modelId}}",
       "downloadCompleted": "Download completed: {{modelId}}",
+      "downloadFailed": "Download failed: {{modelId}}",
       "deleted": "Model deleted: {{modelId}}",
       "selected": "Default model set to {{modelId}}",
       "actionFailed": "Model action failed, please retry"
@@ -439,6 +699,560 @@
       "3": "Good",
       "4": "High",
       "5": "Very High"
+    }
+  },
+  "shell": {
+    "navigation": {
+      "label": "Primary navigation",
+      "tasks": "Tasks",
+      "history": "History",
+      "models": "Models",
+      "settings": "Settings"
+    },
+    "topBar": {
+      "actions": {
+        "activity": "Activity",
+        "activityWithCount": "Activity ({{count}})",
+        "toggleTheme": "Toggle theme",
+        "help": "Help"
+      }
+    },
+    "activityCenter": {
+      "title": "Activity Center",
+      "description": "System status and operational log.",
+      "close": "Close activity center",
+      "sections": {
+        "needsAttention": "Needs Attention",
+        "inProgress": "In Progress",
+        "recent": "Recent"
+      },
+      "empty": {
+        "needsAttention": {
+          "title": "No attention needed",
+          "description": "Failed tasks and restart requirements appear here."
+        },
+        "inProgress": {
+          "title": "No active work",
+          "description": "Running tasks and model downloads appear here."
+        },
+        "recent": {
+          "title": "No recent activity",
+          "description": "Completed tasks and maintenance events appear here."
+        }
+      },
+      "actions": {
+        "dismiss": "Dismiss {{label}}",
+        "dismissAll": "Dismiss all",
+        "clearRecent": "Clear Recent History",
+        "openRoute": "Open {{route}}"
+      },
+      "route": {
+        "history": "History",
+        "models": "Models",
+        "systemInfo": "System Info"
+      },
+      "items": {
+        "failedTask": "Failed task",
+        "restartRequired": "Restart required",
+        "taskInProgress": "Processing transcription",
+        "modelDownload": "Active model download",
+        "taskCompleted": "Completed transcription",
+        "modelDownloadCompleted": "Model download finished",
+        "modelDownloadFailed": "Model download failed",
+        "modelDownloadCancelled": "Model download cancelled",
+        "fileIntegrityChecked": "File integrity checked",
+        "orphanCleanupCompleted": "Orphan cleanup completed",
+        "taskId": "Task {{taskId}}",
+        "configuredModel": "Configured model: {{modelId}}",
+        "affectedCount": "{{count}} affected"
+      }
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Review and adjust product-level configuration.",
+    "navigationLabel": "Settings sections",
+    "tabs": {
+      "general": "General",
+      "transcription": "Transcription",
+      "export": "Export",
+      "modelStorage": "Model Storage",
+      "systemInfo": "System Info"
+    },
+    "general": {
+      "eyebrow": "Workspace Configuration",
+      "title": "General",
+      "description": "Manage how the Nola interface appears and interacts with your local system environment.",
+      "sections": {
+        "interface": {
+          "label": "Interface",
+          "title": "Interface Preferences",
+          "description": "Control language and appearance for this browser session."
+        },
+        "regional": {
+          "label": "Regional & Time",
+          "title": "Regional Preferences",
+          "description": "Review browser-derived time context and choose how measurements appear."
+        }
+      },
+      "fields": {
+        "language": {
+          "label": "Interface Language",
+          "description": "Select the default language for application menus and notifications."
+        },
+        "appearance": {
+          "label": "Appearance",
+          "description": "Choose how Nola appears on this screen. System follows the operating system theme.",
+          "system": "System",
+          "light": "Light",
+          "dark": "Dark"
+        },
+        "timezone": {
+          "label": "Timezone",
+          "description": "Read the local timezone from the current browser environment."
+        },
+        "units": {
+          "label": "Measurement Units",
+          "description": "Display file sizes and processing speeds in metric or imperial units.",
+          "metric": "Metric",
+          "imperial": "Imperial"
+        }
+      },
+      "localOnly": {
+        "title": "Keep these preferences local",
+        "description": "Store language, appearance, and units in this browser only.",
+        "detail": "Configure the same preferences again when you switch to another browser profile or machine."
+      }
+    },
+    "transcription": {
+      "loading": "Loading transcription defaults...",
+      "unavailable": "Transcription defaults are not available.",
+      "sections": {
+        "basic": {
+          "label": "Basic Defaults"
+        },
+        "advanced": {
+          "label": "Advanced Defaults"
+        },
+        "engineDefaults": {
+          "label": "Engine Defaults",
+          "show": "Show Engine Defaults",
+          "hide": "Hide Engine Defaults",
+          "closedNote": "Review overridden values against the engine baseline.",
+          "loading": "Loading engine defaults...",
+          "retry": "Retry",
+          "noOverrides": "Current defaults already match the engine baseline.",
+          "columns": {
+            "field": "Field",
+            "current": "Current Default",
+            "engine": "Engine Default"
+          }
+        },
+        "resources": {
+          "label": "Resource Allocation"
+        }
+      },
+      "fields": {
+        "language": {
+          "description": "Choose the default language for new transcription tasks."
+        },
+        "task": {
+          "description": "Choose the default task mode for new transcription tasks."
+        },
+        "initialPrompt": {
+          "description": "Provide the default prompt context applied before decoding starts."
+        }
+      },
+      "resources": {
+        "modelProfile": {
+          "label": "Model Profile",
+          "description": "Review the current engine model profile in read-only form."
+        },
+        "device": {
+          "label": "Device",
+          "description": "Review which execution device the engine currently targets."
+        },
+        "computeType": {
+          "label": "Compute Type",
+          "description": "Review the active numeric precision for engine execution."
+        },
+        "languageMode": {
+          "label": "Language Mode",
+          "description": "Review whether the current engine build supports multilingual decoding."
+        }
+      },
+      "values": {
+        "empty": "Not set",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "multilingual": "Multilingual",
+        "englishOnly": "English-only"
+      }
+    },
+    "export": {
+      "loading": "Loading export defaults...",
+      "unavailable": "Export defaults are not available.",
+      "sections": {
+        "defaults": {
+          "label": "Export Defaults"
+        },
+        "future": {
+          "label": "Planned Capabilities"
+        }
+      },
+      "fields": {
+        "format": {
+          "label": "Default Export Format",
+          "description": "Choose the file format used by one-click and batch exports."
+        },
+        "includeTimestamps": {
+          "label": "Include Timestamps for TXT",
+          "description": "Add time prefixes to TXT exports. Other formats keep their native timing structure."
+        },
+        "futureFormats": {
+          "label": "Future Formats",
+          "description": "Keep JSON and TSV visible as planned formats until the backend export contract supports them."
+        },
+        "metadata": {
+          "label": "Metadata Inclusion",
+          "description": "Wait for backend support before adding system and model metadata to exported files."
+        },
+        "archivePath": {
+          "label": "Archive Path",
+          "description": "Review the server-side export archive location when the API exposes it."
+        }
+      },
+      "formats": {
+        "srt": {
+          "label": "SubRip (.srt)",
+          "detail": "Use the common subtitle format for players and editors."
+        },
+        "vtt": {
+          "label": "WebVTT (.vtt)",
+          "detail": "Use the web subtitle format for browser playback."
+        },
+        "txt": {
+          "label": "Plain Text (.txt)",
+          "detail": "Use a readable transcript file; timestamp prefixes depend on the TXT timestamp setting."
+        },
+        "ass": {
+          "label": "Advanced SubStation Alpha (.ass)",
+          "detail": "Use the styled subtitle format for advanced subtitle workflows."
+        }
+      },
+      "values": {
+        "comingSoon": "Coming soon",
+        "futureFormat": "{{format}} coming soon",
+        "unavailable": "Not exposed"
+      },
+      "actions": {
+        "retry": "Retry",
+        "reset": "Reset to Defaults",
+        "resetting": "Resetting...",
+        "save": "Save Changes",
+        "saving": "Saving..."
+      },
+      "toast": {
+        "saved": "Export defaults updated",
+        "reset": "Export defaults reset"
+      }
+    },
+    "modelStorage": {
+      "loading": "Loading model storage settings...",
+      "unavailable": "Model storage settings are not available.",
+      "sections": {
+        "current": {
+          "label": "Current State"
+        },
+        "directory": {
+          "label": "Model Cache Directory"
+        }
+      },
+      "fields": {
+        "configuredModel": {
+          "label": "Configured Model",
+          "description": "Review the model selected as the default for new transcription tasks."
+        },
+        "lastLoadedModel": {
+          "label": "Last Loaded Model",
+          "description": "Review the model most recently loaded by the worker process."
+        },
+        "effectiveDirectory": {
+          "label": "Effective Model Directory",
+          "description": "Reserve this position for the resolved cache location after the API stops returning absolute paths."
+        },
+        "overrideSource": {
+          "label": "Override Source",
+          "description": "Review which configuration layer currently controls model storage."
+        },
+        "restartStatus": {
+          "label": "Restart Status",
+          "description": "Review whether the running worker needs a restart before changes apply."
+        },
+        "configuredDirectory": {
+          "label": "Configured Cache Directory",
+          "description": "Reserve this control for model cache changes after the API returns a safe editable value.",
+          "current": "Current configured value: {{path}}"
+        },
+        "environmentOverride": {
+          "label": "Environment Override",
+          "description": "An environment variable controls the model cache directory before stored settings."
+        },
+        "restartRequired": {
+          "label": "Restart Required",
+          "description": "Restart the local service to apply pending model storage changes."
+        }
+      },
+      "values": {
+        "empty": "Not set",
+        "directoryUnavailable": "Hidden until backend returns a safe display path",
+        "environmentOverrideActive": "Environment override active",
+        "restartRequired": "Restart required",
+        "restartNotRequired": "No restart required",
+        "overrideSource": {
+          "environment": "Environment",
+          "database": "Stored setting",
+          "default": "Default"
+        }
+      },
+      "actions": {
+        "retry": "Retry",
+        "save": "Save Changes"
+      }
+    },
+    "systemInfo": {
+      "sections": {
+        "architecture": {
+          "label": "System Architecture"
+        },
+        "integrity": {
+          "label": "File Integrity"
+        },
+        "maintenance": {
+          "label": "Maintenance"
+        }
+      },
+      "fields": {
+        "runtimeBoundary": {
+          "label": "Runtime Boundary",
+          "description": "Run the browser interface against the local API service."
+        },
+        "fileIndex": {
+          "label": "File Index",
+          "description": "Keep uploaded file records in the database and verify them against files on disk."
+        },
+        "modelStorage": {
+          "label": "Model Storage",
+          "description": "Keep model storage controls separate from system maintenance actions."
+        },
+        "integrityCheck": {
+          "label": "Integrity Check",
+          "description": "Check whether database file records still point to files available on disk."
+        },
+        "cleanupOrphans": {
+          "label": "Cleanup Orphans",
+          "description": "Delete orphaned database records after reviewing the integrity check result."
+        }
+      },
+      "values": {
+        "localApi": "Local API service",
+        "databaseAndDisk": "Database records + disk files",
+        "separateSettingsPage": "Model Storage page",
+        "notChecked": "Not checked",
+        "checking": "Checking...",
+        "clean": "No missing files",
+        "missingCount": "{{count}} missing file(s)",
+        "cleanupReady": "Ready after integrity check",
+        "cleanupBlocked": "Run integrity check first",
+        "deletedCount": "{{count}} orphan record(s) deleted"
+      },
+      "actions": {
+        "check": "Check",
+        "checking": "Checking...",
+        "cleanup": "Cleanup",
+        "cleaning": "Cleaning...",
+        "cancel": "Cancel",
+        "confirmCleanup": "Cleanup Orphans"
+      },
+      "confirm": {
+        "title": "Cleanup orphan records?",
+        "description": "Delete database records for files that are already missing on disk. This action cannot restore files."
+      },
+      "toast": {
+        "integrityChecked": "File integrity checked",
+        "cleanupDone": "Orphan records cleaned up"
+      }
+    }
+  },
+  "history": {
+    "title": "History",
+    "description": "Review archived task records and recent execution output.",
+    "modes": {
+      "files": "Filename",
+      "tasks": "Task ID"
+    },
+    "toolbar": {
+      "searchLabel": "Search history records",
+      "searchPlaceholder": "Search by task ID or filename",
+      "exportSelected": "Export Selected",
+      "status": "Status",
+      "sortBy": "Sort by",
+      "order": "Order"
+    },
+    "selection": {
+      "clear": "Clear selection",
+      "selectedCount_one": "{{count}} selected",
+      "selectedCount_other": "{{count}} selected"
+    },
+    "table": {
+      "caption": "History task records",
+      "selectAll": "Select all history rows",
+      "selectRow": "Select task {{taskId}}",
+      "filenameFallback": "Unnamed file",
+      "modelFallback": "System default",
+      "durationFallback": "Not finished",
+      "columns": {
+        "taskId": "Task ID",
+        "filename": "Filename",
+        "duration": "Duration",
+        "identity": "Task ID / Filename",
+        "model": "Model Engine",
+        "status": "Status",
+        "progress": "Progress / Notes",
+        "executionDate": "Execution Date",
+        "actions": "Actions"
+      },
+      "execution": {
+        "created": "CRE",
+        "completed": "FIN",
+        "inProgress": "In progress"
+      },
+      "progressNotes": {
+        "pending": "Queued for processing",
+        "processing": "Task in progress",
+        "completed": "Ready to export",
+        "failed": "Needs attention",
+        "cancelled": "Stopped before completion"
+      },
+      "actions": {
+        "export": "Export record",
+        "cancel": "Cancel task",
+        "retry": "Retry task",
+        "deleteRecord": "Delete record"
+      }
+    },
+    "pagination": {
+      "summary": "Showing {{start}}-{{end}} of {{total}} records",
+      "pageSize": "Page size",
+      "previous": "Previous page",
+      "next": "Next page",
+      "page": "Page {{page}}"
+    },
+    "empty": {
+      "title": "No transcription records found",
+      "description": "Your archive is currently empty. Initialize a new transcription task to begin populating your operational history.",
+      "action": "Create transcription task"
+    },
+    "files": {
+      "selection": {
+        "selectedCount_one": "{{count}} selected",
+        "selectedCount_other": "{{count}} selected"
+      },
+      "batch": {
+        "deleteComingSoon": "Delete selected coming soon"
+      },
+      "table": {
+        "caption": "History file records",
+        "typeFallback": "Unknown",
+        "selectAll": "Select all history files",
+        "selectRow": "Select file {{fileId}}",
+        "tasksUnavailable": "—",
+        "tasksCount_one": "{{count}} task",
+        "tasksCount_other": "{{count}} tasks",
+        "columns": {
+          "file": "File",
+          "tasks": "Tasks",
+          "size": "Size",
+          "contentType": "Content Type",
+          "uploadedAt": "Uploaded At",
+          "actions": "Actions"
+        },
+        "actions": {
+          "delete": "Delete file",
+          "openDetail": "Open details for {{filename}}"
+        }
+      },
+      "detail": {
+        "eyebrow": "File detail",
+        "description": "Review file metadata and known associated tasks.",
+        "close": "Close file detail",
+        "loading": "Loading file detail...",
+        "taskCreatedAt": "Created {{value}}",
+        "sections": {
+          "metadata": "Metadata",
+          "waveform": "Waveform Preview",
+          "associatedTasks": "Associated Tasks"
+        },
+        "waveformDescription": "Waveform preview is decorative in this release.",
+        "waveformPlaceholder": "Waveform preview coming soon",
+        "associatedTasksDescription": "Show tasks already known in the current history context.",
+        "associatedTasksUnavailable": {
+          "title": "Associated tasks unavailable",
+          "description": "Task links are not available from the current file API response."
+        },
+        "associatedTasksEmpty": {
+          "title": "No associated tasks found",
+          "description": "This file has no known tasks in the current history context."
+        },
+        "actions": {
+          "reprocess": "Re-process"
+        }
+      },
+      "empty": {
+        "title": "No uploaded files found",
+        "description": "Your file archive is empty. Return to the task workbench to add source audio and start new runs.",
+        "action": "Go to task workbench"
+      },
+      "deleteDialog": {
+        "title": "Delete file",
+        "description": "Delete {{filename}} and its associated data?",
+        "cancel": "Cancel",
+        "confirm": "Delete file",
+        "deleting": "Deleting..."
+      },
+      "toast": {
+        "deleted": "File deleted: {{filename}}",
+        "deleteFailed": "File delete failed, please retry"
+      }
+    },
+    "taskDetail": {
+      "eyebrow": "Task detail",
+      "close": "Close task detail",
+      "copyTaskId": "Copy task ID",
+      "loading": "Loading task detail...",
+      "sections": {
+        "transcriptionResult": "Transcription Result",
+        "taskMetadata": "Task Metadata",
+        "technicalProperties": "Technical Properties"
+      },
+      "fields": {
+        "duration": "Duration",
+        "model": "Model",
+        "error": "Error"
+      },
+      "segments": {
+        "empty": {
+          "title": "No segments available",
+          "description": "This task does not include transcription segments yet."
+        }
+      },
+      "technicalUnavailable": {
+        "title": "Technical properties unavailable",
+        "description": "Additional media properties are not exposed in the current task detail response."
+      },
+      "toast": {
+        "taskIdCopied": "Task ID copied"
+      }
     }
   }
 }

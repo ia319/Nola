@@ -1,5 +1,6 @@
 """File management API endpoints."""
 
+import sqlite3
 import uuid
 from pathlib import Path
 from typing import Any
@@ -195,7 +196,7 @@ async def get_file(file_id: str) -> dict[str, Any]:
 
 @router.delete("/{file_id}", summary="Delete a file", response_model=DeleteResponse)
 async def delete_file(file_id: str) -> dict[str, str]:
-    """Delete file and associated data.
+    """Delete file metadata when no task records still reference it.
 
     Args:
         file_id: File identifier
@@ -209,10 +210,36 @@ async def delete_file(file_id: str) -> dict[str, str]:
     if file is None:
         raise HTTPException(status_code=404, detail="File not found")
 
+    linked_task_count = file_db.count_linked_tasks(file_id)
+    if linked_task_count > 0:
+        # TODO(backend): Decide whether file deletion should cascade to related
+        # task records instead of rejecting the request [2026-04-15]
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Cannot delete file {file_id}: "
+                f"{linked_task_count} transcription task(s) still reference it"
+            ),
+        )
+
     file_path = Path(file["path"])
 
     # DB first: orphan file is safer than orphan DB record
-    file_db.delete_file(file_id)
+    try:
+        deleted = file_db.delete_file(file_id)
+    except sqlite3.IntegrityError as exc:
+        linked_task_count = max(1, file_db.count_linked_tasks(file_id))
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Cannot delete file {file_id}: "
+                f"{linked_task_count} transcription task(s) still reference it"
+            ),
+        ) from exc
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="File not found")
+
     file_path.unlink(missing_ok=True)
 
     return {"message": f"File {file_id} deleted"}

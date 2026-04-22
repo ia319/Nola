@@ -4,7 +4,7 @@ export type AdvancedOptionValue = string | number | boolean | number[] | null
 
 export type AdvancedTranscriptionOptions = Record<string, AdvancedOptionValue | undefined>
 
-export type TranscriptionTaskType = string
+export type TranscriptionTaskType = NonNullable<CreateTaskPayload['task']>
 
 export interface UseTranscriptionOptionsReturn {
   language: string | undefined

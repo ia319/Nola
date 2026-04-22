@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from nola.config import settings
 from nola.engines import EngineConfig, FasterWhisperEngine, Segment, TranscriptionEngine
 
 
@@ -34,9 +35,9 @@ class TestEngineConfig:
         """Verify default configuration values."""
         config = EngineConfig()
 
-        assert config.model_size == "small"
-        assert config.device == "cpu"
-        assert config.compute_type == "default"
+        assert config.model_size == settings.model_size
+        assert config.device == settings.device
+        assert config.compute_type == settings.compute_type
         assert config.download_root is None
 
     def test_config_custom_values(self) -> None:
@@ -74,9 +75,11 @@ class TestFasterWhisperEngine:
         engine = FasterWhisperEngine()
 
         mock_model.assert_called_once_with(
-            "small", device="cpu", compute_type="default"
+            settings.model_size,
+            device=settings.device,
+            compute_type=settings.compute_type,
         )
-        assert engine._config.model_size == "small"
+        assert engine._config.model_size == settings.model_size
 
     @patch("nola.engines.faster_whisper.WhisperModel")
     def test_engine_creation_custom_config(self, mock_model: MagicMock) -> None:

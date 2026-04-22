@@ -6,6 +6,7 @@ import { OptionsBar } from '../OptionsBar'
 import type { UseAppConfigReturn } from '@/config/use-app-config'
 import type { UseTranscriptionOptionsReturn } from '@/features/transcription-options/types'
 import type { AppError, TranscriptionDefaults } from '@/shared/types'
+import { buildTranscriptionDefaults } from '@/test-utils/transcription-defaults'
 
 const {
   onCreateTaskMock,
@@ -82,7 +83,7 @@ function buildAppConfigReturn(): UseAppConfigReturn {
         compute_type: 'default',
         is_multilingual: true,
       },
-      transcription: { defaults: {} as TranscriptionDefaults, schema: [] },
+      transcription: { defaults: buildTranscriptionDefaults(), schema: [] },
       file: { allowed_extensions: [], allowed_mime_types: [], max_file_size: 0 },
       effective_languages: [],
     },
@@ -91,8 +92,8 @@ function buildAppConfigReturn(): UseAppConfigReturn {
   }
 }
 
-function buildDefaults(values: Record<string, unknown>): TranscriptionDefaults {
-  return values as unknown as TranscriptionDefaults
+function buildDefaults(values: Partial<TranscriptionDefaults>): TranscriptionDefaults {
+  return buildTranscriptionDefaults(values)
 }
 
 function buildHookReturn(

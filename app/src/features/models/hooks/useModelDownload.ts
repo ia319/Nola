@@ -3,10 +3,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createSSEConnection } from '@/shared/lib/sse-client'
 
 import { cancelDownload, startDownload } from '../api'
-import type { DownloadProgressResponse, ModelDownloadSSEPayload } from '../types'
+import type {
+  DownloadProgressResponse,
+  ModelDownloadSSEPayload,
+  ModelDownloadStatus,
+} from '../types'
 
 export interface DownloadState {
-  status: 'downloading' | 'completed' | 'failed' | 'cancelled'
+  status: ModelDownloadStatus
   percent: number
   downloadedBytes: number
   totalBytes: number
@@ -20,6 +24,12 @@ export interface UseModelDownloadResult {
   cancel: (modelId: string) => Promise<void>
 }
 
+export interface DownloadTerminalEvent {
+  modelId: string
+  status: Extract<ModelDownloadStatus, 'completed' | 'failed' | 'cancelled'>
+  error?: string | null
+}
+
 /** Convert a REST snapshot into the hook-internal state shape. */
 export function toDownloadState(progress: DownloadProgressResponse): DownloadState {
   return {
@@ -27,7 +37,7 @@ export function toDownloadState(progress: DownloadProgressResponse): DownloadSta
     percent: progress.percent,
     downloadedBytes: progress.downloaded_bytes,
     totalBytes: progress.total_bytes,
-    speedBps: progress.speed_bps,
+    speedBps: progress.speed_bps ?? 0,
     error: progress.error,
   }
 }
@@ -42,7 +52,7 @@ export function toDownloadState(progress: DownloadProgressResponse): DownloadSta
  */
 export function useModelDownload(
   initialDownloads: Map<string, DownloadState>,
-  onTerminal?: () => void,
+  onTerminal?: (event: DownloadTerminalEvent) => void,
 ): UseModelDownloadResult {
   const [liveDownloads, setLiveDownloads] = useState<Map<string, DownloadState>>(new Map())
   const onTerminalRef = useRef(onTerminal)
@@ -89,7 +99,14 @@ export function useModelDownload(
             state.status === 'failed' ||
             state.status === 'cancelled'
           ) {
-            queueMicrotask(() => onTerminalRef.current?.())
+            const terminalStatus: DownloadTerminalEvent['status'] = state.status
+            queueMicrotask(() =>
+              onTerminalRef.current?.({
+                modelId: data.model_id,
+                status: terminalStatus,
+                error: state.error,
+              }),
+            )
           }
           return next
         })

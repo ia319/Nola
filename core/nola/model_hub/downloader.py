@@ -23,6 +23,7 @@ from nola.model_hub.errors import (
     ModelDownloadFailedError,
     ModelDownloadNotFoundError,
 )
+from nola.model_hub.storage import ModelStorage
 
 _GLOBAL_CHANNEL = "model_downloads"
 logger = logging.getLogger(__name__)
@@ -220,9 +221,7 @@ class ModelDownloader:
 
         terminal_progress = self._drain_queue_after_exit(active, timeout_seconds=0.05)
         if terminal_progress is not None:
-            active.progress = terminal_progress
-            self._emit_progress(terminal_progress, active.callback)
-            self._finalize_download(active)
+            self._publish_terminal_progress(active, terminal_progress)
 
         return active.progress
 
@@ -263,9 +262,7 @@ class ModelDownloader:
                     if not process.is_alive():
                         terminal_progress = self._drain_queue_after_exit(active)
                         if terminal_progress is not None:
-                            active.progress = terminal_progress
-                            self._emit_progress(terminal_progress, active.callback)
-                            self._finalize_download(active)
+                            self._publish_terminal_progress(active, terminal_progress)
                             return
                         break
                     continue
@@ -276,9 +273,7 @@ class ModelDownloader:
                 message = raw_message
                 terminal_progress = self._handle_message(active, message)
                 if terminal_progress is not None:
-                    active.progress = terminal_progress
-                    self._emit_progress(terminal_progress, active.callback)
-                    self._finalize_download(active)
+                    self._publish_terminal_progress(active, terminal_progress)
                     return
 
             if active.cancel_requested:
@@ -294,9 +289,7 @@ class ModelDownloader:
                     total_bytes=active.progress.total_bytes,
                     speed_bps=0.0,
                 )
-                active.progress = completed_progress
-                self._emit_progress(completed_progress, active.callback)
-                self._finalize_download(active)
+                self._publish_terminal_progress(active, completed_progress)
                 return
 
             failure = ModelDownloadFailedError(
@@ -311,9 +304,7 @@ class ModelDownloader:
                 speed_bps=0.0,
                 error=failure.detail,
             )
-            active.progress = failed_progress
-            self._emit_progress(failed_progress, active.callback)
-            self._finalize_download(active)
+            self._publish_terminal_progress(active, failed_progress)
         finally:
             queue_close = getattr(active.message_queue, "close", None)
             if callable(queue_close):
@@ -397,6 +388,26 @@ class ModelDownloader:
             )
 
         return None
+
+    def _publish_terminal_progress(
+        self,
+        active: _ActiveDownload,
+        progress: DownloadProgress,
+    ) -> None:
+        """Emit one terminal snapshot after best-effort cache cleanup."""
+        if progress.status == "completed":
+            self._cleanup_stale_artifacts(active.model_info.repo_id)
+
+        active.progress = progress
+        self._emit_progress(progress, active.callback)
+        self._finalize_download(active)
+
+    def _cleanup_stale_artifacts(self, repo_id: str) -> None:
+        """Remove stale download leftovers without deleting completed cache data."""
+        try:
+            ModelStorage(self.cache_dir).cleanup_stale_artifacts(repo_id)
+        except Exception:
+            logger.exception("Model download cleanup failed for %s", repo_id)
 
     def _emit_progress(
         self,

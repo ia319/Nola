@@ -13,7 +13,7 @@ from nola.api.routes import models as models_routes
 from nola.config.constants import MAX_BATCH_TASK_IDS
 from nola.config.settings import Settings
 from nola.main import app
-from nola.model_hub import DownloadProgress
+from nola.model_hub import DownloadProgress, require_model
 from nola.models import init_db
 
 
@@ -91,6 +91,46 @@ class TestFilesAPI:
         """Test deleting a file that doesn't exist."""
         response = client.delete("/api/files/nonexistent-id")
         assert response.status_code == 404
+
+    def test_delete_file_with_linked_tasks_returns_409(self, client):
+        """Reject file deletion when task records still reference the file."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="linked-file",
+            filename="linked.mp3",
+            path="/tmp/linked.mp3",
+            size=1000,
+        )
+        task_db.enqueue(task_id="linked-task", file_id="linked-file", options=None)
+
+        response = client.delete("/api/files/linked-file")
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == (
+            "Cannot delete file linked-file: 1 transcription task(s) still reference it"
+        )
+        assert file_db.get_file("linked-file") is not None
+
+    def test_delete_file_returns_404_when_row_disappears_before_delete(self, client):
+        """Return not found when a concurrent request already removed the row."""
+        file_db = get_file_db()
+        file_db.create_file(
+            file_id="lost-delete-file",
+            filename="lost.mp3",
+            path="/tmp/lost.mp3",
+            size=1000,
+        )
+
+        with (
+            patch("nola.api.routes.files.get_file_db", return_value=file_db),
+            patch.object(file_db, "delete_file", return_value=False),
+        ):
+            response = client.delete("/api/files/lost-delete-file")
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "File not found"
 
 
 class TestTranscriptionsAPI:
@@ -280,6 +320,62 @@ class TestTranscriptionsAPI:
 
 class TestModelsAPI:
     """Test model-management endpoints."""
+
+    def test_model_responses_expose_description_keys(self, client: TestClient) -> None:
+        """Expose stable i18n keys for list and detail model descriptions."""
+        list_response = client.get("/api/models")
+        assert list_response.status_code == 200
+
+        list_item = next(
+            item
+            for item in list_response.json()["models"]
+            if item["model_id"] == "large-v3"
+        )
+        assert list_item["description_key"] == "models.catalog.largeV3.description"
+
+        detail_response = client.get("/api/models/large-v3")
+        assert detail_response.status_code == 200
+        assert (
+            detail_response.json()["description_key"]
+            == "models.catalog.largeV3.description"
+        )
+
+    def test_start_download_rejects_models_already_cached(
+        self, client: TestClient
+    ) -> None:
+        """Do not start a second download when one model is already cached."""
+        small_model = require_model("small")
+
+        class _FakeStorage:
+            def get_cache_state(self, repo_id: str) -> str:
+                assert repo_id == small_model.repo_id
+                return "downloaded"
+
+        with (
+            patch(
+                "nola.api.routes.models.get_model_storage", return_value=_FakeStorage()
+            ),
+            patch("nola.api.routes.models.get_model_downloader") as get_downloader,
+        ):
+            response = client.post("/api/models/small/download")
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == "Model already downloaded: small"
+        get_downloader.assert_not_called()
+
+    def test_start_download_openapi_declares_all_conflict_reasons(
+        self, client: TestClient
+    ) -> None:
+        """OpenAPI should document both model download conflict states."""
+        response = client.get("/openapi.json")
+        assert response.status_code == 200
+        schema = response.json()
+
+        download_post = schema["paths"]["/api/models/{model_id}/download"]["post"]
+        assert (
+            download_post["responses"]["409"]["description"]
+            == "Download already in progress or model already downloaded"
+        )
 
     def test_list_active_model_downloads_reports_real_speed(
         self, client: TestClient

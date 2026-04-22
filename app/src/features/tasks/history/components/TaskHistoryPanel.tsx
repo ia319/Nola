@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -6,7 +6,6 @@ import { ListToolbar, TaskListPanel } from '@/components/common'
 import type { TaskActionHandler } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import {
-  ExportDialog,
   buildSingleExportFilename,
   type ExportDialogValue,
   useExportDefaults,
@@ -14,7 +13,19 @@ import {
 import { TaskBatchActionBar } from '@/features/tasks/components/TaskBatchActionBar'
 import { useTaskSelection } from '@/features/tasks/hooks/useTaskSelection'
 import type { ExportRequestOptions, SingleExportRequestOptions } from '@/features/export'
-import type { TaskFilterStatus, TaskQueryModel, TaskSortBy, TaskSummary } from '@/shared/types'
+import type {
+  BatchTaskActionResponse,
+  TaskFilterStatus,
+  TaskQueryModel,
+  TaskSortBy,
+  TaskSummary,
+} from '@/shared/types'
+
+type BatchTaskHandler = (taskIds: string[]) => Promise<void | BatchTaskActionResponse>
+type BatchExportHandler = (
+  taskIds: string[],
+  options: ExportRequestOptions & { zip_name?: string | null },
+) => Promise<void>
 
 export interface TaskHistoryPanelProps {
   tasks: TaskSummary[]
@@ -35,12 +46,9 @@ export interface TaskHistoryPanelProps {
     task: TaskSummary,
     options: SingleExportRequestOptions,
   ) => Promise<{ mode: 'download' } | { mode: 'save'; savedPath: string }>
-  onBatchCancelTasks?: (taskIds: string[]) => Promise<unknown>
-  onBatchRetryTasks?: (taskIds: string[]) => Promise<unknown>
-  onBatchExportTasks?: (
-    taskIds: string[],
-    options: ExportRequestOptions & { zip_name?: string | null },
-  ) => Promise<unknown>
+  onBatchCancelTasks?: BatchTaskHandler
+  onBatchRetryTasks?: BatchTaskHandler
+  onBatchExportTasks?: BatchExportHandler
 }
 
 interface ExportDialogState {
@@ -54,6 +62,10 @@ const FALLBACK_EXPORT_OPTIONS: ExportRequestOptions = {
   format: 'srt',
   include_timestamps: true,
 }
+const LazyExportDialog = lazy(async () => {
+  const module = await import('@/features/export')
+  return { default: module.ExportDialog }
+})
 
 function createExportDialogValue(defaults: ExportRequestOptions): ExportDialogValue {
   return {
@@ -139,7 +151,7 @@ export function TaskHistoryPanel({
   async function runBatchAction(
     action: 'cancel' | 'retry',
     taskIds: string[],
-    handler?: (taskIds: string[]) => Promise<unknown>,
+    handler?: BatchTaskHandler,
   ): Promise<void> {
     if (!handler || taskIds.length === 0 || runningBatchActionRef.current) {
       return
@@ -428,24 +440,28 @@ export function TaskHistoryPanel({
             : undefined
         }
       />
-      <ExportDialog
-        open={exportDialog.open}
-        mode={exportDialog.mode}
-        taskCount={exportDialog.mode === 'single' ? 1 : exportDialog.taskIds.length}
-        defaultFilename={singleDefaultFilename}
-        value={exportValue}
-        isLoadingDefaults={exportDefaults.isLoading}
-        isSubmitting={isSubmittingExport}
-        isUpdatingDefaults={isUpdatingDefaults}
-        onChange={setExportValue}
-        onConfirm={() => {
-          void handleConfirmExport()
-        }}
-        onCancel={closeExportDialog}
-        onResetDefaults={() => {
-          void handleResetExportDefaults()
-        }}
-      />
+      {exportDialog.open ? (
+        <Suspense fallback={null}>
+          <LazyExportDialog
+            open={exportDialog.open}
+            mode={exportDialog.mode}
+            taskCount={exportDialog.mode === 'single' ? 1 : exportDialog.taskIds.length}
+            defaultFilename={singleDefaultFilename}
+            value={exportValue}
+            isLoadingDefaults={exportDefaults.isLoading}
+            isSubmitting={isSubmittingExport}
+            isUpdatingDefaults={isUpdatingDefaults}
+            onChange={setExportValue}
+            onConfirm={() => {
+              void handleConfirmExport()
+            }}
+            onCancel={closeExportDialog}
+            onResetDefaults={() => {
+              void handleResetExportDefaults()
+            }}
+          />
+        </Suspense>
+      ) : null}
     </>
   )
 }

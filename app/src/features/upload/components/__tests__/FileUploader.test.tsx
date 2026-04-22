@@ -51,4 +51,17 @@ describe('FileUploader', () => {
     expect(clickSpy).not.toHaveBeenCalled()
     expect(dropzone.getAttribute('aria-disabled')).toBe('true')
   })
+
+  it('renders custom uploader content when provided', () => {
+    const onFilesSelected = vi.fn()
+
+    render(
+      <FileUploader onFilesSelected={onFilesSelected}>
+        <div>Custom uploader body</div>
+      </FileUploader>,
+    )
+
+    expect(screen.getByText('Custom uploader body')).toBeTruthy()
+    expect(screen.queryByText('upload.dropzone.browse')).toBeNull()
+  })
 })

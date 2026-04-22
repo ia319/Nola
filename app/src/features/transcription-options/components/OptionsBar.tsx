@@ -24,7 +24,10 @@ import {
   buildDefaultsPatchPayload,
   buildEffectiveDefaults,
 } from '@/features/transcription-options/lib/defaults-patch'
-import { buildTranscriptionSchemaUiModel } from '@/features/transcription-options/lib/schema-adapter'
+import {
+  AUTO_DETECT_LANGUAGE_VALUE,
+  buildTranscriptionSchemaUiModel,
+} from '@/features/transcription-options/lib/schema-adapter'
 import { isAppError } from '@/shared/lib/error-factory'
 import type { AppError, CreateTaskPayload, CreateTaskResponse } from '@/shared/types'
 
@@ -201,8 +204,10 @@ export function OptionsBar({ fileIds, onCreateTask, onTasksCreated, disabled }: 
         <div className="space-y-1.5">
           <Label htmlFor="language-select">{t(schemaUiModel.languageControl.labelKey)}</Label>
           <Select
-            value={language ?? '__auto__'}
-            onValueChange={(value) => setLanguage(value === '__auto__' ? undefined : value)}
+            value={language ?? AUTO_DETECT_LANGUAGE_VALUE}
+            onValueChange={(value) =>
+              setLanguage(value === AUTO_DETECT_LANGUAGE_VALUE ? undefined : value)
+            }
             disabled={controlsDisabled}
           >
             <SelectTrigger id="language-select" className="w-[160px]">

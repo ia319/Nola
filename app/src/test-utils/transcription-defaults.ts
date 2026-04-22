@@ -1,0 +1,59 @@
+import type { TranscriptionDefaults } from '@/shared/types'
+
+type VadParameterOverrides = Partial<NonNullable<TranscriptionDefaults['vad_parameters']>>
+type TranscriptionDefaultsOverrides = Omit<Partial<TranscriptionDefaults>, 'vad_parameters'> & {
+  vad_parameters?: VadParameterOverrides
+}
+
+export function buildTranscriptionDefaults(
+  overrides: TranscriptionDefaultsOverrides = {},
+): TranscriptionDefaults {
+  const { vad_parameters: vadParameterOverrides, ...topLevelOverrides } = overrides
+
+  return {
+    language: null,
+    task: 'transcribe',
+    beam_size: 5,
+    best_of: 5,
+    patience: 1,
+    length_penalty: 1,
+    repetition_penalty: 1,
+    no_repeat_ngram_size: 0,
+    temperature: [0, 0.2, 0.4, 0.6, 0.8, 1],
+    compression_ratio_threshold: 2.4,
+    log_prob_threshold: -1,
+    no_speech_threshold: 0.6,
+    condition_on_previous_text: true,
+    prompt_reset_on_temperature: 0.5,
+    initial_prompt: null,
+    prefix: null,
+    hotwords: null,
+    suppress_blank: true,
+    suppress_tokens: [-1],
+    max_new_tokens: null,
+    without_timestamps: false,
+    max_initial_timestamp: 1,
+    word_timestamps: false,
+    prepend_punctuations: `"'“¿([{-`,
+    append_punctuations: `"'.。,，!！?？:：”)]}、`,
+    vad_filter: false,
+    vad_parameters: {
+      threshold: 0.5,
+      neg_threshold: null,
+      min_speech_duration_ms: 0,
+      max_speech_duration_s: 'inf',
+      min_silence_duration_ms: 2000,
+      speech_pad_ms: 400,
+      min_silence_at_max_speech: 98,
+      use_max_poss_sil_at_max_speech: true,
+      ...(vadParameterOverrides ?? {}),
+    },
+    multilingual: false,
+    chunk_length: null,
+    clip_timestamps: '0',
+    hallucination_silence_threshold: null,
+    language_detection_threshold: 0.5,
+    language_detection_segments: 1,
+    ...topLevelOverrides,
+  }
+}

@@ -4,6 +4,7 @@ import { isAppError } from '@/shared/lib/error-factory'
 import type { AppError } from '@/shared/types'
 
 import { listModels } from '../api'
+import { subscribeModelRefresh } from '../lib/model-refresh'
 import type { ModelListResponse, ModelResponse } from '../types'
 
 function toAppError(error: unknown): AppError {
@@ -21,8 +22,11 @@ export interface UseModelsResult {
   lastLoadedModelId: string | null
   effectiveModelDir: string
   isLoading: boolean
+  isRefreshing: boolean
+  hasLoaded: boolean
   error: AppError | null
   refresh: () => Promise<void>
+  updateSnapshot: (updater: (current: ModelListResponse) => ModelListResponse) => void
 }
 
 /**
@@ -32,16 +36,30 @@ export interface UseModelsResult {
 export function useModels(): UseModelsResult {
   const [data, setData] = useState<ModelListResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<AppError | null>(null)
   const controllerRef = useRef<AbortController | null>(null)
+  const dataRef = useRef<ModelListResponse | null>(null)
+
+  useEffect(() => {
+    dataRef.current = data
+  }, [data])
 
   const refresh = useCallback(async () => {
     controllerRef.current?.abort()
     const controller = new AbortController()
     controllerRef.current = controller
 
-    setIsLoading(true)
+    const hasSnapshot = dataRef.current !== null
+
     setError(null)
+    // Keep the last successful snapshot visible during follow-up refreshes so
+    // model actions update in place instead of dropping the whole page to loading.
+    if (hasSnapshot) {
+      setIsRefreshing(true)
+    } else {
+      setIsLoading(true)
+    }
 
     try {
       const response = await listModels(controller.signal)
@@ -54,9 +72,17 @@ export function useModels(): UseModelsResult {
     } finally {
       if (!controller.signal.aborted) {
         setIsLoading(false)
+        setIsRefreshing(false)
       }
     }
   }, [])
+
+  const updateSnapshot = useCallback(
+    (updater: (current: ModelListResponse) => ModelListResponse) => {
+      setData((current) => (current === null ? current : updater(current)))
+    },
+    [],
+  )
 
   useEffect(() => {
     void refresh()
@@ -65,13 +91,22 @@ export function useModels(): UseModelsResult {
     }
   }, [refresh])
 
+  useEffect(() => {
+    return subscribeModelRefresh(() => {
+      void refresh()
+    })
+  }, [refresh])
+
   return {
     models: data?.models ?? [],
     configuredModelId: data?.configured_model_id ?? null,
     lastLoadedModelId: data?.last_loaded_model_id ?? null,
     effectiveModelDir: data?.effective_model_dir ?? '',
     isLoading,
+    isRefreshing,
+    hasLoaded: data !== null,
     error,
     refresh,
+    updateSnapshot,
   }
 }

@@ -5,8 +5,10 @@ import type {
   TranscriptionOptionGroup,
 } from '@/shared/types'
 
+export const AUTO_DETECT_LANGUAGE_VALUE = '__auto__'
+
 const AUTO_DETECT_OPTION = {
-  value: '__auto__',
+  value: AUTO_DETECT_LANGUAGE_VALUE,
   labelKey: 'options.language.auto',
 }
 

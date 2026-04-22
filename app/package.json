@@ -20,6 +20,7 @@
     "gen:types:check": "pnpm gen:types && git diff --exit-code -- src/shared/types/openapi.d.ts"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.96.2",
     "@tanstack/react-router": "^1.162.8",
     "axios": "^1.13.5",
     "class-variance-authority": "^0.7.1",
