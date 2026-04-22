@@ -2481,7 +2481,7 @@ export interface operations {
         }
         content?: never
       }
-      /** @description Download already in progress */
+      /** @description Download already in progress or model already downloaded */
       409: {
         headers: {
           [name: string]: unknown
