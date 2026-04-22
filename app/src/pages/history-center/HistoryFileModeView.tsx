@@ -96,6 +96,7 @@ export function HistoryFileModeView({
     },
     onActionSettled: requestTaskRefresh,
   })
+  const { cancelTasks, exportTask, retryTasks } = historyTaskActions
 
   const rows = useMemo(() => {
     return historyFiles.files.map((file) => ({
@@ -125,7 +126,7 @@ export function HistoryFileModeView({
     setSelectedDetailFile(file)
   }, [])
 
-  async function handleConfirmDelete(): Promise<void> {
+  const handleConfirmDelete = useCallback(async (): Promise<void> => {
     if (!pendingDeleteFile) {
       return
     }
@@ -139,23 +140,32 @@ export function HistoryFileModeView({
     } catch {
       return
     }
-  }
+  }, [deleteHistoryFile, pendingDeleteFile])
 
-  async function handleExportAssociatedTask(task: TaskSummary): Promise<void> {
-    await historyTaskActions.exportTask(task, {
-      format: exportDefaults.defaults.format,
-      include_timestamps: exportDefaults.defaults.include_timestamps,
-      target: 'download',
-    })
-  }
+  const handleExportAssociatedTask = useCallback(
+    async (task: TaskSummary): Promise<void> => {
+      await exportTask(task, {
+        format: exportDefaults.defaults.format,
+        include_timestamps: exportDefaults.defaults.include_timestamps,
+        target: 'download',
+      })
+    },
+    [exportDefaults.defaults.format, exportDefaults.defaults.include_timestamps, exportTask],
+  )
 
-  async function handleCancelAssociatedTask(task: TaskSummary): Promise<void> {
-    await historyTaskActions.cancelTasks([task.task_id])
-  }
+  const handleCancelAssociatedTask = useCallback(
+    async (task: TaskSummary): Promise<void> => {
+      await cancelTasks([task.task_id])
+    },
+    [cancelTasks],
+  )
 
-  async function handleRetryAssociatedTask(task: TaskSummary): Promise<void> {
-    await historyTaskActions.retryTasks([task.task_id])
-  }
+  const handleRetryAssociatedTask = useCallback(
+    async (task: TaskSummary): Promise<void> => {
+      await retryTasks([task.task_id])
+    },
+    [retryTasks],
+  )
 
   return (
     <>
