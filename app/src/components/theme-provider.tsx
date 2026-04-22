@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type PropsWithChildren } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState, type PropsWithChildren } from 'react'
 
 import { useUiPreferencesStore } from '@/app/locale/ui-preferences-store'
 import { ThemeContext, type ResolvedTheme, type ThemeContextValue } from './theme-context'
@@ -44,7 +44,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     }
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyDocumentTheme(resolvedTheme)
   }, [resolvedTheme])
 
