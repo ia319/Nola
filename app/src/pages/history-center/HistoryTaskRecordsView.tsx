@@ -603,7 +603,7 @@ export function HistoryTaskRecordsView({
         sortByValue={query.sort_by}
         orderValue={query.order}
         isLoading={isLoading}
-        canExportSelection={exportableTaskIds.length > 0}
+        canExportSelection={Boolean(onBatchExportTasks) && exportableTaskIds.length > 0}
         onSearchChange={setSearchDraft}
         onSearchSubmit={onSearchChange}
         onStatusChange={onStatusChange}
