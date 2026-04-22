@@ -28,6 +28,8 @@ export type { UseModelsResult } from './hooks/useModels'
 export { requestModelRefresh, subscribeModelRefresh } from './lib/model-refresh'
 export {
   formatBytes,
+  formatMegabytes,
+  formatMegabytesPerSecond,
   formatPercent,
   formatSpeed,
   getModelActionState,
