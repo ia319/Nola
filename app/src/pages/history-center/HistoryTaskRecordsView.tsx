@@ -95,18 +95,19 @@ function formatDuration(
     return fallbackLabel
   }
 
-  const totalSeconds = Math.max(0, (completedTimestamp - createdTimestamp) / 1000)
+  const totalTenths = Math.round(Math.max(0, completedTimestamp - createdTimestamp) / 100)
+  const totalSeconds = Math.floor(totalTenths / 10)
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = totalSeconds % 60
+  const tenths = totalTenths % 10
+  const secondsLabel = `${String(seconds).padStart(2, '0')}.${tenths}`
 
   if (hours > 0) {
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${seconds
-      .toFixed(1)
-      .padStart(4, '0')}`
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${secondsLabel}`
   }
 
-  return `${String(minutes).padStart(2, '0')}:${seconds.toFixed(1).padStart(4, '0')}`
+  return `${String(minutes).padStart(2, '0')}:${secondsLabel}`
 }
 
 function createExportDialogValue(defaults: ExportRequestOptions): ExportDialogValue {

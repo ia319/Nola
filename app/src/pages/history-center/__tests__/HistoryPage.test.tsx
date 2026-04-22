@@ -505,6 +505,28 @@ describe('HistoryPage', () => {
     expect(screen.getByText('Not finished')).toBeTruthy()
   })
 
+  it('carries rounded duration seconds into the next minute', () => {
+    historyPageMocks.useHistoryTasks.mockReturnValue({
+      tasks: [
+        createTask({
+          task_id: 'task-rounding',
+          created_at: '2026-04-11T10:00:00.000Z',
+          completed_at: '2026-04-11T10:00:59.960Z',
+          status: 'completed',
+        }),
+      ],
+      total: 1,
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(),
+    })
+
+    renderHistoryPage()
+
+    expect(screen.getByText('01:00.0')).toBeTruthy()
+    expect(screen.queryByText('00:60.0')).toBeNull()
+  })
+
   it('switches to filename mode through the route search model', () => {
     historyPageMocks.search = {
       order: 'asc',
