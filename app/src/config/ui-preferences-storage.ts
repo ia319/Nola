@@ -49,7 +49,7 @@ function parseStoredUiPreferences(rawValue: string | null): UiPreferences | null
   }
 
   try {
-    const parsed = JSON.parse(rawValue) as Partial<UiPreferences>
+    const parsed: unknown = JSON.parse(rawValue)
     return normalizeUiPreferences(parsed)
   } catch {
     return null
@@ -79,10 +79,14 @@ class BrowserUiPreferencesRepository implements UiPreferencesRepository {
     }
 
     const normalized = normalizeUiPreferences(next)
-    storage.setItem(UI_PREFERENCES_STORAGE_KEY, JSON.stringify(normalized))
-    storage.removeItem(LEGACY_LANGUAGE_STORAGE_KEY)
-    storage.removeItem(LEGACY_THEME_STORAGE_KEY)
-    storage.removeItem(LEGACY_UNITS_STORAGE_KEY)
+    try {
+      storage.setItem(UI_PREFERENCES_STORAGE_KEY, JSON.stringify(normalized))
+      storage.removeItem(LEGACY_LANGUAGE_STORAGE_KEY)
+      storage.removeItem(LEGACY_THEME_STORAGE_KEY)
+      storage.removeItem(LEGACY_UNITS_STORAGE_KEY)
+    } catch {
+      return
+    }
   }
 }
 

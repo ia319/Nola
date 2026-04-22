@@ -23,6 +23,7 @@ interface UiPreferencesStoreState {
 }
 
 const repository: UiPreferencesRepository = createUiPreferencesRepository()
+let hydrationPromise: Promise<UiPreferences> | null = null
 
 async function persistPreferences(next: UiPreferences): Promise<void> {
   await repository.save(next)
@@ -37,16 +38,31 @@ export const useUiPreferencesStore = create<UiPreferencesStoreState>((set, get) 
       return get().preferences
     }
 
-    const loadedPreferences = normalizeUiPreferences(await repository.load())
-    set({
-      preferences: loadedPreferences,
-      isHydrated: true,
-    })
+    if (!hydrationPromise) {
+      hydrationPromise = repository
+        .load()
+        .then((loaded) => {
+          const loadedPreferences = normalizeUiPreferences(loaded)
+          set({
+            preferences: loadedPreferences,
+            isHydrated: true,
+          })
 
-    return loadedPreferences
+          return loadedPreferences
+        })
+        .finally(() => {
+          hydrationPromise = null
+        })
+    }
+
+    return hydrationPromise
   },
 
   setLanguage: async (language, hasExplicitLanguagePreference = true) => {
+    if (!get().isHydrated) {
+      await get().hydrate()
+    }
+
     const nextPreferences = normalizeUiPreferences({
       ...get().preferences,
       language,
@@ -58,6 +74,10 @@ export const useUiPreferencesStore = create<UiPreferencesStoreState>((set, get) 
   },
 
   setTheme: async (theme) => {
+    if (!get().isHydrated) {
+      await get().hydrate()
+    }
+
     const nextPreferences = normalizeUiPreferences({
       ...get().preferences,
       theme,
@@ -68,6 +88,10 @@ export const useUiPreferencesStore = create<UiPreferencesStoreState>((set, get) 
   },
 
   setUnits: async (units) => {
+    if (!get().isHydrated) {
+      await get().hydrate()
+    }
+
     const nextPreferences = normalizeUiPreferences({
       ...get().preferences,
       units,
