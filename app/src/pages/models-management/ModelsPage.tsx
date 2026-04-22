@@ -87,6 +87,7 @@ export function ModelsPage() {
   const [detailError, setDetailError] = useState<AppError | null>(null)
   const detailControllerRef = useRef<AbortController | null>(null)
   const selectedModelIdRef = useRef<string | null>(null)
+  const activeModelActionIdsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     selectedModelIdRef.current = selectedModelId
@@ -211,8 +212,21 @@ export function ModelsPage() {
     [downloads, selectedModelId],
   )
 
+  async function runModelMutation(modelId: string, action: () => Promise<void>): Promise<void> {
+    if (activeModelActionIdsRef.current.has(modelId)) {
+      return
+    }
+
+    activeModelActionIdsRef.current.add(modelId)
+    try {
+      await runModelAction(t, action)
+    } finally {
+      activeModelActionIdsRef.current.delete(modelId)
+    }
+  }
+
   async function handleDownload(modelId: string) {
-    await runModelAction(t, async () => {
+    await runModelMutation(modelId, async () => {
       await download(modelId)
       void queryClient.invalidateQueries({ queryKey: queryKeys.models.downloads() })
       toast.success(t('models.toast.downloadStarted', { modelId }))
@@ -220,14 +234,14 @@ export function ModelsPage() {
   }
 
   async function handleCancel(modelId: string) {
-    await runModelAction(t, async () => {
+    await runModelMutation(modelId, async () => {
       await cancel(modelId)
       void queryClient.invalidateQueries({ queryKey: queryKeys.models.downloads() })
     })
   }
 
   async function handleDelete(modelId: string) {
-    await runModelAction(t, async () => {
+    await runModelMutation(modelId, async () => {
       await deleteModel(modelId)
       updateSnapshot((current) => ({
         ...current,
@@ -244,7 +258,7 @@ export function ModelsPage() {
   }
 
   async function handleSelect(modelId: string) {
-    await runModelAction(t, async () => {
+    await runModelMutation(modelId, async () => {
       const result = await selectModel(modelId)
       updateSnapshot((current) => ({
         ...current,

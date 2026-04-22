@@ -361,6 +361,29 @@ describe('ModelsPage', () => {
     })
   })
 
+  it('ignores duplicate model actions while the first request is pending', async () => {
+    let resolveDownload: () => void = () => {
+      throw new Error('Expected download promise resolver to be assigned')
+    }
+    modelsPageMocks.downloadModel.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveDownload = () => resolve()
+      }),
+    )
+
+    render(<ModelsPage />)
+
+    const modelListProps = getModelListProps()
+    const firstDownload = modelListProps.onDownload('nola-large-v3')
+    const secondDownload = modelListProps.onDownload('nola-large-v3')
+
+    expect(modelsPageMocks.downloadModel).toHaveBeenCalledTimes(1)
+
+    resolveDownload()
+    await firstDownload
+    await secondDownload
+  })
+
   it('wires model deletion through snapshot updates and refresh notifications', async () => {
     render(<ModelsPage />)
 
