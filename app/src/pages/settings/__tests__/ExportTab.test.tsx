@@ -19,7 +19,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, params?: Record<string, string | number | boolean | null | undefined>) => {
       const messages: Record<string, string> = {
-        'settings.export.loading': 'Load export defaults...',
+        'settings.export.loading': 'Loading export defaults...',
         'settings.export.unavailable': 'Export defaults are not available.',
         'settings.export.sections.defaults.label': 'Export Defaults',
         'settings.export.sections.future.label': 'Planned Capabilities',
@@ -198,6 +198,10 @@ describe('ExportTab', () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText('Default Export Format')).toHaveValue('srt')
+      expect(screen.getByRole('switch', { name: 'Include Timestamps for TXT' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      )
     })
   })
 })

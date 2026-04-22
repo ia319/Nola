@@ -43,6 +43,10 @@ interface ComparisonRow {
   engineValue: string
 }
 
+interface EnsureEngineDefaultsOptions {
+  notify?: boolean
+}
+
 function toAppError(error: unknown): AppError {
   if (isAppError(error)) return error
   return {
@@ -85,9 +89,37 @@ function resolveInitialPromptValue(
   return defaults?.initial_prompt ?? ''
 }
 
+function isComparableRecord(value: unknown): value is Record<string, unknown> {
+  return Object.prototype.toString.call(value) === '[object Object]'
+}
+
 function areValuesEqual(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true
-  return JSON.stringify(left) === JSON.stringify(right)
+
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+      return false
+    }
+
+    return left.every((leftItem, index) => areValuesEqual(leftItem, right[index]))
+  }
+
+  if (isComparableRecord(left) || isComparableRecord(right)) {
+    if (!isComparableRecord(left) || !isComparableRecord(right)) {
+      return false
+    }
+
+    const leftKeys = Object.keys(left).sort()
+    const rightKeys = Object.keys(right).sort()
+
+    if (!areValuesEqual(leftKeys, rightKeys)) {
+      return false
+    }
+
+    return leftKeys.every((key) => areValuesEqual(left[key], right[key]))
+  }
+
+  return false
 }
 
 function formatComparisonValue(
@@ -243,7 +275,9 @@ export function TranscriptionTab() {
     }
   }
 
-  async function ensureEngineDefaultsLoaded(): Promise<EngineDefaults['defaults'] | null> {
+  async function ensureEngineDefaultsLoaded(
+    options: EnsureEngineDefaultsOptions = {},
+  ): Promise<EngineDefaults['defaults'] | null> {
     if (engineDefaults) return engineDefaults
 
     setIsLoadingEngineDefaults(true)
@@ -255,7 +289,9 @@ export function TranscriptionTab() {
     } catch (error: unknown) {
       logger.error('settings.transcription.engineDefaultsFailed', { error })
       const appError = toAppError(error)
-      toast.error(t(appError.i18nKey, appError.params ?? {}))
+      if (options.notify ?? true) {
+        toast.error(t(appError.i18nKey, appError.params ?? {}))
+      }
       return null
     } finally {
       setIsLoadingEngineDefaults(false)
@@ -268,8 +304,11 @@ export function TranscriptionTab() {
     setIsSaving(true)
 
     try {
-      const loadedEngineDefaults = await ensureEngineDefaultsLoaded()
-      if (!loadedEngineDefaults) return
+      const loadedEngineDefaults = await ensureEngineDefaultsLoaded({ notify: false })
+      if (!loadedEngineDefaults) {
+        toast.error(t('options.defaults.saveRequiresEngineDefaults'))
+        return
+      }
 
       const nextEffectiveDefaults = buildEffectiveDefaults({
         defaults,

@@ -12,7 +12,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, params?: Record<string, string | number | boolean | null | undefined>) => {
       const messages: Record<string, string> = {
-        'settings.modelStorage.loading': 'Load model storage settings...',
+        'settings.modelStorage.loading': 'Loading model storage settings...',
         'settings.modelStorage.unavailable': 'Model storage settings are not available.',
         'settings.modelStorage.sections.current.label': 'Current State',
         'settings.modelStorage.sections.directory.label': 'Model Cache Directory',
@@ -90,7 +90,7 @@ describe('ModelStorageTab', () => {
   })
 
   it('renders model storage state without exposing absolute backend paths', async () => {
-    renderModelStorageTab()
+    const { container } = renderModelStorageTab()
 
     await waitFor(() => {
       expect(screen.getByText('Current State')).toBeTruthy()
@@ -101,8 +101,10 @@ describe('ModelStorageTab', () => {
     expect(screen.getByText('Stored setting')).toBeTruthy()
     expect(screen.getByText('No restart required')).toBeTruthy()
     expect(screen.getAllByText('Safe path pending').length).toBeGreaterThan(0)
-    expect(screen.queryByText('D:/private/models')).toBeNull()
-    expect(screen.queryByText('/Users/private/models')).toBeNull()
+    expect(container.textContent).not.toContain('D:/private/models')
+    expect(container.textContent).not.toContain('/Users/private/models')
+    expect(screen.queryByDisplayValue('D:/private/models')).toBeNull()
+    expect(screen.queryByDisplayValue('/Users/private/models')).toBeNull()
     expect(screen.getByRole('button', { name: 'Save Changes' })).toBeDisabled()
   })
 

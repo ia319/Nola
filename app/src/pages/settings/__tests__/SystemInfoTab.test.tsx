@@ -159,7 +159,9 @@ describe('SystemInfoTab', () => {
       expect(systemInfoMocks.cleanupOrphansMock).toHaveBeenCalledTimes(1)
     })
 
-    expect(screen.getByText('1 orphan record(s) deleted')).toBeTruthy()
-    expect(systemInfoMocks.toastSuccessMock).toHaveBeenCalledWith('Orphan records cleaned up')
+    expect(await screen.findByText('1 orphan record(s) deleted')).toBeTruthy()
+    await waitFor(() => {
+      expect(systemInfoMocks.toastSuccessMock).toHaveBeenCalledWith('Orphan records cleaned up')
+    })
   })
 })

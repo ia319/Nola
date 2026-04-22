@@ -29,7 +29,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => {
       const messages: Record<string, string> = {
-        'settings.transcription.loading': 'Load transcription defaults...',
+        'settings.transcription.loading': 'Loading transcription defaults...',
         'settings.transcription.unavailable': 'Transcription defaults are not available.',
         'settings.transcription.sections.basic.label': 'Basic Defaults',
         'settings.transcription.sections.advanced.label': 'Advanced Defaults',
@@ -38,7 +38,7 @@ vi.mock('react-i18next', () => ({
         'settings.transcription.sections.engineDefaults.hide': 'Hide Engine Defaults',
         'settings.transcription.sections.engineDefaults.closedNote':
           'Review overridden values against the engine baseline.',
-        'settings.transcription.sections.engineDefaults.loading': 'Load engine defaults...',
+        'settings.transcription.sections.engineDefaults.loading': 'Loading engine defaults...',
         'settings.transcription.sections.engineDefaults.noOverrides':
           'Current defaults already match the engine baseline.',
         'settings.transcription.sections.engineDefaults.columns.field': 'Field',
@@ -84,6 +84,7 @@ vi.mock('react-i18next', () => ({
         'options.defaults.resetEngine': 'Reset to Engine Defaults',
         'options.defaults.resetting': 'Resetting...',
         'options.defaults.saved': 'Defaults saved',
+        'options.defaults.saveRequiresEngineDefaults': 'Load engine defaults and retry saving.',
         'options.defaults.resetDone': 'Defaults reset to engine values',
       }
 
@@ -278,6 +279,25 @@ describe('TranscriptionTab', () => {
     expect(transcriptionTabMocks.refreshAppConfigMock).toHaveBeenCalledTimes(1)
     expect(transcriptionTabMocks.resetOptionOverridesMock).toHaveBeenCalledTimes(1)
     expect(transcriptionTabMocks.toastSuccessMock).toHaveBeenCalledWith('Defaults saved')
+  })
+
+  it('shows a save-specific error when engine defaults cannot load', async () => {
+    transcriptionTabMocks.fetchEngineDefaultsMock.mockRejectedValueOnce(
+      new Error('engine defaults unavailable'),
+    )
+
+    render(<TranscriptionTab />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save as Defaults' }))
+
+    await waitFor(() => {
+      expect(transcriptionTabMocks.fetchEngineDefaultsMock).toHaveBeenCalledTimes(1)
+    })
+
+    expect(transcriptionTabMocks.patchTranscriptionDefaultsMock).not.toHaveBeenCalled()
+    expect(transcriptionTabMocks.toastErrorMock).toHaveBeenCalledWith(
+      'Load engine defaults and retry saving.',
+    )
   })
 
   it('resets transcription defaults back to engine values', async () => {
