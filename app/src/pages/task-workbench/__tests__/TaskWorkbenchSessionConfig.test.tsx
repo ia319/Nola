@@ -269,6 +269,59 @@ describe('TaskWorkbenchSessionConfig', () => {
     expect(screen.getByRole('button', { name: 'Start 2 Selected Tasks' })).toBeTruthy()
   })
 
+  it('counts only effective advanced overrides in the summary badge', () => {
+    const defaults = buildDefaults({
+      initial_prompt: null,
+      without_timestamps: false,
+    })
+    taskWorkbenchSessionConfigMocks.useTranscriptionOptionsMock.mockReturnValue(
+      buildTranscriptionOptionsReturn({
+        defaults,
+        advancedOptions: { without_timestamps: false },
+        initialPrompt: null,
+      }),
+    )
+
+    render(
+      <TaskWorkbenchSessionConfig
+        fileIds={['file-1']}
+        onCreateTask={taskWorkbenchSessionConfigMocks.onCreateTaskMock}
+        onTasksCreated={taskWorkbenchSessionConfigMocks.onTasksCreatedMock}
+      />,
+    )
+
+    expect(screen.getByText('0 overrides')).toBeTruthy()
+  })
+
+  it('does not display the first downloaded model when runtime model ids are unavailable', () => {
+    taskWorkbenchSessionConfigMocks.useAppConfigMock.mockReturnValue(
+      buildAppConfigReturn({
+        engine: {
+          model_size: 'tiny',
+          device: 'cuda',
+          compute_type: 'float16',
+          is_multilingual: true,
+        },
+      }),
+    )
+    taskWorkbenchSessionConfigMocks.useModelsMock.mockReturnValue({
+      ...buildModelsReturn(),
+      configuredModelId: 'missing-default',
+      lastLoadedModelId: 'missing-runtime',
+    })
+
+    render(
+      <TaskWorkbenchSessionConfig
+        fileIds={['file-1']}
+        onCreateTask={taskWorkbenchSessionConfigMocks.onCreateTaskMock}
+        onTasksCreated={taskWorkbenchSessionConfigMocks.onTasksCreatedMock}
+      />,
+    )
+
+    expect(screen.getByText('Tiny')).toBeTruthy()
+    expect(screen.queryByText('Large V3')).toBeNull()
+  })
+
   it('creates tasks for all selected files and reports per-file outcomes', async () => {
     const appError: AppError = {
       code: 'API_CLIENT_409',

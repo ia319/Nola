@@ -187,12 +187,14 @@ export function TaskWorkbenchSessionConfig({
     [schemaUiModel.taskControl.options],
   )
 
-  const advancedOverrideCount = useMemo(
-    () =>
-      Object.values(advancedOptions).filter((value) => value !== undefined).length +
-      (initialPrompt !== undefined ? 1 : 0),
-    [advancedOptions, initialPrompt],
-  )
+  const advancedOverrideCount = useMemo(() => {
+    const effectiveAdvancedOptions = buildAppliedAdvancedOptions(advancedOptions, defaults)
+    const defaultInitialPrompt = defaults?.initial_prompt ?? null
+    const hasInitialPromptOverride =
+      initialPrompt !== undefined && !Object.is(initialPrompt, defaultInitialPrompt)
+
+    return Object.keys(effectiveAdvancedOptions).length + (hasInitialPromptOverride ? 1 : 0)
+  }, [advancedOptions, defaults, initialPrompt])
 
   const modelOptions = useMemo<ModelSelectOption[]>(() => {
     const downloadedModels = models
@@ -203,6 +205,21 @@ export function TaskWorkbenchSessionConfig({
       }))
 
     if (downloadedModels.length > 0) {
+      const hasRuntimeModel = downloadedModels.some(
+        (model) => model.value === lastLoadedModelId || model.value === configuredModelId,
+      )
+      if (!hasRuntimeModel) {
+        return [
+          {
+            value: MODEL_EMPTY_VALUE,
+            label:
+              formatEngineValue(config?.engine.model_size) ||
+              t('tasks.workbench.sessionConfig.unavailable'),
+          },
+          ...downloadedModels,
+        ]
+      }
+
       return downloadedModels
     }
 
@@ -231,17 +248,21 @@ export function TaskWorkbenchSessionConfig({
         label: t('tasks.workbench.sessionConfig.model.comingSoon'),
       },
     ]
-  }, [config?.engine.model_size, isModelsLoading, models, t])
+  }, [config?.engine.model_size, configuredModelId, isModelsLoading, lastLoadedModelId, models, t])
 
   const selectedModelValue = useMemo(() => {
-    if (modelOptions.some((option) => option.value === lastLoadedModelId)) {
-      return lastLoadedModelId as string
+    if (lastLoadedModelId && modelOptions.some((option) => option.value === lastLoadedModelId)) {
+      return lastLoadedModelId
     }
 
     // Prefer the currently loaded runtime model. A newly configured default
     // can differ until the backend applies it and clears restart_required.
-    if (modelOptions.some((option) => option.value === configuredModelId)) {
-      return configuredModelId as string
+    if (configuredModelId && modelOptions.some((option) => option.value === configuredModelId)) {
+      return configuredModelId
+    }
+
+    if (modelOptions.some((option) => option.value === MODEL_EMPTY_VALUE)) {
+      return MODEL_EMPTY_VALUE
     }
 
     return modelOptions[0]?.value ?? MODEL_EMPTY_VALUE
