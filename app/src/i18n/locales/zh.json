@@ -148,6 +148,7 @@
       "resetting": "重置中...",
       "saved": "已保存默认值",
       "savedRefreshFailed": "默认值已保存。刷新页面以加载最新值。",
+      "saveRequiresEngineDefaults": "加载引擎默认值后重试保存。",
       "resetDone": "已重置为引擎默认"
     },
     "advanced": {
@@ -755,6 +756,8 @@
         "modelDownload": "模型下载中",
         "taskCompleted": "转写已完成",
         "modelDownloadCompleted": "模型下载完成",
+        "modelDownloadFailed": "模型下载失败",
+        "modelDownloadCancelled": "模型下载已取消",
         "fileIntegrityChecked": "文件完整性检查完成",
         "orphanCleanupCompleted": "孤立记录清理完成",
         "taskId": "任务 {{taskId}}",

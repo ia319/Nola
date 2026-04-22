@@ -149,6 +149,7 @@
       "resetting": "Resetting...",
       "saved": "Defaults saved",
       "savedRefreshFailed": "Defaults saved. Refresh the page to load the latest values.",
+      "saveRequiresEngineDefaults": "Load engine defaults and retry saving.",
       "resetDone": "Defaults reset to engine values"
     },
     "advanced": {
@@ -756,6 +757,8 @@
         "modelDownload": "Active model download",
         "taskCompleted": "Completed transcription",
         "modelDownloadCompleted": "Model download finished",
+        "modelDownloadFailed": "Model download failed",
+        "modelDownloadCancelled": "Model download cancelled",
         "fileIntegrityChecked": "File integrity checked",
         "orphanCleanupCompleted": "Orphan cleanup completed",
         "taskId": "Task {{taskId}}",
@@ -821,7 +824,7 @@
       }
     },
     "transcription": {
-      "loading": "Load transcription defaults...",
+      "loading": "Loading transcription defaults...",
       "unavailable": "Transcription defaults are not available.",
       "sections": {
         "basic": {
@@ -835,7 +838,7 @@
           "show": "Show Engine Defaults",
           "hide": "Hide Engine Defaults",
           "closedNote": "Review overridden values against the engine baseline.",
-          "loading": "Load engine defaults...",
+          "loading": "Loading engine defaults...",
           "noOverrides": "Current defaults already match the engine baseline.",
           "columns": {
             "field": "Field",
@@ -885,7 +888,7 @@
       }
     },
     "export": {
-      "loading": "Load export defaults...",
+      "loading": "Loading export defaults...",
       "unavailable": "Export defaults are not available.",
       "sections": {
         "defaults": {
@@ -953,7 +956,7 @@
       }
     },
     "modelStorage": {
-      "loading": "Load model storage settings...",
+      "loading": "Loading model storage settings...",
       "unavailable": "Model storage settings are not available.",
       "sections": {
         "current": {
