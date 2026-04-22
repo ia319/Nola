@@ -305,6 +305,41 @@ describe('DataTable', () => {
     expect(onRowClick).toHaveBeenCalledWith(rows[0])
   })
 
+  it('does not open rows from nested interactive controls', () => {
+    const onRowClick = vi.fn()
+    const onButtonClick = vi.fn()
+
+    render(
+      <DataTable
+        rows={rows}
+        getRowId={(row) => row.id}
+        onRowClick={onRowClick}
+        columns={[
+          { key: 'name', header: 'Name', cell: (row) => row.name },
+          {
+            key: 'actions',
+            header: 'Actions',
+            cell: () => (
+              <button type="button" onClick={onButtonClick}>
+                Open menu
+              </button>
+            ),
+          },
+        ]}
+      />,
+    )
+
+    const menuButton = screen.getAllByRole('button', { name: 'Open menu' }).at(0)
+    if (!(menuButton instanceof HTMLElement)) {
+      throw new Error('nested action button not found')
+    }
+
+    fireEvent.click(menuButton)
+
+    expect(onButtonClick).toHaveBeenCalledTimes(1)
+    expect(onRowClick).not.toHaveBeenCalled()
+  })
+
   it('allows sticky headers and custom scroll containers for dense console tables', () => {
     render(
       <DataTable

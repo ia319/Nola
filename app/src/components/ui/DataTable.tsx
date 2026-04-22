@@ -43,6 +43,18 @@ function isStateConfig(
   return Boolean(value && typeof value === 'object' && 'title' in value)
 }
 
+function isInteractiveClickTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) {
+    return false
+  }
+
+  return Boolean(
+    target.closest(
+      'a, button, input, select, textarea, [role="button"], [role="link"], [data-row-click-ignore]',
+    ),
+  )
+}
+
 export function DataTable<T>({
   columns,
   rows,
@@ -205,7 +217,8 @@ export function DataTable<T>({
                       isSelected && 'bg-surface-container-low',
                       resolvedRowClassName,
                     )}
-                    onClick={() => {
+                    onClick={(event) => {
+                      if (isInteractiveClickTarget(event.target)) return
                       onRowClick?.(row)
                     }}
                     onKeyDown={(event) => {

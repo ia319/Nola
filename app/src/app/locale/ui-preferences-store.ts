@@ -24,9 +24,13 @@ interface UiPreferencesStoreState {
 
 const repository: UiPreferencesRepository = createUiPreferencesRepository()
 let hydrationPromise: Promise<UiPreferences> | null = null
+let writeQueue: Promise<void> = Promise.resolve()
 
 async function persistPreferences(next: UiPreferences): Promise<void> {
-  await repository.save(next)
+  // Keep preference writes ordered when the repository uses async desktop I/O.
+  const nextWrite = writeQueue.catch(() => undefined).then(() => repository.save(next))
+  writeQueue = nextWrite.catch(() => undefined)
+  await nextWrite
 }
 
 export const useUiPreferencesStore = create<UiPreferencesStoreState>((set, get) => ({

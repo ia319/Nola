@@ -260,12 +260,13 @@ export function ModelsPage() {
   async function handleSelect(modelId: string) {
     await runModelMutation(modelId, async () => {
       const result = await selectModel(modelId)
+      const selectedConfiguredModelId = result.configured_model_id
       updateSnapshot((current) => ({
         ...current,
-        configured_model_id: modelId,
+        configured_model_id: selectedConfiguredModelId,
         models: current.models.map((model) => ({
           ...model,
-          is_configured: model.model_id === modelId,
+          is_configured: model.model_id === selectedConfiguredModelId,
         })),
       }))
       setDetail((current) =>
@@ -273,10 +274,10 @@ export function ModelsPage() {
           ? current
           : {
               ...current,
-              is_configured: current.model_id === modelId,
+              is_configured: current.model_id === selectedConfiguredModelId,
             },
       )
-      toast.success(t('models.toast.selected', { modelId }))
+      toast.success(t('models.toast.selected', { modelId: selectedConfiguredModelId }))
       if (result.restart_required) {
         toast.warning(t('models.restartRequired'))
       }
@@ -285,6 +286,11 @@ export function ModelsPage() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.models.list() })
       void queryClient.invalidateQueries({ queryKey: queryKeys.models.settings() })
       void queryClient.invalidateQueries({ queryKey: queryKeys.models.detail(modelId) })
+      if (selectedConfiguredModelId !== modelId) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.models.detail(selectedConfiguredModelId),
+        })
+      }
       void refreshConfigCaches().catch((error: unknown) => {
         logger.error('models.select.configRefreshFailed', { error, modelId })
       })

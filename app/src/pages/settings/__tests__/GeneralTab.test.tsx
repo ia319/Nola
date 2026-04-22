@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useUiPreferencesStore } from '@/app/locale/ui-preferences-store'
@@ -103,22 +103,24 @@ describe('GeneralTab', () => {
     expect(screen.getByLabelText('Appearance')).toHaveValue('system')
   })
 
-  it('persists language, theme, and units changes from the General settings page', () => {
+  it('persists language, theme, and units changes from the General settings page', async () => {
     render(<GeneralTab />)
 
     fireEvent.change(screen.getByLabelText('Interface Language'), {
       target: { value: 'zh' },
     })
 
-    expect(window.localStorage.getItem(UI_PREFERENCES_STORAGE_KEY)).toBe(
-      JSON.stringify({
-        version: 1,
-        language: 'zh',
-        hasExplicitLanguagePreference: true,
-        theme: 'system',
-        units: 'metric',
-      }),
-    )
+    await waitFor(() => {
+      expect(window.localStorage.getItem(UI_PREFERENCES_STORAGE_KEY)).toBe(
+        JSON.stringify({
+          version: 1,
+          language: 'zh',
+          hasExplicitLanguagePreference: true,
+          theme: 'system',
+          units: 'metric',
+        }),
+      )
+    })
     expect(translationMocks.changeLanguage).toHaveBeenCalledTimes(1)
     expect(translationMocks.changeLanguage).toHaveBeenCalledWith('zh')
     expect(routerMocks.navigate).toHaveBeenCalledWith({
@@ -137,15 +139,17 @@ describe('GeneralTab', () => {
 
     fireEvent.click(screen.getByLabelText('Imperial'))
 
-    expect(window.localStorage.getItem(UI_PREFERENCES_STORAGE_KEY)).toBe(
-      JSON.stringify({
-        version: 1,
-        language: 'zh',
-        hasExplicitLanguagePreference: true,
-        theme: 'system',
-        units: 'imperial',
-      }),
-    )
+    await waitFor(() => {
+      expect(window.localStorage.getItem(UI_PREFERENCES_STORAGE_KEY)).toBe(
+        JSON.stringify({
+          version: 1,
+          language: 'zh',
+          hasExplicitLanguagePreference: true,
+          theme: 'system',
+          units: 'imperial',
+        }),
+      )
+    })
     expect(screen.getByLabelText('Imperial')).toBeChecked()
   })
 })

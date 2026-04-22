@@ -21,6 +21,7 @@ const transcriptionTabMocks = vi.hoisted(() => ({
   useTranscriptionOptionsMock: vi.fn(),
   toastSuccessMock: vi.fn(),
   toastErrorMock: vi.fn(),
+  toastWarningMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   loggerWarnMock: vi.fn(),
 }))
@@ -39,6 +40,7 @@ vi.mock('react-i18next', () => ({
         'settings.transcription.sections.engineDefaults.closedNote':
           'Review overridden values against the engine baseline.',
         'settings.transcription.sections.engineDefaults.loading': 'Loading engine defaults...',
+        'settings.transcription.sections.engineDefaults.retry': 'Retry',
         'settings.transcription.sections.engineDefaults.noOverrides':
           'Current defaults already match the engine baseline.',
         'settings.transcription.sections.engineDefaults.columns.field': 'Field',
@@ -86,6 +88,11 @@ vi.mock('react-i18next', () => ({
         'options.defaults.saved': 'Defaults saved',
         'options.defaults.saveRequiresEngineDefaults': 'Load engine defaults and retry saving.',
         'options.defaults.resetDone': 'Defaults reset to engine values',
+        'options.defaults.savedRefreshFailed':
+          'Defaults saved. Refresh the page to load the latest values.',
+        'options.defaults.resetRefreshFailed':
+          'Defaults reset. Refresh the page to load the latest values.',
+        'error.api.serverError': 'Server error',
       }
 
       return messages[key] ?? key
@@ -97,6 +104,7 @@ vi.mock('sonner', () => ({
   toast: {
     success: transcriptionTabMocks.toastSuccessMock,
     error: transcriptionTabMocks.toastErrorMock,
+    warning: transcriptionTabMocks.toastWarningMock,
   },
 }))
 
@@ -217,6 +225,7 @@ describe('TranscriptionTab', () => {
     transcriptionTabMocks.useTranscriptionOptionsMock.mockReset()
     transcriptionTabMocks.toastSuccessMock.mockReset()
     transcriptionTabMocks.toastErrorMock.mockReset()
+    transcriptionTabMocks.toastWarningMock.mockReset()
     transcriptionTabMocks.loggerErrorMock.mockReset()
     transcriptionTabMocks.loggerWarnMock.mockReset()
 
@@ -300,6 +309,24 @@ describe('TranscriptionTab', () => {
     )
   })
 
+  it('warns when saved defaults cannot refresh into the page state', async () => {
+    transcriptionTabMocks.refreshAppConfigMock.mockRejectedValueOnce(new Error('refresh failed'))
+
+    render(<TranscriptionTab />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save as Defaults' }))
+
+    await waitFor(() => {
+      expect(transcriptionTabMocks.patchTranscriptionDefaultsMock).toHaveBeenCalledTimes(1)
+    })
+
+    expect(transcriptionTabMocks.resetOptionOverridesMock).not.toHaveBeenCalled()
+    expect(transcriptionTabMocks.toastSuccessMock).not.toHaveBeenCalled()
+    expect(transcriptionTabMocks.toastWarningMock).toHaveBeenCalledWith(
+      'Defaults saved. Refresh the page to load the latest values.',
+    )
+  })
+
   it('resets transcription defaults back to engine values', async () => {
     render(<TranscriptionTab />)
 
@@ -313,6 +340,24 @@ describe('TranscriptionTab', () => {
     expect(transcriptionTabMocks.resetOptionOverridesMock).toHaveBeenCalledTimes(1)
     expect(transcriptionTabMocks.toastSuccessMock).toHaveBeenCalledWith(
       'Defaults reset to engine values',
+    )
+  })
+
+  it('warns when reset defaults cannot refresh into the page state', async () => {
+    transcriptionTabMocks.refreshAppConfigMock.mockRejectedValueOnce(new Error('refresh failed'))
+
+    render(<TranscriptionTab />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to Engine Defaults' }))
+
+    await waitFor(() => {
+      expect(transcriptionTabMocks.deleteTranscriptionDefaultsMock).toHaveBeenCalledTimes(1)
+    })
+
+    expect(transcriptionTabMocks.resetOptionOverridesMock).not.toHaveBeenCalled()
+    expect(transcriptionTabMocks.toastSuccessMock).not.toHaveBeenCalled()
+    expect(transcriptionTabMocks.toastWarningMock).toHaveBeenCalledWith(
+      'Defaults reset. Refresh the page to load the latest values.',
     )
   })
 
@@ -355,5 +400,23 @@ describe('TranscriptionTab', () => {
     expect(screen.getAllByText('Auto Detect').length).toBeGreaterThan(0)
     expect(screen.getByText('7')).toBeTruthy()
     expect(screen.getByText('5')).toBeTruthy()
+  })
+
+  it('renders engine defaults load failures instead of the no-overrides state', async () => {
+    transcriptionTabMocks.fetchEngineDefaultsMock.mockRejectedValueOnce(
+      new Error('engine defaults unavailable'),
+    )
+
+    render(<TranscriptionTab />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show Engine Defaults' }))
+
+    await waitFor(() => {
+      expect(transcriptionTabMocks.fetchEngineDefaultsMock).toHaveBeenCalledTimes(1)
+    })
+
+    expect(screen.getByText('Server error')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+    expect(screen.queryByText('Current defaults already match the engine baseline.')).toBeNull()
   })
 })

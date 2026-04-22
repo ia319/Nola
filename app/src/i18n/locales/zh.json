@@ -149,7 +149,8 @@
       "saved": "已保存默认值",
       "savedRefreshFailed": "默认值已保存。刷新页面以加载最新值。",
       "saveRequiresEngineDefaults": "加载引擎默认值后重试保存。",
-      "resetDone": "已重置为引擎默认"
+      "resetDone": "已重置为引擎默认",
+      "resetRefreshFailed": "默认值已重置。刷新页面以加载最新值。"
     },
     "advanced": {
       "toggle": "高级选项",
@@ -838,6 +839,7 @@
           "hide": "隐藏引擎默认值",
           "closedNote": "查看当前应用默认值相对引擎基线的覆盖情况。",
           "loading": "正在加载引擎默认值...",
+          "retry": "重试",
           "noOverrides": "当前默认值已经与引擎基线一致。",
           "columns": {
             "field": "字段",

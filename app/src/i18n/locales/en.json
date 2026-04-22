@@ -150,7 +150,8 @@
       "saved": "Defaults saved",
       "savedRefreshFailed": "Defaults saved. Refresh the page to load the latest values.",
       "saveRequiresEngineDefaults": "Load engine defaults and retry saving.",
-      "resetDone": "Defaults reset to engine values"
+      "resetDone": "Defaults reset to engine values",
+      "resetRefreshFailed": "Defaults reset. Refresh the page to load the latest values."
     },
     "advanced": {
       "toggle": "Advanced Options",
@@ -839,6 +840,7 @@
           "hide": "Hide Engine Defaults",
           "closedNote": "Review overridden values against the engine baseline.",
           "loading": "Loading engine defaults...",
+          "retry": "Retry",
           "noOverrides": "Current defaults already match the engine baseline.",
           "columns": {
             "field": "Field",

@@ -421,9 +421,9 @@ describe('ModelsPage', () => {
 
     render(<ModelsPage />)
 
-    await getModelListProps().onSelect('nola-base-v3')
+    await getModelListProps().onSelect('base')
 
-    expect(modelsPageMocks.selectModel).toHaveBeenCalledWith('nola-base-v3')
+    expect(modelsPageMocks.selectModel).toHaveBeenCalledWith('base')
     expect(modelsPageMocks.updateSnapshot).toHaveBeenCalledTimes(1)
 
     const updateSnapshot = modelsPageMocks.updateSnapshot.mock.calls[0]?.[0]
@@ -455,5 +455,11 @@ describe('ModelsPage', () => {
     expect(modelsPageMocks.toast.warning).toHaveBeenCalledWith('models.restartRequired')
     expect(modelsPageMocks.requestModelRefresh).toHaveBeenCalledTimes(1)
     expect(modelsPageMocks.refreshConfigCaches).toHaveBeenCalledTimes(1)
+    expect(modelsPageMocks.queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['models', 'detail', 'base'],
+    })
+    expect(modelsPageMocks.queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['models', 'detail', 'nola-base-v3'],
+    })
   })
 })

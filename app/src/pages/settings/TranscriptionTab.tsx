@@ -201,6 +201,7 @@ export function TranscriptionTab() {
   const [isCompareOpen, setIsCompareOpen] = useState(false)
   const [isLoadingEngineDefaults, setIsLoadingEngineDefaults] = useState(false)
   const [engineDefaults, setEngineDefaults] = useState<EngineDefaults['defaults'] | null>(null)
+  const [engineDefaultsError, setEngineDefaultsError] = useState<AppError | null>(null)
 
   const schemaUiModel = useMemo(
     () =>
@@ -281,6 +282,7 @@ export function TranscriptionTab() {
     if (engineDefaults) return engineDefaults
 
     setIsLoadingEngineDefaults(true)
+    setEngineDefaultsError(null)
 
     try {
       const response = await fetchEngineDefaults()
@@ -289,6 +291,7 @@ export function TranscriptionTab() {
     } catch (error: unknown) {
       logger.error('settings.transcription.engineDefaultsFailed', { error })
       const appError = toAppError(error)
+      setEngineDefaultsError(appError)
       if (options.notify ?? true) {
         toast.error(t(appError.i18nKey, appError.params ?? {}))
       }
@@ -327,10 +330,12 @@ export function TranscriptionTab() {
       await patchTranscriptionDefaults(payload)
 
       const refreshed = await refreshDefaultsView('save')
-      if (refreshed) {
-        resetOptionOverrides()
+      if (!refreshed) {
+        toast.warning(t('options.defaults.savedRefreshFailed'))
+        return
       }
 
+      resetOptionOverrides()
       toast.success(t('options.defaults.saved'))
     } catch (error: unknown) {
       logger.error('settings.transcription.saveFailed', { error })
@@ -350,10 +355,12 @@ export function TranscriptionTab() {
       await deleteTranscriptionDefaults()
 
       const refreshed = await refreshDefaultsView('reset')
-      if (refreshed) {
-        resetOptionOverrides()
+      if (!refreshed) {
+        toast.warning(t('options.defaults.resetRefreshFailed'))
+        return
       }
 
+      resetOptionOverrides()
       toast.success(t('options.defaults.resetDone'))
     } catch (error: unknown) {
       logger.error('settings.transcription.resetFailed', { error })
@@ -517,6 +524,21 @@ export function TranscriptionTab() {
           ) : isLoadingEngineDefaults && engineDefaults === null ? (
             <div className="text-muted-foreground py-4 text-sm">
               {t('settings.transcription.sections.engineDefaults.loading')}
+            </div>
+          ) : engineDefaultsError ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 py-4">
+              <p className="text-destructive text-sm">
+                {t(engineDefaultsError.i18nKey, engineDefaultsError.params ?? {})}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void ensureEngineDefaultsLoaded()}
+                disabled={isLoadingEngineDefaults}
+              >
+                {t('settings.transcription.sections.engineDefaults.retry')}
+              </Button>
             </div>
           ) : comparisonRows.length === 0 ? (
             <div className="text-muted-foreground py-4 text-sm">
