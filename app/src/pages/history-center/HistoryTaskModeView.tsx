@@ -169,6 +169,8 @@ export function HistoryTaskModeView({
     setRunningDetailAction(action)
     try {
       await handler()
+    } catch (error: unknown) {
+      logger.error('history.detailActionFailed', { action, error })
     } finally {
       setRunningDetailAction(null)
     }
