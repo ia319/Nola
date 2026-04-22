@@ -49,14 +49,13 @@ class ModelStorage:
         """Return one repository cache state for model-management decisions."""
         repo = self._get_repo(repo_id)
         has_revisions = repo is not None and bool(repo.revisions)
-        has_partial_artifacts = self._has_partial_artifacts(repo_id, repo)
 
         # Treat one repo with tracked revisions as downloaded even when stale
         # lock or incomplete artifacts remain from an older interrupted run.
         if has_revisions:
             return "downloaded"
 
-        if has_partial_artifacts:
+        if self._has_partial_artifacts(repo_id, repo):
             return "partial_download"
 
         return "not_downloaded"
@@ -109,7 +108,14 @@ class ModelStorage:
 
     def cleanup_stale_artifacts(self, repo_id: str) -> bool:
         """Delete stale lock and incomplete files without touching cached revisions."""
+        repo = self._get_repo(repo_id)
+        has_revisions = repo is not None and bool(repo.revisions)
         removed_locks = self._delete_tree_if_present(self._repo_lock_dir(repo_id))
+
+        if not has_revisions:
+            removed_cache = self._delete_tree_if_present(self._repo_cache_dir(repo_id))
+            return removed_locks or removed_cache
+
         removed_incomplete = False
 
         for incomplete_file in self._iter_incomplete_files(repo_id):
