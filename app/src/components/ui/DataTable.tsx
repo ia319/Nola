@@ -71,6 +71,8 @@ export function DataTable<T>({
   const selectedCount = rows.filter((row) => selectedRowIdSet.has(getRowId(row))).length
   const allRowsSelected = selectableRows > 0 && selectedCount === selectableRows
   const partiallySelected = selectedCount > 0 && selectedCount < selectableRows
+  const canToggleAllRows =
+    Boolean(selection?.onToggleAllRows) && rows.length > 0 && !isLoading && !errorState
   const columnCount = columns.length + (selection ? 1 : 0)
   const resolvedLoadingRowCount = Number.isFinite(loadingRowCount)
     ? Math.max(1, Math.floor(loadingRowCount))
@@ -109,7 +111,9 @@ export function DataTable<T>({
                       className="border-border h-4 w-4 rounded"
                       aria-label={selection.selectAllLabel ?? t('components.dataTable.selectAll')}
                       checked={allRowsSelected}
+                      disabled={!canToggleAllRows}
                       onChange={(event) => {
+                        if (!canToggleAllRows) return
                         selection.onToggleAllRows?.(event.target.checked, rows)
                       }}
                     />

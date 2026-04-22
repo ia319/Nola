@@ -228,6 +228,61 @@ describe('DataTable', () => {
     expect(onRowClick).toHaveBeenCalledWith(rows[0])
   })
 
+  it('disables select-all while no selectable body rows are rendered', () => {
+    const onToggleAllRows = vi.fn()
+    const { rerender } = render(
+      <DataTable
+        rows={[]}
+        getRowId={(row: Row) => row.id}
+        columns={[{ key: 'name', header: 'Name', cell: (row) => row.name }]}
+        selection={{
+          selectedRowIds: [],
+          onToggleRow: vi.fn(),
+          onToggleAllRows,
+          selectAllLabel: 'Select all files',
+        }}
+      />,
+    )
+
+    expect(screen.getByRole('checkbox', { name: 'Select all files' })).toBeDisabled()
+
+    rerender(
+      <DataTable
+        rows={rows}
+        getRowId={(row: Row) => row.id}
+        columns={[{ key: 'name', header: 'Name', cell: (row) => row.name }]}
+        isLoading
+        selection={{
+          selectedRowIds: [],
+          onToggleRow: vi.fn(),
+          onToggleAllRows,
+          selectAllLabel: 'Select all files',
+        }}
+      />,
+    )
+
+    expect(screen.getByRole('checkbox', { name: 'Select all files' })).toBeDisabled()
+
+    rerender(
+      <DataTable
+        rows={rows}
+        getRowId={(row: Row) => row.id}
+        columns={[{ key: 'name', header: 'Name', cell: (row) => row.name }]}
+        errorState={{ title: 'Could not load records' }}
+        selection={{
+          selectedRowIds: [],
+          onToggleRow: vi.fn(),
+          onToggleAllRows,
+          selectAllLabel: 'Select all files',
+        }}
+      />,
+    )
+
+    expect(screen.getByRole('checkbox', { name: 'Select all files' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select all files' }))
+    expect(onToggleAllRows).not.toHaveBeenCalled()
+  })
+
   it('opens clickable rows with keyboard activation', () => {
     const onRowClick = vi.fn()
 
