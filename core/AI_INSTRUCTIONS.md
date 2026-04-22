@@ -41,8 +41,22 @@ core/
 │   │       ├── payloads.py    # Shared task response payload builders
 │   │       ├── types.py       # TypedDict payload contracts
 │   │       ├── actions/       # Write-side use-cases (create/cancel/batch/delete)
+│   │       │   ├── __init__.py # Action use-case exports
+│   │       │   ├── _batch_action.py # Shared batch action executor
+│   │       │   ├── batch_cancel_tasks.py # Batch cancel use-case
+│   │       │   ├── batch_retry_tasks.py # Batch retry use-case
+│   │       │   ├── cancel_task.py # Single task cancel use-case
+│   │       │   ├── create_task.py # Task creation use-case
+│   │       │   └── delete_task_record.py # Terminal task-record deletion use-case
 │   │       ├── queries/       # Read-side use-cases (list/detail)
+│   │       │   ├── __init__.py # Query use-case exports
+│   │       │   ├── get_task.py # Task detail query use-case
+│   │       │   └── list_tasks.py # Task list query use-case
 │   │       └── exports/       # Export use-cases (single/batch)
+│   │           ├── __init__.py # Export use-case exports
+│   │           ├── batch_export_tasks.py # Batch export archive use-case
+│   │           ├── export_common.py # Shared export payload and error helpers
+│   │           └── export_task.py # Single task export use-case
 │   ├── config/                # Settings, constants, and config modules
 │   │   ├── __init__.py        # Config exports
 │   │   ├── settings.py        # Pydantic Settings (paths, limits, model)
@@ -162,11 +176,26 @@ core/
     └── test_formatters.py     # Formatter tests
 ```
 
+Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, and `.ruff_cache/` out of this tree.
+
 ### Recent Additions
 
 - `nola/common/event_bus.py`: Process-wide in-memory event bus for model-download SSE.
 - `nola/model_hub/`: Model registry, storage, downloader, and domain errors.
 - `nola/api/routes/models.py` + `nola/api/schemas/models.py`: Model management and runtime download APIs.
+- `nola/config/transcription/schema/`: Config-driven option schema for frontend controls and validation boundaries.
+- `nola/config/export/`: Export defaults, export format contracts, and filename helpers.
+- `nola/application/tasks/`: Task use-cases, payload builders, and export orchestration.
+
+### Current Backend Guardrails
+
+- Reject file deletion with `409` when any transcription task references the file.
+- Return `404` when a file row disappears between lookup and delete; do not unlink and report success.
+- Return `409` when a model download starts for an already-downloaded model.
+- Treat Hugging Face repos with revisions as `downloaded` without scanning incomplete files.
+- Remove metadata-only partial cache directories during stale artifact cleanup.
+- Keep model registry descriptions keyed by `description_key`; let the frontend localize and fall back to backend `description`.
+- Keep engine default tests config-driven; do not hardcode `small`, `default`, or device defaults.
 
 ---
 
@@ -225,7 +254,9 @@ Shared backend helper layer:
 ### nola/model_hub/
 Model lifecycle management:
 - `registry.py`: Keep the curated model registry and canonical/alias lookup helpers.
-- `storage.py`: Resolve model cache roots, inspect Hugging Face cache state, and delete full or partial cache artifacts.
+- `storage.py`: Resolve model cache roots, inspect Hugging Face cache state, short-circuit revision-backed repos as downloaded, and delete full or partial cache artifacts.
+- Treat metadata-only repo cache directories with no revisions as partial artifacts; remove them during stale-artifact cleanup.
+- Do not scan the full cache tree for incomplete files once tracked revisions exist.
 - `downloader.py`: Run subprocess-backed downloads, aggregate real byte progress and speed, and expose active download snapshots.
 - `contracts.py`: Keep shared model metadata and download/runtime value objects.
 - `errors.py`: Define model-hub domain errors for API mapping and worker startup guards.
@@ -242,8 +273,8 @@ Transcription engine layer:
 REST API layer:
 - `deps.py`: Dependency injection for database singletons plus shared model storage, downloader, and event-bus singletons.
 - `routes/config.py`: Aggregated config endpoints, transcription defaults management, and export defaults management.
-- `routes/files.py`: File upload/list/delete with validation. All endpoints use `response_model`.
-- `routes/models.py`: Model list/detail/download/cancel/delete/select/settings endpoints, SSE event stream, and active-download runtime summary.
+- `routes/files.py`: File upload/list/delete with validation. Reject file deletion with `409` when tasks still reference the file; return `404` when a concurrent delete wins after the initial lookup. All endpoints use `response_model`.
+- `routes/models.py`: Model list/detail/download/cancel/delete/select/settings endpoints, SSE event stream, active-download runtime summary, and `409` responses for both active downloads and already-downloaded models.
 - `routes/transcriptions.py`: Canonical task router composition entry. Mount read/actions/export task route modules under `/api/transcription-tasks`.
 - `routes/tasks/read.py`: Read endpoints for task list/detail; keep sync handlers for sync DB dependencies.
 - `routes/tasks/actions.py`: Mutation endpoints for create/cancel/batch/retry/delete-record.
@@ -251,7 +282,7 @@ REST API layer:
 - `routes/tasks/_errors.py`: Convert task use-case errors into HTTP exceptions.
 - `schemas/config.py`: Export defaults update request schema.
 - `schemas/files.py`: 8 Pydantic response models (`FileResponse`, `FileListResponse`, etc.)
-- `schemas/models.py`: Model management request/response models for list/detail/settings/download runtime.
+- `schemas/models.py`: Model management request/response models for list/detail/settings/download runtime. Include download conflict metadata in route OpenAPI responses.
 - `schemas/responses.py`: 7 Pydantic response models (`TaskDetailResponse`, `CreateTaskResponse`, etc.); task read responses now expose persisted `model_id` context
 - `schemas/transcriptions.py`: Request models (`TranscriptionRequest`, `BatchTaskActionRequest`, `BatchExportRequest`, `TranscriptionDefaultsUpdateRequest`) with typed `VadParametersRequest` and `extra=forbid`
 - `schemas/validators.py`: Reusable validation functions for language, task options, temperature, and nested `vad_parameters` keys
@@ -296,14 +327,14 @@ FastAPI entry point with lifespan management:
 - `PATCH /api/models/settings` - Update model directory settings
 - `GET /api/models/events` - Stream model download SSE events
 - `GET /api/models/{model_id}` - Get one model detail
-- `POST /api/models/{model_id}/download` - Start model download
+- `POST /api/models/{model_id}/download` - Start model download; return `409` when the model is already downloading or already cached
 - `POST /api/models/{model_id}/cancel` - Cancel active model download
 - `DELETE /api/models/{model_id}` - Delete local model cache
 - `POST /api/models/{model_id}/select` - Select configured model for next worker startup
 - `POST /api/files/` - Upload audio file
 - `GET /api/files/` - List all files
 - `GET /api/files/{file_id}` - Get file metadata
-- `DELETE /api/files/{file_id}` - Delete file
+- `DELETE /api/files/{file_id}` - Delete file only when no transcription task still references it
 - `GET /api/files/check-integrity` - Check database-file consistency
 - `POST /api/files/cleanup` - Remove orphan database records
 - `POST /api/transcription-tasks/` - Create transcription task
@@ -332,6 +363,7 @@ Configuration and constants:
 ### Transcription Rules
 Apply config-driven schema as the only source for frontend option metadata and task option values.
 Apply defaults precedence as `engine defaults < persisted app defaults < task overrides`.
+Derive engine default assertions from `EngineConfig`/settings in tests; do not hardcode `small`, `default`, or device defaults.
 Treat explicit `null` in `PATCH /api/config/transcription/defaults` as remove-override semantics.
 Merge nested defaults objects in PATCH flows without replacing untouched subkeys.
 Reject unknown top-level options and unknown `vad_parameters` keys at request validation with `422`.
@@ -371,7 +403,7 @@ poetry run ruff format --check nola tests
 poetry run mypy nola
 
 # Run tests
-poetry run ruff check nola tests --fix
+poetry run pytest tests -v --tb=short
 
 # Auto-fix lint issues
 poetry run ruff check nola tests --fix
@@ -403,7 +435,7 @@ poetry run python -m nola.services.worker
 
 ## Architecture
 
-```
+```text
 Client ──▶ FastAPI routes ──▶ application use-cases ──▶ SQLite DB ◀── Worker Process
                                    │                          │              │
                                    │                          │       FasterWhisperEngine
@@ -439,6 +471,25 @@ Client ──▶ FastAPI routes ──▶ application use-cases ──▶ SQLite
 | `/api/files/check-integrity` | GET | - | `IntegrityCheckResponse` |
 | `/api/files/cleanup` | POST | - | `CleanupResponse` |
 
+File deletion contract: return `409` when transcription tasks still reference the file; return `404` when the row disappears before delete finishes.
+
+### Models API
+
+| Endpoint | Method | Body/Query | Response Model |
+|----------|--------|------------|----------------|
+| `/api/models` | GET | - | `ModelListResponse` |
+| `/api/models/downloads` | GET | - | `ActiveModelDownloadsResponse` |
+| `/api/models/settings` | GET | - | `ModelSettingsResponse` |
+| `/api/models/settings` | PATCH | `ModelSettingsUpdateRequest` | `ModelSettingsResponse` |
+| `/api/models/events` | GET | SSE | model-download event stream |
+| `/api/models/{model_id}` | GET | - | `ModelDetailResponse` |
+| `/api/models/{model_id}/download` | POST | - | `ModelDownloadStartedResponse` or `409` |
+| `/api/models/{model_id}/cancel` | POST | - | `ModelCancelResponse` |
+| `/api/models/{model_id}` | DELETE | - | `ModelDeleteResponse` |
+| `/api/models/{model_id}/select` | POST | - | `ModelSelectResponse` |
+
+Model download contract: return `409` for both duplicate active downloads and already-cached models; expose both cases in OpenAPI route metadata.
+
 ### Transcription Tasks API
 
 | Endpoint | Method | Body/Query | Response Model |
@@ -457,7 +508,7 @@ Client ──▶ FastAPI routes ──▶ application use-cases ──▶ SQLite
 
 ## Task Lifecycle
 
-```
+```text
 pending ──▶ processing ──▶ completed
                 │
                 ├──▶ failed (auto-retry up to 3x)
