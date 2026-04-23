@@ -489,6 +489,28 @@ class TestConfigAPI:
             "configured_model_id": "large-v3"
         }
 
+    def test_get_session_defaults_ignores_invalid_execution_overrides(
+        self, client: TestClient
+    ) -> None:
+        """Invalid persisted execution overrides should not break reads."""
+        config_db = get_app_config_db()
+        config_db.patch_many(
+            "execution.",
+            {
+                "device": "metal",
+                "compute_type": "float32",
+            },
+        )
+
+        response = client.get("/api/config/session-defaults")
+
+        assert response.status_code == 200
+        assert response.json()["execution"] == {
+            "model_id": "small",
+            "device": settings.device,
+            "compute_type": settings.compute_type,
+        }
+
     def test_get_export_config_returns_effective_defaults(self, client: TestClient):
         """Get /api/config/export should expose export defaults for the UI."""
         response = client.get("/api/config/export")

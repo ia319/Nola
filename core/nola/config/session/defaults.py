@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal, Protocol, TypedDict, TypeVar, cast
+from typing import Protocol, TypedDict, TypeVar, cast
 
 from nola.config import settings
 from nola.config.common.types import ConfigMap
@@ -21,7 +21,8 @@ EXECUTION_CONFIG_PREFIX = "execution."
 _MODEL_ID_KEY = "configured_model_id"
 _DEVICE_KEY = "device"
 _COMPUTE_TYPE_KEY = "compute_type"
-_SessionExecutionValueField = Literal["device", "compute_type"]
+_FALLBACK_DEVICE: EngineDevice = "cpu"
+_FALLBACK_COMPUTE_TYPE: EngineComputeType = "default"
 _AllowedSessionExecutionValue = TypeVar(
     "_AllowedSessionExecutionValue",
     EngineDevice,
@@ -85,13 +86,14 @@ def _resolve_allowed_value(
     *,
     configured_value: object,
     settings_value: str,
+    fallback_value: _AllowedSessionExecutionValue,
     allowed_values: Sequence[_AllowedSessionExecutionValue],
-    field_name: _SessionExecutionValueField,
 ) -> _AllowedSessionExecutionValue:
-    value = configured_value if isinstance(configured_value, str) else settings_value
-    if value in allowed_values:
-        return cast(_AllowedSessionExecutionValue, value)
-    raise ValueError(f"Invalid session execution {field_name}: {value}")
+    if isinstance(configured_value, str) and configured_value in allowed_values:
+        return cast(_AllowedSessionExecutionValue, configured_value)
+    if settings_value in allowed_values:
+        return cast(_AllowedSessionExecutionValue, settings_value)
+    return fallback_value
 
 
 def get_session_execution_defaults(
@@ -106,14 +108,14 @@ def get_session_execution_defaults(
         device=_resolve_allowed_value(
             configured_value=execution_config.get(_DEVICE_KEY),
             settings_value=settings.device,
+            fallback_value=_FALLBACK_DEVICE,
             allowed_values=ALLOWED_ENGINE_DEVICES,
-            field_name="device",
         ),
         compute_type=_resolve_allowed_value(
             configured_value=execution_config.get(_COMPUTE_TYPE_KEY),
             settings_value=settings.compute_type,
+            fallback_value=_FALLBACK_COMPUTE_TYPE,
             allowed_values=ALLOWED_ENGINE_COMPUTE_TYPES,
-            field_name="compute_type",
         ),
     )
 
