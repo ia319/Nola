@@ -14,6 +14,9 @@ from nola.api.routes._model_helpers import (
 )
 from nola.api.schemas import (
     ExportDefaultsUpdateRequest,
+    SessionDefaultsResponse,
+    SessionDefaultsUpdateRequest,
+    SessionExecutionDefaultsResponse,
     TranscriptionDefaultsUpdateRequest,
 )
 from nola.api.schemas.models import ModelConfigResponse
@@ -27,6 +30,10 @@ from nola.config.export import (
 )
 from nola.config.export import (
     get_effective_defaults as get_effective_export_defaults,
+)
+from nola.config.session import (
+    get_session_defaults,
+    patch_session_execution_defaults,
 )
 from nola.config.transcription import (
     AppConfigResponse,
@@ -94,6 +101,38 @@ def _to_export_resolved_defaults(
 ) -> ExportResolvedDefaultsResponse:
     """Validate export defaults against the typed API response contract."""
     return ExportResolvedDefaultsResponse.model_validate(dict(defaults))
+
+
+def _build_session_defaults_response(
+    config_db: AppConfigDatabase,
+) -> SessionDefaultsResponse:
+    """Assemble the Workbench session-defaults response."""
+    defaults = get_session_defaults(config_db)
+    return SessionDefaultsResponse(
+        execution=SessionExecutionDefaultsResponse(
+            model_id=defaults.execution.model_id,
+            device=defaults.execution.device,
+            compute_type=defaults.execution.compute_type,
+        ),
+        transcription=_to_resolved_defaults(defaults.transcription),
+    )
+
+
+def _apply_transcription_defaults_patch(
+    config_db: AppConfigDatabase,
+    request: TranscriptionDefaultsUpdateRequest,
+) -> None:
+    """Apply existing transcription-defaults PATCH semantics."""
+    patch_values = request.get_options_dict()
+
+    if patch_values:
+        # This PATCH flow is a read-modify-write sequence.
+        # Concurrent PATCH requests can overwrite each other's updates because
+        # the merge happens in application code, not inside one locked SQL step.
+        # That tradeoff is acceptable for the current low-traffic config surface.
+        current_overrides = config_db.get_all("transcription.")
+        next_overrides = apply_override_patch(current_overrides, patch_values)
+        config_db.replace_many("transcription.", next_overrides)
 
 
 def _build_model_config(config_db: AppConfigDatabase) -> ModelConfigResponse:
@@ -184,20 +223,54 @@ def patch_transcription_defaults(
 ) -> TranscriptionDefaultsPatchResponse:
     """Persist a partial transcription-defaults update."""
     config_db = get_app_config_db()
-    patch_values = request.get_options_dict()
-
-    if patch_values:
-        # This PATCH flow is a read-modify-write sequence.
-        # Concurrent PATCH requests can overwrite each other's updates because
-        # the merge happens in application code, not inside one locked SQL step.
-        # That tradeoff is acceptable for the current low-traffic config surface.
-        current_overrides = config_db.get_all("transcription.")
-        next_overrides = apply_override_patch(current_overrides, patch_values)
-        config_db.replace_many("transcription.", next_overrides)
+    _apply_transcription_defaults_patch(config_db, request)
 
     return TranscriptionDefaultsPatchResponse(
         defaults=_to_resolved_defaults(get_effective_transcription_defaults(config_db))
     )
+
+
+@router.get(
+    "/session-defaults",
+    summary="Get Workbench session defaults",
+    description=(
+        "Return execution defaults and transcription defaults used when creating "
+        "new Workbench transcription tasks."
+    ),
+    response_model=SessionDefaultsResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_session_default_config() -> SessionDefaultsResponse:
+    """Return defaults for Workbench session creation."""
+    return _build_session_defaults_response(get_app_config_db())
+
+
+@router.patch(
+    "/session-defaults",
+    summary="Update Workbench session defaults",
+    description=(
+        "Apply a partial update to execution defaults and transcription defaults. "
+        "Explicit null removes execution overrides and falls back to settings."
+    ),
+    response_model=SessionDefaultsResponse,
+    status_code=status.HTTP_200_OK,
+)
+def patch_session_default_config(
+    request: SessionDefaultsUpdateRequest,
+) -> SessionDefaultsResponse:
+    """Persist partial session-defaults updates."""
+    config_db = get_app_config_db()
+
+    if request.execution is not None:
+        patch_session_execution_defaults(
+            config_db,
+            request.execution.get_options_dict(),
+        )
+
+    if request.transcription is not None:
+        _apply_transcription_defaults_patch(config_db, request.transcription)
+
+    return _build_session_defaults_response(config_db)
 
 
 @router.delete(

@@ -310,6 +310,185 @@ class TestConfigAPI:
         assert defaults["beam_size"] == 5
         assert defaults["vad_filter"] is False
 
+    def test_get_session_defaults_returns_settings_fallback(
+        self, client: TestClient
+    ) -> None:
+        """Session defaults should fall back to settings without overrides."""
+        response = client.get("/api/config/session-defaults")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["execution"] == {
+            "model_id": "small",
+            "device": settings.device,
+            "compute_type": settings.compute_type,
+        }
+        assert data["transcription"]["beam_size"] == 5
+        assert data["transcription"]["vad_parameters"]["threshold"] == 0.5
+
+    def test_patch_session_defaults_execution_only_preserves_transcription(
+        self, client: TestClient
+    ) -> None:
+        """Execution-only PATCH should not clear transcription defaults."""
+        transcription_response = client.patch(
+            "/api/config/transcription/defaults",
+            json={"beam_size": 3},
+        )
+        assert transcription_response.status_code == 200
+
+        response = client.patch(
+            "/api/config/session-defaults",
+            json={
+                "execution": {
+                    "model_id": "large-v3",
+                    "device": "cuda",
+                    "compute_type": "float16",
+                }
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["execution"] == {
+            "model_id": "large-v3",
+            "device": "cuda",
+            "compute_type": "float16",
+        }
+        assert data["transcription"]["beam_size"] == 3
+
+    def test_patch_session_defaults_transcription_only_preserves_execution(
+        self, client: TestClient
+    ) -> None:
+        """Transcription-only PATCH should not clear execution defaults."""
+        execution_response = client.patch(
+            "/api/config/session-defaults",
+            json={
+                "execution": {
+                    "model_id": "medium",
+                    "device": "cuda",
+                    "compute_type": "float16",
+                }
+            },
+        )
+        assert execution_response.status_code == 200
+
+        response = client.patch(
+            "/api/config/session-defaults",
+            json={"transcription": {"beam_size": 7}},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["execution"] == {
+            "model_id": "medium",
+            "device": "cuda",
+            "compute_type": "float16",
+        }
+        assert data["transcription"]["beam_size"] == 7
+
+    def test_patch_session_defaults_clears_execution_with_null(
+        self, client: TestClient
+    ) -> None:
+        """Explicit null should clear execution overrides."""
+        precondition = client.patch(
+            "/api/config/session-defaults",
+            json={
+                "execution": {
+                    "model_id": "medium",
+                    "device": "cuda",
+                    "compute_type": "float16",
+                }
+            },
+        )
+        assert precondition.status_code == 200
+
+        response = client.patch(
+            "/api/config/session-defaults",
+            json={
+                "execution": {
+                    "model_id": None,
+                    "device": None,
+                    "compute_type": None,
+                }
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["execution"] == {
+            "model_id": "small",
+            "device": settings.device,
+            "compute_type": settings.compute_type,
+        }
+        assert get_app_config_db().get_all("model.") == {}
+        assert get_app_config_db().get_all("execution.") == {}
+
+    def test_patch_session_defaults_keeps_unset_execution_fields(
+        self, client: TestClient
+    ) -> None:
+        """Missing execution fields should not clear existing overrides."""
+        precondition = client.patch(
+            "/api/config/session-defaults",
+            json={
+                "execution": {
+                    "model_id": "medium",
+                    "device": "cuda",
+                    "compute_type": "float16",
+                }
+            },
+        )
+        assert precondition.status_code == 200
+
+        response = client.patch(
+            "/api/config/session-defaults",
+            json={"execution": {"device": "cpu"}},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["execution"] == {
+            "model_id": "medium",
+            "device": "cpu",
+            "compute_type": "float16",
+        }
+
+    def test_patch_session_defaults_rejects_invalid_execution_values(
+        self, client: TestClient
+    ) -> None:
+        """Invalid execution device and compute type should fail validation."""
+        device_response = client.patch(
+            "/api/config/session-defaults",
+            json={"execution": {"device": "metal"}},
+        )
+        compute_response = client.patch(
+            "/api/config/session-defaults",
+            json={"execution": {"compute_type": "float32"}},
+        )
+
+        assert device_response.status_code == 422
+        assert compute_response.status_code == 422
+        assert any(
+            item.get("loc", [None])[-1] == "device"
+            for item in device_response.json()["detail"]
+        )
+        assert any(
+            item.get("loc", [None])[-1] == "compute_type"
+            for item in compute_response.json()["detail"]
+        )
+
+    def test_patch_session_defaults_canonicalizes_model_alias(
+        self, client: TestClient
+    ) -> None:
+        """Execution model aliases should be stored as canonical ids."""
+        response = client.patch(
+            "/api/config/session-defaults",
+            json={"execution": {"model_id": "large"}},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["execution"]["model_id"] == "large-v3"
+        assert get_app_config_db().get_all("model.") == {
+            "configured_model_id": "large-v3"
+        }
+
     def test_get_export_config_returns_effective_defaults(self, client: TestClient):
         """Get /api/config/export should expose export defaults for the UI."""
         response = client.get("/api/config/export")

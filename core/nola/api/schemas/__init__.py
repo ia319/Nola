@@ -1,6 +1,12 @@
 """API schemas package."""
 
-from nola.api.schemas.config import ExportDefaultsUpdateRequest
+from nola.api.schemas.config import (
+    ExportDefaultsUpdateRequest,
+    SessionDefaultsResponse,
+    SessionDefaultsUpdateRequest,
+    SessionExecutionDefaultsResponse,
+    SessionExecutionDefaultsUpdateRequest,
+)
 from nola.api.schemas.files import (
     CleanupResponse,
     DeleteResponse,
@@ -51,6 +57,10 @@ __all__ = [
     "MissingFileInfo",
     "SavedExportResponse",
     "SegmentResponse",
+    "SessionDefaultsResponse",
+    "SessionDefaultsUpdateRequest",
+    "SessionExecutionDefaultsResponse",
+    "SessionExecutionDefaultsUpdateRequest",
     "TaskDetailResponse",
     "TaskListResponse",
     "TaskSummaryResponse",
