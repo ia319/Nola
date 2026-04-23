@@ -4,8 +4,18 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Final, Literal, TypeAlias
 
 from nola.config import settings
+
+EngineDevice: TypeAlias = Literal["auto", "cpu", "cuda"]
+EngineComputeType: TypeAlias = Literal["default", "float16", "int8"]
+ALLOWED_ENGINE_DEVICES: Final[tuple[EngineDevice, ...]] = ("auto", "cpu", "cuda")
+ALLOWED_ENGINE_COMPUTE_TYPES: Final[tuple[EngineComputeType, ...]] = (
+    "default",
+    "float16",
+    "int8",
+)
 
 # Progress callback type: receives progress percentage (0-100)
 ProgressCallback = Callable[[float], None]
