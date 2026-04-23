@@ -59,12 +59,6 @@ def _require_allowed(
 
 def _resolve_model_id(raw_model_id: str, model_resolver: ModelIdResolver) -> str:
     resolved = model_resolver(raw_model_id)
-    if resolved is None:
-        raise TaskUseCaseError(
-            status_code=422,
-            detail=f"Invalid task execution model_id: {raw_model_id}",
-        )
-
     if not resolved:
         raise TaskUseCaseError(
             status_code=422,
