@@ -8,10 +8,6 @@ from typing import Literal, Protocol, TypedDict, TypeVar, cast
 
 from nola.config import settings
 from nola.config.common.types import ConfigMap
-from nola.config.transcription.defaults import (
-    SerializedDefaultValue,
-    get_effective_defaults,
-)
 from nola.engines.base import (
     ALLOWED_ENGINE_COMPUTE_TYPES,
     ALLOWED_ENGINE_DEVICES,
@@ -69,7 +65,7 @@ class SessionDefaults:
     """Represent resolved session defaults for Workbench flows."""
 
     execution: SessionExecutionDefaults
-    transcription: dict[str, SerializedDefaultValue]
+    transcription: ConfigMap
 
 
 def _canonicalize_model_id(raw_model_id: str) -> str:
@@ -124,6 +120,8 @@ def get_session_execution_defaults(
 
 def get_session_defaults(config_db: SupportsSessionDefaultsRead) -> SessionDefaults:
     """Return execution and transcription defaults for session creation."""
+    from nola.config.transcription.defaults import get_effective_defaults
+
     return SessionDefaults(
         execution=get_session_execution_defaults(config_db),
         transcription=get_effective_defaults(config_db),
