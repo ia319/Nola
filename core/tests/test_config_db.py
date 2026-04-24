@@ -174,3 +174,59 @@ class TestAppConfigDatabase:
         assert set(touched) == {"export.format", "export.include_timestamps"}
         assert store.get_all("export.") == {"format": "vtt"}
         assert store.get_all("ui.") == {"language": "en"}
+
+    def test_patch_many_prefixes_applies_updates_across_prefixes(self, config_db):
+        """patch_many_prefixes() should patch related prefixes together."""
+        store, _ = config_db
+
+        store.set_many("ui.", {"language": "en"})
+
+        touched = store.patch_many_prefixes(
+            {
+                "model.": {"configured_model_id": "medium"},
+                "execution.": {
+                    "device": "cuda",
+                    "compute_type": "float16",
+                },
+            }
+        )
+
+        assert set(touched) == {
+            "model.configured_model_id",
+            "execution.device",
+            "execution.compute_type",
+        }
+        assert store.get_all("model.") == {"configured_model_id": "medium"}
+        assert store.get_all("execution.") == {
+            "device": "cuda",
+            "compute_type": "float16",
+        }
+        assert store.get_all("ui.") == {"language": "en"}
+
+    def test_patch_many_prefixes_rolls_back_on_error(self, config_db):
+        """patch_many_prefixes() should leave all prefixes unchanged on failure."""
+        store, db_path = config_db
+
+        store.set_many("model.", {"configured_model_id": "small"})
+        store.set_many("execution.", {"device": "cpu"})
+        with closing(sqlite3.connect(db_path)) as conn:
+            conn.execute("""
+                CREATE TRIGGER fail_execution_device_update
+                BEFORE UPDATE ON app_config
+                WHEN NEW.key = 'execution.device'
+                BEGIN
+                    SELECT RAISE(ABORT, 'forced rollback');
+                END
+            """)
+            conn.commit()
+
+        with pytest.raises(sqlite3.IntegrityError, match="forced rollback"):
+            store.patch_many_prefixes(
+                {
+                    "model.": {"configured_model_id": "medium"},
+                    "execution.": {"device": "cuda"},
+                }
+            )
+
+        assert store.get_all("model.") == {"configured_model_id": "small"}
+        assert store.get_all("execution.") == {"device": "cpu"}
