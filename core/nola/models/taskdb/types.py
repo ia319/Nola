@@ -12,6 +12,8 @@ class TaskRowRaw(TypedDict):
     id: str
     file_id: str
     model_id: str | None
+    engine_device: str | None
+    engine_compute_type: str | None
     filename: NotRequired[str | None]
     status: str
     priority: int
@@ -36,6 +38,8 @@ class TaskRow(TypedDict):
     id: str
     file_id: str
     model_id: str | None
+    engine_device: str | None
+    engine_compute_type: str | None
     filename: NotRequired[str | None]
     status: str
     priority: int

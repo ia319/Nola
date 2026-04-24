@@ -106,17 +106,27 @@ def test_task_store_get_task_drops_invalid_json_shapes(task_repositories):
     assert task["options"] is None
 
 
-def test_task_store_preserves_model_id(task_repositories):
-    """Queue and store layers should keep one reserved task model id."""
+def test_task_store_preserves_execution_config(task_repositories):
+    """Queue and store layers should keep task execution config values."""
     file_db, queue_repo, store_repo = task_repositories
 
     file_db.create_file("file-001", "audio.wav", "/tmp/audio.wav", 1024)
-    queue_repo.enqueue("task-001", "file-001", model_id="small")
+    queue_repo.enqueue(
+        "task-001",
+        "file-001",
+        model_id="small",
+        engine_device="cuda",
+        engine_compute_type="float16",
+    )
 
     claimed = queue_repo.dequeue("worker-001")
     stored = store_repo.get_task("task-001")
 
     assert claimed is not None
     assert claimed["model_id"] == "small"
+    assert claimed["engine_device"] == "cuda"
+    assert claimed["engine_compute_type"] == "float16"
     assert stored is not None
     assert stored["model_id"] == "small"
+    assert stored["engine_device"] == "cuda"
+    assert stored["engine_compute_type"] == "float16"

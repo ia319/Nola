@@ -23,6 +23,8 @@ class TaskQueueRepository(TaskRepositoryBase):
         max_retries: int = 3,
         options: dict[str, Any] | None = None,
         model_id: str | None = None,
+        engine_device: str | None = None,
+        engine_compute_type: str | None = None,
     ) -> None:
         """Add task to queue."""
         with closing(self._connect()) as conn:
@@ -31,8 +33,8 @@ class TaskQueueRepository(TaskRepositoryBase):
                     """
                     INSERT INTO transcription_tasks
                     (id, file_id, status, priority, max_retries, options,
-                     model_id, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                     model_id, engine_device, engine_compute_type, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         task_id,
@@ -42,6 +44,8 @@ class TaskQueueRepository(TaskRepositoryBase):
                         max_retries,
                         json.dumps(options) if options else None,
                         model_id,
+                        engine_device,
+                        engine_compute_type,
                         datetime.now().isoformat(),
                     ),
                 )

@@ -50,6 +50,8 @@ class TaskDatabase:
         max_retries: int = 3,
         options: dict[str, Any] | None = None,
         model_id: str | None = None,
+        engine_device: str | None = None,
+        engine_compute_type: str | None = None,
     ) -> None:
         """Add task to queue."""
         self._queue.enqueue(
@@ -59,6 +61,8 @@ class TaskDatabase:
             max_retries=max_retries,
             options=options,
             model_id=model_id,
+            engine_device=engine_device,
+            engine_compute_type=engine_compute_type,
         )
 
     def dequeue(self, worker_id: str) -> TaskRowRaw | None:
