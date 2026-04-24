@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Protocol, TypedDict, TypeVar, cast
 
@@ -23,8 +23,8 @@ _DEVICE_KEY = "device"
 _COMPUTE_TYPE_KEY = "compute_type"
 _FALLBACK_DEVICE: EngineDevice = "cpu"
 _FALLBACK_COMPUTE_TYPE: EngineComputeType = "default"
-_AllowedSessionExecutionValue = TypeVar(
-    "_AllowedSessionExecutionValue",
+_EngineOptionValue = TypeVar(
+    "_EngineOptionValue",
     EngineDevice,
     EngineComputeType,
 )
@@ -37,19 +37,22 @@ class SupportsSessionDefaultsRead(Protocol):
         """Return all config values matching the provided prefix."""
 
 
-class SupportsSessionDefaultsWrite(SupportsSessionDefaultsRead, Protocol):
+class SupportsSessionDefaultsWrite(Protocol):
     """Expose config writes required by session defaults."""
 
-    def patch_many(self, prefix: str, values: ConfigMap) -> list[str]:
-        """Patch config values matching the provided prefix."""
+    def patch_many_prefixes(
+        self,
+        patches_by_prefix: Mapping[str, ConfigMap],
+    ) -> list[str]:
+        """Patch config values across prefixes in one transaction."""
 
 
 class SessionExecutionDefaultsPatch(TypedDict, total=False):
     """Partial update payload for execution defaults."""
 
     model_id: str | None
-    device: EngineDevice | None
-    compute_type: EngineComputeType | None
+    device: str | None
+    compute_type: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,17 +85,17 @@ def _resolve_model_id(configured_model_id: object) -> str:
     return _canonicalize_model_id(settings.model_size)
 
 
-def _resolve_allowed_value(
+def _resolve_engine_option_value(
     *,
     configured_value: object,
     settings_value: str,
-    fallback_value: _AllowedSessionExecutionValue,
-    allowed_values: Sequence[_AllowedSessionExecutionValue],
-) -> _AllowedSessionExecutionValue:
+    fallback_value: _EngineOptionValue,
+    allowed_values: Sequence[_EngineOptionValue],
+) -> _EngineOptionValue:
     if isinstance(configured_value, str) and configured_value in allowed_values:
-        return cast(_AllowedSessionExecutionValue, configured_value)
+        return cast(_EngineOptionValue, configured_value)
     if settings_value in allowed_values:
-        return cast(_AllowedSessionExecutionValue, settings_value)
+        return cast(_EngineOptionValue, settings_value)
     return fallback_value
 
 
@@ -105,13 +108,13 @@ def get_session_execution_defaults(
 
     return SessionExecutionDefaults(
         model_id=_resolve_model_id(model_config.get(_MODEL_ID_KEY)),
-        device=_resolve_allowed_value(
+        device=_resolve_engine_option_value(
             configured_value=execution_config.get(_DEVICE_KEY),
             settings_value=settings.device,
             fallback_value=_FALLBACK_DEVICE,
             allowed_values=ALLOWED_ENGINE_DEVICES,
         ),
-        compute_type=_resolve_allowed_value(
+        compute_type=_resolve_engine_option_value(
             configured_value=execution_config.get(_COMPUTE_TYPE_KEY),
             settings_value=settings.compute_type,
             fallback_value=_FALLBACK_COMPUTE_TYPE,
@@ -137,6 +140,19 @@ def _require_model_id(raw_model_id: str) -> str:
     return model.model_id
 
 
+def _require_engine_option_value(
+    raw_value: str | None,
+    *,
+    allowed_values: Sequence[_EngineOptionValue],
+    field_name: str,
+) -> _EngineOptionValue | None:
+    if raw_value is None:
+        return None
+    if raw_value in allowed_values:
+        return cast(_EngineOptionValue, raw_value)
+    raise ValueError(f"Invalid session execution {field_name}: {raw_value}")
+
+
 def patch_session_execution_defaults(
     config_db: SupportsSessionDefaultsWrite,
     patch_values: SessionExecutionDefaultsPatch,
@@ -152,13 +168,23 @@ def patch_session_execution_defaults(
         )
 
     if "device" in patch_values:
-        execution_patch[_DEVICE_KEY] = patch_values["device"]
+        execution_patch[_DEVICE_KEY] = _require_engine_option_value(
+            patch_values["device"],
+            allowed_values=ALLOWED_ENGINE_DEVICES,
+            field_name=_DEVICE_KEY,
+        )
 
     if "compute_type" in patch_values:
-        execution_patch[_COMPUTE_TYPE_KEY] = patch_values["compute_type"]
+        execution_patch[_COMPUTE_TYPE_KEY] = _require_engine_option_value(
+            patch_values["compute_type"],
+            allowed_values=ALLOWED_ENGINE_COMPUTE_TYPES,
+            field_name=_COMPUTE_TYPE_KEY,
+        )
 
+    patches_by_prefix: dict[str, ConfigMap] = {}
     if model_patch:
-        config_db.patch_many(MODEL_CONFIG_PREFIX, model_patch)
-
+        patches_by_prefix[MODEL_CONFIG_PREFIX] = model_patch
     if execution_patch:
-        config_db.patch_many(EXECUTION_CONFIG_PREFIX, execution_patch)
+        patches_by_prefix[EXECUTION_CONFIG_PREFIX] = execution_patch
+    if patches_by_prefix:
+        config_db.patch_many_prefixes(patches_by_prefix)

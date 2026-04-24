@@ -93,12 +93,9 @@ class SessionExecutionDefaultsUpdateRequest(BaseModel):
         if "model_id" in raw_values:
             patch["model_id"] = cast(str | None, raw_values["model_id"])
         if "device" in raw_values:
-            patch["device"] = cast(EngineDevice | None, raw_values["device"])
+            patch["device"] = cast(str | None, raw_values["device"])
         if "compute_type" in raw_values:
-            patch["compute_type"] = cast(
-                EngineComputeType | None,
-                raw_values["compute_type"],
-            )
+            patch["compute_type"] = cast(str | None, raw_values["compute_type"])
 
         return patch
 
