@@ -5,7 +5,11 @@ from collections.abc import Callable
 
 from nola.application.tasks.contracts import SupportsFileQueries, SupportsTaskMutations
 from nola.application.tasks.errors import TaskUseCaseError
-from nola.application.tasks.types import CreateTaskPayload, TaskOptions
+from nola.application.tasks.types import (
+    CreateTaskPayload,
+    ResolvedTaskExecutionConfig,
+    TaskOptions,
+)
 
 
 def create_task(
@@ -14,7 +18,7 @@ def create_task(
     task_store: SupportsTaskMutations,
     file_id: str,
     options: TaskOptions | None,
-    model_id: str | None = None,
+    execution_config: ResolvedTaskExecutionConfig,
     task_id_factory: Callable[[], str] | None = None,
 ) -> CreateTaskPayload:
     """Create a pending transcription task for an uploaded file."""
@@ -28,7 +32,9 @@ def create_task(
         task_id=next_task_id,
         file_id=file_id,
         options=resolved_options,
-        model_id=model_id,
+        model_id=execution_config["model_id"],
+        engine_device=execution_config["engine_device"],
+        engine_compute_type=execution_config["engine_compute_type"],
     )
 
     return {
@@ -37,5 +43,5 @@ def create_task(
         "filename": file_row["filename"],
         "status": "pending",
         "options": resolved_options,
-        "model_id": model_id,
+        "model_id": execution_config["model_id"],
     }
