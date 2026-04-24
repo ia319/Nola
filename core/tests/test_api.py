@@ -293,8 +293,8 @@ class TestTranscriptionsAPI:
         assert data["tasks"][0]["task_id"] == "task-list-1"
         assert data["tasks"][0]["model_id"] == "small"
 
-    def test_create_task_persists_canonical_reserved_model_id(self, client: TestClient):
-        """Task creation should store one canonical task-level model id."""
+    def test_create_task_persists_execution_config(self, client: TestClient):
+        """Task creation should store canonical task execution config."""
         file_db = get_file_db()
         task_db = get_task_db()
         file_db.create_file(
@@ -306,16 +306,55 @@ class TestTranscriptionsAPI:
 
         response = client.post(
             "/api/transcription-tasks",
-            json={"file_id": "task-model-file", "model_id": "large"},
+            json={
+                "file_id": "task-model-file",
+                "model_id": "large",
+                "engine": {"device": "cuda", "compute_type": "float16"},
+                "language": "en",
+            },
         )
 
         assert response.status_code == 200
         data = response.json()
         assert data["model_id"] == "large-v3"
+        assert data["options"] == {"language": "en"}
 
         stored = task_db.get_task(data["task_id"])
         assert stored is not None
         assert stored["model_id"] == "large-v3"
+        assert stored["engine_device"] == "cuda"
+        assert stored["engine_compute_type"] == "float16"
+        assert stored["options"] == {"language": "en"}
+
+    def test_create_task_persists_session_execution_defaults(self, client: TestClient):
+        """Task creation should materialize execution defaults when omitted."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        config_db = get_app_config_db()
+        config_db.set_many("model.", {"configured_model_id": "medium"})
+        config_db.set_many(
+            "execution.",
+            {"device": "cuda", "compute_type": "int8"},
+        )
+        file_db.create_file(
+            file_id="task-default-engine-file",
+            filename="task-default-engine.mp3",
+            path="/tmp/task-default-engine.mp3",
+            size=1000,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks",
+            json={"file_id": "task-default-engine-file"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        stored = task_db.get_task(data["task_id"])
+        assert stored is not None
+        assert stored["model_id"] == "medium"
+        assert stored["engine_device"] == "cuda"
+        assert stored["engine_compute_type"] == "int8"
 
 
 class TestModelsAPI:

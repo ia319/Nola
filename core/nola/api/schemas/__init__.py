@@ -33,6 +33,7 @@ from nola.api.schemas.responses import (
 from nola.api.schemas.transcriptions import (
     BatchExportRequest,
     BatchTaskActionRequest,
+    TaskEngineRequest,
     TranscriptionDefaultsUpdateRequest,
     TranscriptionRequest,
 )
@@ -62,6 +63,7 @@ __all__ = [
     "SessionExecutionDefaultsResponse",
     "SessionExecutionDefaultsUpdateRequest",
     "TaskDetailResponse",
+    "TaskEngineRequest",
     "TaskListResponse",
     "TaskSummaryResponse",
     "TranscriptionDefaultsUpdateRequest",
