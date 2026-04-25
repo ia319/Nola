@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Final, Literal, TypeAlias
+from typing import Final, Literal, TypeAlias, cast
 
 from nola.config import settings
 
@@ -16,9 +16,23 @@ ALLOWED_ENGINE_COMPUTE_TYPES: Final[tuple[EngineComputeType, ...]] = (
     "float16",
     "int8",
 )
+DEFAULT_ENGINE_DEVICE: Final[EngineDevice] = "auto"
+DEFAULT_ENGINE_COMPUTE_TYPE: Final[EngineComputeType] = "default"
 
 # Progress callback type: receives progress percentage (0-100)
 ProgressCallback = Callable[[float], None]
+
+
+def _default_engine_device() -> EngineDevice:
+    if settings.device in ALLOWED_ENGINE_DEVICES:
+        return cast(EngineDevice, settings.device)
+    return DEFAULT_ENGINE_DEVICE
+
+
+def _default_engine_compute_type() -> EngineComputeType:
+    if settings.compute_type in ALLOWED_ENGINE_COMPUTE_TYPES:
+        return cast(EngineComputeType, settings.compute_type)
+    return DEFAULT_ENGINE_COMPUTE_TYPE
 
 
 @dataclass
@@ -35,8 +49,10 @@ class EngineConfig:
     """Engine initialization configuration."""
 
     model_size: str = field(default_factory=lambda: settings.model_size)
-    device: str = field(default_factory=lambda: settings.device)
-    compute_type: str = field(default_factory=lambda: settings.compute_type)
+    device: EngineDevice = field(default_factory=_default_engine_device)
+    compute_type: EngineComputeType = field(
+        default_factory=_default_engine_compute_type
+    )
     download_root: Path | None = None
 
 
