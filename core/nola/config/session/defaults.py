@@ -11,6 +11,8 @@ from nola.config.common.types import ConfigMap
 from nola.engines.base import (
     ALLOWED_ENGINE_COMPUTE_TYPES,
     ALLOWED_ENGINE_DEVICES,
+    DEFAULT_ENGINE_COMPUTE_TYPE,
+    DEFAULT_ENGINE_DEVICE,
     EngineComputeType,
     EngineDevice,
 )
@@ -21,8 +23,6 @@ EXECUTION_CONFIG_PREFIX = "execution."
 _MODEL_ID_KEY = "configured_model_id"
 _DEVICE_KEY = "device"
 _COMPUTE_TYPE_KEY = "compute_type"
-_FALLBACK_DEVICE: EngineDevice = "cpu"
-_FALLBACK_COMPUTE_TYPE: EngineComputeType = "default"
 _EngineOptionValue = TypeVar(
     "_EngineOptionValue",
     EngineDevice,
@@ -111,13 +111,13 @@ def get_session_execution_defaults(
         device=_resolve_engine_option_value(
             configured_value=execution_config.get(_DEVICE_KEY),
             settings_value=settings.device,
-            fallback_value=_FALLBACK_DEVICE,
+            fallback_value=DEFAULT_ENGINE_DEVICE,
             allowed_values=ALLOWED_ENGINE_DEVICES,
         ),
         compute_type=_resolve_engine_option_value(
             configured_value=execution_config.get(_COMPUTE_TYPE_KEY),
             settings_value=settings.compute_type,
-            fallback_value=_FALLBACK_COMPUTE_TYPE,
+            fallback_value=DEFAULT_ENGINE_COMPUTE_TYPE,
             allowed_values=ALLOWED_ENGINE_COMPUTE_TYPES,
         ),
     )
