@@ -57,7 +57,7 @@ class SessionExecutionDefaultsUpdateRequest(BaseModel):
         json_schema_extra={
             "example": {
                 "model_id": "small",
-                "device": "cpu",
+                "device": "auto",
                 "compute_type": "default",
             }
         },
@@ -109,7 +109,7 @@ class SessionDefaultsUpdateRequest(BaseModel):
             "example": {
                 "execution": {
                     "model_id": "small",
-                    "device": "cpu",
+                    "device": "auto",
                     "compute_type": "default",
                 },
                 "transcription": {

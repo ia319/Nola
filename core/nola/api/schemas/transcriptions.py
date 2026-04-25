@@ -29,7 +29,7 @@ def _create_task_example() -> dict[str, Any]:
     return {
         "file_id": "uploaded-file-id",
         "model_id": "small",
-        "engine": {"device": "cpu", "compute_type": "default"},
+        "engine": {"device": "auto", "compute_type": "default"},
         **asdict(_ENGINE_DEFAULTS),
     }
 
