@@ -9,8 +9,10 @@ from fastapi import APIRouter, Response, status
 from nola.api.deps import get_app_config_db
 from nola.api.routes._model_helpers import (
     canonicalize_model_id,
+    canonicalize_optional_engine_compute_type,
+    canonicalize_optional_engine_device,
     canonicalize_optional_model_id,
-    compute_restart_required,
+    legacy_restart_required,
 )
 from nola.api.schemas import (
     ExportDefaultsUpdateRequest,
@@ -51,7 +53,13 @@ from nola.config.transcription import (
 from nola.config.transcription import (
     get_effective_defaults as get_effective_transcription_defaults,
 )
-from nola.model_hub import get_model, resolve_model_dir
+from nola.engines.base import (
+    DEFAULT_ENGINE_COMPUTE_TYPE,
+    DEFAULT_ENGINE_DEVICE,
+    EngineComputeType,
+    EngineDevice,
+)
+from nola.model_hub import get_model
 from nola.models import AppConfigDatabase
 
 router = APIRouter(prefix="/api/config", tags=["config"])
@@ -79,12 +87,37 @@ def _resolve_configured_model_id(config_db: AppConfigDatabase) -> str:
     return canonicalize_model_id(settings.model_size)
 
 
-def _build_engine_config(runtime_model_id: str) -> EngineConfigResponse:
+def _resolve_runtime_device(worker_state: Mapping[str, object]) -> EngineDevice:
+    """Return the last loaded device, falling back to settings."""
+    return (
+        canonicalize_optional_engine_device(worker_state.get("last_loaded_device"))
+        or canonicalize_optional_engine_device(settings.device)
+        or DEFAULT_ENGINE_DEVICE
+    )
+
+
+def _resolve_runtime_compute_type(
+    worker_state: Mapping[str, object],
+) -> EngineComputeType:
+    """Return the last loaded compute type, falling back to settings."""
+    return (
+        canonicalize_optional_engine_compute_type(
+            worker_state.get("last_loaded_compute_type")
+        )
+        or canonicalize_optional_engine_compute_type(settings.compute_type)
+        or DEFAULT_ENGINE_COMPUTE_TYPE
+    )
+
+
+def _build_engine_config(
+    runtime_model_id: str,
+    worker_state: Mapping[str, object],
+) -> EngineConfigResponse:
     """Project settings into the public engine-config response."""
     return EngineConfigResponse(
         model_size=runtime_model_id,
-        device=settings.device,
-        compute_type=settings.compute_type,
+        device=_resolve_runtime_device(worker_state),
+        compute_type=_resolve_runtime_compute_type(worker_state),
         is_multilingual=is_multilingual(runtime_model_id),
     )
 
@@ -141,29 +174,28 @@ def _build_model_config(config_db: AppConfigDatabase) -> ModelConfigResponse:
     worker_state = config_db.get_all("worker.")
     last_loaded = worker_state.get("last_loaded_model_id")
     last_loaded_model_id = canonicalize_optional_model_id(last_loaded)
-
-    model_config = config_db.get_all("model.")
-    db_model_dir = model_config.get("configured_model_dir")
-    effective_model_dir, _ = resolve_model_dir(
-        settings.model_dir,
-        db_model_dir if isinstance(db_model_dir, str) else None,
-        settings.default_model_dir,
+    last_loaded_device = canonicalize_optional_engine_device(
+        worker_state.get("last_loaded_device")
+    )
+    last_loaded_compute_type = canonicalize_optional_engine_compute_type(
+        worker_state.get("last_loaded_compute_type")
     )
 
     return ModelConfigResponse(
         configured_model_id=configured_model_id,
         last_loaded_model_id=last_loaded_model_id,
-        restart_required=compute_restart_required(
-            configured_model_id, effective_model_dir, worker_state
-        ),
+        last_loaded_device=last_loaded_device,
+        last_loaded_compute_type=last_loaded_compute_type,
+        restart_required=legacy_restart_required(),
     )
 
 
 def _build_app_config_response(config_db: AppConfigDatabase) -> AppConfigResponse:
     """Assemble the aggregated configuration payload used by the frontend."""
+    worker_state = config_db.get_all("worker.")
     runtime_model_id = _resolve_runtime_model_id(config_db)
     return AppConfigResponse(
-        engine=_build_engine_config(runtime_model_id),
+        engine=_build_engine_config(runtime_model_id, worker_state),
         transcription=TranscriptionConfigResponse(
             defaults=_to_resolved_defaults(
                 get_effective_transcription_defaults(config_db)

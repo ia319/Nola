@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from nola.engines.base import EngineComputeType, EngineDevice
+
 ModelStatusLiteral = Literal[
     "not_downloaded",
     "downloading",
@@ -114,6 +116,8 @@ class ModelSettingsResponse(BaseModel):
 
     configured_model_id: str | None = None
     last_loaded_model_id: str | None = None
+    last_loaded_device: EngineDevice | None = None
+    last_loaded_compute_type: EngineComputeType | None = None
     configured_model_dir: str | None = None
     effective_model_dir: str
     override_source: ModelDirSourceLiteral
@@ -140,4 +144,6 @@ class ModelConfigResponse(BaseModel):
 
     configured_model_id: str | None = None
     last_loaded_model_id: str | None = None
+    last_loaded_device: EngineDevice | None = None
+    last_loaded_compute_type: EngineComputeType | None = None
     restart_required: bool = False

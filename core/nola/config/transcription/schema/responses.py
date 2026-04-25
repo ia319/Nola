@@ -11,14 +11,15 @@ from nola.config.constants import ALLOWED_AUDIO_TYPES, ALLOWED_EXTENSIONS
 from nola.config.settings import settings
 from nola.config.transcription.languages import LanguageOptionSchema
 from nola.config.transcription.schema.models import OptionGroupSchema
+from nola.engines.base import EngineComputeType, EngineDevice
 
 
 class EngineConfigResponse(BaseModel):
     """Expose the active engine configuration."""
 
     model_size: str
-    device: str
-    compute_type: str
+    device: EngineDevice
+    compute_type: EngineComputeType
     is_multilingual: bool
 
 

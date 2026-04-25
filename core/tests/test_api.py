@@ -360,6 +360,31 @@ class TestTranscriptionsAPI:
 class TestModelsAPI:
     """Test model-management endpoints."""
 
+    def test_model_settings_exposes_last_loaded_engine_state(
+        self, client: TestClient
+    ) -> None:
+        """Expose the worker runtime engine fingerprint without restart pressure."""
+        config_db = get_app_config_db()
+        config_db.set_many("model.", {"configured_model_id": "small"})
+        config_db.set_many(
+            "worker.",
+            {
+                "last_loaded_model_id": "large",
+                "last_loaded_device": "cuda",
+                "last_loaded_compute_type": "float16",
+            },
+        )
+
+        response = client.get("/api/models/settings")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["configured_model_id"] == "small"
+        assert data["last_loaded_model_id"] == "large-v3"
+        assert data["last_loaded_device"] == "cuda"
+        assert data["last_loaded_compute_type"] == "float16"
+        assert data["restart_required"] is False
+
     def test_model_responses_expose_description_keys(self, client: TestClient) -> None:
         """Expose stable i18n keys for list and detail model descriptions."""
         list_response = client.get("/api/models")
@@ -401,6 +426,29 @@ class TestModelsAPI:
         assert response.status_code == 409
         assert response.json()["detail"] == "Model already downloaded: small"
         get_downloader.assert_not_called()
+
+    def test_select_model_keeps_restart_required_false(
+        self, client: TestClient
+    ) -> None:
+        """Selecting a default model should not request a manual worker restart."""
+        small_model = require_model("small")
+        config_db = get_app_config_db()
+        config_db.set_many("worker.", {"last_loaded_model_id": "large-v3"})
+
+        class _FakeStorage:
+            def get_cache_state(self, repo_id: str) -> str:
+                assert repo_id == small_model.repo_id
+                return "downloaded"
+
+        with patch(
+            "nola.api.routes.models.get_model_storage", return_value=_FakeStorage()
+        ):
+            response = client.post("/api/models/small/select")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["configured_model_id"] == "small"
+        assert data["restart_required"] is False
 
     def test_start_download_openapi_declares_all_conflict_reasons(
         self, client: TestClient

@@ -93,6 +93,8 @@ class TestConfigAPI:
         assert data["model"] == {
             "configured_model_id": "small",
             "last_loaded_model_id": None,
+            "last_loaded_device": None,
+            "last_loaded_compute_type": None,
             "restart_required": False,
         }
 
@@ -106,6 +108,8 @@ class TestConfigAPI:
             {
                 "last_loaded_model_id": "small.en",
                 "last_loaded_model_dir": str(settings.default_model_dir.resolve()),
+                "last_loaded_device": "cuda",
+                "last_loaded_compute_type": "float16",
             },
         )
         config_db.set_many("model.", {"configured_model_id": "small.en"})
@@ -115,6 +119,8 @@ class TestConfigAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["engine"]["model_size"] == "small.en"
+        assert data["engine"]["device"] == "cuda"
+        assert data["engine"]["compute_type"] == "float16"
         assert data["engine"]["is_multilingual"] is False
         assert data["effective_languages"] == [
             {"code": "en", "label_key": "options.language.en"}
@@ -122,6 +128,8 @@ class TestConfigAPI:
         assert data["model"] == {
             "configured_model_id": "small.en",
             "last_loaded_model_id": "small.en",
+            "last_loaded_device": "cuda",
+            "last_loaded_compute_type": "float16",
             "restart_required": False,
         }
 
@@ -145,13 +153,15 @@ class TestConfigAPI:
         assert data["model"] == {
             "configured_model_id": "large-v3-turbo",
             "last_loaded_model_id": "large-v3-turbo",
+            "last_loaded_device": None,
+            "last_loaded_compute_type": None,
             "restart_required": False,
         }
 
-    def test_get_config_marks_restart_required_for_model_dir_change(
+    def test_get_config_keeps_restart_required_false_for_model_dir_change(
         self, client: TestClient
     ) -> None:
-        """Changing only the effective model cache directory should require restart."""
+        """Model-dir drift should not become a user-facing restart requirement."""
         config_db = get_app_config_db()
         next_model_dir = settings.default_model_dir.parent / "alternate-models"
         config_db.set_many(
@@ -175,7 +185,9 @@ class TestConfigAPI:
         assert response.json()["model"] == {
             "configured_model_id": "small",
             "last_loaded_model_id": "small",
-            "restart_required": True,
+            "last_loaded_device": None,
+            "last_loaded_compute_type": None,
+            "restart_required": False,
         }
 
     def test_get_engine_defaults_returns_expanded_vad_defaults(
