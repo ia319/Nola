@@ -1,6 +1,12 @@
 import apiClient from '@/shared/lib/api-client'
-import type { AppConfig, EngineDefaults, TranscriptionDefaultsPatchResponse } from '@/shared/types'
-import type { TranscriptionDefaultsUpdateRequest } from '@/shared/types/config'
+import type {
+  AppConfig,
+  EngineDefaults,
+  SessionDefaults,
+  SessionDefaultsUpdateRequest,
+  TranscriptionDefaultsPatchResponse,
+  TranscriptionDefaultsUpdateRequest,
+} from '@/shared/types'
 
 /** Fetch the aggregated application configuration from `GET /api/config`. */
 export async function fetchAppConfig(signal?: AbortSignal): Promise<AppConfig> {
@@ -30,6 +36,23 @@ export async function patchTranscriptionDefaults(
     '/api/config/transcription/defaults',
     payload,
   )
+  return data
+}
+
+/** Fetch Workbench session defaults from `GET /api/config/session-defaults`. */
+export async function fetchSessionDefaults(signal?: AbortSignal): Promise<SessionDefaults> {
+  const { data } = await apiClient.get<SessionDefaults>('/api/config/session-defaults', { signal })
+  return data
+}
+
+/**
+ * Persist Workbench session defaults via `PATCH /api/config/session-defaults`.
+ * Keep write requests non-cancelable until the UI adds an explicit cancel/retry flow.
+ */
+export async function patchSessionDefaults(
+  payload: SessionDefaultsUpdateRequest,
+): Promise<SessionDefaults> {
+  const { data } = await apiClient.patch<SessionDefaults>('/api/config/session-defaults', payload)
   return data
 }
 
