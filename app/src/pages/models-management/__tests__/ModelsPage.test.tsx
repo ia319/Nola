@@ -411,7 +411,7 @@ describe('ModelsPage', () => {
   })
 
   it('wires model selection through snapshot updates and activity settings', async () => {
-    const settings = createModelSettingsResponse({ restart_required: true })
+    const settings = createModelSettingsResponse({ restart_required: false })
     modelsPageMocks.selectModel.mockResolvedValueOnce({
       configured_model_id: 'nola-base-v3',
       restart_required: true,
@@ -452,7 +452,7 @@ describe('ModelsPage', () => {
       expect(modelsPageMocks.setActivityModelSettings).toHaveBeenCalledWith(settings)
     })
     expect(modelsPageMocks.toast.success).toHaveBeenCalledWith('Default model set to nola-base-v3')
-    expect(modelsPageMocks.toast.warning).toHaveBeenCalledWith('models.restartRequired')
+    expect(modelsPageMocks.toast.warning).not.toHaveBeenCalled()
     expect(modelsPageMocks.requestModelRefresh).toHaveBeenCalledTimes(1)
     expect(modelsPageMocks.refreshConfigCaches).toHaveBeenCalledTimes(1)
     expect(modelsPageMocks.queryClient.invalidateQueries).toHaveBeenCalledWith({

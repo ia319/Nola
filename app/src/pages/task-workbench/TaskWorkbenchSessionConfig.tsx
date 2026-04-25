@@ -255,8 +255,8 @@ export function TaskWorkbenchSessionConfig({
       return lastLoadedModelId
     }
 
-    // Prefer the currently loaded runtime model. A newly configured default
-    // can differ until the backend applies it and clears restart_required.
+    // Prefer the currently loaded runtime model. Keep the configured default
+    // secondary until a new task loads it at the task boundary.
     if (configuredModelId && modelOptions.some((option) => option.value === configuredModelId)) {
       return configuredModelId
     }

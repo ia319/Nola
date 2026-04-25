@@ -278,9 +278,6 @@ export function ModelsPage() {
             },
       )
       toast.success(t('models.toast.selected', { modelId: selectedConfiguredModelId }))
-      if (result.restart_required) {
-        toast.warning(t('models.restartRequired'))
-      }
 
       requestModelRefresh()
       void queryClient.invalidateQueries({ queryKey: queryKeys.models.list() })
