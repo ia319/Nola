@@ -112,7 +112,7 @@ describe('ModelStorageTab', () => {
       configured_model_dir: 'Model cache',
       effective_model_dir: 'Model cache',
       override_source: 'environment',
-      restart_required: true,
+      restart_required: false,
     })
 
     renderModelStorageTab()

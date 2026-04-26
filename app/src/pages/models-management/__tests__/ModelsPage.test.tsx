@@ -187,7 +187,7 @@ function createModelSettingsResponse(
     configured_model_dir: null,
     effective_model_dir: '/models',
     override_source: 'default',
-    restart_required: true,
+    restart_required: false,
     ...overrides,
   }
 }
@@ -401,8 +401,8 @@ describe('ModelsPage', () => {
     const settings = createModelSettingsResponse({ restart_required: false })
     modelsPageMocks.selectModel.mockResolvedValueOnce({
       configured_model_id: 'nola-base-v3',
-      restart_required: true,
-      message: 'restart required',
+      restart_required: false,
+      message: 'selected',
     })
     modelsPageMocks.getModelSettings.mockResolvedValueOnce(settings)
 
