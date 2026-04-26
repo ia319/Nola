@@ -18,14 +18,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { refreshConfigCaches } from '@/config/cache-invalidation'
 import { fetchEngineDefaults, fetchSessionDefaults, patchSessionDefaults } from '@/config/api'
-import {
-  DEFAULT_ENGINE_COMPUTE_TYPE,
-  DEFAULT_ENGINE_DEVICE,
-  ENGINE_COMPUTE_TYPE_OPTIONS,
-  ENGINE_DEVICE_OPTIONS,
-  isEngineComputeType,
-  isEngineDevice,
-} from '@/config/engine-options'
+import { buildEngineComputeTypeOptions, buildEngineDeviceOptions } from '@/config/engine-options'
 import logger from '@/config/logger'
 import { useAppConfig } from '@/config/use-app-config'
 import { AdvancedOptions, useTranscriptionOptions } from '@/features/transcription-options'
@@ -53,22 +46,12 @@ import type {
   EngineDevice,
   SessionDefaults,
   TranscriptionDefaults,
+  TranscriptionOptionGroup,
 } from '@/shared/types'
 
 const MODEL_LOADING_VALUE = '__loading__'
 const MODEL_EMPTY_VALUE = '__empty__'
-
-const DEVICE_LABEL_KEYS: Record<EngineDevice, string> = {
-  auto: 'tasks.workbench.sessionConfig.device.options.auto',
-  cpu: 'tasks.workbench.sessionConfig.device.options.cpu',
-  cuda: 'tasks.workbench.sessionConfig.device.options.cuda',
-}
-
-const COMPUTE_TYPE_LABEL_KEYS: Record<EngineComputeType, string> = {
-  default: 'tasks.workbench.sessionConfig.computeType.options.default',
-  float16: 'tasks.workbench.sessionConfig.computeType.options.float16',
-  int8: 'tasks.workbench.sessionConfig.computeType.options.int8',
-}
+const EMPTY_ENGINE_SCHEMA: TranscriptionOptionGroup[] = []
 
 export interface TaskWorkbenchSessionConfigProps {
   fileIds: string[]
@@ -197,7 +180,7 @@ export function TaskWorkbenchSessionConfig({
   const [selectedComputeType, setSelectedComputeType] = useState<EngineComputeType | null>(null)
   const hasInitializedExecutionDraftRef = useRef(false)
 
-  const { config } = useAppConfig()
+  const { config, isLoading: isConfigLoading } = useAppConfig()
   const { models, configuredModelId, lastLoadedModelId, isLoading: isModelsLoading } = useModels()
   const sessionDefaultsQuery = useQuery({
     queryKey: queryKeys.config.sessionDefaults(),
@@ -262,6 +245,7 @@ export function TaskWorkbenchSessionConfig({
     if (
       hasInitializedExecutionDraftRef.current ||
       sessionDefaultsQuery.isPending ||
+      isConfigLoading ||
       isModelsLoading
     ) {
       return
@@ -275,12 +259,17 @@ export function TaskWorkbenchSessionConfig({
         downloadedModelIds,
       }),
     )
-    setSelectedDevice(sessionDefaults?.execution.device ?? DEFAULT_ENGINE_DEVICE)
-    setSelectedComputeType(sessionDefaults?.execution.compute_type ?? DEFAULT_ENGINE_COMPUTE_TYPE)
+    setSelectedDevice(sessionDefaults?.execution.device ?? config?.engine.device ?? null)
+    setSelectedComputeType(
+      sessionDefaults?.execution.compute_type ?? config?.engine.compute_type ?? null,
+    )
     hasInitializedExecutionDraftRef.current = true
   }, [
     configuredModelId,
+    config?.engine.compute_type,
+    config?.engine.device,
     downloadedModelIds,
+    isConfigLoading,
     isModelsLoading,
     lastLoadedModelId,
     sessionDefaults,
@@ -325,26 +314,48 @@ export function TaskWorkbenchSessionConfig({
   const selectedModelValue =
     selectedModelId && downloadedModelIds.has(selectedModelId) ? selectedModelId : MODEL_EMPTY_VALUE
   const resolvedDevice =
-    selectedDevice ?? sessionDefaults?.execution.device ?? DEFAULT_ENGINE_DEVICE
+    selectedDevice ?? sessionDefaults?.execution.device ?? config?.engine.device ?? null
   const resolvedComputeType =
-    selectedComputeType ?? sessionDefaults?.execution.compute_type ?? DEFAULT_ENGINE_COMPUTE_TYPE
+    selectedComputeType ??
+    sessionDefaults?.execution.compute_type ??
+    config?.engine.compute_type ??
+    null
+  const engineSchema = config?.engine.schema ?? EMPTY_ENGINE_SCHEMA
+  const deviceOptions = useMemo(
+    () => buildEngineDeviceOptions(engineSchema, resolvedDevice),
+    [engineSchema, resolvedDevice],
+  )
+  const computeTypeOptions = useMemo(
+    () => buildEngineComputeTypeOptions(engineSchema, resolvedComputeType),
+    [engineSchema, resolvedComputeType],
+  )
   const hasSelectableModel = downloadedModelOptions.length > 0
   const controlsDisabled = disabled || isCreating || isSavingDefaults
   const executionControlsDisabled =
-    controlsDisabled || sessionDefaultsQuery.isPending || isModelsLoading
+    controlsDisabled ||
+    sessionDefaultsQuery.isPending ||
+    isConfigLoading ||
+    isModelsLoading ||
+    deviceOptions.length === 0 ||
+    computeTypeOptions.length === 0
   const startDisabled =
     controlsDisabled ||
     sessionDefaultsQuery.isPending ||
+    isConfigLoading ||
     fileIds.length === 0 ||
     !selectedModelId ||
-    !downloadedModelIds.has(selectedModelId)
+    !downloadedModelIds.has(selectedModelId) ||
+    !resolvedDevice ||
+    !resolvedComputeType
 
   async function handleStart() {
     if (
       creatingRef.current ||
       fileIds.length === 0 ||
       !selectedModelId ||
-      !downloadedModelIds.has(selectedModelId)
+      !downloadedModelIds.has(selectedModelId) ||
+      !resolvedDevice ||
+      !resolvedComputeType
     ) {
       return
     }
@@ -396,14 +407,16 @@ export function TaskWorkbenchSessionConfig({
   }
 
   function handleDeviceChange(value: string): void {
-    if (isEngineDevice(value)) {
-      setSelectedDevice(value)
+    const selectedOption = deviceOptions.find((option) => option.value === value)
+    if (selectedOption) {
+      setSelectedDevice(selectedOption.value)
     }
   }
 
   function handleComputeTypeChange(value: string): void {
-    if (isEngineComputeType(value)) {
-      setSelectedComputeType(value)
+    const selectedOption = computeTypeOptions.find((option) => option.value === value)
+    if (selectedOption) {
+      setSelectedComputeType(selectedOption.value)
     }
   }
 
@@ -466,7 +479,9 @@ export function TaskWorkbenchSessionConfig({
       isSavingDefaults ||
       disabled ||
       !selectedModelId ||
-      !downloadedModelIds.has(selectedModelId)
+      !downloadedModelIds.has(selectedModelId) ||
+      !resolvedDevice ||
+      !resolvedComputeType
     ) {
       return
     }
@@ -625,7 +640,7 @@ export function TaskWorkbenchSessionConfig({
                   {t('tasks.workbench.sessionConfig.device.label')}
                 </Label>
                 <Select
-                  value={resolvedDevice}
+                  value={resolvedDevice ?? undefined}
                   onValueChange={handleDeviceChange}
                   disabled={executionControlsDisabled}
                 >
@@ -633,9 +648,9 @@ export function TaskWorkbenchSessionConfig({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ENGINE_DEVICE_OPTIONS.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {t(DEVICE_LABEL_KEYS[value])}
+                    {deviceOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.labelKey ? t(option.labelKey) : option.value}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -647,7 +662,7 @@ export function TaskWorkbenchSessionConfig({
                   {t('tasks.workbench.sessionConfig.computeType.label')}
                 </Label>
                 <Select
-                  value={resolvedComputeType}
+                  value={resolvedComputeType ?? undefined}
                   onValueChange={handleComputeTypeChange}
                   disabled={executionControlsDisabled}
                 >
@@ -655,9 +670,9 @@ export function TaskWorkbenchSessionConfig({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ENGINE_COMPUTE_TYPE_OPTIONS.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {t(COMPUTE_TYPE_LABEL_KEYS[value])}
+                    {computeTypeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.labelKey ? t(option.labelKey) : option.value}
                       </SelectItem>
                     ))}
                   </SelectContent>

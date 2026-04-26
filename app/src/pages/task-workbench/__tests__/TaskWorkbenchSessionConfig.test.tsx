@@ -19,6 +19,7 @@ import type {
   SessionDefaultsUpdateRequest,
   TranscriptionDefaults,
 } from '@/shared/types'
+import { TEST_ENGINE_SCHEMA } from '@/test-utils/engine-schema'
 import { buildTranscriptionDefaults } from '@/test-utils/transcription-defaults'
 import { TaskWorkbenchSessionConfig } from '../TaskWorkbenchSessionConfig'
 
@@ -165,6 +166,7 @@ function buildAppConfigReturn(
         device: 'cuda',
         compute_type: 'float16',
         is_multilingual: true,
+        schema: TEST_ENGINE_SCHEMA,
       },
       transcription: { defaults: buildDefaults(), schema: [] },
       file: { allowed_extensions: [], allowed_mime_types: [], max_file_size: 0 },
@@ -339,6 +341,7 @@ describe('TaskWorkbenchSessionConfig', () => {
           device: 'cuda',
           compute_type: 'float16',
           is_multilingual: true,
+          schema: TEST_ENGINE_SCHEMA,
         },
       }),
     )

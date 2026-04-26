@@ -899,6 +899,8 @@ export interface components {
       compute_type: 'default' | 'float16' | 'int8'
       /** Is Multilingual */
       is_multilingual: boolean
+      /** Schema */
+      schema: components['schemas']['OptionGroupSchema'][]
     }
     /**
      * EngineDefaultsResponse

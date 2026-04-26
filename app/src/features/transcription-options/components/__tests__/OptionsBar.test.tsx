@@ -6,6 +6,7 @@ import { OptionsBar } from '../OptionsBar'
 import type { UseAppConfigReturn } from '@/config/use-app-config'
 import type { UseTranscriptionOptionsReturn } from '@/features/transcription-options/types'
 import type { AppError, TranscriptionDefaults } from '@/shared/types'
+import { TEST_ENGINE_SCHEMA } from '@/test-utils/engine-schema'
 import { buildTranscriptionDefaults } from '@/test-utils/transcription-defaults'
 
 const {
@@ -82,6 +83,7 @@ function buildAppConfigReturn(): UseAppConfigReturn {
         device: 'cpu',
         compute_type: 'default',
         is_multilingual: true,
+        schema: TEST_ENGINE_SCHEMA,
       },
       transcription: { defaults: buildTranscriptionDefaults(), schema: [] },
       file: { allowed_extensions: [], allowed_mime_types: [], max_file_size: 0 },
