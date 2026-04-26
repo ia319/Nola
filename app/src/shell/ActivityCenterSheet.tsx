@@ -1,13 +1,12 @@
 import type { ReactNode } from 'react'
 
-import { AlertTriangle, BellDot, CheckCircle2, Download, RotateCw, X } from 'lucide-react'
+import { AlertTriangle, BellDot, CheckCircle2, Download, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button, DetailSheet, ProgressBar, StatusBadge } from '@/components/ui'
 import type {
   ActivityAttentionItem,
   ActivityInProgressItem,
-  ActivityModelRestartRef,
   ActivityRecentItem,
   ActivityRouteTarget,
 } from '@/features/activity'
@@ -26,13 +25,6 @@ const ACTIVITY_ROUTE_LABEL_KEYS: Record<ActivityRouteTarget, string> = {
   '/models': 'shell.activityCenter.route.models',
   '/settings/system-info': 'shell.activityCenter.route.systemInfo',
 }
-
-const MODEL_OVERRIDE_SOURCE_LABEL_KEYS: Record<ActivityModelRestartRef['overrideSource'], string> =
-  {
-    database: 'settings.modelStorage.values.overrideSource.database',
-    default: 'settings.modelStorage.values.overrideSource.default',
-    environment: 'settings.modelStorage.values.overrideSource.environment',
-  }
 
 interface ActivitySectionProps {
   title: ReactNode
@@ -140,57 +132,23 @@ function AttentionItemCard({
   onNavigate: (route: ActivityRouteTarget) => void
 }) {
   const { t } = useTranslation()
-
-  if (item.kind === 'task_failed') {
-    const title = t('shell.activityCenter.items.failedTask')
-    const identity = formatTaskIdentity(item)
-
-    return (
-      <div className="bg-destructive-container/25 border-destructive/15 rounded-lg border p-4">
-        <div className="flex items-start gap-3">
-          <AlertTriangle className="text-destructive mt-0.5 size-5" />
-          <div className="min-w-0 flex-1 space-y-2">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-foreground text-sm font-bold">{title}</p>
-                <p className="text-muted-foreground truncate font-mono text-xs">{identity}</p>
-              </div>
-              <DismissButton label={title} onDismiss={() => onDismiss(item.id)} />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <StatusBadge status={item.task.status} />
-              <RouteButton route={item.route} onNavigate={onNavigate} />
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  const title = t('shell.activityCenter.items.restartRequired')
-  const modelId =
-    item.model.configuredModelId ??
-    item.model.lastLoadedModelId ??
-    t('settings.modelStorage.values.empty')
+  const title = t('shell.activityCenter.items.failedTask')
+  const identity = formatTaskIdentity(item)
 
   return (
-    <div className="bg-warning-container/30 border-warning/15 rounded-lg border p-4">
+    <div className="bg-destructive-container/25 border-destructive/15 rounded-lg border p-4">
       <div className="flex items-start gap-3">
-        <RotateCw className="text-warning mt-0.5 size-5" />
+        <AlertTriangle className="text-destructive mt-0.5 size-5" />
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="text-foreground text-sm font-bold">{title}</p>
-              <p className="text-muted-foreground truncate text-xs">
-                {t('shell.activityCenter.items.configuredModel', { modelId })}
-              </p>
+              <p className="text-muted-foreground truncate font-mono text-xs">{identity}</p>
             </div>
             <DismissButton label={title} onDismiss={() => onDismiss(item.id)} />
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground text-xs">
-              {t(MODEL_OVERRIDE_SOURCE_LABEL_KEYS[item.model.overrideSource])}
-            </span>
+            <StatusBadge status={item.task.status} />
             <RouteButton route={item.route} onNavigate={onNavigate} />
           </div>
         </div>

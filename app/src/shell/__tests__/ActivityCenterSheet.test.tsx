@@ -3,7 +3,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { ActiveModelDownload, ModelSettingsResponse, TaskSummary } from '@/shared/types'
+import type { ActiveModelDownload, TaskSummary } from '@/shared/types'
 import { useActivityStore } from '@/features/activity'
 
 import { ActivityCenterSheet } from '../ActivityCenterSheet'
@@ -18,8 +18,7 @@ const messages: Record<string, string> = {
   'shell.activityCenter.sections.inProgress': 'In Progress',
   'shell.activityCenter.sections.recent': 'Recent',
   'shell.activityCenter.empty.needsAttention.title': 'No attention needed',
-  'shell.activityCenter.empty.needsAttention.description':
-    'Failed tasks and restart requirements appear here.',
+  'shell.activityCenter.empty.needsAttention.description': 'Failed tasks appear here.',
   'shell.activityCenter.empty.inProgress.title': 'No active work',
   'shell.activityCenter.empty.inProgress.description':
     'Running tasks and model downloads appear here.',
@@ -34,7 +33,6 @@ const messages: Record<string, string> = {
   'shell.activityCenter.route.models': 'Models',
   'shell.activityCenter.route.systemInfo': 'System Info',
   'shell.activityCenter.items.failedTask': 'Failed task',
-  'shell.activityCenter.items.restartRequired': 'Restart required',
   'shell.activityCenter.items.taskInProgress': 'Processing transcription',
   'shell.activityCenter.items.modelDownload': 'Active model download',
   'shell.activityCenter.items.taskCompleted': 'Completed transcription',
@@ -44,7 +42,6 @@ const messages: Record<string, string> = {
   'shell.activityCenter.items.fileIntegrityChecked': 'File integrity checked',
   'shell.activityCenter.items.orphanCleanupCompleted': 'Orphan cleanup completed',
   'shell.activityCenter.items.taskId': 'Task {{taskId}}',
-  'shell.activityCenter.items.configuredModel': 'Configured model: {{modelId}}',
   'shell.activityCenter.items.affectedCount': '{{count}} affected',
   'settings.modelStorage.values.empty': 'Not set',
   'settings.modelStorage.values.overrideSource.database': 'Stored setting',
@@ -78,18 +75,6 @@ function buildTask(taskId: string, overrides: Partial<TaskSummary> = {}): TaskSu
   }
 }
 
-function buildModelSettings(overrides: Partial<ModelSettingsResponse> = {}): ModelSettingsResponse {
-  return {
-    configured_model_id: 'large-v3',
-    last_loaded_model_id: 'small',
-    configured_model_dir: null,
-    effective_model_dir: 'models',
-    override_source: 'database',
-    restart_required: true,
-    ...overrides,
-  }
-}
-
 function buildDownload(overrides: Partial<ActiveModelDownload> = {}): ActiveModelDownload {
   return {
     model_id: 'large-v3',
@@ -119,7 +104,6 @@ function seedActivityStore() {
       progress: 65,
     }),
   ])
-  store.setModelSettings(buildModelSettings())
   store.setModelDownloads([buildDownload()])
   store.addRecent({
     kind: 'model_download_completed',
@@ -144,7 +128,7 @@ describe('ActivityCenterSheet', () => {
     expect(screen.getByText('In Progress')).toBeTruthy()
     expect(screen.getByText('Recent')).toBeTruthy()
     expect(screen.getByText('Failed task')).toBeTruthy()
-    expect(screen.getByText('Restart required')).toBeTruthy()
+    expect(screen.queryByText('Restart required')).toBeNull()
     expect(screen.getByText('running-task.wav')).toBeTruthy()
     expect(screen.getByText('Active model download')).toBeTruthy()
     expect(screen.getByText('Model download finished')).toBeTruthy()
@@ -157,7 +141,7 @@ describe('ActivityCenterSheet', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss Failed task' }))
     expect(screen.queryByText('failed-task.wav')).toBeNull()
-    expect(screen.getByText('Restart required')).toBeTruthy()
+    expect(screen.getByText('No attention needed')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear Recent History' }))
     expect(screen.queryByText('Model download finished')).toBeNull()
