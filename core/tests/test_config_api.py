@@ -434,6 +434,31 @@ class TestConfigAPI:
         assert get_app_config_db().get_all("model.") == {}
         assert get_app_config_db().get_all("execution.") == {}
 
+    def test_patch_session_defaults_clear_model_id_preserves_model_dir(
+        self, client: TestClient
+    ) -> None:
+        """Clearing execution model defaults should preserve model directory config."""
+        config_db = get_app_config_db()
+        configured_model_dir = settings.default_model_dir.parent / "alternate-models"
+        config_db.set_many(
+            "model.",
+            {
+                "configured_model_id": "medium",
+                "configured_model_dir": str(configured_model_dir),
+            },
+        )
+
+        response = client.patch(
+            "/api/config/session-defaults",
+            json={"execution": {"model_id": None}},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["execution"]["model_id"] == "small"
+        assert config_db.get_all("model.") == {
+            "configured_model_dir": str(configured_model_dir)
+        }
+
     def test_patch_session_defaults_keeps_unset_execution_fields(
         self, client: TestClient
     ) -> None:
