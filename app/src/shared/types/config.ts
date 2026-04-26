@@ -23,6 +23,12 @@ export type SessionDefaultsUpdateRequest = Schemas['SessionDefaultsUpdateRequest
 /** Execution defaults exposed inside GET /api/config/session-defaults. */
 export type SessionExecutionDefaults = Schemas['SessionExecutionDefaultsResponse']
 
+/** Engine device option accepted by task and session execution config. */
+export type EngineDevice = SessionExecutionDefaults['device']
+
+/** Engine compute type option accepted by task and session execution config. */
+export type EngineComputeType = SessionExecutionDefaults['compute_type']
+
 /** Execution-default patch payload for Workbench defaults. */
 export type SessionExecutionDefaultsUpdateRequest = Schemas['SessionExecutionDefaultsUpdateRequest']
 
