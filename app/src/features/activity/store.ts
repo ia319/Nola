@@ -1,12 +1,6 @@
 import { create } from 'zustand'
 
-import type {
-  ActiveModelDownload,
-  ModelDirSource,
-  ModelSettingsResponse,
-  TaskStatus,
-  TaskSummary,
-} from '@/shared/types'
+import type { ActiveModelDownload, TaskStatus, TaskSummary } from '@/shared/types'
 
 export const ACTIVITY_RECENT_LIMIT = 10
 
@@ -22,12 +16,6 @@ export interface ActivityTaskRef {
   progress: number
   createdAt: string
   completedAt: string | null
-}
-
-export interface ActivityModelRestartRef {
-  configuredModelId: string | null
-  lastLoadedModelId: string | null
-  overrideSource: ModelDirSource
 }
 
 export interface ActivityModelDownloadRef {
@@ -55,14 +43,7 @@ export interface TaskFailedActivityItem extends BaseActivityItem {
   task: ActivityTaskRef
 }
 
-export interface ModelRestartRequiredActivityItem extends BaseActivityItem {
-  kind: 'model_restart_required'
-  source: 'model'
-  route: '/models'
-  model: ActivityModelRestartRef
-}
-
-export type ActivityAttentionItem = TaskFailedActivityItem | ModelRestartRequiredActivityItem
+export type ActivityAttentionItem = TaskFailedActivityItem
 
 export interface TaskInProgressActivityItem extends BaseActivityItem {
   kind: 'task_in_progress'
@@ -185,7 +166,6 @@ export interface ActivityStoreState {
   recent: ActivityRecentItem[]
   dismissedIds: Record<string, true>
   setTasks: (tasks: TaskSummary[]) => void
-  setModelSettings: (settings: ModelSettingsResponse | null) => void
   setModelDownloads: (downloads: ActiveModelDownload[]) => void
   addRecent: (input: ActivityRecentInput) => void
   dismissActivity: (activityId: string) => void
@@ -256,23 +236,6 @@ function createActiveTaskItem(task: TaskSummary): TaskInProgressActivityItem {
     route: '/history',
     occurredAt: task.created_at,
     task: toTaskRef(task),
-  }
-}
-
-function createModelRestartItem(settings: ModelSettingsResponse): ModelRestartRequiredActivityItem {
-  const modelId = settings.configured_model_id ?? settings.last_loaded_model_id ?? 'unconfigured'
-
-  return {
-    id: `model:restart-required:${modelId}`,
-    kind: 'model_restart_required',
-    source: 'model',
-    route: '/models',
-    occurredAt: nowIso(),
-    model: {
-      configuredModelId: settings.configured_model_id ?? null,
-      lastLoadedModelId: settings.last_loaded_model_id ?? null,
-      overrideSource: settings.override_source,
-    },
   }
 }
 
@@ -406,20 +369,6 @@ export const useActivityStore = create<ActivityStoreState>((set) => ({
           state.dismissedIds,
         ),
         inProgress: mergeGeneratedItems(state.inProgress, 'task', activeTasks, state.dismissedIds),
-      }
-    }),
-
-  setModelSettings: (settings) =>
-    set((state) => {
-      const nextItems = settings?.restart_required ? [createModelRestartItem(settings)] : []
-
-      return {
-        needsAttention: mergeGeneratedItems(
-          state.needsAttention,
-          'model',
-          nextItems,
-          state.dismissedIds,
-        ),
       }
     }),
 

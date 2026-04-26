@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ModelDownloadSSEPayload } from '@/features/models'
 import { useTaskBoardStore } from '@/features/tasks/store/task-board-store'
 import { queryKeys } from '@/shared/lib/query-keys'
-import type { ActiveModelDownload, ModelSettingsResponse, TaskSummary } from '@/shared/types'
+import type { ActiveModelDownload, TaskSummary } from '@/shared/types'
 
 import { useActivityStore } from '../store'
 import { ActivityDataBridge } from '../ActivityDataBridge'
@@ -21,7 +21,6 @@ const activityBridgeMocks = vi.hoisted(() => {
   const sseOptions: CapturedModelDownloadSseOptions | null = null
 
   return {
-    getModelSettings: vi.fn(),
     listActiveModelDownloads: vi.fn(),
     requestModelRefresh: vi.fn(),
     refreshConfigCaches: vi.fn(),
@@ -31,7 +30,6 @@ const activityBridgeMocks = vi.hoisted(() => {
 })
 
 vi.mock('@/features/models', () => ({
-  getModelSettings: activityBridgeMocks.getModelSettings,
   listActiveModelDownloads: activityBridgeMocks.listActiveModelDownloads,
   requestModelRefresh: activityBridgeMocks.requestModelRefresh,
 }))
@@ -90,18 +88,6 @@ function buildTask(
   }
 }
 
-function buildModelSettings(overrides: Partial<ModelSettingsResponse> = {}): ModelSettingsResponse {
-  return {
-    configured_model_id: 'small',
-    last_loaded_model_id: 'tiny',
-    configured_model_dir: null,
-    effective_model_dir: 'models',
-    override_source: 'database',
-    restart_required: false,
-    ...overrides,
-  }
-}
-
 function buildDownload(overrides: Partial<ActiveModelDownload> = {}): ActiveModelDownload {
   return {
     model_id: 'small',
@@ -117,7 +103,6 @@ function buildDownload(overrides: Partial<ActiveModelDownload> = {}): ActiveMode
 }
 
 beforeEach(() => {
-  activityBridgeMocks.getModelSettings.mockResolvedValue(buildModelSettings())
   activityBridgeMocks.listActiveModelDownloads.mockResolvedValue({
     downloads: [],
     active_count: 0,
@@ -134,7 +119,6 @@ beforeEach(() => {
 afterEach(() => {
   useActivityStore.getState().clearActivity()
   useTaskBoardStore.getState().clearTaskBoard()
-  activityBridgeMocks.getModelSettings.mockReset()
   activityBridgeMocks.listActiveModelDownloads.mockReset()
   activityBridgeMocks.refreshConfigCaches.mockReset()
   activityBridgeMocks.createSSEConnection.mockReset()
@@ -164,10 +148,7 @@ describe('ActivityDataBridge', () => {
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: queryKeys.tasks.lists() })
   })
 
-  it('syncs model settings, active downloads, and terminal SSE events into activity', async () => {
-    activityBridgeMocks.getModelSettings.mockResolvedValue(
-      buildModelSettings({ restart_required: true }),
-    )
+  it('syncs active downloads and terminal SSE events into activity', async () => {
     activityBridgeMocks.listActiveModelDownloads.mockResolvedValue({
       downloads: [buildDownload()],
       active_count: 1,
@@ -178,10 +159,7 @@ describe('ActivityDataBridge', () => {
     const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries')
 
     await waitFor(() => {
-      expect(useActivityStore.getState().needsAttention[0]).toHaveProperty(
-        'kind',
-        'model_restart_required',
-      )
+      expect(useActivityStore.getState().needsAttention).toEqual([])
       expect(useActivityStore.getState().inProgress[0]).toHaveProperty(
         'kind',
         'model_download_in_progress',

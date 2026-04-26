@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { refreshConfigCaches } from '@/config/cache-invalidation'
 import logger from '@/config/logger'
-import { getModelSettings, listActiveModelDownloads, requestModelRefresh } from '@/features/models'
+import { listActiveModelDownloads, requestModelRefresh } from '@/features/models'
 import type { ModelDownloadSSEPayload } from '@/features/models'
 import { ACTIVE_TASK_STATUSES, isTerminalTaskStatus } from '@/features/tasks/lib/task-status-groups'
 import { useTaskBoardStore } from '@/features/tasks/store/task-board-store'
@@ -82,15 +82,9 @@ function useTaskActivitySync(): void {
 
 function useModelActivitySync(): void {
   const queryClient = useQueryClient()
-  const setModelSettings = useActivityStore((state) => state.setModelSettings)
   const setModelDownloads = useActivityStore((state) => state.setModelDownloads)
   const addRecent = useActivityStore((state) => state.addRecent)
   const activeDownloadsRef = useRef<Map<string, ActiveModelDownload>>(new Map())
-
-  const modelSettingsQuery = useQuery({
-    queryKey: queryKeys.models.settings(),
-    queryFn: ({ signal }) => getModelSettings(signal),
-  })
 
   const activeDownloadsQuery = useQuery({
     queryKey: queryKeys.models.downloads(),
@@ -98,10 +92,6 @@ function useModelActivitySync(): void {
     refetchInterval: (query) =>
       query.state.data?.active_count ? ACTIVE_DOWNLOADS_REFETCH_MS : false,
   })
-
-  useEffect(() => {
-    setModelSettings(modelSettingsQuery.data ?? null)
-  }, [modelSettingsQuery.data, setModelSettings])
 
   useEffect(() => {
     const downloads = activeDownloadsQuery.data?.downloads ?? []
