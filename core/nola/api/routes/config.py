@@ -12,7 +12,6 @@ from nola.api.routes._model_helpers import (
     canonicalize_optional_engine_compute_type,
     canonicalize_optional_engine_device,
     canonicalize_optional_model_id,
-    legacy_restart_required,
 )
 from nola.api.schemas import (
     ExportDefaultsUpdateRequest,
@@ -186,7 +185,7 @@ def _build_model_config(config_db: AppConfigDatabase) -> ModelConfigResponse:
         last_loaded_model_id=last_loaded_model_id,
         last_loaded_device=last_loaded_device,
         last_loaded_compute_type=last_loaded_compute_type,
-        restart_required=legacy_restart_required(),
+        restart_required=False,
     )
 
 

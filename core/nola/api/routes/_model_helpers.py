@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, TypeVar, cast
+from typing import TypeVar, cast
 
 from nola.engines.base import (
     ALLOWED_ENGINE_COMPUTE_TYPES,
@@ -51,8 +51,3 @@ def canonicalize_optional_engine_compute_type(
 ) -> EngineComputeType | None:
     """Return a supported engine compute type value when present."""
     return _canonicalize_optional_engine_option(raw_value, ALLOWED_ENGINE_COMPUTE_TYPES)
-
-
-def legacy_restart_required() -> Literal[False]:
-    """Keep restart_required false after task-boundary engine reload."""
-    return False

@@ -24,7 +24,6 @@ from nola.api.routes._model_helpers import (
     canonicalize_optional_engine_compute_type,
     canonicalize_optional_engine_device,
     canonicalize_optional_model_id,
-    legacy_restart_required,
 )
 from nola.api.schemas.models import (
     ActiveModelDownloadResponse,
@@ -252,7 +251,7 @@ def get_model_settings() -> ModelSettingsResponse:
         configured_model_dir=db_model_dir if isinstance(db_model_dir, str) else None,
         effective_model_dir=str(effective_dir),
         override_source=source,
-        restart_required=legacy_restart_required(),
+        restart_required=False,
     )
 
 
@@ -550,7 +549,7 @@ def select_model(model_id: str) -> ModelSelectResponse | Response:
 
     return ModelSelectResponse(
         configured_model_id=info.model_id,
-        restart_required=legacy_restart_required(),
+        restart_required=False,
         message=f"Configured model set to {info.name}",
     )
 
