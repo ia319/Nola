@@ -22,12 +22,10 @@ function findExecutionSelectField(
   schema: TranscriptionOptionGroup[],
   key: EngineOptionKey,
 ): SelectOptionField | null {
-  for (const group of schema) {
-    const field = group.fields.find((item) => item.key === key)
-    if (field && isSelectField(field)) return field
-  }
+  const executionGroup = schema.find((group) => group.group === 'execution')
+  const field = executionGroup?.fields.find((item) => item.key === key)
 
-  return null
+  return field && isSelectField(field) ? field : null
 }
 
 function buildSelectOptions<TValue extends EngineOptionValue>(

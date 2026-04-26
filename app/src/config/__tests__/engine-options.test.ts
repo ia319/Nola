@@ -69,4 +69,38 @@ describe('engine option metadata', () => {
 
     expect(options).toEqual([{ value: 'cpu', labelKey: null }])
   })
+
+  it('does not duplicate a resolved value already present in schema metadata', () => {
+    const options = buildEngineDeviceOptions(EXECUTION_SCHEMA, 'auto')
+
+    expect(options.map((option) => option.value)).toEqual(['auto', 'cuda'])
+  })
+
+  it('ignores matching fields outside the execution schema group', () => {
+    const options = buildEngineDeviceOptions(
+      [
+        {
+          group: 'other',
+          group_label_key: 'options.group.other',
+          fields: [
+            {
+              key: 'device',
+              label_key: 'options.field.otherDevice',
+              type: 'select',
+              options: [
+                {
+                  value: 'cpu',
+                  label_key: 'tasks.workbench.sessionConfig.device.options.cpu',
+                },
+              ],
+            },
+          ],
+        },
+        ...EXECUTION_SCHEMA,
+      ],
+      null,
+    )
+
+    expect(options.map((option) => option.value)).toEqual(['auto', 'cuda'])
+  })
 })
