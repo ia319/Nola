@@ -135,6 +135,17 @@ class TestFasterWhisperEngine:
             engine.transcribe_stream(b"audio_data")
 
     @patch("nola.engines.faster_whisper.WhisperModel")
+    def test_close_releases_model_reference(self, mock_model: MagicMock) -> None:
+        """Close the engine before replacing a loaded faster-whisper model."""
+        engine = FasterWhisperEngine()
+
+        engine.close()
+
+        assert engine.model is None
+        with pytest.raises(RuntimeError, match="closed"):
+            list(engine.transcribe("test.mp3"))
+
+    @patch("nola.engines.faster_whisper.WhisperModel")
     def test_transcribe_with_options(self, mock_model: MagicMock) -> None:
         """Verify transcribe passes options to model."""
         from nola.engines import TranscribeOptions

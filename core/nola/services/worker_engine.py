@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -118,6 +119,7 @@ def _resolve_fallback_model_id(model_config: ConfigMap) -> str:
     configured_raw = model_config.get("configured_model_id")
     if isinstance(configured_raw, str):
         return configured_raw
+    # Use process settings as the baseline when persisted session defaults are reset.
     return settings.model_size
 
 
@@ -171,11 +173,12 @@ def build_desired_engine_state(
     )
 
 
-def _assert_model_downloaded(
+def assert_engine_model_downloaded(
     desired: DesiredEngineState,
     *,
-    storage_factory: ModelStorageFactory,
+    storage_factory: ModelStorageFactory = ModelStorage,
 ) -> None:
+    """Require the desired task engine model to exist in the resolved cache."""
     storage = storage_factory(desired.fingerprint.model_dir)
     if storage.get_cache_state(desired.model_info.repo_id) != "downloaded":
         raise WorkerEngineError(
@@ -183,6 +186,27 @@ def _assert_model_downloaded(
             f"{desired.fingerprint.model_id} in {desired.fingerprint.model_dir}",
             should_retry=False,
         )
+
+
+def release_loaded_engine(loaded: LoadedEngineState) -> None:
+    """Close one loaded engine before replacing its runtime fingerprint."""
+    fingerprint = loaded.fingerprint
+    logger.info(
+        "Releasing engine model=%s dir=%s device=%s compute_type=%s",
+        fingerprint.model_id,
+        fingerprint.model_dir,
+        fingerprint.device,
+        fingerprint.compute_type,
+    )
+    try:
+        loaded.engine.close()
+    except Exception as exc:
+        raise WorkerEngineError(
+            f"Failed to release loaded task execution engine: {exc}",
+            should_retry=True,
+        ) from exc
+    finally:
+        gc.collect()
 
 
 def _persist_loaded_state(
@@ -211,15 +235,16 @@ def ensure_engine_loaded(
     task: TaskRowRaw,
     loaded: LoadedEngineState | None,
     config_db: SupportsWorkerConfig,
+    desired: DesiredEngineState | None = None,
     engine_factory: EngineFactory = create_faster_whisper_engine,
     storage_factory: ModelStorageFactory = ModelStorage,
 ) -> LoadedEngineState:
     """Return a loaded engine matching the task execution fingerprint."""
-    desired = build_desired_engine_state(task, config_db)
+    desired = desired or build_desired_engine_state(task, config_db)
     if loaded is not None and loaded.fingerprint == desired.fingerprint:
         return loaded
 
-    _assert_model_downloaded(desired, storage_factory=storage_factory)
+    assert_engine_model_downloaded(desired, storage_factory=storage_factory)
     fingerprint = desired.fingerprint
     action = "Loading" if loaded is None else "Reloading"
     logger.info(

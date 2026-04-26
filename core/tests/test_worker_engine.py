@@ -18,6 +18,7 @@ from nola.services.worker_engine import (
     WorkerEngineError,
     build_desired_engine_state,
     ensure_engine_loaded,
+    release_loaded_engine,
 )
 
 
@@ -153,6 +154,31 @@ def test_build_desired_engine_state_falls_back_for_legacy_tasks(
         device="cpu",
         compute_type="default",
     )
+
+
+def test_build_desired_engine_state_prefers_settings_model_dir(
+    tmp_path: Path,
+) -> None:
+    """An explicit process model dir should take precedence over DB/default dirs."""
+    env_model_dir = tmp_path / "env-models"
+    db_model_dir = tmp_path / "db-models"
+    default_model_dir = tmp_path / "default-models"
+
+    with (
+        patch.object(worker_engine.settings, "model_dir", env_model_dir),
+        patch.object(
+            Settings,
+            "default_model_dir",
+            new_callable=PropertyMock,
+            return_value=default_model_dir,
+        ),
+    ):
+        desired = build_desired_engine_state(
+            _raw_task(),
+            StubWorkerConfig({"configured_model_dir": str(db_model_dir)}),
+        )
+
+    assert desired.fingerprint.model_dir == env_model_dir.resolve(strict=False)
 
 
 def test_build_desired_engine_state_rejects_invalid_engine_option(
@@ -383,6 +409,51 @@ def test_ensure_engine_loaded_reloads_when_model_changes(tmp_path: Path) -> None
     assert configs[0].model_size == "base"
 
 
+def test_release_loaded_engine_closes_engine_and_collects(
+    tmp_path: Path,
+) -> None:
+    """Reload release should close the engine and trigger finalizers promptly."""
+    engine = Mock(spec=TranscriptionEngine)
+    loaded = LoadedEngineState(
+        fingerprint=EngineFingerprint(
+            model_id="small",
+            model_dir=tmp_path,
+            device="cpu",
+            compute_type="default",
+        ),
+        engine=engine,
+    )
+
+    with patch("nola.services.worker_engine.gc.collect") as collect:
+        release_loaded_engine(loaded)
+
+    engine.close.assert_called_once_with()
+    collect.assert_called_once_with()
+
+
+def test_release_loaded_engine_reports_close_failure(tmp_path: Path) -> None:
+    """Close failures should fail the current task without loading a new engine."""
+    engine = Mock(spec=TranscriptionEngine)
+    engine.close.side_effect = RuntimeError("close failed")
+    loaded = LoadedEngineState(
+        fingerprint=EngineFingerprint(
+            model_id="small",
+            model_dir=tmp_path,
+            device="cpu",
+            compute_type="default",
+        ),
+        engine=engine,
+    )
+
+    with (
+        patch("nola.services.worker_engine.gc.collect") as collect,
+        pytest.raises(WorkerEngineError, match="Failed to release"),
+    ):
+        release_loaded_engine(loaded)
+
+    collect.assert_called_once_with()
+
+
 def test_ensure_engine_loaded_rejects_missing_model_cache(tmp_path: Path) -> None:
     """Missing model cache should fail the task before engine creation."""
     configs: list[EngineConfig] = []
@@ -413,6 +484,11 @@ def test_ensure_engine_loaded_ignores_worker_state_write_failure(
 ) -> None:
     """Worker state persistence failures should not fail transcription loading."""
     configs: list[EngineConfig] = []
+    produced_engine = Mock(spec=TranscriptionEngine)
+
+    def create_engine(config: EngineConfig) -> TranscriptionEngine:
+        configs.append(config)
+        return produced_engine
 
     with (
         patch.object(worker_engine.settings, "model_dir", None),
@@ -428,9 +504,10 @@ def test_ensure_engine_loaded_ignores_worker_state_write_failure(
             task=_raw_task(),
             loaded=None,
             config_db=FailingWorkerConfig(),
-            engine_factory=_engine_factory(configs),
+            engine_factory=create_engine,
             storage_factory=lambda _path: StubModelStorage(),
         )
 
     assert loaded.fingerprint.model_id == "small"
+    assert loaded.engine is produced_engine
     logger_warning.assert_called_once()

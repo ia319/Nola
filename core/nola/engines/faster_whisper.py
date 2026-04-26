@@ -26,7 +26,7 @@ class FasterWhisperEngine(TranscriptionEngine):
         }
         if cfg.download_root is not None:
             init_kwargs["download_root"] = str(cfg.download_root)
-        self.model = WhisperModel(cfg.model_size, **init_kwargs)
+        self.model: WhisperModel | None = WhisperModel(cfg.model_size, **init_kwargs)
         self._config = cfg
 
     def transcribe(
@@ -46,6 +46,8 @@ class FasterWhisperEngine(TranscriptionEngine):
             Segment objects with start time, end time, and text.
         """
         opts = options or TranscribeOptions()
+        if self.model is None:
+            raise RuntimeError("Transcription engine is closed")
 
         # Convert dataclass to dict, excluding None values for optional params
         opts_dict = {k: v for k, v in asdict(opts).items() if v is not None}
@@ -73,3 +75,7 @@ class FasterWhisperEngine(TranscriptionEngine):
             NotImplementedError: Always raised, streaming not yet supported.
         """
         raise NotImplementedError("Streaming transcription not implemented yet")
+
+    def close(self) -> None:
+        """Release the underlying faster-whisper model reference."""
+        self.model = None

@@ -148,3 +148,6 @@ class TranscriptionEngine(ABC):
             Transcribed text or None if no speech detected.
         """
         pass
+
+    def close(self) -> None:
+        """Release resources held by this engine instance."""
