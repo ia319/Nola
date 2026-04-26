@@ -1,5 +1,6 @@
 """Define base transcription engine interface."""
 
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
@@ -7,6 +8,8 @@ from pathlib import Path
 from typing import Final, Literal, TypeAlias, cast
 
 from nola.config import settings
+
+logger = logging.getLogger(__name__)
 
 EngineDevice: TypeAlias = Literal["auto", "cpu", "cuda"]
 EngineComputeType: TypeAlias = Literal["default", "float16", "int8"]
@@ -26,12 +29,22 @@ ProgressCallback = Callable[[float], None]
 def _default_engine_device() -> EngineDevice:
     if settings.device in ALLOWED_ENGINE_DEVICES:
         return cast(EngineDevice, settings.device)
+    logger.warning(
+        "Invalid engine device setting %r; falling back to %r.",
+        settings.device,
+        DEFAULT_ENGINE_DEVICE,
+    )
     return DEFAULT_ENGINE_DEVICE
 
 
 def _default_engine_compute_type() -> EngineComputeType:
     if settings.compute_type in ALLOWED_ENGINE_COMPUTE_TYPES:
         return cast(EngineComputeType, settings.compute_type)
+    logger.warning(
+        "Invalid engine compute_type setting %r; falling back to %r.",
+        settings.compute_type,
+        DEFAULT_ENGINE_COMPUTE_TYPE,
+    )
     return DEFAULT_ENGINE_COMPUTE_TYPE
 
 
@@ -150,4 +163,8 @@ class TranscriptionEngine(ABC):
         pass
 
     def close(self) -> None:
-        """Release resources held by this engine instance."""
+        """Release resources held by this engine instance.
+
+        Override this method when a subclass owns runtime resources. Do not call
+        transcription methods after close() returns.
+        """
