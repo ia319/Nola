@@ -20,7 +20,10 @@ from nola.models.tasks import TaskRowRaw
 from nola.services.worker_engine import (
     LoadedEngineState,
     WorkerEngineError,
+    assert_engine_model_downloaded,
+    build_desired_engine_state,
     ensure_engine_loaded,
+    release_loaded_engine,
 )
 
 logger = logging.getLogger("nola.worker")
@@ -112,6 +115,7 @@ def run_transcription(
         task: Task dictionary from database
         file_db: File database instance
         task_db: Task database instance
+        app_config_db: App config store used to resolve transcription defaults
         engine: Pre-loaded transcription engine
     """
     task_id = task["id"]
@@ -223,10 +227,21 @@ def worker_loop(db_path: str | Path | None = None) -> bool:
 
             if task:
                 try:
+                    desired_engine = build_desired_engine_state(task, app_config_db)
+                    if (
+                        loaded_engine is not None
+                        and loaded_engine.fingerprint != desired_engine.fingerprint
+                    ):
+                        assert_engine_model_downloaded(desired_engine)
+                        engine_to_release = loaded_engine
+                        loaded_engine = None
+                        release_loaded_engine(engine_to_release)
+
                     loaded_engine = ensure_engine_loaded(
                         task=task,
                         loaded=loaded_engine,
                         config_db=app_config_db,
+                        desired=desired_engine,
                     )
                 except WorkerEngineError as exc:
                     logger.error(
@@ -235,6 +250,18 @@ def worker_loop(db_path: str | Path | None = None) -> bool:
                         exc,
                     )
                     task_db.fail(task["id"], str(exc), should_retry=exc.should_retry)
+                    continue
+                except Exception as exc:
+                    logger.exception(
+                        "Unexpected worker engine error for task %s",
+                        task["id"],
+                    )
+                    loaded_engine = None
+                    task_db.fail(
+                        task["id"],
+                        f"Unexpected worker engine error: {exc}",
+                        should_retry=True,
+                    )
                     continue
 
                 run_transcription(

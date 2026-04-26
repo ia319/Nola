@@ -6,10 +6,12 @@ from unittest.mock import Mock, patch
 import pytest
 
 from nola.engines.base import TranscribeOptions, TranscriptionEngine
+from nola.model_hub import require_model
 from nola.models.tasks import TaskRowRaw
 from nola.services import worker as worker_module
 from nola.services.worker import build_transcribe_options
 from nola.services.worker_engine import (
+    DesiredEngineState,
     EngineFingerprint,
     LoadedEngineState,
     WorkerEngineError,
@@ -194,6 +196,14 @@ def _raw_task(task_id: str = "task-1") -> TaskRowRaw:
     }
 
 
+def _desired_state(fingerprint: EngineFingerprint) -> DesiredEngineState:
+    """Build a desired engine state for worker loop tests."""
+    return DesiredEngineState(
+        fingerprint=fingerprint,
+        model_info=require_model(fingerprint.model_id),
+    )
+
+
 class TestWorkerLoop:
     """Test worker queue loop coordination with engine loading."""
 
@@ -224,6 +234,10 @@ class TestWorkerLoop:
                 return_value=config_store,
             ),
             patch(
+                "nola.services.worker.build_desired_engine_state",
+                return_value=_desired_state(loaded_state.fingerprint),
+            ),
+            patch(
                 "nola.services.worker.ensure_engine_loaded",
                 return_value=loaded_state,
             ) as ensure_loaded,
@@ -236,6 +250,7 @@ class TestWorkerLoop:
             task=task,
             loaded=None,
             config_db=config_store,
+            desired=_desired_state(loaded_state.fingerprint),
         )
         run_transcription.assert_called_once_with(
             task,
@@ -275,6 +290,12 @@ class TestWorkerLoop:
                 return_value=config_store,
             ),
             patch(
+                "nola.services.worker.build_desired_engine_state",
+                return_value=_desired_state(first_state.fingerprint),
+            ),
+            patch("nola.services.worker.assert_engine_model_downloaded"),
+            patch("nola.services.worker.release_loaded_engine") as release_engine,
+            patch(
                 "nola.services.worker.ensure_engine_loaded",
                 side_effect=[first_state, second_state],
             ) as ensure_loaded,
@@ -285,6 +306,102 @@ class TestWorkerLoop:
         assert started is True
         assert ensure_loaded.call_args_list[0].kwargs["loaded"] is None
         assert ensure_loaded.call_args_list[1].kwargs["loaded"] is first_state
+        release_engine.assert_not_called()
+
+    def test_worker_loop_releases_loaded_engine_before_reload(
+        self, tmp_path: Path
+    ) -> None:
+        """Release the previous engine before loading a changed fingerprint."""
+        first_task = _raw_task("task-1")
+        second_task = _raw_task("task-2")
+        task_db = Mock()
+        task_db.dequeue.side_effect = [first_task, second_task, KeyboardInterrupt]
+        config_store = Mock()
+        first_fingerprint = EngineFingerprint(
+            model_id="small",
+            model_dir=tmp_path,
+            device="cpu",
+            compute_type="default",
+        )
+        second_fingerprint = EngineFingerprint(
+            model_id="small",
+            model_dir=tmp_path,
+            device="cuda",
+            compute_type="float16",
+        )
+        first_state = LoadedEngineState(
+            fingerprint=first_fingerprint,
+            engine=Mock(spec=TranscriptionEngine),
+        )
+        second_state = LoadedEngineState(
+            fingerprint=second_fingerprint,
+            engine=Mock(spec=TranscriptionEngine),
+        )
+
+        with (
+            patch.object(worker_module, "_running", True),
+            patch("nola.services.worker.FileDatabase"),
+            patch("nola.services.worker.TaskDatabase", return_value=task_db),
+            patch(
+                "nola.services.worker.AppConfigDatabase",
+                return_value=config_store,
+            ),
+            patch(
+                "nola.services.worker.build_desired_engine_state",
+                side_effect=[
+                    _desired_state(first_fingerprint),
+                    _desired_state(second_fingerprint),
+                ],
+            ),
+            patch(
+                "nola.services.worker.assert_engine_model_downloaded",
+            ) as assert_downloaded,
+            patch(
+                "nola.services.worker.release_loaded_engine",
+            ) as release_engine,
+            patch(
+                "nola.services.worker.ensure_engine_loaded",
+                side_effect=[first_state, second_state],
+            ) as ensure_loaded,
+            patch("nola.services.worker.run_transcription"),
+        ):
+            started = worker_module.worker_loop(tmp_path / "nola.db")
+
+        assert started is True
+        assert_downloaded.assert_called_once_with(_desired_state(second_fingerprint))
+        release_engine.assert_called_once_with(first_state)
+        assert ensure_loaded.call_args_list[1].kwargs["loaded"] is None
+
+    def test_worker_loop_fails_task_on_unexpected_engine_error(
+        self, tmp_path: Path
+    ) -> None:
+        """Fail the dequeued task when engine preparation raises unexpectedly."""
+        task = _raw_task()
+        task_db = Mock()
+        task_db.dequeue.side_effect = [task, KeyboardInterrupt]
+
+        with (
+            patch.object(worker_module, "_running", True),
+            patch("nola.services.worker.FileDatabase"),
+            patch("nola.services.worker.TaskDatabase", return_value=task_db),
+            patch("nola.services.worker.AppConfigDatabase", return_value=Mock()),
+            patch(
+                "nola.services.worker.build_desired_engine_state",
+                side_effect=RuntimeError("config unavailable"),
+            ),
+            patch("nola.services.worker.ensure_engine_loaded") as ensure_loaded,
+            patch("nola.services.worker.run_transcription") as run_transcription,
+        ):
+            started = worker_module.worker_loop(tmp_path / "nola.db")
+
+        assert started is True
+        ensure_loaded.assert_not_called()
+        task_db.fail.assert_called_once_with(
+            "task-1",
+            "Unexpected worker engine error: config unavailable",
+            should_retry=True,
+        )
+        run_transcription.assert_not_called()
 
     def test_worker_loop_fails_task_when_engine_load_fails(
         self, tmp_path: Path
@@ -299,6 +416,17 @@ class TestWorkerLoop:
             patch("nola.services.worker.FileDatabase"),
             patch("nola.services.worker.TaskDatabase", return_value=task_db),
             patch("nola.services.worker.AppConfigDatabase", return_value=Mock()),
+            patch(
+                "nola.services.worker.build_desired_engine_state",
+                return_value=_desired_state(
+                    EngineFingerprint(
+                        model_id="small",
+                        model_dir=tmp_path,
+                        device="cpu",
+                        compute_type="default",
+                    )
+                ),
+            ),
             patch(
                 "nola.services.worker.ensure_engine_loaded",
                 side_effect=WorkerEngineError("bad engine", should_retry=False),
