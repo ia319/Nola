@@ -57,7 +57,8 @@ class FasterWhisperEngine(TranscriptionEngine):
         for seg in segments:
             yield Segment(start=seg.start, end=seg.end, text=seg.text.strip())
 
-            # Report progress based on segment end time
+            # Report output coverage; do not treat this as faster-whisper
+            # internal progress.
             if on_progress and total_duration > 0:
                 progress = min(seg.end / total_duration * 100, 99.0)
                 on_progress(progress)

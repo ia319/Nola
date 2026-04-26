@@ -55,6 +55,7 @@ class VadParametersRequest(BaseModel):
     max_speech_duration_s: float | Literal["inf"] | None = None
     min_silence_duration_ms: int | None = Field(None, ge=0)
     speech_pad_ms: int | None = Field(None, ge=0)
+    # Keep these fields gated by the installed faster-whisper VadOptions.
     min_silence_at_max_speech: int | None = Field(None, ge=0)
     use_max_poss_sil_at_max_speech: bool | None = None
 

@@ -292,6 +292,7 @@ _TRANSCRIPTION_PARAM_SCHEMA: list[OptionGroupSchema] = [
                 depends_on="vad_filter",
                 special_values=["inf"],
             ),
+            # Keep these fields gated by the installed faster-whisper VadOptions.
             NumberFieldSchema(
                 key="vad_parameters.min_silence_at_max_speech",
                 label_key="options.field.vadMinSilenceAtMaxSpeech",
