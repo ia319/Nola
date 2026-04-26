@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { refreshConfigCaches } from '@/config/cache-invalidation'
-import { fetchEngineDefaults, fetchSessionDefaults, patchTranscriptionDefaults } from '@/config/api'
+import { fetchEngineDefaults, fetchSessionDefaults, patchSessionDefaults } from '@/config/api'
 import {
   DEFAULT_ENGINE_COMPUTE_TYPE,
   DEFAULT_ENGINE_DEVICE,
@@ -43,6 +43,7 @@ import { buildTranscriptionSchemaUiModel } from '@/features/transcription-option
 import { useModels } from '@/features/models'
 import { cn } from '@/lib/utils'
 import { isAppError } from '@/shared/lib/error-factory'
+import { queryClient } from '@/shared/lib/query-client'
 import { queryKeys } from '@/shared/lib/query-keys'
 import type {
   AppError,
@@ -448,6 +449,10 @@ export function TaskWorkbenchSessionConfig({
   async function refreshDefaultsView(): Promise<boolean> {
     try {
       await refreshConfigCaches()
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.models.list() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.models.settings() }),
+      ])
       return true
     } catch (error: unknown) {
       logger.error('config.defaults.refreshFailed', { context: 'save', error })
@@ -456,7 +461,15 @@ export function TaskWorkbenchSessionConfig({
   }
 
   async function handleSaveAsDefault(): Promise<void> {
-    if (!defaults || isSavingDefaults || disabled) return
+    if (
+      !defaults ||
+      isSavingDefaults ||
+      disabled ||
+      !selectedModelId ||
+      !downloadedModelIds.has(selectedModelId)
+    ) {
+      return
+    }
 
     setIsSavingDefaults(true)
 
@@ -476,7 +489,15 @@ export function TaskWorkbenchSessionConfig({
         nextEffectiveDefaults,
       })
 
-      await patchTranscriptionDefaults(payload)
+      const response = await patchSessionDefaults({
+        execution: {
+          model_id: selectedModelId,
+          device: resolvedDevice,
+          compute_type: resolvedComputeType,
+        },
+        transcription: payload,
+      })
+      queryClient.setQueryData(queryKeys.config.sessionDefaults(), response)
       const refreshed = await refreshDefaultsView()
 
       if (refreshed) {
@@ -710,7 +731,13 @@ export function TaskWorkbenchSessionConfig({
               type="button"
               variant="outline"
               onClick={() => void handleSaveAsDefault()}
-              disabled={controlsDisabled || defaults === null}
+              disabled={
+                controlsDisabled ||
+                sessionDefaultsQuery.isPending ||
+                defaults === null ||
+                !selectedModelId ||
+                !downloadedModelIds.has(selectedModelId)
+              }
             >
               {isSavingDefaults
                 ? t('tasks.workbench.advancedSheet.savingDefault')

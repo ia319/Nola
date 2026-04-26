@@ -327,7 +327,7 @@
         "reset": "Reset to Defaults",
         "cancel": "Cancel",
         "apply": "Apply Changes",
-        "saveDefault": "Save as Default",
+        "saveDefault": "Save as Task Defaults",
         "savingDefault": "Saving..."
       }
     },

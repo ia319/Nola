@@ -16,9 +16,8 @@ import type {
   AppError,
   EngineDefaults,
   SessionDefaults,
+  SessionDefaultsUpdateRequest,
   TranscriptionDefaults,
-  TranscriptionDefaultsPatchResponse,
-  TranscriptionDefaultsUpdateRequest,
 } from '@/shared/types'
 import { buildTranscriptionDefaults } from '@/test-utils/transcription-defaults'
 import { TaskWorkbenchSessionConfig } from '../TaskWorkbenchSessionConfig'
@@ -30,10 +29,8 @@ const taskWorkbenchSessionConfigMocks = vi.hoisted(() => ({
   useTranscriptionOptionsMock: vi.fn<() => UseTranscriptionOptionsReturn>(),
   fetchEngineDefaultsMock: vi.fn<() => Promise<EngineDefaults>>(),
   fetchSessionDefaultsMock: vi.fn<(signal?: AbortSignal) => Promise<SessionDefaults>>(),
-  patchTranscriptionDefaultsMock:
-    vi.fn<
-      (payload: TranscriptionDefaultsUpdateRequest) => Promise<TranscriptionDefaultsPatchResponse>
-    >(),
+  patchSessionDefaultsMock:
+    vi.fn<(payload: SessionDefaultsUpdateRequest) => Promise<SessionDefaults>>(),
   toastSuccessMock: vi.fn(),
   toastErrorMock: vi.fn(),
   toastWarningMock: vi.fn(),
@@ -90,7 +87,7 @@ vi.mock('react-i18next', () => ({
         'tasks.workbench.advancedSheet.cancel': 'Cancel',
         'tasks.workbench.advancedSheet.apply': 'Apply Changes',
         'tasks.workbench.advancedSheet.reset': 'Reset to Defaults',
-        'tasks.workbench.advancedSheet.saveDefault': 'Save as Default',
+        'tasks.workbench.advancedSheet.saveDefault': 'Save as Task Defaults',
         'tasks.workbench.advancedSheet.savingDefault': 'Saving...',
       }
 
@@ -122,7 +119,7 @@ vi.mock('@/config/logger', () => ({
 vi.mock('@/config/api', () => ({
   fetchEngineDefaults: taskWorkbenchSessionConfigMocks.fetchEngineDefaultsMock,
   fetchSessionDefaults: taskWorkbenchSessionConfigMocks.fetchSessionDefaultsMock,
-  patchTranscriptionDefaults: taskWorkbenchSessionConfigMocks.patchTranscriptionDefaultsMock,
+  patchSessionDefaults: taskWorkbenchSessionConfigMocks.patchSessionDefaultsMock,
 }))
 
 vi.mock('@/config/cache-invalidation', () => ({
@@ -285,8 +282,13 @@ describe('TaskWorkbenchSessionConfig', () => {
       },
       transcription: buildDefaults(),
     })
-    taskWorkbenchSessionConfigMocks.patchTranscriptionDefaultsMock.mockResolvedValue({
-      defaults: buildDefaults(),
+    taskWorkbenchSessionConfigMocks.patchSessionDefaultsMock.mockResolvedValue({
+      execution: {
+        model_id: 'large-v3',
+        device: 'auto',
+        compute_type: 'default',
+      },
+      transcription: buildDefaults(),
     })
     taskWorkbenchSessionConfigMocks.refreshConfigCachesMock.mockResolvedValue(
       buildAppConfigReturn().config,
@@ -482,7 +484,7 @@ describe('TaskWorkbenchSessionConfig', () => {
     })
   })
 
-  it('saves the current session draft as transcription defaults and refreshes shared config', async () => {
+  it('saves the current session draft as session defaults and refreshes shared config', async () => {
     const defaults = buildDefaults({
       language: null,
       task: 'transcribe',
@@ -523,15 +525,22 @@ describe('TaskWorkbenchSessionConfig', () => {
       target: { value: 'Keep names consistent' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Change Beam Size' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Save as Default' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save as Task Defaults' }))
 
     await waitFor(() => {
       expect(taskWorkbenchSessionConfigMocks.fetchEngineDefaultsMock).toHaveBeenCalledTimes(1)
-      expect(taskWorkbenchSessionConfigMocks.patchTranscriptionDefaultsMock).toHaveBeenCalledWith({
-        language: 'en',
-        task: 'translate',
-        beam_size: 9,
-        initial_prompt: 'Keep names consistent',
+      expect(taskWorkbenchSessionConfigMocks.patchSessionDefaultsMock).toHaveBeenCalledWith({
+        execution: {
+          model_id: 'large-v3',
+          device: 'auto',
+          compute_type: 'default',
+        },
+        transcription: {
+          language: 'en',
+          task: 'translate',
+          beam_size: 9,
+          initial_prompt: 'Keep names consistent',
+        },
       })
       expect(taskWorkbenchSessionConfigMocks.refreshConfigCachesMock).toHaveBeenCalledTimes(1)
       expect(taskWorkbenchSessionConfigMocks.resetOptionOverridesMock).toHaveBeenCalledTimes(1)
@@ -553,12 +562,10 @@ describe('TaskWorkbenchSessionConfig', () => {
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Advanced Parameters' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Save as Default' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save as Task Defaults' }))
 
     await waitFor(() => {
-      expect(taskWorkbenchSessionConfigMocks.patchTranscriptionDefaultsMock).toHaveBeenCalledTimes(
-        1,
-      )
+      expect(taskWorkbenchSessionConfigMocks.patchSessionDefaultsMock).toHaveBeenCalledTimes(1)
       expect(taskWorkbenchSessionConfigMocks.resetOptionOverridesMock).not.toHaveBeenCalled()
       expect(taskWorkbenchSessionConfigMocks.toastSuccessMock).not.toHaveBeenCalled()
       expect(taskWorkbenchSessionConfigMocks.toastWarningMock).toHaveBeenCalledWith(

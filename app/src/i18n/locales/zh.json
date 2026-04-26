@@ -326,7 +326,7 @@
         "reset": "重置为默认值",
         "cancel": "取消",
         "apply": "应用更改",
-        "saveDefault": "保存为默认值",
+        "saveDefault": "保存为任务默认值",
         "savingDefault": "保存中..."
       }
     },
