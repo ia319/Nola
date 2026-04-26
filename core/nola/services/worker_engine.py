@@ -14,6 +14,8 @@ from nola.config.common.types import ConfigMap
 from nola.engines.base import (
     ALLOWED_ENGINE_COMPUTE_TYPES,
     ALLOWED_ENGINE_DEVICES,
+    DEFAULT_ENGINE_COMPUTE_TYPE,
+    DEFAULT_ENGINE_DEVICE,
     EngineComputeType,
     EngineConfig,
     EngineDevice,
@@ -109,6 +111,46 @@ def _require_engine_option(
     )
 
 
+def _resolve_settings_engine_option(
+    value: str,
+    *,
+    field_name: str,
+    allowed_values: tuple[_EngineOptionValue, ...],
+    default_value: _EngineOptionValue,
+) -> _EngineOptionValue:
+    if value in allowed_values:
+        return cast(_EngineOptionValue, value)
+    logger.warning(
+        "Invalid worker settings %s=%s; falling back to %s",
+        field_name,
+        value,
+        default_value,
+    )
+    return default_value
+
+
+def _resolve_task_engine_option(
+    task_value: str | None,
+    settings_value: str,
+    *,
+    field_name: str,
+    allowed_values: tuple[_EngineOptionValue, ...],
+    default_value: _EngineOptionValue,
+) -> _EngineOptionValue:
+    if task_value is not None:
+        return _require_engine_option(
+            task_value,
+            field_name=field_name,
+            allowed_values=allowed_values,
+        )
+    return _resolve_settings_engine_option(
+        settings_value,
+        field_name=field_name,
+        allowed_values=allowed_values,
+        default_value=default_value,
+    )
+
+
 def _pick_task_or_fallback(task_value: str | None, fallback_value: str) -> str:
     if task_value is not None:
         return task_value
@@ -133,11 +175,6 @@ def build_desired_engine_state(
         task["model_id"],
         _resolve_fallback_model_id(model_config),
     )
-    raw_device = _pick_task_or_fallback(task["engine_device"], settings.device)
-    raw_compute_type = _pick_task_or_fallback(
-        task["engine_compute_type"],
-        settings.compute_type,
-    )
 
     try:
         model_info = require_model(raw_model_id)
@@ -158,15 +195,19 @@ def build_desired_engine_state(
         fingerprint=EngineFingerprint(
             model_id=model_info.model_id,
             model_dir=model_dir,
-            device=_require_engine_option(
-                raw_device,
+            device=_resolve_task_engine_option(
+                task["engine_device"],
+                settings.device,
                 field_name="device",
                 allowed_values=ALLOWED_ENGINE_DEVICES,
+                default_value=DEFAULT_ENGINE_DEVICE,
             ),
-            compute_type=_require_engine_option(
-                raw_compute_type,
+            compute_type=_resolve_task_engine_option(
+                task["engine_compute_type"],
+                settings.compute_type,
                 field_name="compute_type",
                 allowed_values=ALLOWED_ENGINE_COMPUTE_TYPES,
+                default_value=DEFAULT_ENGINE_COMPUTE_TYPE,
             ),
         ),
         model_info=model_info,
@@ -239,7 +280,11 @@ def ensure_engine_loaded(
     engine_factory: EngineFactory = create_faster_whisper_engine,
     storage_factory: ModelStorageFactory = ModelStorage,
 ) -> LoadedEngineState:
-    """Return a loaded engine matching the task execution fingerprint."""
+    """Return a loaded engine matching the task execution fingerprint.
+
+    Pass a loaded engine only when the caller already released any prior
+    non-matching fingerprint.
+    """
     desired = desired or build_desired_engine_state(task, config_db)
     if loaded is not None and loaded.fingerprint == desired.fingerprint:
         return loaded

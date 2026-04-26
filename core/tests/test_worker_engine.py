@@ -8,7 +8,12 @@ import pytest
 
 from nola.config.common.types import ConfigMap
 from nola.config.settings import Settings
-from nola.engines.base import EngineConfig, TranscriptionEngine
+from nola.engines.base import (
+    DEFAULT_ENGINE_COMPUTE_TYPE,
+    DEFAULT_ENGINE_DEVICE,
+    EngineConfig,
+    TranscriptionEngine,
+)
 from nola.model_hub.contracts import ModelCacheState
 from nola.models.tasks import TaskRowRaw
 from nola.services import worker_engine
@@ -154,6 +159,41 @@ def test_build_desired_engine_state_falls_back_for_legacy_tasks(
         device="cpu",
         compute_type="default",
     )
+
+
+def test_build_desired_engine_state_safely_falls_back_for_invalid_settings(
+    tmp_path: Path,
+) -> None:
+    """Invalid process settings should not permanently fail legacy tasks."""
+    with (
+        patch.object(worker_engine.settings, "model_size", "small"),
+        patch.object(worker_engine.settings, "model_dir", None),
+        patch.object(worker_engine.settings, "device", "metal"),
+        patch.object(worker_engine.settings, "compute_type", "bf16"),
+        patch.object(worker_engine.logger, "warning") as logger_warning,
+        patch.object(
+            Settings,
+            "default_model_dir",
+            new_callable=PropertyMock,
+            return_value=tmp_path,
+        ),
+    ):
+        desired = build_desired_engine_state(
+            _raw_task(
+                model_id=None,
+                engine_device=None,
+                engine_compute_type=None,
+            ),
+            StubWorkerConfig(),
+        )
+
+    assert desired.fingerprint == EngineFingerprint(
+        model_id="small",
+        model_dir=tmp_path,
+        device=DEFAULT_ENGINE_DEVICE,
+        compute_type=DEFAULT_ENGINE_COMPUTE_TYPE,
+    )
+    assert logger_warning.call_count == 2
 
 
 def test_build_desired_engine_state_prefers_settings_model_dir(
