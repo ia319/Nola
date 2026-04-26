@@ -24,19 +24,16 @@ vi.mock('react-i18next', () => ({
         'settings.modelStorage.fields.effectiveDirectory.description': 'Reserve safe path display.',
         'settings.modelStorage.fields.overrideSource.label': 'Override Source',
         'settings.modelStorage.fields.overrideSource.description': 'Review override source.',
-        'settings.modelStorage.fields.restartStatus.label': 'Restart Status',
-        'settings.modelStorage.fields.restartStatus.description': 'Review restart state.',
+        'settings.modelStorage.fields.reloadMode.label': 'Reload Mode',
+        'settings.modelStorage.fields.reloadMode.description': 'Review reload mode.',
         'settings.modelStorage.fields.configuredDirectory.label': 'Configured Cache Directory',
         'settings.modelStorage.fields.configuredDirectory.description': 'Reserve cache control.',
         'settings.modelStorage.fields.environmentOverride.label': 'Environment Override',
         'settings.modelStorage.fields.environmentOverride.description': 'Environment controls it.',
-        'settings.modelStorage.fields.restartRequired.label': 'Restart Required',
-        'settings.modelStorage.fields.restartRequired.description': 'Restart local service.',
         'settings.modelStorage.values.empty': 'Not set',
         'settings.modelStorage.values.directoryUnavailable': 'Safe path pending',
         'settings.modelStorage.values.environmentOverrideActive': 'Environment override active',
-        'settings.modelStorage.values.restartRequired': 'Restart required',
-        'settings.modelStorage.values.restartNotRequired': 'No restart required',
+        'settings.modelStorage.values.taskBoundaryReload': 'Task-boundary reload',
         'settings.modelStorage.values.overrideSource.environment': 'Environment',
         'settings.modelStorage.values.overrideSource.database': 'Stored setting',
         'settings.modelStorage.values.overrideSource.default': 'Default',
@@ -99,7 +96,7 @@ describe('ModelStorageTab', () => {
     expect(screen.getByText('small')).toBeTruthy()
     expect(screen.getByText('large-v3')).toBeTruthy()
     expect(screen.getByText('Stored setting')).toBeTruthy()
-    expect(screen.getByText('No restart required')).toBeTruthy()
+    expect(screen.getByText('Task-boundary reload')).toBeTruthy()
     expect(screen.getAllByText('Safe path pending').length).toBeGreaterThan(0)
     expect(container.textContent).not.toContain('D:/private/models')
     expect(container.textContent).not.toContain('/Users/private/models')
@@ -127,6 +124,7 @@ describe('ModelStorageTab', () => {
     expect(screen.getAllByText('Model cache').length).toBeGreaterThan(0)
     expect(screen.getByDisplayValue('Model cache')).toBeDisabled()
     expect(screen.getByText('Environment override active')).toBeTruthy()
-    expect(screen.getAllByText('Restart required').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Restart required')).toBeNull()
+    expect(screen.getByText('Task-boundary reload')).toBeTruthy()
   })
 })
