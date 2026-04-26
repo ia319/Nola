@@ -17,10 +17,16 @@ from nola.engines.base import EngineComputeType, EngineDevice
 class EngineConfigResponse(BaseModel):
     """Expose the active engine configuration."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     model_size: str
     device: EngineDevice
     compute_type: EngineComputeType
     is_multilingual: bool
+    schema_: list[OptionGroupSchema] = Field(
+        alias="schema",
+        serialization_alias="schema",
+    )
 
 
 class FileConfigResponse(BaseModel):

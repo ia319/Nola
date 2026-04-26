@@ -34,6 +34,7 @@ from nola.config.export import (
 )
 from nola.config.session import (
     get_session_defaults,
+    get_session_execution_param_schema,
     patch_session_execution_defaults,
 )
 from nola.config.transcription import (
@@ -118,6 +119,7 @@ def _build_engine_config(
         device=_resolve_runtime_device(worker_state),
         compute_type=_resolve_runtime_compute_type(worker_state),
         is_multilingual=is_multilingual(runtime_model_id),
+        schema=get_session_execution_param_schema(),
     )
 
 

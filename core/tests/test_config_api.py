@@ -72,6 +72,24 @@ class TestConfigAPI:
         assert data["engine"]["device"] == settings.device
         assert data["engine"]["compute_type"] == "default"
         assert data["engine"]["is_multilingual"] is True
+        execution_group = next(
+            group for group in data["engine"]["schema"] if group["group"] == "execution"
+        )
+        execution_fields = {field["key"]: field for field in execution_group["fields"]}
+        assert [
+            option["value"] for option in execution_fields["device"]["options"]
+        ] == [
+            "auto",
+            "cpu",
+            "cuda",
+        ]
+        assert [
+            option["value"] for option in execution_fields["compute_type"]["options"]
+        ] == [
+            "default",
+            "float16",
+            "int8",
+        ]
         assert data["transcription"]["defaults"]["beam_size"] == 5
         assert data["transcription"]["defaults"]["vad_parameters"]["threshold"] == 0.5
         assert (
