@@ -268,7 +268,7 @@ def ensure_engine_loaded(
     except Exception as exc:
         raise WorkerEngineError(
             f"Failed to load task execution engine: {exc}",
-            should_retry=False,
+            should_retry=True,
         ) from exc
 
     _persist_loaded_state(config_db, fingerprint)

@@ -479,6 +479,29 @@ def test_ensure_engine_loaded_rejects_missing_model_cache(tmp_path: Path) -> Non
     assert configs == []
 
 
+def test_ensure_engine_loaded_marks_factory_failure_retryable(tmp_path: Path) -> None:
+    """Engine construction failures should requeue while retries remain."""
+    with (
+        patch.object(worker_engine.settings, "model_dir", None),
+        patch.object(
+            Settings,
+            "default_model_dir",
+            new_callable=PropertyMock,
+            return_value=tmp_path,
+        ),
+        pytest.raises(WorkerEngineError, match="Failed to load") as exc_info,
+    ):
+        ensure_engine_loaded(
+            task=_raw_task(),
+            loaded=None,
+            config_db=StubWorkerConfig(),
+            engine_factory=Mock(side_effect=RuntimeError("cuda busy")),
+            storage_factory=lambda _path: StubModelStorage(),
+        )
+
+    assert exc_info.value.should_retry is True
+
+
 def test_ensure_engine_loaded_ignores_worker_state_write_failure(
     tmp_path: Path,
 ) -> None:
