@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { UseAppConfigReturn } from '@/config/use-app-config'
@@ -14,6 +15,7 @@ import type {
   AppConfig,
   AppError,
   EngineDefaults,
+  SessionDefaults,
   TranscriptionDefaults,
   TranscriptionDefaultsPatchResponse,
   TranscriptionDefaultsUpdateRequest,
@@ -27,6 +29,7 @@ const taskWorkbenchSessionConfigMocks = vi.hoisted(() => ({
   useModelsMock: vi.fn<() => UseModelsResult>(),
   useTranscriptionOptionsMock: vi.fn<() => UseTranscriptionOptionsReturn>(),
   fetchEngineDefaultsMock: vi.fn<() => Promise<EngineDefaults>>(),
+  fetchSessionDefaultsMock: vi.fn<(signal?: AbortSignal) => Promise<SessionDefaults>>(),
   patchTranscriptionDefaultsMock:
     vi.fn<
       (payload: TranscriptionDefaultsUpdateRequest) => Promise<TranscriptionDefaultsPatchResponse>
@@ -64,13 +67,20 @@ vi.mock('react-i18next', () => ({
         'tasks.workbench.sections.sessionConfig.title': 'Session Configuration',
         'tasks.workbench.sessionConfig.globalSettings': 'Global Settings',
         'tasks.workbench.sessionConfig.executionEngine': 'Execution Engine',
-        'tasks.workbench.sessionConfig.sessionOverride': 'Session override',
+        'tasks.workbench.sessionConfig.sessionOverride': 'Task execution',
         'tasks.workbench.sessionConfig.model.label': 'Model',
-        'tasks.workbench.sessionConfig.model.badge': 'Coming soon',
+        'tasks.workbench.sessionConfig.model.badge': 'Task model',
         'tasks.workbench.sessionConfig.model.loading': 'Loading models',
-        'tasks.workbench.sessionConfig.model.comingSoon': 'Coming soon',
+        'tasks.workbench.sessionConfig.model.placeholder': 'Select a downloaded model',
+        'tasks.workbench.sessionConfig.model.noDownloaded': 'No downloaded models',
         'tasks.workbench.sessionConfig.device.label': 'Device',
+        'tasks.workbench.sessionConfig.device.options.auto': 'Auto',
+        'tasks.workbench.sessionConfig.device.options.cpu': 'CPU',
+        'tasks.workbench.sessionConfig.device.options.cuda': 'CUDA',
         'tasks.workbench.sessionConfig.computeType.label': 'Compute Type',
+        'tasks.workbench.sessionConfig.computeType.options.default': 'Default',
+        'tasks.workbench.sessionConfig.computeType.options.float16': 'Float16',
+        'tasks.workbench.sessionConfig.computeType.options.int8': 'Int8',
         'tasks.workbench.sessionConfig.unavailable': 'Unavailable',
         'tasks.workbench.sessionConfig.advanced.button': 'Advanced Parameters',
         'tasks.workbench.advancedSheet.title': 'Advanced Configuration',
@@ -111,6 +121,7 @@ vi.mock('@/config/logger', () => ({
 
 vi.mock('@/config/api', () => ({
   fetchEngineDefaults: taskWorkbenchSessionConfigMocks.fetchEngineDefaultsMock,
+  fetchSessionDefaults: taskWorkbenchSessionConfigMocks.fetchSessionDefaultsMock,
   patchTranscriptionDefaults: taskWorkbenchSessionConfigMocks.patchTranscriptionDefaultsMock,
 }))
 
@@ -225,6 +236,33 @@ function requireTextAreaElement(value: HTMLElement, label: string): HTMLTextArea
   throw new Error(`Expected ${label} to be a textarea`)
 }
 
+function createQueryClient(): QueryClient {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  })
+}
+
+function renderSessionConfig(props: {
+  fileIds: string[]
+  onCreateTask?: typeof taskWorkbenchSessionConfigMocks.onCreateTaskMock
+  onTasksCreated?: typeof taskWorkbenchSessionConfigMocks.onTasksCreatedMock
+  disabled?: boolean
+}) {
+  return render(
+    <QueryClientProvider client={createQueryClient()}>
+      <TaskWorkbenchSessionConfig
+        fileIds={props.fileIds}
+        onCreateTask={props.onCreateTask ?? taskWorkbenchSessionConfigMocks.onCreateTaskMock}
+        onTasksCreated={props.onTasksCreated ?? taskWorkbenchSessionConfigMocks.onTasksCreatedMock}
+        disabled={props.disabled}
+      />
+    </QueryClientProvider>,
+  )
+}
+
 describe('TaskWorkbenchSessionConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -239,6 +277,14 @@ describe('TaskWorkbenchSessionConfig', () => {
     taskWorkbenchSessionConfigMocks.fetchEngineDefaultsMock.mockResolvedValue({
       defaults: buildDefaults(),
     })
+    taskWorkbenchSessionConfigMocks.fetchSessionDefaultsMock.mockResolvedValue({
+      execution: {
+        model_id: 'large-v3',
+        device: 'auto',
+        compute_type: 'default',
+      },
+      transcription: buildDefaults(),
+    })
     taskWorkbenchSessionConfigMocks.patchTranscriptionDefaultsMock.mockResolvedValue({
       defaults: buildDefaults(),
     })
@@ -247,14 +293,8 @@ describe('TaskWorkbenchSessionConfig', () => {
     )
   })
 
-  it('renders the planned session config layout and current execution engine values', () => {
-    render(
-      <TaskWorkbenchSessionConfig
-        fileIds={['file-1', 'file-2']}
-        onCreateTask={taskWorkbenchSessionConfigMocks.onCreateTaskMock}
-        onTasksCreated={taskWorkbenchSessionConfigMocks.onTasksCreatedMock}
-      />,
-    )
+  it('renders the planned session config layout and current execution engine values', async () => {
+    renderSessionConfig({ fileIds: ['file-1', 'file-2'] })
 
     expect(screen.getByRole('heading', { name: 'Session Configuration', level: 2 })).toBeTruthy()
     expect(screen.getByText('Global Settings')).toBeTruthy()
@@ -262,9 +302,11 @@ describe('TaskWorkbenchSessionConfig', () => {
     expect(screen.getByLabelText('Language')).toBeTruthy()
     expect(screen.getByLabelText('Task')).toBeTruthy()
     expect(screen.getByLabelText('Model')).toBeTruthy()
-    expect(screen.getByText('Large V3')).toBeTruthy()
-    expect(screen.getByText('CUDA')).toBeTruthy()
-    expect(screen.getByText('Float16')).toBeTruthy()
+    await waitFor(() => {
+      expect(screen.getByText('Large V3')).toBeTruthy()
+    })
+    expect(screen.getByText('Auto')).toBeTruthy()
+    expect(screen.getByText('Default')).toBeTruthy()
     expect(screen.getByText('1 overrides')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Start 2 Selected Tasks' })).toBeTruthy()
   })
@@ -282,18 +324,12 @@ describe('TaskWorkbenchSessionConfig', () => {
       }),
     )
 
-    render(
-      <TaskWorkbenchSessionConfig
-        fileIds={['file-1']}
-        onCreateTask={taskWorkbenchSessionConfigMocks.onCreateTaskMock}
-        onTasksCreated={taskWorkbenchSessionConfigMocks.onTasksCreatedMock}
-      />,
-    )
+    renderSessionConfig({ fileIds: ['file-1'] })
 
     expect(screen.getByText('0 overrides')).toBeTruthy()
   })
 
-  it('does not display the first downloaded model when runtime model ids are unavailable', () => {
+  it('does not display the first downloaded model when default and runtime ids are unavailable', async () => {
     taskWorkbenchSessionConfigMocks.useAppConfigMock.mockReturnValue(
       buildAppConfigReturn({
         engine: {
@@ -304,22 +340,27 @@ describe('TaskWorkbenchSessionConfig', () => {
         },
       }),
     )
+    taskWorkbenchSessionConfigMocks.fetchSessionDefaultsMock.mockResolvedValue({
+      execution: {
+        model_id: 'missing-session-default',
+        device: 'auto',
+        compute_type: 'default',
+      },
+      transcription: buildDefaults(),
+    })
     taskWorkbenchSessionConfigMocks.useModelsMock.mockReturnValue({
       ...buildModelsReturn(),
       configuredModelId: 'missing-default',
       lastLoadedModelId: 'missing-runtime',
     })
 
-    render(
-      <TaskWorkbenchSessionConfig
-        fileIds={['file-1']}
-        onCreateTask={taskWorkbenchSessionConfigMocks.onCreateTaskMock}
-        onTasksCreated={taskWorkbenchSessionConfigMocks.onTasksCreatedMock}
-      />,
-    )
+    renderSessionConfig({ fileIds: ['file-1'] })
 
-    expect(screen.getByText('Tiny')).toBeTruthy()
+    await waitFor(() => {
+      expect(screen.getByText('Select a downloaded model')).toBeTruthy()
+    })
     expect(screen.queryByText('Large V3')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Start 1 Selected Tasks' })).toBeDisabled()
   })
 
   it('creates tasks for all selected files and reports per-file outcomes', async () => {
@@ -339,13 +380,11 @@ describe('TaskWorkbenchSessionConfig', () => {
       })
       .mockRejectedValueOnce(appError)
 
-    render(
-      <TaskWorkbenchSessionConfig
-        fileIds={['file-1', 'file-2']}
-        onCreateTask={taskWorkbenchSessionConfigMocks.onCreateTaskMock}
-        onTasksCreated={taskWorkbenchSessionConfigMocks.onTasksCreatedMock}
-      />,
-    )
+    renderSessionConfig({ fileIds: ['file-1', 'file-2'] })
+
+    await waitFor(() => {
+      expect(screen.getByText('Large V3')).toBeTruthy()
+    })
 
     fireEvent.click(screen.getByRole('button', { name: 'Start 2 Selected Tasks' }))
 
@@ -367,16 +406,18 @@ describe('TaskWorkbenchSessionConfig', () => {
 
     expect(taskWorkbenchSessionConfigMocks.buildRequestMock).toHaveBeenNthCalledWith(1, 'file-1')
     expect(taskWorkbenchSessionConfigMocks.buildRequestMock).toHaveBeenNthCalledWith(2, 'file-2')
+    expect(taskWorkbenchSessionConfigMocks.onCreateTaskMock).toHaveBeenNthCalledWith(1, {
+      file_id: 'file-1',
+      model_id: 'large-v3',
+      engine: {
+        device: 'auto',
+        compute_type: 'default',
+      },
+    })
   })
 
   it('applies advanced draft changes and the initial prompt through the shared session state', async () => {
-    render(
-      <TaskWorkbenchSessionConfig
-        fileIds={['file-1']}
-        onCreateTask={taskWorkbenchSessionConfigMocks.onCreateTaskMock}
-        onTasksCreated={taskWorkbenchSessionConfigMocks.onTasksCreatedMock}
-      />,
-    )
+    renderSessionConfig({ fileIds: ['file-1'] })
 
     fireEvent.click(screen.getByRole('button', { name: 'Advanced Parameters' }))
 
@@ -415,13 +456,7 @@ describe('TaskWorkbenchSessionConfig', () => {
       }),
     )
 
-    render(
-      <TaskWorkbenchSessionConfig
-        fileIds={['file-1']}
-        onCreateTask={taskWorkbenchSessionConfigMocks.onCreateTaskMock}
-        onTasksCreated={taskWorkbenchSessionConfigMocks.onTasksCreatedMock}
-      />,
-    )
+    renderSessionConfig({ fileIds: ['file-1'] })
 
     fireEvent.click(screen.getByRole('button', { name: 'Advanced Parameters' }))
 
@@ -477,13 +512,11 @@ describe('TaskWorkbenchSessionConfig', () => {
       }),
     })
 
-    render(
-      <TaskWorkbenchSessionConfig
-        fileIds={['file-1']}
-        onCreateTask={taskWorkbenchSessionConfigMocks.onCreateTaskMock}
-        onTasksCreated={taskWorkbenchSessionConfigMocks.onTasksCreatedMock}
-      />,
-    )
+    renderSessionConfig({ fileIds: ['file-1'] })
+
+    await waitFor(() => {
+      expect(screen.getByText('Large V3')).toBeTruthy()
+    })
 
     fireEvent.click(screen.getByRole('button', { name: 'Advanced Parameters' }))
     fireEvent.change(screen.getByLabelText('Initial Prompt'), {
@@ -513,13 +546,11 @@ describe('TaskWorkbenchSessionConfig', () => {
       new Error('refresh failed'),
     )
 
-    render(
-      <TaskWorkbenchSessionConfig
-        fileIds={['file-1']}
-        onCreateTask={taskWorkbenchSessionConfigMocks.onCreateTaskMock}
-        onTasksCreated={taskWorkbenchSessionConfigMocks.onTasksCreatedMock}
-      />,
-    )
+    renderSessionConfig({ fileIds: ['file-1'] })
+
+    await waitFor(() => {
+      expect(screen.getByText('Large V3')).toBeTruthy()
+    })
 
     fireEvent.click(screen.getByRole('button', { name: 'Advanced Parameters' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save as Default' }))

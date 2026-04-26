@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Play, RotateCcw, SlidersHorizontal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -16,7 +17,15 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { refreshConfigCaches } from '@/config/cache-invalidation'
-import { fetchEngineDefaults, patchTranscriptionDefaults } from '@/config/api'
+import { fetchEngineDefaults, fetchSessionDefaults, patchTranscriptionDefaults } from '@/config/api'
+import {
+  DEFAULT_ENGINE_COMPUTE_TYPE,
+  DEFAULT_ENGINE_DEVICE,
+  ENGINE_COMPUTE_TYPE_OPTIONS,
+  ENGINE_DEVICE_OPTIONS,
+  isEngineComputeType,
+  isEngineDevice,
+} from '@/config/engine-options'
 import logger from '@/config/logger'
 import { useAppConfig } from '@/config/use-app-config'
 import { AdvancedOptions, useTranscriptionOptions } from '@/features/transcription-options'
@@ -34,15 +43,31 @@ import { buildTranscriptionSchemaUiModel } from '@/features/transcription-option
 import { useModels } from '@/features/models'
 import { cn } from '@/lib/utils'
 import { isAppError } from '@/shared/lib/error-factory'
+import { queryKeys } from '@/shared/lib/query-keys'
 import type {
   AppError,
   CreateTaskPayload,
   CreateTaskResponse,
+  EngineComputeType,
+  EngineDevice,
+  SessionDefaults,
   TranscriptionDefaults,
 } from '@/shared/types'
 
 const MODEL_LOADING_VALUE = '__loading__'
 const MODEL_EMPTY_VALUE = '__empty__'
+
+const DEVICE_LABEL_KEYS: Record<EngineDevice, string> = {
+  auto: 'tasks.workbench.sessionConfig.device.options.auto',
+  cpu: 'tasks.workbench.sessionConfig.device.options.cpu',
+  cuda: 'tasks.workbench.sessionConfig.device.options.cuda',
+}
+
+const COMPUTE_TYPE_LABEL_KEYS: Record<EngineComputeType, string> = {
+  default: 'tasks.workbench.sessionConfig.computeType.options.default',
+  float16: 'tasks.workbench.sessionConfig.computeType.options.float16',
+  int8: 'tasks.workbench.sessionConfig.computeType.options.int8',
+}
 
 export interface TaskWorkbenchSessionConfigProps {
   fileIds: string[]
@@ -54,6 +79,7 @@ export interface TaskWorkbenchSessionConfigProps {
 interface ModelSelectOption {
   value: string
   label: string
+  disabled?: boolean
 }
 
 function toAppError(error: unknown): AppError {
@@ -63,31 +89,6 @@ function toAppError(error: unknown): AppError {
     i18nKey: 'error.api.serverError',
     retriable: true,
   }
-}
-
-function formatEngineValue(value: string | null | undefined): string {
-  if (!value) return ''
-
-  const normalized = value.replace(/[_-]+/g, ' ').trim()
-  if (normalized === '') return ''
-
-  return normalized
-    .split(/\s+/)
-    .map((segment) => {
-      const lower = segment.toLowerCase()
-
-      if (lower === 'cpu' || lower === 'gpu' || lower === 'cuda') {
-        return lower.toUpperCase()
-      }
-
-      if (lower === 'fp16') return 'FP16'
-      if (lower === 'fp32') return 'FP32'
-
-      return /^[a-z]/.test(segment)
-        ? `${segment.charAt(0).toUpperCase()}${segment.slice(1)}`
-        : segment
-    })
-    .join(' ')
 }
 
 function applyAdvancedDraftChange(
@@ -142,6 +143,41 @@ function buildAppliedAdvancedOptions(
   return next
 }
 
+function hasDownloadedModel(
+  modelIds: ReadonlySet<string>,
+  modelId: string | null | undefined,
+): modelId is string {
+  return typeof modelId === 'string' && modelIds.has(modelId)
+}
+
+function resolveInitialModelId({
+  sessionDefaults,
+  configuredModelId,
+  lastLoadedModelId,
+  downloadedModelIds,
+}: {
+  sessionDefaults: SessionDefaults | null
+  configuredModelId: string | null
+  lastLoadedModelId: string | null
+  downloadedModelIds: ReadonlySet<string>
+}): string | null {
+  const sessionModelId = sessionDefaults?.execution.model_id ?? null
+
+  if (hasDownloadedModel(downloadedModelIds, sessionModelId)) {
+    return sessionModelId
+  }
+
+  if (hasDownloadedModel(downloadedModelIds, configuredModelId)) {
+    return configuredModelId
+  }
+
+  if (hasDownloadedModel(downloadedModelIds, lastLoadedModelId)) {
+    return lastLoadedModelId
+  }
+
+  return null
+}
+
 export function TaskWorkbenchSessionConfig({
   fileIds,
   onCreateTask,
@@ -155,9 +191,18 @@ export function TaskWorkbenchSessionConfig({
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
   const [draftAdvancedOptions, setDraftAdvancedOptions] = useState<AdvancedTranscriptionOptions>({})
   const [draftInitialPrompt, setDraftInitialPrompt] = useState<string | null | undefined>(undefined)
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
+  const [selectedDevice, setSelectedDevice] = useState<EngineDevice | null>(null)
+  const [selectedComputeType, setSelectedComputeType] = useState<EngineComputeType | null>(null)
+  const hasInitializedExecutionDraftRef = useRef(false)
 
   const { config } = useAppConfig()
   const { models, configuredModelId, lastLoadedModelId, isLoading: isModelsLoading } = useModels()
+  const sessionDefaultsQuery = useQuery({
+    queryKey: queryKeys.config.sessionDefaults(),
+    queryFn: ({ signal }) => fetchSessionDefaults(signal),
+  })
+  const sessionDefaults = sessionDefaultsQuery.data ?? null
   const {
     language,
     task,
@@ -196,83 +241,112 @@ export function TaskWorkbenchSessionConfig({
     return Object.keys(effectiveAdvancedOptions).length + (hasInitialPromptOverride ? 1 : 0)
   }, [advancedOptions, defaults, initialPrompt])
 
-  const modelOptions = useMemo<ModelSelectOption[]>(() => {
-    const downloadedModels = models
-      .filter((model) => model.status === 'downloaded')
-      .map((model) => ({
-        value: model.model_id,
-        label: model.name,
-      }))
+  const downloadedModelOptions = useMemo<ModelSelectOption[]>(
+    () =>
+      models
+        .filter((model) => model.status === 'downloaded')
+        .map((model) => ({
+          value: model.model_id,
+          label: model.name,
+        })),
+    [models],
+  )
 
-    if (downloadedModels.length > 0) {
-      const hasRuntimeModel = downloadedModels.some(
-        (model) => model.value === lastLoadedModelId || model.value === configuredModelId,
-      )
-      if (!hasRuntimeModel) {
-        return [
-          {
-            value: MODEL_EMPTY_VALUE,
-            label:
-              formatEngineValue(config?.engine.model_size) ||
-              t('tasks.workbench.sessionConfig.unavailable'),
-          },
-          ...downloadedModels,
-        ]
-      }
+  const downloadedModelIds = useMemo(
+    () => new Set(downloadedModelOptions.map((option) => option.value)),
+    [downloadedModelOptions],
+  )
 
-      return downloadedModels
+  useEffect(() => {
+    if (
+      hasInitializedExecutionDraftRef.current ||
+      sessionDefaultsQuery.isPending ||
+      isModelsLoading
+    ) {
+      return
     }
 
+    setSelectedModelId(
+      resolveInitialModelId({
+        sessionDefaults,
+        configuredModelId,
+        lastLoadedModelId,
+        downloadedModelIds,
+      }),
+    )
+    setSelectedDevice(sessionDefaults?.execution.device ?? DEFAULT_ENGINE_DEVICE)
+    setSelectedComputeType(sessionDefaults?.execution.compute_type ?? DEFAULT_ENGINE_COMPUTE_TYPE)
+    hasInitializedExecutionDraftRef.current = true
+  }, [
+    configuredModelId,
+    downloadedModelIds,
+    isModelsLoading,
+    lastLoadedModelId,
+    sessionDefaults,
+    sessionDefaultsQuery.isPending,
+  ])
+
+  const modelOptions = useMemo<ModelSelectOption[]>(() => {
     if (isModelsLoading) {
       return [
         {
           value: MODEL_LOADING_VALUE,
           label: t('tasks.workbench.sessionConfig.model.loading'),
+          disabled: true,
         },
       ]
     }
 
-    const engineModelSize = formatEngineValue(config?.engine.model_size)
-    if (engineModelSize) {
+    if (downloadedModelOptions.length === 0) {
       return [
         {
           value: MODEL_EMPTY_VALUE,
-          label: engineModelSize,
+          label: t('tasks.workbench.sessionConfig.model.noDownloaded'),
+          disabled: true,
         },
       ]
     }
 
-    return [
-      {
-        value: MODEL_EMPTY_VALUE,
-        label: t('tasks.workbench.sessionConfig.model.comingSoon'),
-      },
-    ]
-  }, [config?.engine.model_size, configuredModelId, isModelsLoading, lastLoadedModelId, models, t])
-
-  const selectedModelValue = useMemo(() => {
-    if (lastLoadedModelId && modelOptions.some((option) => option.value === lastLoadedModelId)) {
-      return lastLoadedModelId
+    if (!selectedModelId || !downloadedModelIds.has(selectedModelId)) {
+      return [
+        {
+          value: MODEL_EMPTY_VALUE,
+          label: t('tasks.workbench.sessionConfig.model.placeholder'),
+          disabled: true,
+        },
+        ...downloadedModelOptions,
+      ]
     }
 
-    // Prefer the currently loaded runtime model. Keep the configured default
-    // secondary until a new task loads it at the task boundary.
-    if (configuredModelId && modelOptions.some((option) => option.value === configuredModelId)) {
-      return configuredModelId
-    }
+    return downloadedModelOptions
+  }, [downloadedModelIds, downloadedModelOptions, isModelsLoading, selectedModelId, t])
 
-    if (modelOptions.some((option) => option.value === MODEL_EMPTY_VALUE)) {
-      return MODEL_EMPTY_VALUE
-    }
-
-    return modelOptions[0]?.value ?? MODEL_EMPTY_VALUE
-  }, [configuredModelId, lastLoadedModelId, modelOptions])
-
+  const selectedModelValue =
+    selectedModelId && downloadedModelIds.has(selectedModelId) ? selectedModelId : MODEL_EMPTY_VALUE
+  const resolvedDevice =
+    selectedDevice ?? sessionDefaults?.execution.device ?? DEFAULT_ENGINE_DEVICE
+  const resolvedComputeType =
+    selectedComputeType ?? sessionDefaults?.execution.compute_type ?? DEFAULT_ENGINE_COMPUTE_TYPE
+  const hasSelectableModel = downloadedModelOptions.length > 0
   const controlsDisabled = disabled || isCreating || isSavingDefaults
-  const startDisabled = controlsDisabled || fileIds.length === 0
+  const executionControlsDisabled =
+    controlsDisabled || sessionDefaultsQuery.isPending || isModelsLoading
+  const startDisabled =
+    controlsDisabled ||
+    sessionDefaultsQuery.isPending ||
+    fileIds.length === 0 ||
+    !selectedModelId ||
+    !downloadedModelIds.has(selectedModelId)
 
   async function handleStart() {
-    if (creatingRef.current || fileIds.length === 0) return
+    if (
+      creatingRef.current ||
+      fileIds.length === 0 ||
+      !selectedModelId ||
+      !downloadedModelIds.has(selectedModelId)
+    ) {
+      return
+    }
 
     creatingRef.current = true
     setIsCreating(true)
@@ -282,7 +356,15 @@ export function TaskWorkbenchSessionConfig({
 
       for (const fileId of fileIds) {
         try {
-          const response = await onCreateTask(buildRequest(fileId))
+          const payload: CreateTaskPayload = {
+            ...buildRequest(fileId),
+            model_id: selectedModelId,
+            engine: {
+              device: resolvedDevice,
+              compute_type: resolvedComputeType,
+            },
+          }
+          const response = await onCreateTask(payload)
           results.push({
             fileId,
             taskId: response.task_id,
@@ -302,6 +384,25 @@ export function TaskWorkbenchSessionConfig({
     } finally {
       creatingRef.current = false
       setIsCreating(false)
+    }
+  }
+
+  function handleModelChange(value: string): void {
+    if (value === MODEL_EMPTY_VALUE || value === MODEL_LOADING_VALUE) return
+    if (downloadedModelIds.has(value)) {
+      setSelectedModelId(value)
+    }
+  }
+
+  function handleDeviceChange(value: string): void {
+    if (isEngineDevice(value)) {
+      setSelectedDevice(value)
+    }
+  }
+
+  function handleComputeTypeChange(value: string): void {
+    if (isEngineComputeType(value)) {
+      setSelectedComputeType(value)
     }
   }
 
@@ -460,7 +561,7 @@ export function TaskWorkbenchSessionConfig({
             </div>
           </div>
 
-          <div className="bg-surface-container-low flex flex-1 flex-col gap-4 rounded-xl border px-4 py-4">
+          <div className="flex flex-1 flex-col gap-4 border-y py-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-[11px] font-semibold tracking-[0.22em] uppercase">
                 {t('tasks.workbench.sessionConfig.executionEngine')}
@@ -479,13 +580,17 @@ export function TaskWorkbenchSessionConfig({
                   {t('tasks.workbench.sessionConfig.model.badge')}
                 </span>
               </div>
-              <Select value={selectedModelValue} disabled>
+              <Select
+                value={selectedModelValue}
+                onValueChange={handleModelChange}
+                disabled={executionControlsDisabled || !hasSelectableModel}
+              >
                 <SelectTrigger id="task-workbench-model-select">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {modelOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
+                    <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
                       {option.label}
                     </SelectItem>
                   ))}
@@ -495,19 +600,47 @@ export function TaskWorkbenchSessionConfig({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label>{t('tasks.workbench.sessionConfig.device.label')}</Label>
-                <div className="bg-background text-muted-foreground flex min-h-10 items-center rounded-lg border px-3 text-sm">
-                  {formatEngineValue(config?.engine.device) ||
-                    t('tasks.workbench.sessionConfig.unavailable')}
-                </div>
+                <Label htmlFor="task-workbench-device-select">
+                  {t('tasks.workbench.sessionConfig.device.label')}
+                </Label>
+                <Select
+                  value={resolvedDevice}
+                  onValueChange={handleDeviceChange}
+                  disabled={executionControlsDisabled}
+                >
+                  <SelectTrigger id="task-workbench-device-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ENGINE_DEVICE_OPTIONS.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {t(DEVICE_LABEL_KEYS[value])}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-1.5">
-                <Label>{t('tasks.workbench.sessionConfig.computeType.label')}</Label>
-                <div className="bg-background text-muted-foreground flex min-h-10 items-center rounded-lg border px-3 text-sm">
-                  {formatEngineValue(config?.engine.compute_type) ||
-                    t('tasks.workbench.sessionConfig.unavailable')}
-                </div>
+                <Label htmlFor="task-workbench-compute-type-select">
+                  {t('tasks.workbench.sessionConfig.computeType.label')}
+                </Label>
+                <Select
+                  value={resolvedComputeType}
+                  onValueChange={handleComputeTypeChange}
+                  disabled={executionControlsDisabled}
+                >
+                  <SelectTrigger id="task-workbench-compute-type-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ENGINE_COMPUTE_TYPE_OPTIONS.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {t(COMPUTE_TYPE_LABEL_KEYS[value])}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
