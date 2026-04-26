@@ -18,14 +18,12 @@ interface CapturedModelDownloadSseOptions {
 }
 
 const activityBridgeMocks = vi.hoisted(() => {
-  const sseOptions: CapturedModelDownloadSseOptions | null = null
-
   return {
     listActiveModelDownloads: vi.fn(),
     requestModelRefresh: vi.fn(),
     refreshConfigCaches: vi.fn(),
     createSSEConnection: vi.fn(),
-    sseOptions,
+    sseOptions: null as CapturedModelDownloadSseOptions | null,
   }
 })
 
