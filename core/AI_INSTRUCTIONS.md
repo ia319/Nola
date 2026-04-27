@@ -215,6 +215,7 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - Keep `restart_required` as a compatibility field returning `False` while task-boundary engine reload is supported; do not use it to signal manual worker restart.
 - Keep VAD fields gated by the installed `faster-whisper` `VadOptions`; do not expose fields only present in local source unless the installed package supports them.
 - Treat transcription progress as segment output coverage, not faster-whisper internal progress.
+- Keep the Windows `CT2_CUDA_ALLOCATOR=cub_caching` compatibility default in `nola/__init__.py` until CTranslate2 fixes CUDA model cleanup crashes and `base -> release -> small -> release` passes without it.
 
 ---
 
@@ -290,6 +291,7 @@ Transcription engine layer:
 - `TranscribeOptions`: Full transcription options passed to `WhisperModel.transcribe(...)`; do not add engine initialization parameters here.
 - `TranscriptionEngine`: Abstract interface for transcription engines, including explicit resource release through `close()`.
 - `FasterWhisperEngine`: Faster-Whisper implementation. Report progress as segment output coverage only, raise immediately when closed, and unload the underlying CTranslate2 model on close.
+- `nola/__init__.py`: Set `CT2_CUDA_ALLOCATOR=cub_caching` by default on Windows before any faster-whisper import to avoid CTranslate2 CUDA model cleanup aborts. Keep user overrides intact with `setdefault`.
 
 ### nola/api/
 REST API layer:
