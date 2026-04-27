@@ -42,6 +42,7 @@ describe('queryKeys', () => {
       'transcription',
       'engine-defaults',
     ])
+    expect(queryKeys.config.sessionDefaults()).toEqual(['config', 'session-defaults'])
     expect(queryKeys.config.exportDefaults()).toEqual(['config', 'export', 'defaults'])
   })
 })

@@ -1,17 +1,21 @@
 """Pytest tests for worker module."""
 
 from pathlib import Path
-from unittest.mock import Mock, PropertyMock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
-from nola.config import settings as app_settings
-from nola.config.settings import Settings
-from nola.engines.base import TranscribeOptions
-from nola.model_hub.contracts import ModelInfo
-from nola.model_hub.errors import UnknownModelError
+from nola.engines.base import TranscribeOptions, TranscriptionEngine
+from nola.model_hub import require_model
+from nola.models.tasks import TaskRowRaw
 from nola.services import worker as worker_module
 from nola.services.worker import build_transcribe_options
+from nola.services.worker_engine import (
+    DesiredEngineState,
+    EngineFingerprint,
+    LoadedEngineState,
+    WorkerEngineError,
+)
 
 
 class StubConfigStore:
@@ -166,109 +170,118 @@ class TestBuildTranscribeOptions:
         assert options.hotwords == "inf"
 
 
-class _WorkerModelConfigStore:
-    """Provide the minimal model config contract used during worker startup."""
+def _raw_task(task_id: str = "task-1") -> TaskRowRaw:
+    """Build one raw task row for worker loop tests."""
+    return {
+        "id": task_id,
+        "file_id": "file-1",
+        "model_id": "small",
+        "engine_device": "cpu",
+        "engine_compute_type": "default",
+        "status": "processing",
+        "priority": 0,
+        "retry_count": 0,
+        "max_retries": 3,
+        "worker_id": "worker-1",
+        "started_at": None,
+        "last_heartbeat": None,
+        "timeout_seconds": 3600,
+        "options": None,
+        "progress": 0.0,
+        "duration": None,
+        "segments": None,
+        "error": None,
+        "created_at": "2026-01-01T00:00:00",
+        "completed_at": None,
+    }
 
-    def __init__(self, values: dict[str, object] | None = None) -> None:
-        """Store model config reads and later worker state writes."""
-        self.values = values or {}
-        self.writes: list[tuple[str, dict[str, object]]] = []
 
-    def get_all(self, prefix: str) -> dict[str, object]:
-        """Return model settings for the requested prefix."""
-        assert prefix == "model."
-        return self.values
-
-    def set_many(self, prefix: str, values: dict[str, object]) -> None:
-        """Record worker state writes for later assertions."""
-        self.writes.append((prefix, values))
+def _desired_state(fingerprint: EngineFingerprint) -> DesiredEngineState:
+    """Build a desired engine state for worker loop tests."""
+    return DesiredEngineState(
+        fingerprint=fingerprint,
+        model_info=require_model(fingerprint.model_id),
+    )
 
 
-class TestWorkerStartup:
-    """Test worker startup guards around configured models."""
+class TestWorkerLoop:
+    """Test worker queue loop coordination with engine loading."""
 
-    def test_worker_loop_logs_unknown_model_and_exits(self, tmp_path: Path) -> None:
-        """Exit cleanly when the configured model is not in the registry."""
-        model_dir = tmp_path / "models"
-        model_dir.mkdir()
-        db_path = tmp_path / "nola.db"
-        config_store = _WorkerModelConfigStore({"configured_model_id": "missing-model"})
+    def test_worker_loop_loads_engine_for_claimed_task(self, tmp_path: Path) -> None:
+        """Load the task engine before running transcription."""
+        task = _raw_task()
+        task_db = Mock()
+        task_db.dequeue.side_effect = [task, KeyboardInterrupt]
+        file_db = Mock()
+        config_store = Mock()
+        engine = Mock(spec=TranscriptionEngine)
+        loaded_state = LoadedEngineState(
+            fingerprint=EngineFingerprint(
+                model_id="small",
+                model_dir=tmp_path,
+                device="cpu",
+                compute_type="default",
+            ),
+            engine=engine,
+        )
 
         with (
-            patch.object(
-                Settings, "db_path", new_callable=PropertyMock, return_value=db_path
-            ),
-            patch.object(app_settings, "model_size", "small"),
-            patch.object(app_settings, "model_dir", model_dir),
-            patch.object(
-                Settings,
-                "default_model_dir",
-                new_callable=PropertyMock,
-                return_value=model_dir,
-            ),
-            patch("nola.services.worker.FileDatabase"),
-            patch("nola.services.worker.TaskDatabase"),
+            patch.object(worker_module, "_running", True),
+            patch("nola.services.worker.FileDatabase", return_value=file_db),
+            patch("nola.services.worker.TaskDatabase", return_value=task_db),
             patch(
                 "nola.services.worker.AppConfigDatabase",
                 return_value=config_store,
             ),
             patch(
-                "nola.services.worker.resolve_model_dir",
-                return_value=(model_dir, "settings"),
+                "nola.services.worker.build_desired_engine_state",
+                return_value=_desired_state(loaded_state.fingerprint),
             ),
             patch(
-                "nola.model_hub.require_model",
-                side_effect=UnknownModelError("missing-model"),
-            ),
-            patch.object(worker_module.logger, "error") as logger_error,
+                "nola.services.worker.ensure_engine_loaded",
+                return_value=loaded_state,
+            ) as ensure_loaded,
+            patch("nola.services.worker.run_transcription") as run_transcription,
         ):
-            started = worker_module.worker_loop(db_path)
+            started = worker_module.worker_loop(tmp_path / "nola.db")
 
-        logger_error.assert_any_call(
-            "Configured model '%s' is not part of the supported registry. "
-            "Update the model setting before starting the Worker.",
-            "missing-model",
+        assert started is True
+        ensure_loaded.assert_called_once_with(
+            task=task,
+            loaded=None,
+            config_db=config_store,
+            desired=_desired_state(loaded_state.fingerprint),
         )
-        assert started is False
-        assert config_store.writes == []
+        run_transcription.assert_called_once_with(
+            task,
+            file_db,
+            task_db,
+            config_store,
+            engine,
+        )
 
-    def test_worker_loop_persists_canonical_loaded_model_id(
-        self, tmp_path: Path
-    ) -> None:
-        """Persist the canonical model id after startup resolves aliases."""
-        model_dir = tmp_path / "models"
-        model_dir.mkdir()
-        db_path = tmp_path / "nola.db"
-        config_store = _WorkerModelConfigStore({"configured_model_id": "large"})
+    def test_worker_loop_reuses_loaded_engine_state(self, tmp_path: Path) -> None:
+        """Pass the previous loaded state into the next task boundary."""
+        first_task = _raw_task("task-1")
+        second_task = _raw_task("task-2")
         task_db = Mock()
-        task_db.dequeue.side_effect = KeyboardInterrupt
-        storage = Mock()
-        storage.get_cache_state.return_value = "downloaded"
-        model_info = ModelInfo(
-            model_id="large-v3",
-            name="Large V3",
-            repo_id="repo/large-v3",
-            runtime="faster-whisper",
-            languages="multilingual",
-            size_bytes=1,
-            speed_rank=1,
-            accuracy_rank=1,
-            description="test model",
-            description_key="tests.models.large-v3.description",
+        task_db.dequeue.side_effect = [first_task, second_task, KeyboardInterrupt]
+        config_store = Mock()
+        first_state = LoadedEngineState(
+            fingerprint=EngineFingerprint(
+                model_id="small",
+                model_dir=tmp_path,
+                device="cpu",
+                compute_type="default",
+            ),
+            engine=Mock(spec=TranscriptionEngine),
+        )
+        second_state = LoadedEngineState(
+            fingerprint=first_state.fingerprint,
+            engine=first_state.engine,
         )
 
         with (
-            patch.object(
-                Settings, "db_path", new_callable=PropertyMock, return_value=db_path
-            ),
-            patch.object(app_settings, "model_size", "small"),
-            patch.object(app_settings, "model_dir", model_dir),
-            patch.object(
-                Settings,
-                "default_model_dir",
-                new_callable=PropertyMock,
-                return_value=model_dir,
-            ),
             patch.object(worker_module, "_running", True),
             patch("nola.services.worker.FileDatabase"),
             patch("nola.services.worker.TaskDatabase", return_value=task_db),
@@ -277,67 +290,55 @@ class TestWorkerStartup:
                 return_value=config_store,
             ),
             patch(
-                "nola.services.worker.resolve_model_dir",
-                return_value=(model_dir, "settings"),
+                "nola.services.worker.build_desired_engine_state",
+                return_value=_desired_state(first_state.fingerprint),
             ),
-            patch("nola.model_hub.require_model", return_value=model_info),
-            patch("nola.model_hub.ModelStorage", return_value=storage),
-            patch("nola.services.worker.FasterWhisperEngine") as engine_cls,
+            patch("nola.services.worker.assert_engine_model_downloaded"),
+            patch("nola.services.worker.release_loaded_engine") as release_engine,
+            patch(
+                "nola.services.worker.ensure_engine_loaded",
+                side_effect=[first_state, second_state],
+            ) as ensure_loaded,
+            patch("nola.services.worker.run_transcription"),
         ):
-            started = worker_module.worker_loop(db_path)
+            started = worker_module.worker_loop(tmp_path / "nola.db")
 
-        engine_config = engine_cls.call_args.kwargs["config"]
         assert started is True
-        assert engine_config.model_size == "large-v3"
-        assert engine_config.download_root == model_dir
-        assert config_store.writes == [
-            (
-                "worker.",
-                {
-                    "last_loaded_model_id": "large-v3",
-                    "last_loaded_model_dir": str(model_dir),
-                },
-            )
-        ]
+        assert ensure_loaded.call_args_list[0].kwargs["loaded"] is None
+        assert ensure_loaded.call_args_list[1].kwargs["loaded"] is first_state
+        release_engine.assert_not_called()
 
-    def test_worker_loop_warns_when_worker_state_persistence_fails(
+    def test_worker_loop_releases_loaded_engine_before_reload(
         self, tmp_path: Path
     ) -> None:
-        """Keep the worker running when restart-tracking writes fail."""
-        model_dir = tmp_path / "models"
-        model_dir.mkdir()
-        db_path = tmp_path / "nola.db"
-        config_store = _WorkerModelConfigStore({"configured_model_id": "large"})
+        """Release the previous engine before loading a changed fingerprint."""
+        first_task = _raw_task("task-1")
+        second_task = _raw_task("task-2")
         task_db = Mock()
-        task_db.dequeue.side_effect = KeyboardInterrupt
-        storage = Mock()
-        storage.get_cache_state.return_value = "downloaded"
-        model_info = ModelInfo(
-            model_id="large-v3",
-            name="Large V3",
-            repo_id="repo/large-v3",
-            runtime="faster-whisper",
-            languages="multilingual",
-            size_bytes=1,
-            speed_rank=1,
-            accuracy_rank=1,
-            description="test model",
-            description_key="tests.models.large-v3.description",
+        task_db.dequeue.side_effect = [first_task, second_task, KeyboardInterrupt]
+        config_store = Mock()
+        first_fingerprint = EngineFingerprint(
+            model_id="small",
+            model_dir=tmp_path,
+            device="cpu",
+            compute_type="default",
         )
-        config_store.set_many = Mock(side_effect=RuntimeError("db busy"))
+        second_fingerprint = EngineFingerprint(
+            model_id="small",
+            model_dir=tmp_path,
+            device="cuda",
+            compute_type="float16",
+        )
+        first_state = LoadedEngineState(
+            fingerprint=first_fingerprint,
+            engine=Mock(spec=TranscriptionEngine),
+        )
+        second_state = LoadedEngineState(
+            fingerprint=second_fingerprint,
+            engine=Mock(spec=TranscriptionEngine),
+        )
 
         with (
-            patch.object(
-                Settings, "db_path", new_callable=PropertyMock, return_value=db_path
-            ),
-            patch.object(app_settings, "model_size", "small"),
-            patch.object(app_settings, "model_dir", model_dir),
-            patch.object(
-                Settings,
-                "default_model_dir",
-                new_callable=PropertyMock,
-                return_value=model_dir,
-            ),
             patch.object(worker_module, "_running", True),
             patch("nola.services.worker.FileDatabase"),
             patch("nola.services.worker.TaskDatabase", return_value=task_db),
@@ -346,21 +347,104 @@ class TestWorkerStartup:
                 return_value=config_store,
             ),
             patch(
-                "nola.services.worker.resolve_model_dir",
-                return_value=(model_dir, "settings"),
+                "nola.services.worker.build_desired_engine_state",
+                side_effect=[
+                    _desired_state(first_fingerprint),
+                    _desired_state(second_fingerprint),
+                ],
             ),
-            patch("nola.model_hub.require_model", return_value=model_info),
-            patch("nola.model_hub.ModelStorage", return_value=storage),
-            patch("nola.services.worker.FasterWhisperEngine"),
-            patch.object(worker_module.logger, "warning") as logger_warning,
+            patch(
+                "nola.services.worker.assert_engine_model_downloaded",
+            ) as assert_downloaded,
+            patch(
+                "nola.services.worker.release_loaded_engine",
+            ) as release_engine,
+            patch(
+                "nola.services.worker.ensure_engine_loaded",
+                side_effect=[first_state, second_state],
+            ) as ensure_loaded,
+            patch("nola.services.worker.run_transcription"),
         ):
-            started = worker_module.worker_loop(db_path)
+            started = worker_module.worker_loop(tmp_path / "nola.db")
 
         assert started is True
-        logger_warning.assert_called_once()
+        assert_downloaded.assert_called_once_with(_desired_state(second_fingerprint))
+        release_engine.assert_called_once_with(first_state)
+        assert ensure_loaded.call_args_list[1].kwargs["loaded"] is None
+
+    def test_worker_loop_fails_task_on_unexpected_engine_error(
+        self, tmp_path: Path
+    ) -> None:
+        """Fail the dequeued task when engine preparation raises unexpectedly."""
+        task = _raw_task()
+        task_db = Mock()
+        task_db.dequeue.side_effect = [task, KeyboardInterrupt]
+
+        with (
+            patch.object(worker_module, "_running", True),
+            patch("nola.services.worker.FileDatabase"),
+            patch("nola.services.worker.TaskDatabase", return_value=task_db),
+            patch("nola.services.worker.AppConfigDatabase", return_value=Mock()),
+            patch(
+                "nola.services.worker.build_desired_engine_state",
+                side_effect=RuntimeError("config unavailable"),
+            ),
+            patch("nola.services.worker.ensure_engine_loaded") as ensure_loaded,
+            patch("nola.services.worker.run_transcription") as run_transcription,
+        ):
+            started = worker_module.worker_loop(tmp_path / "nola.db")
+
+        assert started is True
+        ensure_loaded.assert_not_called()
+        task_db.fail.assert_called_once_with(
+            "task-1",
+            "Unexpected worker engine error: config unavailable",
+            should_retry=True,
+        )
+        run_transcription.assert_not_called()
+
+    def test_worker_loop_fails_task_when_engine_load_fails(
+        self, tmp_path: Path
+    ) -> None:
+        """Fail only the current task when engine loading is invalid."""
+        task = _raw_task()
+        task_db = Mock()
+        task_db.dequeue.side_effect = [task, KeyboardInterrupt]
+
+        with (
+            patch.object(worker_module, "_running", True),
+            patch("nola.services.worker.FileDatabase"),
+            patch("nola.services.worker.TaskDatabase", return_value=task_db),
+            patch("nola.services.worker.AppConfigDatabase", return_value=Mock()),
+            patch(
+                "nola.services.worker.build_desired_engine_state",
+                return_value=_desired_state(
+                    EngineFingerprint(
+                        model_id="small",
+                        model_dir=tmp_path,
+                        device="cpu",
+                        compute_type="default",
+                    )
+                ),
+            ),
+            patch(
+                "nola.services.worker.ensure_engine_loaded",
+                side_effect=WorkerEngineError("bad engine", should_retry=False),
+            ),
+            patch("nola.services.worker.run_transcription") as run_transcription,
+        ):
+            started = worker_module.worker_loop(tmp_path / "nola.db")
+
+        assert started is True
+        task_db.fail.assert_called_once_with(
+            "task-1",
+            "bad engine",
+            should_retry=False,
+        )
+        run_transcription.assert_not_called()
 
     def test_main_exits_non_zero_when_worker_startup_fails(self) -> None:
-        """Exit with a failure status when worker startup preflight fails."""
+        """Exit with a failure status when the worker loop reports failure."""
         with (
             patch("nola.services.worker.init_db"),
             patch("nola.services.worker.worker_loop", return_value=False),

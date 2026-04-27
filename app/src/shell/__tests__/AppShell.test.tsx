@@ -156,14 +156,18 @@ describe('AppShell', () => {
   })
 
   it('passes the activity badge count to the top bar', () => {
-    useActivityStore.getState().setModelSettings({
-      configured_model_id: 'large-v3',
-      last_loaded_model_id: 'small',
-      configured_model_dir: null,
-      effective_model_dir: 'models',
-      override_source: 'database',
-      restart_required: true,
-    })
+    useActivityStore.getState().setTasks([
+      {
+        task_id: 'task-1',
+        file_id: 'file-1',
+        filename: 'failed.wav',
+        model_id: 'large-v3',
+        status: 'failed',
+        progress: 100,
+        created_at: '2026-04-20T10:00:00.000Z',
+        completed_at: '2026-04-20T10:01:00.000Z',
+      },
+    ])
 
     render(<AppShell />)
 

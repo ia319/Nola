@@ -19,10 +19,6 @@ import type {
   useModels,
 } from '@/features/models'
 
-type ActivityStateSlice = {
-  setModelSettings: (settings: ModelSettingsResponse | null) => void
-}
-
 type UpdateModelsSnapshot = UseModelsResult['updateSnapshot']
 
 const modelsPageMocks = vi.hoisted(() => ({
@@ -42,7 +38,6 @@ const modelsPageMocks = vi.hoisted(() => ({
   requestModelRefresh: vi.fn(),
   toDownloadState: vi.fn(),
   refreshConfigCaches: vi.fn<() => Promise<void>>(),
-  setActivityModelSettings: vi.fn(),
   refreshModels: vi.fn(),
   updateSnapshot: vi.fn<UpdateModelsSnapshot>(),
   downloadModel: vi.fn<UseModelDownloadResult['download']>(),
@@ -121,13 +116,6 @@ vi.mock('@/config/cache-invalidation', () => ({
   refreshConfigCaches: modelsPageMocks.refreshConfigCaches,
 }))
 
-vi.mock('@/features/activity', () => ({
-  useActivityStore: <T,>(selector: (state: ActivityStateSlice) => T) =>
-    selector({
-      setModelSettings: modelsPageMocks.setActivityModelSettings,
-    }),
-}))
-
 vi.mock('@/features/models', () => ({
   deleteModel: modelsPageMocks.deleteModel,
   getModelSettings: modelsPageMocks.getModelSettings,
@@ -199,7 +187,7 @@ function createModelSettingsResponse(
     configured_model_dir: null,
     effective_model_dir: '/models',
     override_source: 'default',
-    restart_required: true,
+    restart_required: false,
     ...overrides,
   }
 }
@@ -236,7 +224,6 @@ describe('ModelsPage', () => {
     modelsPageMocks.requestModelRefresh.mockReset()
     modelsPageMocks.toDownloadState.mockReset()
     modelsPageMocks.refreshConfigCaches.mockReset()
-    modelsPageMocks.setActivityModelSettings.mockReset()
     modelsPageMocks.refreshModels.mockReset()
     modelsPageMocks.updateSnapshot.mockReset()
     modelsPageMocks.downloadModel.mockReset()
@@ -410,12 +397,12 @@ describe('ModelsPage', () => {
     expect(modelsPageMocks.requestModelRefresh).toHaveBeenCalledTimes(1)
   })
 
-  it('wires model selection through snapshot updates and activity settings', async () => {
-    const settings = createModelSettingsResponse({ restart_required: true })
+  it('wires model selection through snapshot updates and settings cache refresh', async () => {
+    const settings = createModelSettingsResponse({ restart_required: false })
     modelsPageMocks.selectModel.mockResolvedValueOnce({
       configured_model_id: 'nola-base-v3',
-      restart_required: true,
-      message: 'restart required',
+      restart_required: false,
+      message: 'selected',
     })
     modelsPageMocks.getModelSettings.mockResolvedValueOnce(settings)
 
@@ -449,10 +436,13 @@ describe('ModelsPage', () => {
     ).toBe(false)
 
     await waitFor(() => {
-      expect(modelsPageMocks.setActivityModelSettings).toHaveBeenCalledWith(settings)
+      expect(modelsPageMocks.queryClient.setQueryData).toHaveBeenCalledWith(
+        ['models', 'settings'],
+        settings,
+      )
     })
     expect(modelsPageMocks.toast.success).toHaveBeenCalledWith('Default model set to nola-base-v3')
-    expect(modelsPageMocks.toast.warning).toHaveBeenCalledWith('models.restartRequired')
+    expect(modelsPageMocks.toast.warning).not.toHaveBeenCalled()
     expect(modelsPageMocks.requestModelRefresh).toHaveBeenCalledTimes(1)
     expect(modelsPageMocks.refreshConfigCaches).toHaveBeenCalledTimes(1)
     expect(modelsPageMocks.queryClient.invalidateQueries).toHaveBeenCalledWith({

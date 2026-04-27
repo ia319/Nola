@@ -68,6 +68,30 @@ export interface paths {
     patch: operations['patch_transcription_defaults_api_config_transcription_defaults_patch']
     trace?: never
   }
+  '/api/config/session-defaults': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get Workbench session defaults
+     * @description Return execution defaults and transcription defaults used when creating new Workbench transcription tasks.
+     */
+    get: operations['get_session_default_config_api_config_session_defaults_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /**
+     * Update Workbench session defaults
+     * @description Apply a partial update to execution defaults and transcription defaults. Explicit null removes execution overrides and falls back to settings.
+     */
+    patch: operations['patch_session_default_config_api_config_session_defaults_patch']
+    trace?: never
+  }
   '/api/config/export': {
     parameters: {
       query?: never
@@ -161,7 +185,7 @@ export interface paths {
     }
     /**
      * Get model settings
-     * @description Return model directory configuration and override state.
+     * @description Return model directory configuration and worker runtime state.
      */
     get: operations['get_model_settings_api_models_settings_get']
     put?: never
@@ -271,7 +295,7 @@ export interface paths {
     put?: never
     /**
      * Select configured model
-     * @description Set the configured model for next Worker startup.
+     * @description Set the default model used by future tasks.
      */
     post: operations['select_model_api_models__model_id__select_post']
     delete?: never
@@ -863,12 +887,20 @@ export interface components {
     EngineConfigResponse: {
       /** Model Size */
       model_size: string
-      /** Device */
-      device: string
-      /** Compute Type */
-      compute_type: string
+      /**
+       * Device
+       * @enum {string}
+       */
+      device: 'auto' | 'cpu' | 'cuda'
+      /**
+       * Compute Type
+       * @enum {string}
+       */
+      compute_type: 'default' | 'float16' | 'int8'
       /** Is Multilingual */
       is_multilingual: boolean
+      /** Schema */
+      schema: components['schemas']['OptionGroupSchema'][]
     }
     /**
      * EngineDefaultsResponse
@@ -1037,6 +1069,10 @@ export interface components {
       configured_model_id?: string | null
       /** Last Loaded Model Id */
       last_loaded_model_id?: string | null
+      /** Last Loaded Device */
+      last_loaded_device?: ('auto' | 'cpu' | 'cuda') | null
+      /** Last Loaded Compute Type */
+      last_loaded_compute_type?: ('default' | 'float16' | 'int8') | null
       /**
        * Restart Required
        * @default false
@@ -1188,6 +1224,10 @@ export interface components {
       configured_model_id?: string | null
       /** Last Loaded Model Id */
       last_loaded_model_id?: string | null
+      /** Last Loaded Device */
+      last_loaded_device?: ('auto' | 'cpu' | 'cuda') | null
+      /** Last Loaded Compute Type */
+      last_loaded_compute_type?: ('default' | 'float16' | 'int8') | null
       /** Configured Model Dir */
       configured_model_dir?: string | null
       /** Effective Model Dir */
@@ -1342,6 +1382,79 @@ export interface components {
       label_key: string
     }
     /**
+     * SessionDefaultsResponse
+     * @description Expose Workbench defaults split by execution and transcription scope.
+     */
+    SessionDefaultsResponse: {
+      execution: components['schemas']['SessionExecutionDefaultsResponse']
+      transcription: components['schemas']['TranscriptionResolvedDefaultsResponse']
+    }
+    /**
+     * SessionDefaultsUpdateRequest
+     * @description Partial update payload for session defaults.
+     * @example {
+     *       "execution": {
+     *         "compute_type": "default",
+     *         "device": "auto",
+     *         "model_id": "small"
+     *       },
+     *       "transcription": {
+     *         "vad_filter": true,
+     *         "vad_parameters": {
+     *           "threshold": 0.1
+     *         }
+     *       }
+     *     }
+     */
+    SessionDefaultsUpdateRequest: {
+      execution?: components['schemas']['SessionExecutionDefaultsUpdateRequest'] | null
+      transcription?: components['schemas']['TranscriptionDefaultsUpdateRequest'] | null
+    }
+    /**
+     * SessionExecutionDefaultsResponse
+     * @description Expose resolved execution defaults for new session tasks.
+     */
+    SessionExecutionDefaultsResponse: {
+      /** Model Id */
+      model_id: string
+      /**
+       * Device
+       * @enum {string}
+       */
+      device: 'auto' | 'cpu' | 'cuda'
+      /**
+       * Compute Type
+       * @enum {string}
+       */
+      compute_type: 'default' | 'float16' | 'int8'
+    }
+    /**
+     * SessionExecutionDefaultsUpdateRequest
+     * @description Partial update payload for session execution defaults.
+     * @example {
+     *       "compute_type": "default",
+     *       "device": "auto",
+     *       "model_id": "small"
+     *     }
+     */
+    SessionExecutionDefaultsUpdateRequest: {
+      /**
+       * Model Id
+       * @description Default model id for new tasks
+       */
+      model_id?: string | null
+      /**
+       * Device
+       * @description Default engine device for new tasks
+       */
+      device?: ('auto' | 'cpu' | 'cuda') | null
+      /**
+       * Compute Type
+       * @description Default engine compute type for new tasks
+       */
+      compute_type?: ('default' | 'float16' | 'int8') | null
+    }
+    /**
      * SliderFieldSchema
      * @description Describe a slider-backed numeric field.
      */
@@ -1411,6 +1524,22 @@ export interface components {
       segments: components['schemas']['SegmentResponse'][] | null
       /** Error */
       error: string | null
+    }
+    /**
+     * TaskEngineRequest
+     * @description Task-level engine initialization overrides.
+     */
+    TaskEngineRequest: {
+      /**
+       * Device
+       * @description Task engine device override
+       */
+      device?: ('auto' | 'cpu' | 'cuda') | null
+      /**
+       * Compute Type
+       * @description Task engine compute type override
+       */
+      compute_type?: ('default' | 'float16' | 'int8') | null
     }
     /**
      * TaskListResponse
@@ -1709,12 +1838,17 @@ export interface components {
      *       "clip_timestamps": "0",
      *       "compression_ratio_threshold": 2.4,
      *       "condition_on_previous_text": true,
+     *       "engine": {
+     *         "compute_type": "default",
+     *         "device": "auto"
+     *       },
      *       "file_id": "uploaded-file-id",
      *       "language_detection_segments": 1,
      *       "language_detection_threshold": 0.5,
      *       "length_penalty": 1,
      *       "log_prob_threshold": -1,
      *       "max_initial_timestamp": 1,
+     *       "model_id": "small",
      *       "multilingual": false,
      *       "no_repeat_ngram_size": 0,
      *       "no_speech_threshold": 0.6,
@@ -1950,9 +2084,11 @@ export interface components {
       file_id: string
       /**
        * Model Id
-       * @description Target model id (reserved, not used in execution yet).
+       * @description Target task model id
        */
       model_id?: string | null
+      /** @description Task engine initialization overrides */
+      engine?: components['schemas']['TaskEngineRequest'] | null
     }
     /**
      * TranscriptionResolvedDefaultsResponse
@@ -2165,6 +2301,59 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['TranscriptionDefaultsPatchResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_session_default_config_api_config_session_defaults_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SessionDefaultsResponse']
+        }
+      }
+    }
+  }
+  patch_session_default_config_api_config_session_defaults_patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SessionDefaultsUpdateRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SessionDefaultsResponse']
         }
       }
       /** @description Validation Error */

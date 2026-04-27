@@ -63,6 +63,7 @@ export const queryKeys = {
     transcription: () => ['config', 'transcription'] as const,
     transcriptionDefaults: () => ['config', 'transcription', 'defaults'] as const,
     transcriptionEngineDefaults: () => ['config', 'transcription', 'engine-defaults'] as const,
+    sessionDefaults: () => ['config', 'session-defaults'] as const,
     export: () => ['config', 'export'] as const,
     exportDefaults: () => ['config', 'export', 'defaults'] as const,
   },

@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { AppConfig } from '@/shared/types'
+import { TEST_ENGINE_SCHEMA } from '@/test-utils/engine-schema'
 import { _resetConfigCache, refreshAppConfig, useAppConfig } from '../use-app-config'
 
 const { fetchAppConfigMock } = vi.hoisted(() => ({
@@ -24,6 +25,7 @@ function buildConfig(overrides?: Partial<AppConfig>): AppConfig {
       device: 'cpu',
       compute_type: 'default',
       is_multilingual: true,
+      schema: TEST_ENGINE_SCHEMA,
     },
     transcription: {
       defaults: {

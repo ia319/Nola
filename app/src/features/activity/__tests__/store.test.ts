@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import type { ActiveModelDownload, ModelSettingsResponse, TaskSummary } from '@/shared/types'
+import type { ActiveModelDownload, TaskSummary } from '@/shared/types'
 
 import { ACTIVITY_RECENT_LIMIT, selectActivityBadgeCount, useActivityStore } from '../store'
 
@@ -14,18 +14,6 @@ function buildTask(taskId: string, overrides: Partial<TaskSummary> = {}): TaskSu
     progress: 0,
     created_at: `2026-04-20T10:00:0${taskId.slice(-1)}.000Z`,
     completed_at: null,
-    ...overrides,
-  }
-}
-
-function buildModelSettings(overrides: Partial<ModelSettingsResponse> = {}): ModelSettingsResponse {
-  return {
-    configured_model_id: 'small',
-    last_loaded_model_id: 'tiny',
-    configured_model_dir: null,
-    effective_model_dir: 'models',
-    override_source: 'database',
-    restart_required: false,
     ...overrides,
   }
 }
@@ -52,7 +40,7 @@ afterEach(() => {
 })
 
 describe('activity store', () => {
-  it('groups failed tasks and restart-required models under needs attention', () => {
+  it('groups failed tasks under needs attention', () => {
     const store = useActivityStore.getState()
 
     store.setTasks([
@@ -62,17 +50,12 @@ describe('activity store', () => {
       }),
       buildTask('task-2', { status: 'completed', completed_at: '2026-04-20T10:11:00.000Z' }),
     ])
-    store.setModelSettings(buildModelSettings({ restart_required: true }))
 
     const snapshot = useActivityStore.getState()
     const attentionKinds = snapshot.needsAttention.map((item) => item.kind)
-    expect(attentionKinds).toContain('model_restart_required')
     expect(attentionKinds).toContain('task_failed')
-    expect(snapshot.needsAttention).toHaveLength(2)
-    expect(selectActivityBadgeCount(snapshot)).toBe(2)
-    expect(
-      snapshot.needsAttention.find((item) => item.kind === 'model_restart_required')?.route,
-    ).toBe('/models')
+    expect(snapshot.needsAttention).toHaveLength(1)
+    expect(selectActivityBadgeCount(snapshot)).toBe(1)
     expect(snapshot.needsAttention.find((item) => item.kind === 'task_failed')?.route).toBe(
       '/history',
     )

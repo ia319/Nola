@@ -1,7 +1,9 @@
 """Pytest tests for database models."""
 
 import gc
+import sqlite3
 import tempfile
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -392,3 +394,84 @@ class TestTaskDatabase:
         assert task["status"] == "cancelled"
         assert task["progress"] == original["progress"]
         assert task["last_heartbeat"] == original["last_heartbeat"]
+
+    def test_init_db_migrates_task_execution_columns(self):
+        """init_db() should add execution columns to existing task tables."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "legacy.db"
+            with closing(sqlite3.connect(db_path)) as conn:
+                with conn:
+                    conn.execute("""
+                        CREATE TABLE files (
+                            id TEXT PRIMARY KEY,
+                            filename TEXT NOT NULL,
+                            path TEXT NOT NULL,
+                            size INTEGER NOT NULL,
+                            content_type TEXT,
+                            created_at TEXT NOT NULL
+                        )
+                    """)
+                    conn.execute("""
+                        CREATE TABLE transcription_tasks (
+                            id TEXT PRIMARY KEY,
+                            file_id TEXT NOT NULL,
+                            status TEXT NOT NULL,
+                            priority INTEGER DEFAULT 0,
+                            retry_count INTEGER DEFAULT 0,
+                            max_retries INTEGER DEFAULT 3,
+                            worker_id TEXT,
+                            started_at TEXT,
+                            last_heartbeat TEXT,
+                            timeout_seconds INTEGER DEFAULT 3600,
+                            options TEXT,
+                            progress REAL DEFAULT 0.0,
+                            duration REAL,
+                            segments TEXT,
+                            error TEXT,
+                            created_at TEXT NOT NULL,
+                            completed_at TEXT,
+                            FOREIGN KEY (file_id) REFERENCES files(id)
+                        )
+                    """)
+                    conn.execute(
+                        """
+                        INSERT INTO files
+                        (id, filename, path, size, content_type, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            "legacy-file",
+                            "legacy.wav",
+                            "/tmp/legacy.wav",
+                            100,
+                            "audio/wav",
+                            "2026-01-01T00:00:00",
+                        ),
+                    )
+                    conn.execute(
+                        """
+                        INSERT INTO transcription_tasks
+                        (id, file_id, status, created_at)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (
+                            "legacy-task",
+                            "legacy-file",
+                            "pending",
+                            "2026-01-01T00:00:00",
+                        ),
+                    )
+
+            init_db(db_path)
+
+            with closing(sqlite3.connect(db_path)) as conn:
+                rows = conn.execute("PRAGMA table_info(transcription_tasks)").fetchall()
+            columns = {row[1] for row in rows}
+            task_db = TaskDatabase(db_path)
+            task = task_db.get_task("legacy-task")
+
+            assert {"model_id", "engine_device", "engine_compute_type"} <= columns
+            assert task is not None
+            assert task["model_id"] is None
+            assert task["engine_device"] is None
+            assert task["engine_compute_type"] is None

@@ -26,7 +26,7 @@ class FasterWhisperEngine(TranscriptionEngine):
         }
         if cfg.download_root is not None:
             init_kwargs["download_root"] = str(cfg.download_root)
-        self.model = WhisperModel(cfg.model_size, **init_kwargs)
+        self.model: WhisperModel | None = WhisperModel(cfg.model_size, **init_kwargs)
         self._config = cfg
 
     def transcribe(
@@ -45,19 +45,35 @@ class FasterWhisperEngine(TranscriptionEngine):
         Yields:
             Segment objects with start time, end time, and text.
         """
-        opts = options or TranscribeOptions()
+        self._require_model()
+        return self._transcribe_open_model(file_path, options, on_progress)
 
+    def _require_model(self) -> WhisperModel:
+        model = self.model
+        if model is None:
+            raise RuntimeError("Transcription engine is closed")
+        return model
+
+    def _transcribe_open_model(
+        self,
+        file_path: str,
+        options: TranscribeOptions | None = None,
+        on_progress: ProgressCallback | None = None,
+    ) -> Generator[Segment, None, None]:
+        opts = options or TranscribeOptions()
+        model = self._require_model()
         # Convert dataclass to dict, excluding None values for optional params
         opts_dict = {k: v for k, v in asdict(opts).items() if v is not None}
 
         # transcribe returns (segments_generator, transcription_info)
-        segments, info = self.model.transcribe(file_path, **opts_dict)
+        segments, info = model.transcribe(file_path, **opts_dict)
         total_duration = info.duration if info and info.duration else 0.0
 
         for seg in segments:
             yield Segment(start=seg.start, end=seg.end, text=seg.text.strip())
 
-            # Report progress based on segment end time
+            # Report output coverage; do not treat this as faster-whisper
+            # internal progress.
             if on_progress and total_duration > 0:
                 progress = min(seg.end / total_duration * 100, 99.0)
                 on_progress(progress)
@@ -72,3 +88,14 @@ class FasterWhisperEngine(TranscriptionEngine):
             NotImplementedError: Always raised, streaming not yet supported.
         """
         raise NotImplementedError("Streaming transcription not implemented yet")
+
+    def close(self) -> None:
+        """Release the underlying faster-whisper model reference."""
+        model = self.model
+        if model is None:
+            return
+
+        try:
+            model.model.unload_model()
+        finally:
+            self.model = None

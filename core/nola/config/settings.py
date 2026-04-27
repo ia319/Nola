@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     # Model settings
     model_size: str = "small"
     model_dir: Path | None = None
-    device: str = "cpu"  # "auto", "cpu", "cuda"
+    device: str = "auto"  # "auto", "cpu", "cuda"
     compute_type: str = "default"  # "default", "float16", "int8"
 
     # Server settings

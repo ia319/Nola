@@ -38,6 +38,7 @@ core/
 │   │       ├── __init__.py    # Task use-case exports
 │   │       ├── contracts.py   # Task/file gateway protocols
 │   │       ├── errors.py      # Application-layer error model
+│   │       ├── execution_config.py # Resolve task-level engine execution config
 │   │       ├── payloads.py    # Shared task response payload builders
 │   │       ├── types.py       # TypedDict payload contracts
 │   │       ├── actions/       # Write-side use-cases (create/cancel/batch/delete)
@@ -71,6 +72,9 @@ core/
 │   │   │   ├── filenames.py   # Export filename sanitize/unique-write helpers
 │   │   │   ├── metadata.py    # Export config response models
 │   │   │   └── types.py       # Shared export format enum/contracts
+│   │   ├── session/           # Workbench session defaults aggregation
+│   │   │   ├── __init__.py    # Session config exports
+│   │   │   └── defaults.py    # Execution and transcription defaults helpers
 │   │   └── transcription/     # Transcription contracts/defaults/languages/schema
 │   │       ├── __init__.py    # Transcription config package exports
 │   │       ├── contracts.py   # Shared transcription option contracts
@@ -107,7 +111,7 @@ core/
 │   │   │       └── _errors.py # Task use-case error mapping helper
 │   │   └── schemas/           # Pydantic request/response models
 │   │       ├── __init__.py    # Schema package exports
-│   │       ├── config.py      # Export defaults update request schema
+│   │       ├── config.py      # Session defaults and export defaults schemas
 │   │       ├── files.py       # FileResponse, FileListResponse, etc.
 │   │       ├── models.py      # Model request/response schema set
 │   │       ├── responses.py   # TaskDetailResponse, CreateTaskResponse, etc.
@@ -147,6 +151,7 @@ core/
 │   └── services/              # Business logic
 │       ├── __init__.py        # Service package exports
 │       ├── worker.py          # Background worker process
+│       ├── worker_engine.py   # Task-boundary engine fingerprint reload helper
 │       └── formatters/        # Subtitle formatters
 │           ├── __init__.py    # formatter registry exports
 │           ├── base.py        # BaseFormatter, SegmentData
@@ -171,8 +176,10 @@ core/
     ├── test_transcription_config.py # Transcription schema/defaults tests
     ├── test_transcription_contracts.py # Transcription contract consistency tests
     ├── test_transcription_schemas.py # Request schema validation tests
+    ├── test_task_execution_config.py # Task execution config resolution tests
     ├── test_task_use_cases.py # Application-layer task use-case tests
     ├── test_worker.py         # Worker tests
+    ├── test_worker_engine.py  # Worker engine reload tests
     └── test_formatters.py     # Formatter tests
 ```
 
@@ -185,7 +192,11 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - `nola/api/routes/models.py` + `nola/api/schemas/models.py`: Model management and runtime download APIs.
 - `nola/config/transcription/schema/`: Config-driven option schema for frontend controls and validation boundaries.
 - `nola/config/export/`: Export defaults, export format contracts, and filename helpers.
+- `nola/config/session/`: Workbench session defaults for execution and transcription.
+- `nola/config/session/schema.py`: Execution option schema metadata for frontend device and compute-type controls.
 - `nola/application/tasks/`: Task use-cases, payload builders, and export orchestration.
+- `nola/application/tasks/execution_config.py`: Resolve task-level `model_id`, `engine_device`, and `engine_compute_type` before persistence.
+- `nola/services/worker_engine.py`: Reuse or reload `FasterWhisperEngine` at task boundaries from a model/model-dir/device/compute-type fingerprint.
 
 ### Current Backend Guardrails
 
@@ -196,6 +207,14 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - Remove metadata-only partial cache directories during stale artifact cleanup.
 - Keep model registry descriptions keyed by `description_key`; let the frontend localize and fall back to backend `description`.
 - Keep engine default tests config-driven; do not hardcode `small`, `default`, or device defaults.
+- Keep execution option metadata in `/api/config.engine.schema`; do not require the frontend to mirror backend engine option lists.
+- Keep worker engine reload at task boundaries; do not switch engine while `transcribe()` is running.
+- Close the loaded transcription engine before replacing it; do not rely on reassignment or garbage collection as the only release path for model runtime resources.
+- Treat engine construction failures as retryable task-start failures; keep validation and missing-cache failures non-retryable.
+- Keep `model_id`, `device`, and `compute_type` out of `TranscribeOptions` and task `options` JSON.
+- Keep `restart_required` as a compatibility field returning `False` while task-boundary engine reload is supported; do not use it to signal manual worker restart.
+- Keep VAD fields gated by the installed `faster-whisper` `VadOptions`; do not expose fields only present in local source unless the installed package supports them.
+- Treat transcription progress as segment output coverage, not faster-whisper internal progress.
 
 ---
 
@@ -235,14 +254,14 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 
 ### nola/models/
 Data persistence layer (SQLite):
-- `database.py`: Schema initialization, connection management, and foreign key enforcement.
+- `database.py`: Schema initialization, connection management, foreign key enforcement, and task execution config column migrations.
 - `app_config.py`: `AppConfigDatabase` for persisted application defaults under `app_config`.
 - `files.py`: `FileDatabase` for managing audio file metadata. Uses `FileRow` TypedDict.
 - `tasks.py`: Keep `TaskDatabase` as facade and delegate to split repositories.
-- `taskdb/task_queue.py`: Handle enqueue/dequeue/heartbeat/complete/fail/requeue flows; clear stale `error` on successful completion; reset `progress` when requeueing failed/timeout/dead-worker tasks.
+- `taskdb/task_queue.py`: Handle enqueue/dequeue/heartbeat/complete/fail/requeue flows; persist task `model_id`, `engine_device`, and `engine_compute_type`; clear stale `error` on successful completion; reset `progress` when requeueing failed/timeout/dead-worker tasks.
 - `taskdb/task_store.py`: Handle get/list/count/cancel/delete persistence queries.
 - `taskdb/query_helpers.py`: Keep query helper functions isolated from repository classes; validate decoded JSON shapes for `segments` and `options` before casting task rows.
-- `taskdb/types.py`: Keep shared task statuses, sort fields, and TypedDict contracts.
+- `taskdb/types.py`: Keep shared task statuses, sort fields, and task row TypedDict contracts including persisted execution config fields.
 - `utils/db.py`: Database utilities (e.g., `ensure_sqlite_version`).
 
 ### nola/common/
@@ -263,36 +282,40 @@ Model lifecycle management:
 
 ### nola/engines/
 Transcription engine layer:
-- `Segment`: Data class for transcribed segment with timing
-- `EngineConfig`: Engine initialization configuration
-- `TranscribeOptions`: Full transcription options (language, beam_size, vad_filter, etc.)
-- `TranscriptionEngine`: Abstract interface for transcription engines
-- `FasterWhisperEngine`: Faster-Whisper implementation
+- `EngineDevice` / `EngineComputeType`: Literal engine initialization option contracts. Keep allowed values centralized in `engines/base.py`.
+- `DEFAULT_ENGINE_DEVICE`: Keep the safe fallback as `auto`.
+- `DEFAULT_ENGINE_COMPUTE_TYPE`: Keep the safe fallback as `default`.
+- `Segment`: Data class for transcribed segment with timing.
+- `EngineConfig`: Engine initialization configuration. Keep model size, model directory, device, and compute type here.
+- `TranscribeOptions`: Full transcription options passed to `WhisperModel.transcribe(...)`; do not add engine initialization parameters here.
+- `TranscriptionEngine`: Abstract interface for transcription engines, including explicit resource release through `close()`.
+- `FasterWhisperEngine`: Faster-Whisper implementation. Report progress as segment output coverage only, raise immediately when closed, and unload the underlying CTranslate2 model on close.
 
 ### nola/api/
 REST API layer:
 - `deps.py`: Dependency injection for database singletons plus shared model storage, downloader, and event-bus singletons.
-- `routes/config.py`: Aggregated config endpoints, transcription defaults management, and export defaults management.
+- `routes/config.py`: Aggregated config endpoints, session defaults management, transcription defaults management, and export defaults management.
 - `routes/files.py`: File upload/list/delete with validation. Reject file deletion with `409` when tasks still reference the file; return `404` when a concurrent delete wins after the initial lookup. All endpoints use `response_model`.
 - `routes/models.py`: Model list/detail/download/cancel/delete/select/settings endpoints, SSE event stream, active-download runtime summary, and `409` responses for both active downloads and already-downloaded models.
 - `routes/transcriptions.py`: Canonical task router composition entry. Mount read/actions/export task route modules under `/api/transcription-tasks`.
 - `routes/tasks/read.py`: Read endpoints for task list/detail; keep sync handlers for sync DB dependencies.
-- `routes/tasks/actions.py`: Mutation endpoints for create/cancel/batch/retry/delete-record.
+- `routes/tasks/actions.py`: Mutation endpoints for create/cancel/batch/retry/delete-record; resolve task execution config before task creation.
 - `routes/tasks/export.py`: Single/batch export endpoints and OpenAPI response metadata; map use-case output to FastAPI `Response`/`StreamingResponse`.
 - `routes/tasks/_errors.py`: Convert task use-case errors into HTTP exceptions.
-- `schemas/config.py`: Export defaults update request schema.
+- `schemas/config.py`: Config request/response schemas for session defaults and export defaults.
 - `schemas/files.py`: 8 Pydantic response models (`FileResponse`, `FileListResponse`, etc.)
 - `schemas/models.py`: Model management request/response models for list/detail/settings/download runtime. Include download conflict metadata in route OpenAPI responses.
 - `schemas/responses.py`: 7 Pydantic response models (`TaskDetailResponse`, `CreateTaskResponse`, etc.); task read responses now expose persisted `model_id` context
-- `schemas/transcriptions.py`: Request models (`TranscriptionRequest`, `BatchTaskActionRequest`, `BatchExportRequest`, `TranscriptionDefaultsUpdateRequest`) with typed `VadParametersRequest` and `extra=forbid`
+- `schemas/transcriptions.py`: Request models (`TranscriptionRequest`, `TaskEngineRequest`, `BatchTaskActionRequest`, `BatchExportRequest`, `TranscriptionDefaultsUpdateRequest`) with typed `VadParametersRequest` and `extra=forbid`
 - `schemas/validators.py`: Reusable validation functions for language, task options, temperature, and nested `vad_parameters` keys
 
 ### nola/application/
 Application-layer orchestration:
 - `tasks/contracts.py`: Protocol contracts for task/file gateways used by use-cases.
-- `tasks/types.py`: TypedDict payload contracts for task use-case outputs, including persisted task `model_id` in read payloads.
+- `tasks/types.py`: TypedDict payload contracts for task use-case outputs and resolved task execution config.
+- `tasks/execution_config.py`: Resolve task execution config from request values, Session defaults, settings, and model aliases before enqueue.
 - `tasks/payloads.py`: Shared task payload builders (`to_task_summary_payload`, batch summary builder); preserve task `model_id` across list/detail/cancel responses.
-- `tasks/actions/`: Write-side use-cases (`create_task`, `cancel_task`, `batch_cancel_tasks`, `batch_retry_tasks`, `delete_task_record`).
+- `tasks/actions/`: Write-side use-cases (`create_task`, `cancel_task`, `batch_cancel_tasks`, `batch_retry_tasks`, `delete_task_record`); create/retry paths preserve persisted execution config.
 - `tasks/actions/_batch_action.py`: Reuse batch execution skeleton; keep per-task result semantics; return item-level failures instead of aborting whole batch.
 - `tasks/queries/`: Read-side use-cases (`list_tasks`, `get_task`).
 - `tasks/exports/`: Keep export use-cases (`export_task`, `batch_export_tasks`) and export option resolver; return framework-agnostic `BatchExportArchive` from batch use-case; map `save=true` write-path I/O failures to stable `TaskUseCaseError` details.
@@ -300,12 +323,24 @@ Application-layer orchestration:
 ### nola/services/
 Background services:
 - `worker.py`: Independent worker process that dequeues and executes transcription tasks
-  - Loads engine once for performance
-  - `build_transcribe_options()` merges engine defaults, app defaults, and task overrides
+  - Enters the queue loop without preloading an engine
+  - Resolves the desired engine state before each claimed task
+  - Releases the previous engine before loading a different fingerprint
+  - Calls `worker_engine.ensure_engine_loaded()` after task-boundary reload checks
+  - `build_transcribe_options()` merges engine defaults, app defaults, and task transcription overrides only
   - JSON options parsing with error handling
-  - Resolves `configured_model_id` and effective `model_dir` before engine startup; validate explicit configured ids instead of silently replacing them
   - Rejects implicit model auto-download and requires cached models from model management
-  - Persists canonical `worker.last_loaded_model_id` and `worker.last_loaded_model_dir` for runtime config state
+  - Persists canonical `worker.last_loaded_model_id`, `worker.last_loaded_model_dir`, `worker.last_loaded_device`, and `worker.last_loaded_compute_type` after engine load
+  - Fails only the current task when engine resolution, model cache validation, engine release, or engine load fails
+  - Marks dequeued tasks retryable when unexpected Python errors occur during engine preparation
+- `worker_engine.py`: Task-boundary engine reload helper
+  - Build desired engine state from persisted task execution config and current model directory settings.
+  - Fallback legacy tasks through configured model/settings when persisted execution columns are missing.
+  - Validate downloaded model cache before loading.
+  - Close loaded engines before replacing a runtime fingerprint.
+  - Reuse a loaded engine when the fingerprint matches.
+  - Reload only between tasks when model, model directory, device, or compute type changes.
+  - Ignore runtime state write failures after successful engine load.
 - `formatters/`: Subtitle export formatters (SRT, VTT, TXT, ASS)
   - `get_formatter(format, include_timestamps)` factory function
   - Static registry pattern for format discovery
@@ -318,6 +353,8 @@ FastAPI entry point with lifespan management:
 - `GET /api/config/transcription/engine-defaults` - Raw engine defaults
 - `PATCH /api/config/transcription/defaults` - Persist transcription default overrides
 - `DELETE /api/config/transcription/defaults` - Reset persisted transcription defaults
+- `GET /api/config/session-defaults` - Get Workbench session defaults
+- `PATCH /api/config/session-defaults` - Persist Workbench session defaults
 - `GET /api/config/export` - Get effective export defaults
 - `PATCH /api/config/export/defaults` - Persist export default overrides
 - `DELETE /api/config/export/defaults` - Reset persisted export defaults
@@ -330,7 +367,7 @@ FastAPI entry point with lifespan management:
 - `POST /api/models/{model_id}/download` - Start model download; return `409` when the model is already downloading or already cached
 - `POST /api/models/{model_id}/cancel` - Cancel active model download
 - `DELETE /api/models/{model_id}` - Delete local model cache
-- `POST /api/models/{model_id}/select` - Select configured model for next worker startup
+- `POST /api/models/{model_id}/select` - Select the configured default model for future tasks without forcing worker restart
 - `POST /api/files/` - Upload audio file
 - `GET /api/files/` - List all files
 - `GET /api/files/{file_id}` - Get file metadata
@@ -359,20 +396,36 @@ Configuration and constants:
 - `transcription/defaults.py` + `transcription/languages.py`: Resolve effective defaults and effective language list.
 - `export/types.py`: Keep shared `ExportFormat` enum for config and formatter layers.
 - `export/`: Keep export defaults and filename handling without introducing `config -> services` reverse dependency.
+- `session/defaults.py`: Resolve Workbench session defaults by combining execution defaults and transcription defaults.
+- `session/schema.py`: Publish execution control metadata for device and compute type through aggregated config responses.
 
 ### Transcription Rules
 Apply config-driven schema as the only source for frontend option metadata and task option values.
 Apply defaults precedence as `engine defaults < persisted app defaults < task overrides`.
+Apply execution config precedence as request values, then Session defaults, then settings fallbacks.
+Publish execution `device` and `compute_type` options through `/api/config.engine.schema`; keep frontend option labels and values derived from this metadata.
 Derive engine default assertions from `EngineConfig`/settings in tests; do not hardcode `small`, `default`, or device defaults.
 Treat explicit `null` in `PATCH /api/config/transcription/defaults` as remove-override semantics.
+Treat explicit `null` in `PATCH /api/config/session-defaults` execution fields as clear-override semantics.
 Merge nested defaults objects in PATCH flows without replacing untouched subkeys.
 Reject unknown top-level options and unknown `vad_parameters` keys at request validation with `422`.
+Reject invalid task or Session default `device` / `compute_type` values at the boundary; read paths may ignore stale invalid persisted overrides and fall back safely.
+Treat invalid process settings `device` / `compute_type` as warning-worthy fallback inputs for legacy tasks; keep explicit task execution values strict.
+Separate configuration validation failures from runtime engine load failures; make runtime engine construction retryable when the task has not started transcription.
 Keep `engines/base.py` as pass-through for option values; do not add engine-side strict range enforcement.
 Keep `api/schemas/*` as coarse guard; block clearly invalid payloads and return `422`.
 Keep `config/transcription/schema/*` as UI constraint source; ensure UI ranges remain a subset of API acceptance.
 Keep API coarse guards and UI schema constraints independent; do not force exact numeric-range equality across both layers.
 Serialize infinity as `"inf"` at API boundaries and deserialize it back before engine invocation.
 Use only `/api/transcription-tasks/*` for task APIs; do not add `/api/transcriptions/*` runtime aliases.
+Use `/api/config/session-defaults` for Workbench execution defaults; do not add `/api/config/engine` as a parallel write path.
+Persist resolved `model_id`, `engine_device`, and `engine_compute_type` on new tasks; do not let later default changes mutate already queued tasks.
+Treat `worker.last_loaded_*` fields as recently loaded runtime state, not desired defaults.
+Treat Default and Running model mismatch as normal after task-boundary reload.
+Treat `restart_required` as a compatibility field that remains `false` under the current task-boundary reload architecture.
+Close the current transcription engine before loading a different engine fingerprint.
+Gate local-source-only VAD fields with the installed `faster-whisper` `VadOptions`.
+Treat `FasterWhisperEngine` progress callbacks as output coverage estimates; do not call them faster-whisper internal progress.
 Apply export defaults precedence as `built-in export defaults < persisted export defaults < request overrides`.
 Map export write-path `OSError` and `UnicodeError` failures to stable API error details; do not widen this mapping to catch-all exceptions.
 Keep batch export error output sanitized; write stable task-level reasons to `_errors.txt` and do not write raw exception text into archives.
@@ -456,6 +509,8 @@ Client ──▶ FastAPI routes ──▶ application use-cases ──▶ SQLite
 | `/api/config/transcription/engine-defaults` | GET | - | `EngineDefaultsResponse` |
 | `/api/config/transcription/defaults` | PATCH | `TranscriptionDefaultsUpdateRequest` | `TranscriptionDefaultsPatchResponse` |
 | `/api/config/transcription/defaults` | DELETE | - | `204 No Content` |
+| `/api/config/session-defaults` | GET | - | `SessionDefaultsResponse` |
+| `/api/config/session-defaults` | PATCH | `SessionDefaultsUpdateRequest` | `SessionDefaultsResponse` |
 | `/api/config/export` | GET | - | `ExportConfigResponse` |
 | `/api/config/export/defaults` | PATCH | `ExportDefaultsUpdateRequest` | `ExportDefaultsPatchResponse` |
 | `/api/config/export/defaults` | DELETE | - | `204 No Content` |

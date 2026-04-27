@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { buildTranscriptionDefaults } from '@/test-utils/transcription-defaults'
 import type { AppConfig } from '@/shared/types'
+import { TEST_ENGINE_SCHEMA } from '@/test-utils/engine-schema'
 
 const transcriptionTabMocks = vi.hoisted(() => ({
   fetchEngineDefaultsMock: vi.fn(),
@@ -142,6 +143,7 @@ function buildConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       device: 'cuda',
       compute_type: 'float16',
       is_multilingual: true,
+      schema: TEST_ENGINE_SCHEMA,
     },
     transcription: {
       defaults: buildTranscriptionDefaults(),

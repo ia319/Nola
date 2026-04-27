@@ -47,11 +47,15 @@ class FakeTaskStore:
         max_retries: int = 3,
         options: dict[str, object] | None = None,
         model_id: str | None = None,
+        engine_device: str | None = None,
+        engine_compute_type: str | None = None,
     ) -> None:
         task = {
             "id": task_id,
             "file_id": file_id,
             "model_id": model_id,
+            "engine_device": engine_device,
+            "engine_compute_type": engine_compute_type,
             "status": "pending",
             "progress": 0.0,
             "created_at": "2026-01-01T00:00:00",
@@ -67,6 +71,8 @@ class FakeTaskStore:
                 "max_retries": max_retries,
                 "options": options,
                 "model_id": model_id,
+                "engine_device": engine_device,
+                "engine_compute_type": engine_compute_type,
             }
         )
 
@@ -96,6 +102,8 @@ class FailingEnqueueTaskStore(FakeTaskStore):
         max_retries: int = 3,
         options: dict[str, object] | None = None,
         model_id: str | None = None,
+        engine_device: str | None = None,
+        engine_compute_type: str | None = None,
     ) -> None:
         if task_id in self.fail_enqueue_task_ids:
             raise RuntimeError("sqlite busy")
@@ -106,6 +114,8 @@ class FailingEnqueueTaskStore(FakeTaskStore):
             max_retries=max_retries,
             options=options,
             model_id=model_id,
+            engine_device=engine_device,
+            engine_compute_type=engine_compute_type,
         )
 
 
@@ -114,6 +124,8 @@ def _base_task(*, task_id: str, file_id: str, status: str) -> dict[str, object]:
         "id": task_id,
         "file_id": file_id,
         "model_id": None,
+        "engine_device": None,
+        "engine_compute_type": None,
         "status": status,
         "progress": 0.0,
         "created_at": "2026-01-01T00:00:00",
@@ -153,7 +165,7 @@ def test_batch_cancel_tasks_returns_mixed_outcomes() -> None:
     assert results[3]["error_code"] == "duplicate_task_id"
 
 
-def test_create_task_persists_reserved_model_id() -> None:
+def test_create_task_persists_execution_config() -> None:
     file_store = FakeFileStore(files={"f1": {"id": "f1", "filename": "audio.mp3"}})
     task_store = FakeTaskStore(tasks={})
 
@@ -162,7 +174,11 @@ def test_create_task_persists_reserved_model_id() -> None:
         task_store=task_store,
         file_id="f1",
         options={"language": "en"},
-        model_id="small",
+        execution_config={
+            "model_id": "small",
+            "engine_device": "cpu",
+            "engine_compute_type": "default",
+        },
         task_id_factory=lambda: "task-001",
     )
 
@@ -176,6 +192,8 @@ def test_create_task_persists_reserved_model_id() -> None:
             "max_retries": 3,
             "options": {"language": "en"},
             "model_id": "small",
+            "engine_device": "cpu",
+            "engine_compute_type": "default",
         }
     ]
 
@@ -192,6 +210,9 @@ def test_batch_retry_tasks_returns_mixed_outcomes() -> None:
             "failed": {
                 **_base_task(task_id="failed", file_id="f1", status="failed"),
                 "options": {"language": "zh"},
+                "model_id": "small",
+                "engine_device": "cuda",
+                "engine_compute_type": "float16",
             },
             "pending": _base_task(task_id="pending", file_id="f2", status="pending"),
             "cancelled_missing_file": _base_task(
@@ -221,6 +242,9 @@ def test_batch_retry_tasks_returns_mixed_outcomes() -> None:
     results = payload["results"]
     assert results[0]["ok"] is True
     assert results[0]["new_task_id"] == "retry-1"
+    assert task_store.enqueued[0]["model_id"] == "small"
+    assert task_store.enqueued[0]["engine_device"] == "cuda"
+    assert task_store.enqueued[0]["engine_compute_type"] == "float16"
     assert results[1]["error_code"] == "file_missing"
     assert results[2]["error_code"] == "invalid_status"
     assert results[3]["error_code"] == "not_found"
@@ -275,6 +299,11 @@ def test_create_task_raises_when_file_missing() -> None:
             task_store=task_store,
             file_id="missing-file",
             options=None,
+            execution_config={
+                "model_id": "small",
+                "engine_device": "cpu",
+                "engine_compute_type": "default",
+            },
         )
 
     assert error.value.status_code == 404

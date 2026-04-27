@@ -21,8 +21,9 @@ from nola.api.deps import (
 )
 from nola.api.routes._model_helpers import (
     canonicalize_model_id,
+    canonicalize_optional_engine_compute_type,
+    canonicalize_optional_engine_device,
     canonicalize_optional_model_id,
-    compute_restart_required,
 )
 from nola.api.schemas.models import (
     ActiveModelDownloadResponse,
@@ -222,7 +223,7 @@ def list_active_downloads() -> ActiveModelDownloadsResponse:
     status_code=status.HTTP_200_OK,
 )
 def get_model_settings() -> ModelSettingsResponse:
-    """Return model directory configuration and override state."""
+    """Return model directory configuration and worker runtime state."""
     config_db = get_app_config_db()
     model_config = config_db.get_all("model.")
     worker_state = _read_worker_state()
@@ -234,19 +235,23 @@ def get_model_settings() -> ModelSettingsResponse:
     last_loaded_id = canonicalize_optional_model_id(
         worker_state.get("last_loaded_model_id")
     )
+    last_loaded_device = canonicalize_optional_engine_device(
+        worker_state.get("last_loaded_device")
+    )
+    last_loaded_compute_type = canonicalize_optional_engine_compute_type(
+        worker_state.get("last_loaded_compute_type")
+    )
     db_model_dir = model_config.get("configured_model_dir")
 
     return ModelSettingsResponse(
         configured_model_id=configured_id,
         last_loaded_model_id=last_loaded_id,
+        last_loaded_device=last_loaded_device,
+        last_loaded_compute_type=last_loaded_compute_type,
         configured_model_dir=db_model_dir if isinstance(db_model_dir, str) else None,
         effective_model_dir=str(effective_dir),
         override_source=source,
-        restart_required=compute_restart_required(
-            configured_id or canonicalize_model_id(settings.model_size),
-            effective_dir,
-            worker_state,
-        ),
+        restart_required=False,
     )
 
 
@@ -521,7 +526,7 @@ def delete_model(model_id: str) -> ModelDeleteResponse | Response:
     },
 )
 def select_model(model_id: str) -> ModelSelectResponse | Response:
-    """Set the configured model for next Worker startup."""
+    """Set the default model used by future tasks."""
     try:
         info = require_model(model_id)
     except UnknownModelError:
@@ -542,14 +547,9 @@ def select_model(model_id: str) -> ModelSelectResponse | Response:
     config_db = get_app_config_db()
     config_db.set_many("model.", {"configured_model_id": info.model_id})
 
-    model_config = _read_model_config()
-    worker_state = _read_worker_state()
-    effective_dir, _ = _resolve_effective_dir(model_config)
-    restart = compute_restart_required(info.model_id, effective_dir, worker_state)
-
     return ModelSelectResponse(
         configured_model_id=info.model_id,
-        restart_required=restart,
+        restart_required=False,
         message=f"Configured model set to {info.name}",
     )
 

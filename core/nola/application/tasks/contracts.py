@@ -50,6 +50,8 @@ class SupportsTaskMutations(Protocol):
         max_retries: int = 3,
         options: TaskOptions | None = None,
         model_id: str | None = None,
+        engine_device: str | None = None,
+        engine_compute_type: str | None = None,
     ) -> None:
         """Insert a pending task."""
         ...

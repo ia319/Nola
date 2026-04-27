@@ -13,7 +13,7 @@ from nola.api.schemas.validators import (
 )
 from nola.config.constants import MAX_BATCH_TASK_IDS
 from nola.config.export import ExportFormat
-from nola.engines.base import TranscribeOptions
+from nola.engines.base import EngineComputeType, EngineDevice, TranscribeOptions
 from nola.model_hub import get_model
 
 _ENGINE_DEFAULTS = TranscribeOptions()
@@ -26,7 +26,12 @@ def _swagger_default(value: Any) -> dict[str, Any]:
 
 def _create_task_example() -> dict[str, Any]:
     """Build a complete create-task example with runtime value types."""
-    return {"file_id": "uploaded-file-id", **asdict(_ENGINE_DEFAULTS)}
+    return {
+        "file_id": "uploaded-file-id",
+        "model_id": "small",
+        "engine": {"device": "auto", "compute_type": "default"},
+        **asdict(_ENGINE_DEFAULTS),
+    }
 
 
 def _defaults_patch_example() -> dict[str, Any]:
@@ -50,6 +55,7 @@ class VadParametersRequest(BaseModel):
     max_speech_duration_s: float | Literal["inf"] | None = None
     min_silence_duration_ms: int | None = Field(None, ge=0)
     speech_pad_ms: int | None = Field(None, ge=0)
+    # Keep these fields gated by the installed faster-whisper VadOptions.
     min_silence_at_max_speech: int | None = Field(None, ge=0)
     use_max_poss_sil_at_max_speech: bool | None = None
 
@@ -72,6 +78,21 @@ class VadParametersRequest(BaseModel):
         if value < 0:
             raise ValueError("max_speech_duration_s must be non-negative.")
         return value
+
+
+class TaskEngineRequest(BaseModel):
+    """Task-level engine initialization overrides."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    device: EngineDevice | None = Field(
+        None,
+        description="Task engine device override",
+    )
+    compute_type: EngineComputeType | None = Field(
+        None,
+        description="Task engine compute type override",
+    )
 
 
 class TranscriptionOptionsPayload(BaseModel):
@@ -326,7 +347,11 @@ class TranscriptionRequest(TranscriptionOptionsPayload):
     file_id: str = Field(..., description="File ID from upload API")
     model_id: str | None = Field(
         None,
-        description="Target model id (reserved, not used in execution yet).",
+        description="Target task model id",
+    )
+    engine: TaskEngineRequest | None = Field(
+        None,
+        description="Task engine initialization overrides",
     )
 
     @field_validator("model_id")
@@ -342,8 +367,11 @@ class TranscriptionRequest(TranscriptionOptionsPayload):
         return model.model_id
 
     def get_options_dict(self) -> dict[str, Any]:
-        """Return non-None transcription options without file_id and model_id."""
-        return self.model_dump(exclude={"file_id", "model_id"}, exclude_none=True)
+        """Return non-None transcription options without execution config."""
+        return self.model_dump(
+            exclude={"file_id", "model_id", "engine"},
+            exclude_none=True,
+        )
 
 
 class TranscriptionDefaultsUpdateRequest(TranscriptionOptionsPayload):

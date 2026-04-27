@@ -62,12 +62,13 @@ app/                          # Frontend workspace root
 │   │       └── nola-logo-mark.svg # Nola shell logo mark
 │   │
 │   ├── config/               # Centralized configuration
-│   │   ├── api.ts            # Config API (fetch + defaults update/reset)
+│   │   ├── api.ts            # Config API (fetch + transcription/session/export defaults update/reset)
 │   │   ├── cache-invalidation.ts # Refresh shared config/default caches after mutations
 │   │   ├── __tests__/        # Config store and preference persistence tests
 │   │   │   ├── ui-preferences-storage.test.ts # Storage migration/fallback tests
 │   │   │   └── use-app-config.test.ts # Shared config cache/store tests
 │   │   ├── constants.ts      # App constants (synced with backend)
+│   │   ├── engine-options.ts # Typed engine option defaults, constants, and guards
 │   │   ├── env.ts            # Typed environment variables (import.meta.env)
 │   │   ├── logger.ts         # Lightweight logger ([Nola] prefix, test-aware mute)
 │   │   ├── test-env.ts       # Shared test-runtime flags and log opt-in env
@@ -125,7 +126,7 @@ app/                          # Frontend workspace root
 │   │
 │   ├── features/             # Business modules (Domain logic)
 │   │   ├── activity/         # Activity Center aggregation
-│   │   │   ├── ActivityDataBridge.tsx # Bridge task/model sources into activity store
+│   │   │   ├── ActivityDataBridge.tsx # Bridge task/download sources into activity store
 │   │   │   ├── store.ts      # needsAttention/inProgress/recent zustand store
 │   │   │   ├── __tests__/    # Activity store and bridge tests
 │   │   │   │   ├── ActivityDataBridge.test.tsx # Verify activity data-source bridge behavior
@@ -244,7 +245,7 @@ app/                          # Frontend workspace root
 │   │   │   │       ├── OptionsBar.test.tsx # Verify options bar behavior
 │   │   │   │       └── AdvancedOptions.test.tsx # Verify advanced options behavior
 │   │   │   ├── hooks/
-│   │   │   │   ├── useTranscriptionOptions.ts # Manage option overrides and payload build
+│   │   │   │   ├── useTranscriptionOptions.ts # Manage transcription overrides and payload build
 │   │   │   │   └── __tests__/
 │   │   │   │       └── useTranscriptionOptions.test.ts # Verify option hook behavior
 │   │   │   └── lib/
@@ -429,7 +430,7 @@ Keep generated or local-runtime directories such as `node_modules/`, `dist/`, an
 - `src/shell/`: Compose the product shell, locale controller, Activity Center, sidebar, and top bar.
 - `src/layouts/`: Keep page workspace wrappers and Settings row/section primitives.
 - `src/pages/`: Keep route page implementations outside `features/*`.
-- `src/features/activity/`: Aggregate task/model activity into `needsAttention`, `inProgress`, and `recent`.
+- `src/features/activity/`: Aggregate task and model-download activity into `needsAttention`, `inProgress`, and `recent`.
 - `src/shared/lib/query-*`: Centralize TanStack Query keys, fetcher, and client defaults.
 - `src/shared/lib/overlay-events.ts`: Coordinate mutually exclusive detail sheets and Activity Center.
 - `src/components/theme-provider.tsx`: Apply app-owned light/dark/system theme without `next-themes`.
@@ -438,13 +439,20 @@ Keep generated or local-runtime directories such as `node_modules/`, `dist/`, an
 
 - Keep Settings subpage content direct; do not add page-level title/description blocks inside each settings tab.
 - Keep Settings controls compact and continuous; do not split one tab into separate heavy cards.
-- Keep Task Workbench model selection read-only; prefer `last_loaded_model_id`, then `configured_model_id`, then a placeholder.
-- Treat Task Workbench Advanced `Reset to Defaults` as a local draft reset; do not send a request until Save as Default.
+- Let Task Workbench control task-level `model_id`, `device`, and `compute_type`; select only downloaded models.
+- Derive Workbench `device` and `compute_type` options from `/api/config.engine.schema`; do not hardcode option lists or label keys in the frontend.
+- Initialize Task Workbench execution config from Session defaults, then configured model, then last-loaded model fallback; do not auto-select the first downloaded model.
+- Keep `useTranscriptionOptions` independent from engine execution config; merge `model_id` and `engine` only in the Workbench/page container.
+- Treat Task Workbench Advanced `Reset to Defaults` as a local draft reset; do not send a request until Save as Task Defaults.
+- Save Task Workbench defaults through `PATCH /api/config/session-defaults` with both `execution` and `transcription` payloads.
 - Show warning feedback when defaults save/reset succeeds but config refresh fails; do not show success in that partial-failure path.
 - Show engine-defaults fetch errors with retry; do not render failed fetches as “no overrides”.
 - Guard model mutations per `model_id`; use API-returned `configured_model_id` after select.
-- Keep `Runtime` in model details as a placeholder until model family/backend terminology is settled.
+- Treat `Default` and `Running` model mismatch as normal; do not surface it as a restart-required warning.
+- Treat `restart_required` as a backend compatibility field that remains `false` under task-boundary reload; do not reintroduce warning toasts, disabled states, or Activity Center attention from it unless the backend contract changes.
+- Keep Settings Transcription resources read-only; keep Workbench as the session execution defaults editor.
 - Keep Activity Center recent events for model download `completed`, `failed`, and `cancelled` terminal states.
+- Do not generate or render `model_restart_required` Activity Center attention.
 - Keep upload completion as toast/upload-queue feedback, not Activity Center history.
 
 ---
@@ -463,46 +471,50 @@ Keep generated or local-runtime directories such as `node_modules/`, `dist/`, an
 >    - `src/lib/*`: app/platform-level helpers (e.g., shadcn `cn`)
 >    - `src/shared/lib/*`: cross-feature reusable runtime helpers
 >    - `src/features/*/lib/*`: feature-private helpers; promote to `shared/lib` only when reused by another feature
-> 7. **Schema-Driven Controls**: Drive language/task/initial prompt and advanced controls from backend schema via `schema-adapter`; do not reintroduce hardcoded option groups.
-> 8. **Defaults Priority**: Apply `engine defaults < persisted defaults < task overrides` when composing request payloads and defaults patches.
+> 7. **Schema-Driven Controls**: Drive language/task/initial prompt, advanced controls, and engine execution selects from backend schema metadata; do not reintroduce hardcoded option groups.
+> 8. **Transcription Defaults Priority**: Apply `engine defaults < persisted defaults < task overrides` when composing transcription request payloads and defaults patches.
 > 9. **Defaults Patch Semantics**: Use `undefined` for unchanged fields, use `null` to clear persisted overrides, and send concrete values for explicit overrides.
-> 10. **Language Ordering**: Consume `effective_languages` in backend return order; do not assume alphabetical ordering.
-> 11. **Vitest Environment Split**: Keep `node` as default test environment. Add `// @vitest-environment jsdom` only for DOM-driven tests.
-> 12. **Import Boundaries (ESLint-Enforced)**:
+> 10. **Execution Config Boundary**: Keep `model_id`, `device`, and `compute_type` out of `transcription-options`; compose them as `model_id` and `engine` in Workbench.
+> 11. **Session Defaults Boundary**: Use Session defaults for Workbench task defaults. Use transcription defaults for Settings transcription defaults.
+> 12. **Language Ordering**: Consume `effective_languages` in backend return order; do not assume alphabetical ordering.
+> 13. **Vitest Environment Split**: Keep `node` as default test environment. Add `// @vitest-environment jsdom` only for DOM-driven tests.
+> 14. **Import Boundaries (ESLint-Enforced)**:
 >     - Outside `src/features/*`, import public feature surfaces from `@/features/<name>`; do not deep import `@/features/<name>/**` unless the folder is explicitly helper-only and has no public barrel.
 >     - Keep `@/features/settings/lib/ui-preferences` as a settings-page helper exception until it gains a public barrel or moves to `src/app/locale`.
 >     - `src/components/common/*` must not import from `@/features/*`.
 >     - Inside `src/features/<name>/*`, do not deep import from other features; import only via feature public entry.
-> 13. **Feature Naming Boundary**:
+> 15. **Feature Naming Boundary**:
 >     - Use `src/features/tasks` for task lifecycle and history flows.
 >     - Use `src/features/transcription-options` for option composition and defaults-patch logic.
 >     - Do not create or restore `src/features/history` or `src/features/transcription`.
-> 14. **Subdomain Composition Boundary**:
+> 16. **Subdomain Composition Boundary**:
 >     - Keep `transcription-options` independent from `tasks`.
 >     - Compose `transcription-options` with `tasks` only in page or shell containers under `src/pages/*` and `src/shell/*`.
 >     - Do not reintroduce compatibility re-export modules for removed legacy feature roots.
-> 15. **Task API Path Boundary**:
+> 17. **Task API Path Boundary**:
 >     - Use `/api/transcription-tasks/*` as runtime task endpoints.
 >     - Do not add new frontend runtime clients for `/api/transcriptions/*` aliases.
-> 16. **Locale Routing Boundary**:
+> 18. **Locale Routing Boundary**:
 >     - Use `src/app/locale/*` for locale-prefix parsing, route localization, and UI preference persistence.
 >     - Let explicit Settings language changes rewrite the current route with a locale prefix.
 >     - Keep the default locale path unprefixed until the user explicitly chooses a language.
-> 17. **Theme Boundary**:
+> 19. **Theme Boundary**:
 >     - Use the app-owned `ThemeProvider`, `useTheme`, and UI preferences store.
 >     - Do not introduce new `next-themes` usage.
 >     - Apply document theme before paint and serialize UI preference writes.
-> 18. **Activity Boundary**:
->     - Keep Activity Center as a client aggregation layer over task polling, model settings, active downloads, and model SSE.
+> 20. **Activity Boundary**:
+>     - Keep Activity Center as a client aggregation layer over task polling, active downloads, and model SSE.
 >     - Store structured route targets and data only; render labels in shell/i18n.
+>     - Do not represent Default/Running model mismatch as attention.
+>     - Do not use `restart_required` to create restart attention while task-boundary reload remains the backend contract.
 >     - Keep upload completion as toast/queue feedback, not Activity Center history.
-> 19. **DataTable Boundary**:
+> 21. **DataTable Boundary**:
 >     - Disable select-all while loading, error, or empty states render.
 >     - Ignore nested interactive controls when handling row clicks.
 >     - Use keyboard activation only on the row element.
 >
 > [!IMPORTANT]
-> Use `GET /api/config` and `GET /api/config/transcription/engine-defaults` as the only defaults source.
+> Use `GET /api/config`, `GET /api/config/transcription/engine-defaults`, and `GET /api/config/session-defaults` as the config/default sources.
 > Do not add new frontend calls to `/api/transcriptions/options/defaults`.
 >
 > [!NOTE]
@@ -570,7 +582,7 @@ Backend (Pydantic) ──► openapi.json ──► openapi.d.ts ──► domai
 Separate business domain logic by feature. Expose every feature public surface through `index.ts`.
 
 - **activity**:
-  - `ActivityDataBridge.tsx`: Sync task board state, model settings, active downloads, and model SSE terminal events into the activity store.
+  - `ActivityDataBridge.tsx`: Sync task board state, active downloads, and model SSE terminal events into the activity store.
   - `store.ts`: Keep `needsAttention`, `inProgress`, `recent`, stable dismissal ids, sorted recent events, and route targets.
   - `index.ts`: Expose activity feature public exports.
 - **upload**:
@@ -623,8 +635,8 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `components/OptionsBar.tsx`: Compose file selector, language/task selector, prompt input, defaults actions, and task creation trigger.
   - `components/AdvancedOptions.tsx`: Render backend-schema-driven advanced controls.
   - `components/__tests__/OptionsBar.test.tsx`, `components/__tests__/AdvancedOptions.test.tsx`: Verify option UI behavior.
-  - `hooks/useTranscriptionOptions.ts`: Manage override state and build typed `CreateTaskPayload`.
-  - `hooks/__tests__/useTranscriptionOptions.test.ts`: Verify state reset, mutual exclusion, and payload composition.
+  - `hooks/useTranscriptionOptions.ts`: Manage transcription override state and build transcription-only task payload pieces.
+  - `hooks/__tests__/useTranscriptionOptions.test.ts`: Verify state reset, mutual exclusion, and transcription payload composition.
   - `lib/defaults-patch.ts`: Build transcription defaults PATCH payload with `undefined/null/value` semantics.
   - `lib/object-path.ts`: Read/write nested fields by dot-path.
   - `lib/schema-adapter.ts`: Adapt backend schema to top-level and advanced option models.
@@ -699,10 +711,10 @@ Page-level layout primitives.
 
 Route page implementations.
 
-- **task-workbench/**: Compose upload queue, session config, Advanced side sheet, and session activity monitor. Keep model selection read-only until task-level `model_id` execution becomes effective.
+- **task-workbench/**: Compose upload queue, session config, Advanced side sheet, and session activity monitor. Let session config create task-level execution payloads with `model_id` and schema-derived `engine` values.
 - **history-center/**: Compose Task ID and Filename modes, URL search state, pagination, detail dialogs, export dialog loading, and file/task associated actions.
-- **models-management/**: Compose model overview, model table, detail sheet, mutation de-duplication, canonical `configured_model_id` handling, and model refresh.
-- **settings/**: Compose General, Transcription, Export, Model Storage, and System Info tabs. Keep subpage titles removed; show settings content directly.
+- **models-management/**: Compose model overview, model table, detail sheet, mutation de-duplication, canonical `configured_model_id` handling, Default/Running display, model refresh, and restart-free model selection feedback.
+- **settings/**: Compose General, Transcription, Export, Model Storage, and System Info tabs. Keep subpage titles removed; show settings content directly. Keep engine resources read-only and use task-boundary reload language instead of restart-required language.
 
 ### src/shell/
 
@@ -745,10 +757,10 @@ Cross-feature shared code, split into `lib/` and `types/`.
 - **types/openapi.d.ts**: Auto-generated by `pnpm gen:types`. Never edit manually.
 - **types/api-error.ts**: Backend error payload contracts (`ApiError`, `ValidationErrorItem`).
 - **types/app-error.ts**: Frontend error contract (`AppError`: `code`, `i18nKey`, `params`, `retriable`).
-- **types/config.ts**: Thin aliases for config contracts (`AppConfig`, `EngineDefaults`, `TranscriptionDefaultsUpdateRequest`).
+- **types/config.ts**: Thin aliases for config contracts (`AppConfig`, `EngineDefaults`, `SessionDefaults`, `EngineDevice`, `EngineComputeType`, defaults update requests).
 - **types/file.ts**: Thin aliases over OpenAPI file schemas (`FileInfo`, `FileUploadResponse`, etc.).
 - **types/model.ts**: Thin aliases over OpenAPI model schemas and active download contracts.
-- **types/task.ts**: Thin aliases over OpenAPI task schemas + derived types (`TaskStatus`, `ExportFormat` from schema enums); task read responses now include reserved `model_id` context.
+- **types/task.ts**: Thin aliases over OpenAPI task schemas + derived types (`TaskStatus`, `ExportFormat` from schema enums); task read responses expose persisted `model_id` context.
 - **types/task-query.ts**: Shared query model for list toolbar and pagination contracts.
 - **types/index.ts**: Barrel re-export for `import type { ... } from '@/shared/types'`.
 
@@ -780,8 +792,9 @@ Use `src/app/locale/*` for route-prefix language behavior and Settings-triggered
 
 Runtime config access and fallback constants.
 
-- **api.ts**: Config endpoints (`fetchAppConfig`, `fetchEngineDefaults`, transcription defaults `PATCH`/`DELETE`, export defaults `GET/PATCH/DELETE`).
-- **cache-invalidation.ts**: Refresh shared config, transcription defaults, and export defaults caches after mutations.
+- **api.ts**: Config endpoints (`fetchAppConfig`, `fetchEngineDefaults`, `fetchSessionDefaults`, `patchSessionDefaults`, transcription defaults `PATCH`/`DELETE`, export defaults `GET/PATCH/DELETE`).
+- **cache-invalidation.ts**: Refresh shared config and all config query caches after mutations.
+- **engine-options.ts**: Build engine device and compute-type select options from `/api/config.engine.schema`; use the resolved current value only as a fallback when schema metadata is unavailable.
 - **use-app-config.ts**: Shared config singleton store using `useSyncExternalStore`, plus `refreshAppConfig()`. Notify all mounted consumers when the shared snapshot changes.
 - **ui-preferences.ts**: Normalize and validate language/theme/unit preferences from unknown persisted values.
 - **ui-preferences-storage.ts**: Load unified UI preferences first, fall back to legacy `nola-*` keys, and swallow browser storage write failures.

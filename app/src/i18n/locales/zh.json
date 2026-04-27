@@ -288,19 +288,30 @@
       "sessionConfig": {
         "globalSettings": "全局设置",
         "executionEngine": "执行引擎",
-        "sessionOverride": "会话覆盖",
+        "sessionOverride": "任务执行",
         "unavailable": "不可用",
         "model": {
           "label": "模型",
-          "badge": "即将支持",
+          "badge": "任务模型",
           "loading": "正在加载模型",
-          "comingSoon": "即将支持"
+          "placeholder": "选择已下载模型",
+          "noDownloaded": "没有已下载模型"
         },
         "device": {
-          "label": "设备"
+          "label": "设备",
+          "options": {
+            "auto": "自动",
+            "cpu": "CPU",
+            "cuda": "CUDA"
+          }
         },
         "computeType": {
-          "label": "计算类型"
+          "label": "计算类型",
+          "options": {
+            "default": "默认",
+            "float16": "Float16",
+            "int8": "Int8"
+          }
         },
         "advanced": {
           "button": "高级参数",
@@ -315,7 +326,7 @@
         "reset": "重置为默认值",
         "cancel": "取消",
         "apply": "应用更改",
-        "saveDefault": "保存为默认值",
+        "saveDefault": "保存为任务默认值",
         "savingDefault": "保存中..."
       }
     },
@@ -564,7 +575,6 @@
     },
     "configured": "默认",
     "lastLoaded": "运行中",
-    "restartRequired": "需要重启以应用模型更改",
     "status": {
       "not_downloaded": "未下载",
       "downloading": "下载中",
@@ -728,7 +738,7 @@
       "empty": {
         "needsAttention": {
           "title": "暂无需要关注的事项",
-          "description": "失败任务和需要重启的模型变更会显示在这里。"
+          "description": "失败任务会显示在这里。"
         },
         "inProgress": {
           "title": "暂无进行中的工作",
@@ -752,7 +762,6 @@
       },
       "items": {
         "failedTask": "失败任务",
-        "restartRequired": "需要重启",
         "taskInProgress": "正在转写",
         "modelDownload": "模型下载中",
         "taskCompleted": "转写已完成",
@@ -762,7 +771,6 @@
         "fileIntegrityChecked": "文件完整性检查完成",
         "orphanCleanupCompleted": "孤立记录清理完成",
         "taskId": "任务 {{taskId}}",
-        "configuredModel": "已配置模型：{{modelId}}",
         "affectedCount": "影响 {{count}} 项"
       }
     }
@@ -984,9 +992,9 @@
           "label": "覆盖来源",
           "description": "查看当前由哪一层配置控制模型存储。"
         },
-        "restartStatus": {
-          "label": "重启状态",
-          "description": "查看运行中的 worker 是否需要重启后才能应用变更。"
+        "reloadMode": {
+          "label": "重载模式",
+          "description": "查看模型变更如何应用到新的 worker 任务。"
         },
         "configuredDirectory": {
           "label": "已配置缓存目录",
@@ -996,18 +1004,13 @@
         "environmentOverride": {
           "label": "环境变量覆盖",
           "description": "环境变量会优先于已保存设置控制模型缓存目录。"
-        },
-        "restartRequired": {
-          "label": "需要重启",
-          "description": "重启本地服务以应用待生效的模型存储变更。"
         }
       },
       "values": {
         "empty": "未设置",
         "directoryUnavailable": "等待后端返回安全展示路径",
         "environmentOverrideActive": "环境变量覆盖已启用",
-        "restartRequired": "需要重启",
-        "restartNotRequired": "无需重启",
+        "taskBoundaryReload": "任务边界重载",
         "overrideSource": {
           "environment": "环境变量",
           "database": "已保存设置",

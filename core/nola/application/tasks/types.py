@@ -1,6 +1,9 @@
 """Shared payload and value types for task use-cases."""
 
+from dataclasses import dataclass
 from typing import Literal, TypedDict
+
+from nola.engines.base import EngineComputeType, EngineDevice
 
 TaskStatusValue = str
 BatchTaskActionErrorCode = Literal[
@@ -11,6 +14,23 @@ BatchTaskActionErrorCode = Literal[
 ]
 TaskOptions = dict[str, object]
 TaskSegment = dict[str, object]
+
+
+@dataclass(frozen=True, slots=True)
+class TaskExecutionConfigValues:
+    """Group one layer of task execution configuration values."""
+
+    model_id: str | None = None
+    device: str | None = None
+    compute_type: str | None = None
+
+
+class ResolvedTaskExecutionConfig(TypedDict):
+    """Task execution configuration materialized at creation time."""
+
+    model_id: str
+    engine_device: EngineDevice
+    engine_compute_type: EngineComputeType
 
 
 class TaskSummaryPayload(TypedDict):

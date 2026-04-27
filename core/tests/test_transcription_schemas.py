@@ -81,11 +81,39 @@ class TestTranscriptionSchemas:
 
         assert request.get_options_dict() == {"chunk_length": 30}
 
+    def test_transcription_request_excludes_execution_config_from_options(self):
+        """Task creation payload should keep engine config outside options JSON."""
+        request = TranscriptionRequest(
+            file_id="file-001",
+            model_id="small",
+            engine={"device": "cuda", "compute_type": "float16"},
+            language="en",
+        )
+
+        assert request.get_options_dict() == {"language": "en"}
+        assert request.engine is not None
+        assert request.engine.device == "cuda"
+        assert request.engine.compute_type == "float16"
+
     def test_transcription_request_canonicalizes_model_id_aliases(self):
         """Accepted model aliases should normalize to one canonical model id."""
         request = TranscriptionRequest(file_id="file-001", model_id="large")
 
         assert request.model_id == "large-v3"
+
+    def test_transcription_request_rejects_unknown_engine_values(self):
+        """Unknown task engine values should fail request validation early."""
+        with pytest.raises(ValidationError):
+            TranscriptionRequest(
+                file_id="file-001",
+                engine={"device": "metal"},
+            )
+
+        with pytest.raises(ValidationError):
+            TranscriptionRequest(
+                file_id="file-001",
+                engine={"compute_type": "float32"},
+            )
 
     def test_transcription_defaults_update_request_has_no_file_id(self):
         """Defaults update schema should expose only transcription option fields."""

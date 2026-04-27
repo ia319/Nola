@@ -9,11 +9,15 @@ from fastapi import APIRouter, Response, status
 from nola.api.deps import get_app_config_db
 from nola.api.routes._model_helpers import (
     canonicalize_model_id,
+    canonicalize_optional_engine_compute_type,
+    canonicalize_optional_engine_device,
     canonicalize_optional_model_id,
-    compute_restart_required,
 )
 from nola.api.schemas import (
     ExportDefaultsUpdateRequest,
+    SessionDefaultsResponse,
+    SessionDefaultsUpdateRequest,
+    SessionExecutionDefaultsResponse,
     TranscriptionDefaultsUpdateRequest,
 )
 from nola.api.schemas.models import ModelConfigResponse
@@ -27,6 +31,11 @@ from nola.config.export import (
 )
 from nola.config.export import (
     get_effective_defaults as get_effective_export_defaults,
+)
+from nola.config.session import (
+    get_session_defaults,
+    get_session_execution_param_schema,
+    patch_session_execution_defaults,
 )
 from nola.config.transcription import (
     AppConfigResponse,
@@ -44,7 +53,13 @@ from nola.config.transcription import (
 from nola.config.transcription import (
     get_effective_defaults as get_effective_transcription_defaults,
 )
-from nola.model_hub import get_model, resolve_model_dir
+from nola.engines.base import (
+    DEFAULT_ENGINE_COMPUTE_TYPE,
+    DEFAULT_ENGINE_DEVICE,
+    EngineComputeType,
+    EngineDevice,
+)
+from nola.model_hub import get_model
 from nola.models import AppConfigDatabase
 
 router = APIRouter(prefix="/api/config", tags=["config"])
@@ -72,13 +87,39 @@ def _resolve_configured_model_id(config_db: AppConfigDatabase) -> str:
     return canonicalize_model_id(settings.model_size)
 
 
-def _build_engine_config(runtime_model_id: str) -> EngineConfigResponse:
+def _resolve_runtime_device(worker_state: Mapping[str, object]) -> EngineDevice:
+    """Return the last loaded device, falling back to settings."""
+    return (
+        canonicalize_optional_engine_device(worker_state.get("last_loaded_device"))
+        or canonicalize_optional_engine_device(settings.device)
+        or DEFAULT_ENGINE_DEVICE
+    )
+
+
+def _resolve_runtime_compute_type(
+    worker_state: Mapping[str, object],
+) -> EngineComputeType:
+    """Return the last loaded compute type, falling back to settings."""
+    return (
+        canonicalize_optional_engine_compute_type(
+            worker_state.get("last_loaded_compute_type")
+        )
+        or canonicalize_optional_engine_compute_type(settings.compute_type)
+        or DEFAULT_ENGINE_COMPUTE_TYPE
+    )
+
+
+def _build_engine_config(
+    runtime_model_id: str,
+    worker_state: Mapping[str, object],
+) -> EngineConfigResponse:
     """Project settings into the public engine-config response."""
     return EngineConfigResponse(
         model_size=runtime_model_id,
-        device=settings.device,
-        compute_type=settings.compute_type,
+        device=_resolve_runtime_device(worker_state),
+        compute_type=_resolve_runtime_compute_type(worker_state),
         is_multilingual=is_multilingual(runtime_model_id),
+        schema=get_session_execution_param_schema(),
     )
 
 
@@ -96,35 +137,66 @@ def _to_export_resolved_defaults(
     return ExportResolvedDefaultsResponse.model_validate(dict(defaults))
 
 
+def _build_session_defaults_response(
+    config_db: AppConfigDatabase,
+) -> SessionDefaultsResponse:
+    """Assemble the Workbench session-defaults response."""
+    defaults = get_session_defaults(config_db)
+    return SessionDefaultsResponse(
+        execution=SessionExecutionDefaultsResponse(
+            model_id=defaults.execution.model_id,
+            device=defaults.execution.device,
+            compute_type=defaults.execution.compute_type,
+        ),
+        transcription=_to_resolved_defaults(defaults.transcription),
+    )
+
+
+def _apply_transcription_defaults_patch(
+    config_db: AppConfigDatabase,
+    request: TranscriptionDefaultsUpdateRequest,
+) -> None:
+    """Apply existing transcription-defaults PATCH semantics."""
+    patch_values = request.get_options_dict()
+
+    if patch_values:
+        # This PATCH flow is a read-modify-write sequence.
+        # Concurrent PATCH requests can overwrite each other's updates because
+        # the merge happens in application code, not inside one locked SQL step.
+        # That tradeoff is acceptable for the current low-traffic config surface.
+        current_overrides = config_db.get_all("transcription.")
+        next_overrides = apply_override_patch(current_overrides, patch_values)
+        config_db.replace_many("transcription.", next_overrides)
+
+
 def _build_model_config(config_db: AppConfigDatabase) -> ModelConfigResponse:
     """Assemble the model sub-field for the aggregated config response."""
     configured_model_id = _resolve_configured_model_id(config_db)
     worker_state = config_db.get_all("worker.")
     last_loaded = worker_state.get("last_loaded_model_id")
     last_loaded_model_id = canonicalize_optional_model_id(last_loaded)
-
-    model_config = config_db.get_all("model.")
-    db_model_dir = model_config.get("configured_model_dir")
-    effective_model_dir, _ = resolve_model_dir(
-        settings.model_dir,
-        db_model_dir if isinstance(db_model_dir, str) else None,
-        settings.default_model_dir,
+    last_loaded_device = canonicalize_optional_engine_device(
+        worker_state.get("last_loaded_device")
+    )
+    last_loaded_compute_type = canonicalize_optional_engine_compute_type(
+        worker_state.get("last_loaded_compute_type")
     )
 
     return ModelConfigResponse(
         configured_model_id=configured_model_id,
         last_loaded_model_id=last_loaded_model_id,
-        restart_required=compute_restart_required(
-            configured_model_id, effective_model_dir, worker_state
-        ),
+        last_loaded_device=last_loaded_device,
+        last_loaded_compute_type=last_loaded_compute_type,
+        restart_required=False,
     )
 
 
 def _build_app_config_response(config_db: AppConfigDatabase) -> AppConfigResponse:
     """Assemble the aggregated configuration payload used by the frontend."""
+    worker_state = config_db.get_all("worker.")
     runtime_model_id = _resolve_runtime_model_id(config_db)
     return AppConfigResponse(
-        engine=_build_engine_config(runtime_model_id),
+        engine=_build_engine_config(runtime_model_id, worker_state),
         transcription=TranscriptionConfigResponse(
             defaults=_to_resolved_defaults(
                 get_effective_transcription_defaults(config_db)
@@ -184,20 +256,54 @@ def patch_transcription_defaults(
 ) -> TranscriptionDefaultsPatchResponse:
     """Persist a partial transcription-defaults update."""
     config_db = get_app_config_db()
-    patch_values = request.get_options_dict()
-
-    if patch_values:
-        # This PATCH flow is a read-modify-write sequence.
-        # Concurrent PATCH requests can overwrite each other's updates because
-        # the merge happens in application code, not inside one locked SQL step.
-        # That tradeoff is acceptable for the current low-traffic config surface.
-        current_overrides = config_db.get_all("transcription.")
-        next_overrides = apply_override_patch(current_overrides, patch_values)
-        config_db.replace_many("transcription.", next_overrides)
+    _apply_transcription_defaults_patch(config_db, request)
 
     return TranscriptionDefaultsPatchResponse(
         defaults=_to_resolved_defaults(get_effective_transcription_defaults(config_db))
     )
+
+
+@router.get(
+    "/session-defaults",
+    summary="Get Workbench session defaults",
+    description=(
+        "Return execution defaults and transcription defaults used when creating "
+        "new Workbench transcription tasks."
+    ),
+    response_model=SessionDefaultsResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_session_default_config() -> SessionDefaultsResponse:
+    """Return defaults for Workbench session creation."""
+    return _build_session_defaults_response(get_app_config_db())
+
+
+@router.patch(
+    "/session-defaults",
+    summary="Update Workbench session defaults",
+    description=(
+        "Apply a partial update to execution defaults and transcription defaults. "
+        "Explicit null removes execution overrides and falls back to settings."
+    ),
+    response_model=SessionDefaultsResponse,
+    status_code=status.HTTP_200_OK,
+)
+def patch_session_default_config(
+    request: SessionDefaultsUpdateRequest,
+) -> SessionDefaultsResponse:
+    """Persist partial session-defaults updates."""
+    config_db = get_app_config_db()
+
+    if request.execution is not None:
+        patch_session_execution_defaults(
+            config_db,
+            request.execution.get_options_dict(),
+        )
+
+    if request.transcription is not None:
+        _apply_transcription_defaults_patch(config_db, request.transcription)
+
+    return _build_session_defaults_response(config_db)
 
 
 @router.delete(

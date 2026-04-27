@@ -289,19 +289,30 @@
       "sessionConfig": {
         "globalSettings": "Global Settings",
         "executionEngine": "Execution Engine",
-        "sessionOverride": "Session override",
+        "sessionOverride": "Task execution",
         "unavailable": "Unavailable",
         "model": {
           "label": "Model",
-          "badge": "Coming soon",
+          "badge": "Task model",
           "loading": "Loading models",
-          "comingSoon": "Coming soon"
+          "placeholder": "Select a downloaded model",
+          "noDownloaded": "No downloaded models"
         },
         "device": {
-          "label": "Device"
+          "label": "Device",
+          "options": {
+            "auto": "Auto",
+            "cpu": "CPU",
+            "cuda": "CUDA"
+          }
         },
         "computeType": {
-          "label": "Compute Type"
+          "label": "Compute Type",
+          "options": {
+            "default": "Default",
+            "float16": "Float16",
+            "int8": "Int8"
+          }
         },
         "advanced": {
           "button": "Advanced Parameters",
@@ -316,7 +327,7 @@
         "reset": "Reset to Defaults",
         "cancel": "Cancel",
         "apply": "Apply Changes",
-        "saveDefault": "Save as Default",
+        "saveDefault": "Save as Task Defaults",
         "savingDefault": "Saving..."
       }
     },
@@ -565,7 +576,6 @@
     },
     "configured": "Default",
     "lastLoaded": "Running",
-    "restartRequired": "Restart required to apply model change",
     "status": {
       "not_downloaded": "Not Downloaded",
       "downloading": "Downloading",
@@ -729,7 +739,7 @@
       "empty": {
         "needsAttention": {
           "title": "No attention needed",
-          "description": "Failed tasks and restart requirements appear here."
+          "description": "Failed tasks appear here."
         },
         "inProgress": {
           "title": "No active work",
@@ -753,7 +763,6 @@
       },
       "items": {
         "failedTask": "Failed task",
-        "restartRequired": "Restart required",
         "taskInProgress": "Processing transcription",
         "modelDownload": "Active model download",
         "taskCompleted": "Completed transcription",
@@ -763,7 +772,6 @@
         "fileIntegrityChecked": "File integrity checked",
         "orphanCleanupCompleted": "Orphan cleanup completed",
         "taskId": "Task {{taskId}}",
-        "configuredModel": "Configured model: {{modelId}}",
         "affectedCount": "{{count}} affected"
       }
     }
@@ -985,9 +993,9 @@
           "label": "Override Source",
           "description": "Review which configuration layer currently controls model storage."
         },
-        "restartStatus": {
-          "label": "Restart Status",
-          "description": "Review whether the running worker needs a restart before changes apply."
+        "reloadMode": {
+          "label": "Reload Mode",
+          "description": "Review how model changes apply to new worker tasks."
         },
         "configuredDirectory": {
           "label": "Configured Cache Directory",
@@ -997,18 +1005,13 @@
         "environmentOverride": {
           "label": "Environment Override",
           "description": "An environment variable controls the model cache directory before stored settings."
-        },
-        "restartRequired": {
-          "label": "Restart Required",
-          "description": "Restart the local service to apply pending model storage changes."
         }
       },
       "values": {
         "empty": "Not set",
         "directoryUnavailable": "Hidden until backend returns a safe display path",
         "environmentOverrideActive": "Environment override active",
-        "restartRequired": "Restart required",
-        "restartNotRequired": "No restart required",
+        "taskBoundaryReload": "Task-boundary reload",
         "overrideSource": {
           "environment": "Environment",
           "database": "Stored setting",

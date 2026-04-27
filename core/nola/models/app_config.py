@@ -3,6 +3,7 @@
 import json
 import logging
 import sqlite3
+from collections.abc import Mapping
 from contextlib import closing
 from pathlib import Path
 from typing import cast
@@ -104,23 +105,42 @@ class AppConfigDatabase:
         Returns:
             List of full keys touched by the patch operation.
         """
+        return self.patch_many_prefixes({prefix: values})
+
+    def patch_many_prefixes(
+        self,
+        patches_by_prefix: Mapping[str, ConfigMap],
+    ) -> list[str]:
+        """Patch configuration keys across prefixes in one transaction.
+
+        Values set to ``None`` remove the key; other values are upserted.
+        This keeps related settings under separate key prefixes while applying
+        one logical update atomically.
+
+        Args:
+            patches_by_prefix: Mapping of key prefixes to unprefixed patch values
+
+        Returns:
+            List of full keys touched by the patch operation.
+        """
         touched_keys: list[str] = []
         with closing(self._connect()) as conn:
             with conn:
-                for key, value in values.items():
-                    full_key = f"{prefix}{key}"
-                    if value is None:
-                        conn.execute(
-                            "DELETE FROM app_config WHERE key = ?",
-                            (full_key,),
-                        )
-                    else:
-                        conn.execute(
-                            "INSERT INTO app_config (key, value) VALUES (?, ?) "
-                            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-                            (full_key, json.dumps(value)),
-                        )
-                    touched_keys.append(full_key)
+                for prefix, values in patches_by_prefix.items():
+                    for key, value in values.items():
+                        full_key = f"{prefix}{key}"
+                        if value is None:
+                            conn.execute(
+                                "DELETE FROM app_config WHERE key = ?",
+                                (full_key,),
+                            )
+                        else:
+                            conn.execute(
+                                "INSERT INTO app_config (key, value) VALUES (?, ?) "
+                                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                                (full_key, json.dumps(value)),
+                            )
+                        touched_keys.append(full_key)
         return touched_keys
 
     def replace_many(self, prefix: str, values: ConfigMap) -> list[str]:

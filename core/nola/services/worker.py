@@ -14,11 +14,17 @@ from pathlib import Path
 from typing import Any
 
 from nola.common.merge import deep_merge
-from nola.engines.base import EngineConfig, TranscribeOptions
-from nola.engines.faster_whisper import FasterWhisperEngine
-from nola.model_hub import resolve_model_dir
+from nola.engines.base import TranscribeOptions, TranscriptionEngine
 from nola.models import AppConfigDatabase, FileDatabase, TaskDatabase, init_db
 from nola.models.tasks import TaskRowRaw
+from nola.services.worker_engine import (
+    LoadedEngineState,
+    WorkerEngineError,
+    assert_engine_model_downloaded,
+    build_desired_engine_state,
+    ensure_engine_loaded,
+    release_loaded_engine,
+)
 
 logger = logging.getLogger("nola.worker")
 
@@ -101,7 +107,7 @@ def run_transcription(
     file_db: FileDatabase,
     task_db: TaskDatabase,
     app_config_db: AppConfigDatabase,
-    engine: FasterWhisperEngine,
+    engine: TranscriptionEngine,
 ) -> None:
     """Execute transcription for a single task.
 
@@ -109,6 +115,7 @@ def run_transcription(
         task: Task dictionary from database
         file_db: File database instance
         task_db: Task database instance
+        app_config_db: App config store used to resolve transcription defaults
         engine: Pre-loaded transcription engine
     """
     task_id = task["id"]
@@ -212,75 +219,58 @@ def worker_loop(db_path: str | Path | None = None) -> bool:
     file_db = FileDatabase(db_path)
     task_db = TaskDatabase(db_path)
     app_config_db = AppConfigDatabase(db_path)
-
-    # Resolve configured model and cache directory
-    model_config = app_config_db.get_all("model.")
-    configured_raw = model_config.get("configured_model_id")
-    configured_model = (
-        configured_raw if isinstance(configured_raw, str) else settings.model_size
-    )
-    db_model_dir = model_config.get("configured_model_dir")
-    model_dir, _ = resolve_model_dir(
-        settings.model_dir,
-        db_model_dir if isinstance(db_model_dir, str) else None,
-        settings.default_model_dir,
-    )
-
-    # Verify the model is cached locally before loading.
-    # WhisperModel would silently download from HF if missing; the plan
-    # requires users to download via the model management page first.
-    from nola.model_hub import ModelStorage, UnknownModelError, require_model
-
-    try:
-        model_info = require_model(configured_model)
-    except UnknownModelError:
-        logger.error(
-            "Configured model '%s' is not part of the supported registry. "
-            "Update the model setting before starting the Worker.",
-            configured_model,
-        )
-        return False
-
-    configured_model = model_info.model_id
-    logger.info(f"Loading model '{configured_model}' from {model_dir}")
-
-    storage = ModelStorage(model_dir)
-    if storage.get_cache_state(model_info.repo_id) != "downloaded":
-        logger.error(
-            f"Model '{configured_model}' is not downloaded in {model_dir}. "
-            "Download it via the model management page before starting the Worker."
-        )
-        return False
-
-    engine_config = EngineConfig(
-        model_size=configured_model,
-        download_root=model_dir,
-    )
-    engine = FasterWhisperEngine(config=engine_config)
-    logger.info("Model loaded successfully")
-
-    # Report loaded state for restart_required calculation. This should not
-    # block task execution if the UI-facing restart state cannot be written.
-    try:
-        app_config_db.set_many(
-            "worker.",
-            {
-                "last_loaded_model_id": configured_model,
-                "last_loaded_model_dir": str(model_dir),
-            },
-        )
-    except Exception:
-        logger.warning(
-            "Failed to persist worker model state for restart tracking.",
-            exc_info=True,
-        )
+    loaded_engine: LoadedEngineState | None = None
 
     while _running:
         try:
             task = task_db.dequeue(worker_id)
 
             if task:
-                run_transcription(task, file_db, task_db, app_config_db, engine)
+                try:
+                    desired_engine = build_desired_engine_state(task, app_config_db)
+                    if (
+                        loaded_engine is not None
+                        and loaded_engine.fingerprint != desired_engine.fingerprint
+                    ):
+                        assert_engine_model_downloaded(desired_engine)
+                        engine_to_release = loaded_engine
+                        loaded_engine = None
+                        release_loaded_engine(engine_to_release)
+
+                    loaded_engine = ensure_engine_loaded(
+                        task=task,
+                        loaded=loaded_engine,
+                        config_db=app_config_db,
+                        desired=desired_engine,
+                    )
+                except WorkerEngineError as exc:
+                    logger.error(
+                        "Worker engine load failed for task %s: %s",
+                        task["id"],
+                        exc,
+                    )
+                    task_db.fail(task["id"], str(exc), should_retry=exc.should_retry)
+                    continue
+                except Exception as exc:
+                    logger.exception(
+                        "Unexpected worker engine error for task %s",
+                        task["id"],
+                    )
+                    loaded_engine = None
+                    task_db.fail(
+                        task["id"],
+                        f"Unexpected worker engine error: {exc}",
+                        should_retry=True,
+                    )
+                    continue
+
+                run_transcription(
+                    task,
+                    file_db,
+                    task_db,
+                    app_config_db,
+                    loaded_engine.engine,
+                )
             else:
                 time.sleep(1)
 

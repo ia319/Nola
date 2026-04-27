@@ -293,8 +293,8 @@ class TestTranscriptionsAPI:
         assert data["tasks"][0]["task_id"] == "task-list-1"
         assert data["tasks"][0]["model_id"] == "small"
 
-    def test_create_task_persists_canonical_reserved_model_id(self, client: TestClient):
-        """Task creation should store one canonical task-level model id."""
+    def test_create_task_persists_execution_config(self, client: TestClient):
+        """Task creation should store canonical task execution config."""
         file_db = get_file_db()
         task_db = get_task_db()
         file_db.create_file(
@@ -306,20 +306,84 @@ class TestTranscriptionsAPI:
 
         response = client.post(
             "/api/transcription-tasks",
-            json={"file_id": "task-model-file", "model_id": "large"},
+            json={
+                "file_id": "task-model-file",
+                "model_id": "large",
+                "engine": {"device": "cuda", "compute_type": "float16"},
+                "language": "en",
+            },
         )
 
         assert response.status_code == 200
         data = response.json()
         assert data["model_id"] == "large-v3"
+        assert data["options"] == {"language": "en"}
 
         stored = task_db.get_task(data["task_id"])
         assert stored is not None
         assert stored["model_id"] == "large-v3"
+        assert stored["engine_device"] == "cuda"
+        assert stored["engine_compute_type"] == "float16"
+        assert stored["options"] == {"language": "en"}
+
+    def test_create_task_persists_session_execution_defaults(self, client: TestClient):
+        """Task creation should materialize execution defaults when omitted."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        config_db = get_app_config_db()
+        config_db.set_many("model.", {"configured_model_id": "medium"})
+        config_db.set_many(
+            "execution.",
+            {"device": "cuda", "compute_type": "int8"},
+        )
+        file_db.create_file(
+            file_id="task-default-engine-file",
+            filename="task-default-engine.mp3",
+            path="/tmp/task-default-engine.mp3",
+            size=1000,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks",
+            json={"file_id": "task-default-engine-file"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        stored = task_db.get_task(data["task_id"])
+        assert stored is not None
+        assert stored["model_id"] == "medium"
+        assert stored["engine_device"] == "cuda"
+        assert stored["engine_compute_type"] == "int8"
 
 
 class TestModelsAPI:
     """Test model-management endpoints."""
+
+    def test_model_settings_exposes_last_loaded_engine_state(
+        self, client: TestClient
+    ) -> None:
+        """Expose the worker runtime engine fingerprint without restart pressure."""
+        config_db = get_app_config_db()
+        config_db.set_many("model.", {"configured_model_id": "small"})
+        config_db.set_many(
+            "worker.",
+            {
+                "last_loaded_model_id": "large",
+                "last_loaded_device": "cuda",
+                "last_loaded_compute_type": "float16",
+            },
+        )
+
+        response = client.get("/api/models/settings")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["configured_model_id"] == "small"
+        assert data["last_loaded_model_id"] == "large-v3"
+        assert data["last_loaded_device"] == "cuda"
+        assert data["last_loaded_compute_type"] == "float16"
+        assert data["restart_required"] is False
 
     def test_model_responses_expose_description_keys(self, client: TestClient) -> None:
         """Expose stable i18n keys for list and detail model descriptions."""
@@ -362,6 +426,29 @@ class TestModelsAPI:
         assert response.status_code == 409
         assert response.json()["detail"] == "Model already downloaded: small"
         get_downloader.assert_not_called()
+
+    def test_select_model_keeps_restart_required_false(
+        self, client: TestClient
+    ) -> None:
+        """Selecting a default model should not request a manual worker restart."""
+        small_model = require_model("small")
+        config_db = get_app_config_db()
+        config_db.set_many("worker.", {"last_loaded_model_id": "large-v3"})
+
+        class _FakeStorage:
+            def get_cache_state(self, repo_id: str) -> str:
+                assert repo_id == small_model.repo_id
+                return "downloaded"
+
+        with patch(
+            "nola.api.routes.models.get_model_storage", return_value=_FakeStorage()
+        ):
+            response = client.post("/api/models/small/select")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["configured_model_id"] == "small"
+        assert data["restart_required"] is False
 
     def test_start_download_openapi_declares_all_conflict_reasons(
         self, client: TestClient

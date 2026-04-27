@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from nola.api.deps import get_file_db, get_task_db
+from nola.api.deps import get_app_config_db, get_file_db, get_task_db
 from nola.api.routes.tasks._errors import raise_http_error
 from nola.api.schemas import (
     BatchTaskActionRequest,
@@ -20,14 +20,52 @@ from nola.application.tasks.actions import (
     delete_task_record,
 )
 from nola.application.tasks.errors import TaskUseCaseError
+from nola.application.tasks.execution_config import resolve_task_execution_config
 from nola.application.tasks.types import (
     BatchTaskActionPayload,
     CancelTaskPayload,
     CreateTaskPayload,
     DeleteTaskRecordPayload,
+    TaskExecutionConfigValues,
 )
+from nola.config import settings
+from nola.config.session import get_session_execution_defaults
+from nola.model_hub import get_model
 
 router = APIRouter()
+
+
+def _resolve_model_id(model_id: str) -> str | None:
+    model = get_model(model_id)
+    return model.model_id if model is not None else None
+
+
+def _build_request_execution_values(
+    request: TranscriptionRequest,
+) -> TaskExecutionConfigValues:
+    engine = request.engine
+    return TaskExecutionConfigValues(
+        model_id=request.model_id,
+        device=engine.device if engine else None,
+        compute_type=engine.compute_type if engine else None,
+    )
+
+
+def _build_session_execution_values() -> TaskExecutionConfigValues:
+    defaults = get_session_execution_defaults(get_app_config_db())
+    return TaskExecutionConfigValues(
+        model_id=defaults.model_id,
+        device=defaults.device,
+        compute_type=defaults.compute_type,
+    )
+
+
+def _build_settings_execution_values() -> TaskExecutionConfigValues:
+    return TaskExecutionConfigValues(
+        model_id=settings.model_size,
+        device=settings.device,
+        compute_type=settings.compute_type,
+    )
 
 
 @router.post(
@@ -46,12 +84,18 @@ async def create_transcription(request: TranscriptionRequest) -> CreateTaskPaylo
     (engine defaults plus persisted application overrides) are used.
     """
     try:
+        execution_config = resolve_task_execution_config(
+            request=_build_request_execution_values(request),
+            session_defaults=_build_session_execution_values(),
+            settings_defaults=_build_settings_execution_values(),
+            model_resolver=_resolve_model_id,
+        )
         return create_task(
             file_store=get_file_db(),
             task_store=get_task_db(),
             file_id=request.file_id,
             options=request.get_options_dict(),
-            model_id=request.model_id,
+            execution_config=execution_config,
         )
     except TaskUseCaseError as error:
         raise_http_error(error)

@@ -8,7 +8,6 @@ import { ErrorBoundary } from '@/components/common'
 import { Button, DetailSheet, EmptyState, MetricCard, StatusBadge } from '@/components/ui'
 import { refreshConfigCaches } from '@/config/cache-invalidation'
 import logger from '@/config/logger'
-import { useActivityStore } from '@/features/activity'
 import { ContentCanvas, PageHeader } from '@/layouts'
 import {
   deleteModel,
@@ -80,7 +79,6 @@ export function ModelsPage() {
     refresh,
     updateSnapshot,
   } = useModels()
-  const setActivityModelSettings = useActivityStore((state) => state.setModelSettings)
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
   const [detail, setDetail] = useState<ModelDetailResponse | null>(null)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
@@ -278,9 +276,6 @@ export function ModelsPage() {
             },
       )
       toast.success(t('models.toast.selected', { modelId: selectedConfiguredModelId }))
-      if (result.restart_required) {
-        toast.warning(t('models.restartRequired'))
-      }
 
       requestModelRefresh()
       void queryClient.invalidateQueries({ queryKey: queryKeys.models.list() })
@@ -298,7 +293,6 @@ export function ModelsPage() {
       try {
         const settings = await getModelSettings()
         queryClient.setQueryData(queryKeys.models.settings(), settings)
-        setActivityModelSettings(settings)
       } catch (error: unknown) {
         logger.error('models.select.settingsRefreshFailed', { error, modelId })
       }

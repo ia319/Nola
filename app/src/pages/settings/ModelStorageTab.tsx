@@ -32,12 +32,6 @@ function formatOverrideSource(source: ModelDirSource, t: Translate): string {
   return t(`settings.modelStorage.values.overrideSource.${source}`)
 }
 
-function formatRestartStatus(restartRequired: boolean, t: Translate): string {
-  return restartRequired
-    ? t('settings.modelStorage.values.restartRequired')
-    : t('settings.modelStorage.values.restartNotRequired')
-}
-
 function ReadOnlyValue({ value, mono = false }: { value: string; mono?: boolean }) {
   return (
     <span
@@ -136,19 +130,13 @@ export function ModelStorageTab() {
           </FormRow>
 
           <FormRow
-            label={t('settings.modelStorage.fields.restartStatus.label')}
-            description={t('settings.modelStorage.fields.restartStatus.description')}
+            label={t('settings.modelStorage.fields.reloadMode.label')}
+            description={t('settings.modelStorage.fields.reloadMode.description')}
             align="center"
             className="border-b-0"
           >
-            <span
-              className={
-                settings.restart_required
-                  ? 'border-warning/15 bg-warning-container text-on-warning-container inline-flex min-h-10 items-center rounded-md border px-3 text-sm font-medium'
-                  : 'border-success/15 bg-success-container text-on-success-container inline-flex min-h-10 items-center rounded-md border px-3 text-sm font-medium'
-              }
-            >
-              {formatRestartStatus(settings.restart_required, t)}
+            <span className="border-success/15 bg-success-container text-on-success-container inline-flex min-h-10 items-center rounded-md border px-3 text-sm font-medium">
+              {t('settings.modelStorage.values.taskBoundaryReload')}
             </span>
           </FormRow>
         </div>
@@ -190,19 +178,6 @@ export function ModelStorageTab() {
             >
               <span className="border-warning/15 bg-warning-container text-on-warning-container inline-flex min-h-10 items-center rounded-md border px-3 text-sm font-medium">
                 {t('settings.modelStorage.values.environmentOverrideActive')}
-              </span>
-            </FormRow>
-          ) : null}
-
-          {settings.restart_required ? (
-            <FormRow
-              label={t('settings.modelStorage.fields.restartRequired.label')}
-              description={t('settings.modelStorage.fields.restartRequired.description')}
-              align="center"
-              className="border-b-0"
-            >
-              <span className="border-warning/15 bg-warning-container text-on-warning-container inline-flex min-h-10 items-center rounded-md border px-3 text-sm font-medium">
-                {t('settings.modelStorage.values.restartRequired')}
               </span>
             </FormRow>
           ) : null}

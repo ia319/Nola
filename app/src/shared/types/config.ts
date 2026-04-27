@@ -14,6 +14,24 @@ export type TranscriptionDefaultsPatchResponse = Schemas['TranscriptionDefaultsP
 /** PATCH /api/config/transcription/defaults request body. */
 export type TranscriptionDefaultsUpdateRequest = Schemas['TranscriptionDefaultsUpdateRequest']
 
+/** GET /api/config/session-defaults response. */
+export type SessionDefaults = Schemas['SessionDefaultsResponse']
+
+/** PATCH /api/config/session-defaults request body. */
+export type SessionDefaultsUpdateRequest = Schemas['SessionDefaultsUpdateRequest']
+
+/** Execution defaults exposed inside GET /api/config/session-defaults. */
+export type SessionExecutionDefaults = Schemas['SessionExecutionDefaultsResponse']
+
+/** Engine device option accepted by task and session execution config. */
+export type EngineDevice = SessionExecutionDefaults['device']
+
+/** Engine compute type option accepted by task and session execution config. */
+export type EngineComputeType = SessionExecutionDefaults['compute_type']
+
+/** Execution-default patch payload for Workbench defaults. */
+export type SessionExecutionDefaultsUpdateRequest = Schemas['SessionExecutionDefaultsUpdateRequest']
+
 /** GET /api/config/export response. */
 export type ExportConfig = Schemas['ExportConfigResponse']
 

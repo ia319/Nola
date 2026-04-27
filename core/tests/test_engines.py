@@ -7,6 +7,8 @@ import pytest
 
 from nola.config import settings
 from nola.engines import EngineConfig, FasterWhisperEngine, Segment, TranscriptionEngine
+from nola.engines import base as engine_base
+from nola.engines.base import DEFAULT_ENGINE_COMPUTE_TYPE, DEFAULT_ENGINE_DEVICE
 
 
 class TestSegment:
@@ -55,6 +57,28 @@ class TestEngineConfig:
         config = EngineConfig(download_root=tmp_path)
 
         assert config.download_root == tmp_path
+
+    def test_invalid_device_setting_falls_back_with_warning(self) -> None:
+        """Warn when process settings contain an unsupported engine device."""
+        with (
+            patch.object(settings, "device", "mps"),
+            patch.object(engine_base.logger, "warning") as logger_warning,
+        ):
+            config = EngineConfig()
+
+        assert config.device == DEFAULT_ENGINE_DEVICE
+        logger_warning.assert_called_once()
+
+    def test_invalid_compute_type_setting_falls_back_with_warning(self) -> None:
+        """Warn when process settings contain an unsupported engine compute type."""
+        with (
+            patch.object(settings, "compute_type", "bfloat16"),
+            patch.object(engine_base.logger, "warning") as logger_warning,
+        ):
+            config = EngineConfig()
+
+        assert config.compute_type == DEFAULT_ENGINE_COMPUTE_TYPE
+        logger_warning.assert_called_once()
 
 
 class TestTranscriptionEngine:
@@ -133,6 +157,19 @@ class TestFasterWhisperEngine:
 
         with pytest.raises(NotImplementedError, match="Streaming"):
             engine.transcribe_stream(b"audio_data")
+
+    @patch("nola.engines.faster_whisper.WhisperModel")
+    def test_close_releases_model_reference(self, mock_model: MagicMock) -> None:
+        """Close the engine before replacing a loaded faster-whisper model."""
+        engine = FasterWhisperEngine()
+        model = mock_model.return_value
+
+        engine.close()
+
+        model.model.unload_model.assert_called_once_with()
+        assert engine.model is None
+        with pytest.raises(RuntimeError, match="closed"):
+            engine.transcribe("test.mp3")
 
     @patch("nola.engines.faster_whisper.WhisperModel")
     def test_transcribe_with_options(self, mock_model: MagicMock) -> None:

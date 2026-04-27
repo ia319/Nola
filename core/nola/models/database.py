@@ -58,8 +58,10 @@ def init_db(db_path: str | Path | None = None) -> None:
                     -- Transcription options (JSON)
                     options TEXT,
 
-                    -- Model override (reserved for hot-reload)
+                    -- Task execution config
                     model_id TEXT,
+                    engine_device TEXT,
+                    engine_compute_type TEXT,
 
                     -- Result fields
                     progress REAL DEFAULT 0.0,
@@ -97,8 +99,19 @@ def init_db(db_path: str | Path | None = None) -> None:
                 )
             """)
 
-            # Schema migrations for model_id column
+            # Schema migrations for task execution config columns
             cursor = conn.execute("PRAGMA table_info(transcription_tasks)")
             existing_columns = {row[1] for row in cursor.fetchall()}
-            if "model_id" not in existing_columns:
-                conn.execute("ALTER TABLE transcription_tasks ADD COLUMN model_id TEXT")
+            task_execution_columns = {
+                "model_id": "ALTER TABLE transcription_tasks ADD COLUMN model_id TEXT",
+                "engine_device": (
+                    "ALTER TABLE transcription_tasks ADD COLUMN engine_device TEXT"
+                ),
+                "engine_compute_type": (
+                    "ALTER TABLE transcription_tasks "
+                    "ADD COLUMN engine_compute_type TEXT"
+                ),
+            }
+            for column_name, alter_sql in task_execution_columns.items():
+                if column_name not in existing_columns:
+                    conn.execute(alter_sql)
