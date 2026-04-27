@@ -440,6 +440,7 @@ Keep generated or local-runtime directories such as `node_modules/`, `dist/`, an
 - Keep Settings subpage content direct; do not add page-level title/description blocks inside each settings tab.
 - Keep Settings controls compact and continuous; do not split one tab into separate heavy cards.
 - Let Task Workbench control task-level `model_id`, `device`, and `compute_type`; select only downloaded models.
+- Derive Workbench `device` and `compute_type` options from `/api/config.engine.schema`; do not hardcode option lists or label keys in the frontend.
 - Initialize Task Workbench execution config from Session defaults, then configured model, then last-loaded model fallback; do not auto-select the first downloaded model.
 - Keep `useTranscriptionOptions` independent from engine execution config; merge `model_id` and `engine` only in the Workbench/page container.
 - Treat Task Workbench Advanced `Reset to Defaults` as a local draft reset; do not send a request until Save as Task Defaults.
@@ -470,7 +471,7 @@ Keep generated or local-runtime directories such as `node_modules/`, `dist/`, an
 >    - `src/lib/*`: app/platform-level helpers (e.g., shadcn `cn`)
 >    - `src/shared/lib/*`: cross-feature reusable runtime helpers
 >    - `src/features/*/lib/*`: feature-private helpers; promote to `shared/lib` only when reused by another feature
-> 7. **Schema-Driven Controls**: Drive language/task/initial prompt and advanced controls from backend schema via `schema-adapter`; do not reintroduce hardcoded option groups.
+> 7. **Schema-Driven Controls**: Drive language/task/initial prompt, advanced controls, and engine execution selects from backend schema metadata; do not reintroduce hardcoded option groups.
 > 8. **Transcription Defaults Priority**: Apply `engine defaults < persisted defaults < task overrides` when composing transcription request payloads and defaults patches.
 > 9. **Defaults Patch Semantics**: Use `undefined` for unchanged fields, use `null` to clear persisted overrides, and send concrete values for explicit overrides.
 > 10. **Execution Config Boundary**: Keep `model_id`, `device`, and `compute_type` out of `transcription-options`; compose them as `model_id` and `engine` in Workbench.
@@ -710,7 +711,7 @@ Page-level layout primitives.
 
 Route page implementations.
 
-- **task-workbench/**: Compose upload queue, session config, Advanced side sheet, and session activity monitor. Let session config create task-level execution payloads with `model_id` and `engine`.
+- **task-workbench/**: Compose upload queue, session config, Advanced side sheet, and session activity monitor. Let session config create task-level execution payloads with `model_id` and schema-derived `engine` values.
 - **history-center/**: Compose Task ID and Filename modes, URL search state, pagination, detail dialogs, export dialog loading, and file/task associated actions.
 - **models-management/**: Compose model overview, model table, detail sheet, mutation de-duplication, canonical `configured_model_id` handling, Default/Running display, model refresh, and restart-free model selection feedback.
 - **settings/**: Compose General, Transcription, Export, Model Storage, and System Info tabs. Keep subpage titles removed; show settings content directly. Keep engine resources read-only and use task-boundary reload language instead of restart-required language.
@@ -793,7 +794,7 @@ Runtime config access and fallback constants.
 
 - **api.ts**: Config endpoints (`fetchAppConfig`, `fetchEngineDefaults`, `fetchSessionDefaults`, `patchSessionDefaults`, transcription defaults `PATCH`/`DELETE`, export defaults `GET/PATCH/DELETE`).
 - **cache-invalidation.ts**: Refresh shared config and all config query caches after mutations.
-- **engine-options.ts**: Keep frontend engine option defaults, display values, and type guards derived from OpenAPI aliases.
+- **engine-options.ts**: Build engine device and compute-type select options from `/api/config.engine.schema`; use the resolved current value only as a fallback when schema metadata is unavailable.
 - **use-app-config.ts**: Shared config singleton store using `useSyncExternalStore`, plus `refreshAppConfig()`. Notify all mounted consumers when the shared snapshot changes.
 - **ui-preferences.ts**: Normalize and validate language/theme/unit preferences from unknown persisted values.
 - **ui-preferences-storage.ts**: Load unified UI preferences first, fall back to legacy `nola-*` keys, and swallow browser storage write failures.

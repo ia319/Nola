@@ -193,6 +193,7 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - `nola/config/transcription/schema/`: Config-driven option schema for frontend controls and validation boundaries.
 - `nola/config/export/`: Export defaults, export format contracts, and filename helpers.
 - `nola/config/session/`: Workbench session defaults for execution and transcription.
+- `nola/config/session/schema.py`: Execution option schema metadata for frontend device and compute-type controls.
 - `nola/application/tasks/`: Task use-cases, payload builders, and export orchestration.
 - `nola/application/tasks/execution_config.py`: Resolve task-level `model_id`, `engine_device`, and `engine_compute_type` before persistence.
 - `nola/services/worker_engine.py`: Reuse or reload `FasterWhisperEngine` at task boundaries from a model/model-dir/device/compute-type fingerprint.
@@ -206,8 +207,10 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - Remove metadata-only partial cache directories during stale artifact cleanup.
 - Keep model registry descriptions keyed by `description_key`; let the frontend localize and fall back to backend `description`.
 - Keep engine default tests config-driven; do not hardcode `small`, `default`, or device defaults.
+- Keep execution option metadata in `/api/config.engine.schema`; do not require the frontend to mirror backend engine option lists.
 - Keep worker engine reload at task boundaries; do not switch engine while `transcribe()` is running.
 - Close the loaded transcription engine before replacing it; do not rely on reassignment or garbage collection as the only release path for model runtime resources.
+- Treat engine construction failures as retryable task-start failures; keep validation and missing-cache failures non-retryable.
 - Keep `model_id`, `device`, and `compute_type` out of `TranscribeOptions` and task `options` JSON.
 - Keep `restart_required` as a compatibility field returning `False` while task-boundary engine reload is supported; do not use it to signal manual worker restart.
 - Keep VAD fields gated by the installed `faster-whisper` `VadOptions`; do not expose fields only present in local source unless the installed package supports them.
@@ -286,7 +289,7 @@ Transcription engine layer:
 - `EngineConfig`: Engine initialization configuration. Keep model size, model directory, device, and compute type here.
 - `TranscribeOptions`: Full transcription options passed to `WhisperModel.transcribe(...)`; do not add engine initialization parameters here.
 - `TranscriptionEngine`: Abstract interface for transcription engines, including explicit resource release through `close()`.
-- `FasterWhisperEngine`: Faster-Whisper implementation. Report progress as segment output coverage only and release the underlying model reference on close.
+- `FasterWhisperEngine`: Faster-Whisper implementation. Report progress as segment output coverage only, raise immediately when closed, and unload the underlying CTranslate2 model on close.
 
 ### nola/api/
 REST API layer:
@@ -394,17 +397,21 @@ Configuration and constants:
 - `export/types.py`: Keep shared `ExportFormat` enum for config and formatter layers.
 - `export/`: Keep export defaults and filename handling without introducing `config -> services` reverse dependency.
 - `session/defaults.py`: Resolve Workbench session defaults by combining execution defaults and transcription defaults.
+- `session/schema.py`: Publish execution control metadata for device and compute type through aggregated config responses.
 
 ### Transcription Rules
 Apply config-driven schema as the only source for frontend option metadata and task option values.
 Apply defaults precedence as `engine defaults < persisted app defaults < task overrides`.
 Apply execution config precedence as request values, then Session defaults, then settings fallbacks.
+Publish execution `device` and `compute_type` options through `/api/config.engine.schema`; keep frontend option labels and values derived from this metadata.
 Derive engine default assertions from `EngineConfig`/settings in tests; do not hardcode `small`, `default`, or device defaults.
 Treat explicit `null` in `PATCH /api/config/transcription/defaults` as remove-override semantics.
 Treat explicit `null` in `PATCH /api/config/session-defaults` execution fields as clear-override semantics.
 Merge nested defaults objects in PATCH flows without replacing untouched subkeys.
 Reject unknown top-level options and unknown `vad_parameters` keys at request validation with `422`.
 Reject invalid task or Session default `device` / `compute_type` values at the boundary; read paths may ignore stale invalid persisted overrides and fall back safely.
+Treat invalid process settings `device` / `compute_type` as warning-worthy fallback inputs for legacy tasks; keep explicit task execution values strict.
+Separate configuration validation failures from runtime engine load failures; make runtime engine construction retryable when the task has not started transcription.
 Keep `engines/base.py` as pass-through for option values; do not add engine-side strict range enforcement.
 Keep `api/schemas/*` as coarse guard; block clearly invalid payloads and return `422`.
 Keep `config/transcription/schema/*` as UI constraint source; ensure UI ranges remain a subset of API acceptance.
