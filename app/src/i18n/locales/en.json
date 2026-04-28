@@ -576,10 +576,28 @@
         "profile": "Profile",
         "actions": "Actions"
       },
+      "rowActions": "More actions for {{name}}",
       "empty": {
         "title": "No models available",
         "description": "Download a model to start configuring local runs."
       }
+    },
+    "selection": {
+      "selectAll": "Select all models",
+      "selectRow": "Select {{name}}",
+      "selectedCount": "{{count}} selected",
+      "clear": "Clear selection"
+    },
+    "filters": {
+      "searchPlaceholder": "Search models",
+      "clearSearch": "Clear search",
+      "status": "Status filter",
+      "statusAll": "All Statuses"
+    },
+    "batchActions": {
+      "download": "Download selected",
+      "cancel": "Cancel selected",
+      "delete": "Delete selected"
     },
     "configured": "Default",
     "lastLoaded": "Running",
