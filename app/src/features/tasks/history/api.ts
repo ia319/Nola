@@ -1,23 +1,14 @@
 import type {
   BatchTaskActionRequest,
   BatchTaskActionResponse,
-  SortOrder,
+  TaskListApiQuery,
   TaskListResponse,
-  TaskSortBy,
-  TaskStatus,
 } from '@/shared/types'
 
 import { batchCancelTasks, batchRetryTasks, listTasks } from '@/features/tasks/api'
 
 export async function listHistoryTasks(
-  params: {
-    status?: TaskStatus
-    q?: string
-    sort_by?: TaskSortBy
-    order?: SortOrder
-    limit?: number
-    offset?: number
-  } = {},
+  params: TaskListApiQuery = {},
   signal?: AbortSignal,
 ): Promise<TaskListResponse> {
   return listTasks(params, signal)
