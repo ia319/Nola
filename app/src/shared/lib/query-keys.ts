@@ -1,13 +1,6 @@
-import type { SortOrder, TaskSortBy, TaskStatus } from '@/shared/types'
+import type { TaskListApiQuery } from '@/shared/types'
 
-type TaskListKeyParams = {
-  status?: TaskStatus
-  q?: string
-  sort_by?: TaskSortBy
-  order?: SortOrder
-  limit?: number
-  offset?: number
-}
+type TaskListKeyParams = TaskListApiQuery
 
 type FileListKeyParams = {
   limit?: number

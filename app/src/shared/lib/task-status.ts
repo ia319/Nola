@@ -1,28 +1,66 @@
 import type { TaskStatus } from '@/shared/types'
 
-export const TASK_STATUS_OPTIONS = [
-  'pending',
-  'processing',
-  'completed',
-  'failed',
-  'cancelled',
-] as const satisfies readonly TaskStatus[]
+const TASK_STATUS_OPTION_FLAGS: Record<TaskStatus, true> = {
+  pending: true,
+  processing: true,
+  completed: true,
+  failed: true,
+  cancelled: true,
+}
 
-export const ACTIVE_TASK_STATUSES: ReadonlySet<TaskStatus> = new Set(['pending', 'processing'])
+const ACTIVE_TASK_STATUS_RULES: Record<TaskStatus, boolean> = {
+  pending: true,
+  processing: true,
+  completed: false,
+  failed: false,
+  cancelled: false,
+}
 
-export const TERMINAL_TASK_STATUSES: ReadonlySet<TaskStatus> = new Set([
-  'completed',
-  'failed',
-  'cancelled',
-])
+const TERMINAL_TASK_STATUS_RULES: Record<TaskStatus, boolean> = {
+  pending: false,
+  processing: false,
+  completed: true,
+  failed: true,
+  cancelled: true,
+}
 
-export const RETRYABLE_TASK_STATUSES: ReadonlySet<TaskStatus> = new Set(['failed', 'cancelled'])
+const RETRYABLE_TASK_STATUS_RULES: Record<TaskStatus, boolean> = {
+  pending: false,
+  processing: false,
+  completed: false,
+  failed: true,
+  cancelled: true,
+}
 
-export const DELETABLE_TASK_RECORD_STATUSES: ReadonlySet<TaskStatus> = TERMINAL_TASK_STATUSES
+const COMPLETED_TASK_STATUS_RULES: Record<TaskStatus, boolean> = {
+  pending: false,
+  processing: false,
+  completed: true,
+  failed: false,
+  cancelled: false,
+}
 
-export const COMPLETED_TASK_STATUSES: ReadonlySet<TaskStatus> = new Set(['completed'])
+function toStatusSet(rules: Record<TaskStatus, boolean>): ReadonlySet<TaskStatus> {
+  return new Set(
+    Object.entries(rules)
+      .filter(([, enabled]) => enabled)
+      .map(([status]) => status as TaskStatus),
+  )
+}
 
-export const EXPORTABLE_TASK_STATUSES: ReadonlySet<TaskStatus> = COMPLETED_TASK_STATUSES
+export const TASK_STATUS_OPTIONS = Object.keys(TASK_STATUS_OPTION_FLAGS) as readonly TaskStatus[]
+
+export const ACTIVE_TASK_STATUSES = toStatusSet(ACTIVE_TASK_STATUS_RULES)
+
+export const TERMINAL_TASK_STATUSES = toStatusSet(TERMINAL_TASK_STATUS_RULES)
+
+export const RETRYABLE_TASK_STATUSES = toStatusSet(RETRYABLE_TASK_STATUS_RULES)
+
+export const DELETABLE_TASK_RECORD_STATUSES = TERMINAL_TASK_STATUSES
+
+export const COMPLETED_TASK_STATUSES = toStatusSet(COMPLETED_TASK_STATUS_RULES)
+
+export const EXPORTABLE_TASK_STATUSES = COMPLETED_TASK_STATUSES
 
 /**
  * Check whether a task can still receive active-task operations.

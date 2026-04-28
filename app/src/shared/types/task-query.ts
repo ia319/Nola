@@ -1,7 +1,7 @@
-import type { SortOrder, TaskSortBy, TaskStatus } from './task'
+import type { SortOrder, TaskListFilterStatus, TaskSortBy } from './task'
 
 /** Unified status filter used by recent/history query controls. */
-export type TaskFilterStatus = TaskStatus | 'all'
+export type TaskFilterStatus = TaskListFilterStatus | 'all'
 
 /** Shared query model for task list interactions. */
 export interface TaskQueryModel {
