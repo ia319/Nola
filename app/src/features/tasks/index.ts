@@ -10,13 +10,28 @@ export {
 export { cancelTaskAndRefresh, deleteTaskRecordAction, retryTaskAndRefresh } from './actions'
 export { CurrentBatchTasksPanel } from './components/CurrentBatchTasksPanel'
 export { TaskDetailContent } from './components/TaskDetailContent'
+export { TaskDetailSheet } from './components/TaskDetailSheet'
 export { TaskBatchActionBar } from './components/TaskBatchActionBar'
 export type { CurrentBatchTasksPanelProps } from './components/CurrentBatchTasksPanel'
 export type { TaskDetailContentProps } from './components/TaskDetailContent'
+export type {
+  TaskDetailSheetAction,
+  TaskDetailSheetActionPlacement,
+  TaskDetailSheetActionVariant,
+  TaskDetailSheetProps,
+  TaskDetailSheetTask,
+} from './components/TaskDetailSheet'
 export { useTaskPolling } from './hooks/useTaskPolling'
 export { useRecentTaskQuery } from './hooks/useRecentTaskQuery'
+export { useTaskDetail } from './hooks/useTaskDetail'
+export { useTaskDetailSheet } from './hooks/useTaskDetailSheet'
 export { useTaskSelection } from './hooks/useTaskSelection'
 export type { UseTaskSelectionOptions, UseTaskSelectionResult } from './hooks/useTaskSelection'
+export type { UseTaskDetailResult } from './hooks/useTaskDetail'
+export type {
+  UseTaskDetailSheetOptions,
+  UseTaskDetailSheetResult,
+} from './hooks/useTaskDetailSheet'
 export { requestTaskRefresh } from './lib/task-refresh'
 export { selectActiveTasks, selectRecentTerminalTasks } from './lib/task-selectors'
 export { useSessionTasksStore } from './store/session-tasks-store'
