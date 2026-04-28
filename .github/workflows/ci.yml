@@ -1,4 +1,4 @@
-﻿name: Run CI
+name: Run CI
 
 on:
   pull_request:
@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   app-quality:
-    name: run app quality checks (lint, typecheck, build; node-${{ matrix.node }})
+    name: run app quality checks (lint, typecheck, build, storybook; node-${{ matrix.node }})
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -54,6 +54,9 @@ jobs:
 
       - name: Run build
         run: pnpm build
+
+      - name: Run Storybook build
+        run: pnpm build-storybook
 
   core-quality:
     name: run core quality checks (ruff, mypy)
