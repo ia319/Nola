@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
@@ -46,7 +46,6 @@ export function InteractiveTableSortableHeader<SortKey extends string>({
   const active = sort?.key === sortKey
   const nextDirection = resolveNextDirection(sortKey, sort, defaultSortDirection)
   const sortState = active ? sort.direction : 'none'
-  const Icon = active ? (sort.direction === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
 
   return (
     <button
@@ -64,10 +63,20 @@ export function InteractiveTableSortableHeader<SortKey extends string>({
       }}
     >
       <span className="truncate">{label}</span>
-      <Icon
-        aria-hidden="true"
-        className={cn('size-3.5 shrink-0', active ? 'text-foreground' : 'text-muted-foreground/70')}
-      />
+      <span className="-my-0.5 flex shrink-0 flex-col" aria-hidden="true">
+        <ChevronUp
+          className={cn(
+            'size-3 transition-colors',
+            active && sort.direction === 'asc' ? 'text-foreground' : 'text-muted-foreground/45',
+          )}
+        />
+        <ChevronDown
+          className={cn(
+            '-mt-1 size-3 transition-colors',
+            active && sort.direction === 'desc' ? 'text-foreground' : 'text-muted-foreground/45',
+          )}
+        />
+      </span>
     </button>
   )
 }
