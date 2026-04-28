@@ -170,6 +170,7 @@ function getPreviewRowActions(row: PreviewRow): readonly InteractiveTableRowActi
       label: 'Delete',
       icon: <Trash2 />,
       variant: 'destructive',
+      hidden: row.status === 'pending',
       disabled: row.status === 'processing',
       run: () => undefined,
     },

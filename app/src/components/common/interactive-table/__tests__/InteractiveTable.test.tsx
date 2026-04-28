@@ -231,7 +231,7 @@ describe('InteractiveTable', () => {
       />,
     )
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'More actions' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Details' })[0])
     expect(onRowClick).not.toHaveBeenCalled()
   })
 

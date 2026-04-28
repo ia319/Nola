@@ -36,6 +36,7 @@ describe('InteractiveTableRowActionsMenu', () => {
           {
             id: 'delete',
             label: 'Delete',
+            disabled: true,
             variant: 'destructive',
             run: onDelete,
           },
@@ -50,6 +51,10 @@ describe('InteractiveTableRowActionsMenu', () => {
 
     const deleteItem = screen.getByRole('menuitem', { name: 'Delete' })
     expect(deleteItem).toHaveAttribute('data-variant', 'destructive')
+    expect(deleteItem).toHaveAttribute('data-disabled')
+    expect(deleteItem).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(deleteItem)
+    expect(onDelete).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Details' }))
     expect(onDetails).toHaveBeenCalledTimes(1)
@@ -67,19 +72,50 @@ describe('InteractiveTableRowActionsMenu', () => {
             id: 'delete',
             label: 'Delete',
             disabled: true,
+            variant: 'destructive',
             run: onDelete,
           },
         ]}
       />,
     )
 
-    openMenu()
+    expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull()
 
-    const deleteItem = await screen.findByRole('menuitem', { name: 'Delete' })
-    expect(deleteItem).toHaveAttribute('data-disabled')
-    expect(deleteItem).toHaveAttribute('aria-disabled', 'true')
+    const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+    expect(deleteButton).toBeDisabled()
+    expect(deleteButton).toHaveAttribute('data-disabled')
+    expect(deleteButton).toHaveAttribute('data-action-variant', 'destructive')
+    expect(deleteButton).toHaveAttribute('aria-disabled', 'true')
 
-    fireEvent.click(deleteItem)
+    fireEvent.click(deleteButton)
     expect(onDelete).not.toHaveBeenCalled()
+  })
+
+  it('renders a single visible action as a direct row button', () => {
+    const onRetry = vi.fn()
+
+    render(
+      <InteractiveTableRowActionsMenu
+        actions={[
+          {
+            id: 'details',
+            label: 'Details',
+            hidden: true,
+            run: vi.fn(),
+          },
+          {
+            id: 'retry',
+            label: 'Retry',
+            run: onRetry,
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(onRetry).toHaveBeenCalledTimes(1)
   })
 })

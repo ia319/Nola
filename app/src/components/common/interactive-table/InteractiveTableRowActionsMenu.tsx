@@ -34,7 +34,7 @@ export type InteractiveTableRowActionsMenuProps = Omit<
 }
 
 /**
- * Render a compact row action menu for feature-provided operations.
+ * Render compact row actions for feature-provided operations.
  */
 export function InteractiveTableRowActionsMenu({
   actions,
@@ -48,6 +48,47 @@ export function InteractiveTableRowActionsMenu({
 
   if (visibleActions.length === 0) {
     return null
+  }
+
+  if (visibleActions.length === 1) {
+    const action = visibleActions[0]
+    if (!action) {
+      return null
+    }
+    const hasIcon = Boolean(action.icon)
+
+    return (
+      <div
+        data-slot="interactive-table-row-actions-menu"
+        data-row-click-ignore
+        className={cn('inline-flex', className)}
+        {...props}
+      >
+        <Button
+          type="button"
+          variant="ghost"
+          size={hasIcon ? 'icon-xs' : 'xs'}
+          aria-label={action.ariaLabel}
+          aria-disabled={action.disabled || undefined}
+          data-disabled={action.disabled ? '' : undefined}
+          data-action-variant={action.variant}
+          disabled={action.disabled}
+          className={cn(
+            action.variant === 'destructive' && 'text-destructive hover:text-destructive',
+            triggerClassName,
+          )}
+          onClick={() => {
+            if (action.disabled) {
+              return
+            }
+            void action.run()
+          }}
+        >
+          {action.icon}
+          <span className={hasIcon ? 'sr-only' : undefined}>{action.label}</span>
+        </Button>
+      </div>
+    )
   }
 
   return (
@@ -77,6 +118,7 @@ export function InteractiveTableRowActionsMenu({
               aria-label={action.ariaLabel}
               aria-disabled={action.disabled || undefined}
               data-disabled={action.disabled ? '' : undefined}
+              disabled={action.disabled}
               variant={action.variant}
               className="gap-1.5 text-xs [&_svg]:size-3.5"
               onSelect={(event) => {
