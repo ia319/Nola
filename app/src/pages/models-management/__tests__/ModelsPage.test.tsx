@@ -117,6 +117,12 @@ vi.mock('@/config/cache-invalidation', () => ({
 }))
 
 vi.mock('@/features/models', () => ({
+  DEFAULT_MODEL_LIST_QUERY: {
+    q: '',
+    status: 'all',
+    sort_by: null,
+    order: 'asc',
+  },
   deleteModel: modelsPageMocks.deleteModel,
   getModelSettings: modelsPageMocks.getModelSettings,
   ModelList: (props: ModelListProps) => {
@@ -377,7 +383,7 @@ describe('ModelsPage', () => {
     await getModelListProps().onDelete('nola-large-v3')
 
     expect(modelsPageMocks.deleteModel).toHaveBeenCalledWith('nola-large-v3')
-    expect(modelsPageMocks.updateSnapshot).toHaveBeenCalledTimes(1)
+    expect(modelsPageMocks.updateSnapshot).toHaveBeenCalledTimes(2)
 
     const updateSnapshot = modelsPageMocks.updateSnapshot.mock.calls[0]?.[0]
     if (typeof updateSnapshot !== 'function') {
@@ -411,7 +417,7 @@ describe('ModelsPage', () => {
     await getModelListProps().onSelect('base')
 
     expect(modelsPageMocks.selectModel).toHaveBeenCalledWith('base')
-    expect(modelsPageMocks.updateSnapshot).toHaveBeenCalledTimes(1)
+    expect(modelsPageMocks.updateSnapshot).toHaveBeenCalledTimes(2)
 
     const updateSnapshot = modelsPageMocks.updateSnapshot.mock.calls[0]?.[0]
     if (typeof updateSnapshot !== 'function') {

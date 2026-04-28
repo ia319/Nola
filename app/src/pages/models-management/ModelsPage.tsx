@@ -4,19 +4,23 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
-import { ErrorBoundary } from '@/components/common'
+import { ErrorBoundary, type InteractiveSortState } from '@/components/common'
 import { Button, DetailSheet, EmptyState, MetricCard, StatusBadge } from '@/components/ui'
 import { refreshConfigCaches } from '@/config/cache-invalidation'
 import logger from '@/config/logger'
 import { ContentCanvas, PageHeader } from '@/layouts'
 import {
   deleteModel,
+  DEFAULT_MODEL_LIST_QUERY,
   type DownloadTerminalEvent,
   getModelActionState,
   getModelDetail,
   getModelSettings,
   ModelList,
   type ModelDetailResponse,
+  type ModelListQuery,
+  type ModelListResponse,
+  type ModelListSortBy,
   requestModelRefresh,
   resolveModelDescription,
   selectModel,
@@ -70,15 +74,22 @@ async function runModelAction(t: TFunction, action: () => Promise<void>): Promis
 export function ModelsPage() {
   const { t } = useTranslation()
   const {
-    models,
+    models: overviewModels,
     configuredModelId,
     lastLoadedModelId,
+    isLoading: isOverviewLoading,
+    hasLoaded: hasOverviewLoaded,
+    updateSnapshot: updateOverviewSnapshot,
+  } = useModels()
+  const [modelListQuery, setModelListQuery] = useState<ModelListQuery>(DEFAULT_MODEL_LIST_QUERY)
+  const {
+    models,
     isLoading,
     hasLoaded,
     error,
     refresh,
-    updateSnapshot,
-  } = useModels()
+    updateSnapshot: updateListSnapshot,
+  } = useModels(modelListQuery)
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
   const [detail, setDetail] = useState<ModelDetailResponse | null>(null)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
@@ -98,12 +109,12 @@ export function ModelsPage() {
   useDetailOverlayCloseRequest(closeModelDetail)
 
   const activeModel = useMemo(
-    () => models.find((model) => model.model_id === lastLoadedModelId) ?? null,
-    [lastLoadedModelId, models],
+    () => overviewModels.find((model) => model.model_id === lastLoadedModelId) ?? null,
+    [lastLoadedModelId, overviewModels],
   )
   const configuredModel = useMemo(
-    () => models.find((model) => model.model_id === configuredModelId) ?? null,
-    [configuredModelId, models],
+    () => overviewModels.find((model) => model.model_id === configuredModelId) ?? null,
+    [configuredModelId, overviewModels],
   )
   const selectedListModel = useMemo(
     () => models.find((model) => model.model_id === selectedModelId) ?? null,
@@ -113,13 +124,29 @@ export function ModelsPage() {
   // Build a seed map so in-flight downloads survive a page reload.
   const initialDownloads = useMemo(() => {
     const map = new Map<string, DownloadState>()
-    for (const model of models) {
+    for (const model of overviewModels) {
       if (model.download_progress) {
         map.set(model.model_id, toDownloadState(model.download_progress))
       }
     }
     return map
-  }, [models])
+  }, [overviewModels])
+
+  function updateModelListQuery(updater: (current: ModelListQuery) => ModelListQuery): void {
+    setModelListQuery((current) => {
+      const next = updater(current)
+      if (
+        next.q === current.q &&
+        next.status === current.status &&
+        next.sort_by === current.sort_by &&
+        next.order === current.order
+      ) {
+        return current
+      }
+
+      return next
+    })
+  }
 
   const loadModelDetail = useCallback(async (modelId: string) => {
     detailControllerRef.current?.abort()
@@ -226,7 +253,9 @@ export function ModelsPage() {
   async function handleDownload(modelId: string) {
     await runModelMutation(modelId, async () => {
       await download(modelId)
+      requestModelRefresh()
       void queryClient.invalidateQueries({ queryKey: queryKeys.models.downloads() })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.models.list() })
       toast.success(t('models.toast.downloadStarted', { modelId }))
     })
   }
@@ -234,17 +263,21 @@ export function ModelsPage() {
   async function handleCancel(modelId: string) {
     await runModelMutation(modelId, async () => {
       await cancel(modelId)
+      requestModelRefresh()
       void queryClient.invalidateQueries({ queryKey: queryKeys.models.downloads() })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.models.list() })
     })
   }
 
   async function handleDelete(modelId: string) {
     await runModelMutation(modelId, async () => {
       await deleteModel(modelId)
-      updateSnapshot((current) => ({
+      const removeModel = (current: ModelListResponse): ModelListResponse => ({
         ...current,
         models: current.models.filter((model) => model.model_id !== modelId),
-      }))
+      })
+      updateListSnapshot(removeModel)
+      updateOverviewSnapshot(removeModel)
       if (selectedModelIdRef.current === modelId) {
         setSelectedModelId(null)
       }
@@ -259,14 +292,16 @@ export function ModelsPage() {
     await runModelMutation(modelId, async () => {
       const result = await selectModel(modelId)
       const selectedConfiguredModelId = result.configured_model_id
-      updateSnapshot((current) => ({
+      const updateConfiguredModel = (current: ModelListResponse): ModelListResponse => ({
         ...current,
         configured_model_id: selectedConfiguredModelId,
         models: current.models.map((model) => ({
           ...model,
           is_configured: model.model_id === selectedConfiguredModelId,
         })),
-      }))
+      })
+      updateListSnapshot(updateConfiguredModel)
+      updateOverviewSnapshot(updateConfiguredModel)
       setDetail((current) =>
         current === null
           ? current
@@ -303,7 +338,8 @@ export function ModelsPage() {
   const detailActionState =
     detailModel == null ? null : getModelActionState(detailModel, selectedDownloadState)
   const isInitialLoading = !hasLoaded && isLoading
-  const initialErrorMessage = !hasLoaded && error ? t(error.i18nKey, error.params ?? {}) : null
+  const isOverviewInitialLoading = !hasOverviewLoaded && isOverviewLoading
+  const listErrorMessage = error ? t(error.i18nKey, error.params ?? {}) : null
 
   function renderDetailFooter() {
     if (!detailModel || !detailActionState) {
@@ -400,7 +436,7 @@ export function ModelsPage() {
       <ContentCanvas as="main" width="full" height="fill" className="gap-6" data-slot="models-page">
         <PageHeader title={t('models.title')} description={t('models.description')} />
 
-        {!initialErrorMessage ? (
+        {!listErrorMessage ? (
           <section
             data-slot="models-overview"
             aria-label={t('models.overview.region')}
@@ -409,14 +445,14 @@ export function ModelsPage() {
             <MetricCard
               title={t('models.overview.activeEngine.title')}
               value={
-                isInitialLoading ? (
+                isOverviewInitialLoading ? (
                   <span className="bg-surface-container-high block h-8 w-40 rounded-full motion-safe:animate-pulse" />
                 ) : (
                   (activeModel?.name ?? t('models.overview.activeEngine.empty'))
                 )
               }
               description={
-                isInitialLoading ? (
+                isOverviewInitialLoading ? (
                   <span className="bg-surface-container-high block h-4 w-48 rounded-full motion-safe:animate-pulse" />
                 ) : activeModel ? (
                   t('models.overview.activeEngine.meta', { modelId: activeModel.model_id })
@@ -430,14 +466,14 @@ export function ModelsPage() {
             <MetricCard
               title={t('models.overview.defaultModel.title')}
               value={
-                isInitialLoading ? (
+                isOverviewInitialLoading ? (
                   <span className="bg-surface-container-high block h-8 w-36 rounded-full motion-safe:animate-pulse" />
                 ) : (
                   (configuredModel?.name ?? t('models.overview.defaultModel.empty'))
                 )
               }
               description={
-                isInitialLoading ? (
+                isOverviewInitialLoading ? (
                   <span className="bg-surface-container-high block h-4 w-52 rounded-full motion-safe:animate-pulse" />
                 ) : configuredModel ? (
                   t('models.overview.defaultModel.meta', { modelId: configuredModel.model_id })
@@ -451,7 +487,7 @@ export function ModelsPage() {
             <MetricCard
               title={t('models.overview.storagePath.title')}
               value={
-                isInitialLoading ? (
+                isOverviewInitialLoading ? (
                   <span className="bg-surface-container-high block h-8 w-32 rounded-full motion-safe:animate-pulse" />
                 ) : (
                   <span className="block font-mono text-base leading-6 break-all">
@@ -461,7 +497,7 @@ export function ModelsPage() {
                 )
               }
               description={
-                isInitialLoading ? (
+                isOverviewInitialLoading ? (
                   <span className="bg-surface-container-high block h-4 w-44 rounded-full motion-safe:animate-pulse" />
                 ) : (
                   t('models.overview.storagePath.meta')
@@ -475,8 +511,28 @@ export function ModelsPage() {
         <ModelList
           models={models}
           downloads={downloads}
-          errorMessage={initialErrorMessage}
+          query={modelListQuery}
+          errorMessage={listErrorMessage}
           isLoading={isInitialLoading}
+          onSearchChange={(search) => {
+            updateModelListQuery((current) => ({
+              ...current,
+              q: search,
+            }))
+          }}
+          onStatusFilterChange={(status) => {
+            updateModelListQuery((current) => ({
+              ...current,
+              status,
+            }))
+          }}
+          onSortChange={(sort: InteractiveSortState<ModelListSortBy>) => {
+            updateModelListQuery((current) => ({
+              ...current,
+              sort_by: sort.key,
+              order: sort.direction,
+            }))
+          }}
           onDownload={handleDownload}
           onCancel={handleCancel}
           onDelete={handleDelete}
