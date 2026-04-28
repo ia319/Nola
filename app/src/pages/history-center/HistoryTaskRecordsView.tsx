@@ -16,6 +16,12 @@ import {
   useExportDefaults,
 } from '@/features/export'
 import { useTaskSelection } from '@/features/tasks'
+import {
+  isActiveTaskStatus,
+  isDeletableTaskRecordStatus,
+  isExportableTaskStatus,
+  isRetryableTaskStatus,
+} from '@/shared/lib/task-status'
 import type {
   BatchTaskActionResponse,
   SortOrder,
@@ -189,17 +195,17 @@ export function HistoryTaskRecordsView({
 
   const cancellableTaskIds = selectedTaskIds.filter((taskId) => {
     const task = tasksById[taskId]
-    return task?.status === 'pending' || task?.status === 'processing'
+    return task ? isActiveTaskStatus(task.status) : false
   })
 
   const retryableTaskIds = selectedTaskIds.filter((taskId) => {
     const task = tasksById[taskId]
-    return task?.status === 'failed' || task?.status === 'cancelled'
+    return task ? isRetryableTaskStatus(task.status) : false
   })
 
   const exportableTaskIds = selectedTaskIds.filter((taskId) => {
     const task = tasksById[taskId]
-    return task?.status === 'completed'
+    return task ? isExportableTaskStatus(task.status) : false
   })
 
   async function runBatchAction(
@@ -511,11 +517,10 @@ export function HistoryTaskRecordsView({
       className: 'w-[152px]',
       headerClassName: 'text-right',
       cell: (task) => {
-        const canCancel = task.status === 'pending' || task.status === 'processing'
-        const canRetry = task.status === 'failed' || task.status === 'cancelled'
-        const canDelete =
-          task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
-        const canExport = task.status === 'completed'
+        const canCancel = isActiveTaskStatus(task.status)
+        const canRetry = isRetryableTaskStatus(task.status)
+        const canDelete = isDeletableTaskRecordStatus(task.status)
+        const canExport = isExportableTaskStatus(task.status)
 
         const cancelBusy = runningRowActions.has(buildRowActionKey(task.task_id, 'cancel'))
         const retryBusy = runningRowActions.has(buildRowActionKey(task.task_id, 'retry'))

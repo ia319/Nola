@@ -1,18 +1,34 @@
 import { useCallback, useMemo, useState } from 'react'
 
 import { RECENT_PAGE_SIZE } from '@/config/constants'
-import type { TaskFilterStatus, TaskQueryModel, TaskSortBy, TaskSummary } from '@/shared/types'
+import {
+  DEFAULT_TASK_FILTER_STATUS,
+  DEFAULT_TASK_ORDER,
+  DEFAULT_TASK_SORT_BY,
+} from '@/shared/lib/task-query-options'
+import type { SortOrder, TaskFilterStatus, TaskSortBy, TaskSummary } from '@/shared/types'
+
+export type RecentTaskSortBy = TaskSortBy | 'task_id'
+
+export interface RecentTaskQueryModel {
+  q: string
+  status: TaskFilterStatus
+  sort_by: RecentTaskSortBy
+  order: SortOrder
+  page: number
+  page_size: number
+}
 
 export interface UseRecentTaskQueryResult {
-  query: TaskQueryModel
+  query: RecentTaskQueryModel
   tasks: TaskSummary[]
   total: number
   totalPages: number
   newTaskCount: number
   setSearch: (value: string) => void
   setStatus: (value: TaskFilterStatus) => void
-  setSortBy: (value: TaskSortBy) => void
-  setOrder: (value: TaskQueryModel['order']) => void
+  setSortBy: (value: RecentTaskSortBy) => void
+  setOrder: (value: RecentTaskQueryModel['order']) => void
   setPage: (value: number) => void
   goToFirstPageForNewTasks: () => void
 }
@@ -23,7 +39,13 @@ function toTimestamp(value: string | null): number {
   return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed
 }
 
-function compareBySortField(a: TaskSummary, b: TaskSummary, sortBy: TaskSortBy): number {
+function compareBySortField(a: TaskSummary, b: TaskSummary, sortBy: RecentTaskSortBy): number {
+  if (sortBy === 'task_id') {
+    return a.task_id.localeCompare(b.task_id)
+  }
+  if (sortBy === 'filename') {
+    return (a.filename?.trim() || a.file_id).localeCompare(b.filename?.trim() || b.file_id)
+  }
   if (sortBy === 'created_at') {
     return toTimestamp(a.created_at) - toTimestamp(b.created_at)
   }
@@ -39,8 +61,8 @@ function compareBySortField(a: TaskSummary, b: TaskSummary, sortBy: TaskSortBy):
 function compareTasks(
   a: TaskSummary,
   b: TaskSummary,
-  sortBy: TaskSortBy,
-  order: TaskQueryModel['order'],
+  sortBy: RecentTaskSortBy,
+  order: RecentTaskQueryModel['order'],
 ): number {
   const primary = compareBySortField(a, b, sortBy)
   if (primary !== 0) {
@@ -66,11 +88,11 @@ export function useRecentTaskQuery(
   sourceTasks: TaskSummary[],
   pageSize: number = RECENT_PAGE_SIZE,
 ): UseRecentTaskQueryResult {
-  const [query, setQuery] = useState<TaskQueryModel>({
+  const [query, setQuery] = useState<RecentTaskQueryModel>({
     q: '',
-    status: 'all',
-    sort_by: 'created_at',
-    order: 'desc',
+    status: DEFAULT_TASK_FILTER_STATUS,
+    sort_by: DEFAULT_TASK_SORT_BY,
+    order: DEFAULT_TASK_ORDER,
     page: 1,
     page_size: pageSize,
   })
@@ -79,7 +101,7 @@ export function useRecentTaskQuery(
     const keyword = query.q.trim()
     return sourceTasks
       .filter((task) => {
-        if (query.status !== 'all' && task.status !== query.status) {
+        if (query.status !== DEFAULT_TASK_FILTER_STATUS && task.status !== query.status) {
           return false
         }
         return includeByKeyword(task, keyword)
@@ -125,7 +147,7 @@ export function useRecentTaskQuery(
   )
 
   const setSortBy = useCallback(
-    (value: TaskSortBy) => {
+    (value: RecentTaskSortBy) => {
       setAcknowledgedTotal(total)
       setQuery((previous) => ({
         ...previous,
@@ -137,7 +159,7 @@ export function useRecentTaskQuery(
   )
 
   const setOrder = useCallback(
-    (value: TaskQueryModel['order']) => {
+    (value: RecentTaskQueryModel['order']) => {
       setAcknowledgedTotal(total)
       setQuery((previous) => ({
         ...previous,

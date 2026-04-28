@@ -70,6 +70,28 @@ describe('useRecentTaskQuery', () => {
     expect(result.current.tasks.map((task) => task.task_id)).toEqual(['task-2', 'task-3'])
   })
 
+  it('sorts task id and filename across the full filtered result before paging', () => {
+    const sourceTasks = [
+      buildTask('task-b', 'processing', { filename: 'zulu.wav' }),
+      buildTask('task-a', 'processing', { filename: 'alpha.wav' }),
+      buildTask('task-c', 'processing', { filename: 'middle.wav' }),
+    ]
+
+    const { result } = renderHook(() => useRecentTaskQuery(sourceTasks, 2))
+
+    act(() => {
+      result.current.setSortBy('task_id')
+      result.current.setOrder('asc')
+    })
+    expect(result.current.tasks.map((task) => task.task_id)).toEqual(['task-a', 'task-b'])
+
+    act(() => {
+      result.current.setSortBy('filename')
+      result.current.setOrder('desc')
+    })
+    expect(result.current.tasks.map((task) => task.task_id)).toEqual(['task-b', 'task-c'])
+  })
+
   it('tracks newly added matching tasks while user stays on later pages', () => {
     const sourceTasks = [
       buildTask('task-1', 'processing', { created_at: '2026-03-20T09:00:00.000Z' }),

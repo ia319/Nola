@@ -1,22 +1,19 @@
 import { HISTORY_PAGE_SIZE } from '@/config/constants'
+import {
+  DEFAULT_TASK_FILTER_STATUS,
+  DEFAULT_TASK_ORDER,
+  DEFAULT_TASK_SORT_BY,
+  TASK_FILTER_STATUS_OPTIONS,
+  TASK_ORDER_OPTIONS,
+  TASK_SORT_OPTIONS,
+} from '@/shared/lib/task-query-options'
 import type { SortOrder, TaskFilterStatus, TaskQueryModel, TaskSortBy } from '@/shared/types'
 
-const STATUS_OPTIONS: TaskFilterStatus[] = [
-  'all',
-  'pending',
-  'processing',
-  'completed',
-  'failed',
-  'cancelled',
-]
-
-const SORT_OPTIONS: TaskSortBy[] = ['created_at', 'completed_at', 'status', 'progress', 'filename']
-const ORDER_OPTIONS: SortOrder[] = ['desc', 'asc']
 export const HISTORY_PAGE_SIZE_OPTIONS = [20, 50, 100] as const
 
-const STATUS_SET = new Set(STATUS_OPTIONS)
-const SORT_SET = new Set(SORT_OPTIONS)
-const ORDER_SET = new Set(ORDER_OPTIONS)
+const STATUS_SET = new Set<TaskFilterStatus>(TASK_FILTER_STATUS_OPTIONS)
+const SORT_SET = new Set<TaskSortBy>(TASK_SORT_OPTIONS)
+const ORDER_SET = new Set<SortOrder>(TASK_ORDER_OPTIONS)
 const PAGE_SIZE_SET = new Set<number>(HISTORY_PAGE_SIZE_OPTIONS)
 
 export type HistoryPageSize = (typeof HISTORY_PAGE_SIZE_OPTIONS)[number]
@@ -92,15 +89,18 @@ export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
       next.q = qValue
     }
 
-    if (STATUS_SET.has(statusValue as TaskFilterStatus) && statusValue !== 'all') {
+    if (
+      STATUS_SET.has(statusValue as TaskFilterStatus) &&
+      statusValue !== DEFAULT_TASK_FILTER_STATUS
+    ) {
       next.status = statusValue as TaskFilterStatus
     }
 
-    if (SORT_SET.has(sortByValue as TaskSortBy) && sortByValue !== 'created_at') {
+    if (SORT_SET.has(sortByValue as TaskSortBy) && sortByValue !== DEFAULT_TASK_SORT_BY) {
       next.sort_by = sortByValue as TaskSortBy
     }
 
-    if (ORDER_SET.has(orderValue as SortOrder) && orderValue !== 'desc') {
+    if (ORDER_SET.has(orderValue as SortOrder) && orderValue !== DEFAULT_TASK_ORDER) {
       next.order = orderValue as SortOrder
     }
   }
@@ -124,9 +124,9 @@ export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
 export function buildHistoryTaskQuery(search: HistoryRouteSearch): HistoryTaskQuery {
   return {
     q: search.q ?? '',
-    status: search.status ?? 'all',
-    sort_by: search.sort_by ?? 'created_at',
-    order: search.order ?? 'desc',
+    status: search.status ?? DEFAULT_TASK_FILTER_STATUS,
+    sort_by: search.sort_by ?? DEFAULT_TASK_SORT_BY,
+    order: search.order ?? DEFAULT_TASK_ORDER,
     page: search.page ?? 1,
     page_size: search.page_size ?? HISTORY_PAGE_SIZE,
   }

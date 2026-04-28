@@ -12,6 +12,11 @@ import {
 } from '@/features/export'
 import { TaskBatchActionBar } from '@/features/tasks/components/TaskBatchActionBar'
 import { useTaskSelection } from '@/features/tasks/hooks/useTaskSelection'
+import {
+  isActiveTaskStatus,
+  isExportableTaskStatus,
+  isRetryableTaskStatus,
+} from '@/shared/lib/task-status'
 import type { ExportRequestOptions, SingleExportRequestOptions } from '@/features/export'
 import type {
   BatchTaskActionResponse,
@@ -137,15 +142,15 @@ export function TaskHistoryPanel({
 
   const cancellableTaskIds = selectedTaskIds.filter((taskId) => {
     const task = tasksById[taskId]
-    return task?.status === 'pending' || task?.status === 'processing'
+    return task ? isActiveTaskStatus(task.status) : false
   })
   const retryableTaskIds = selectedTaskIds.filter((taskId) => {
     const task = tasksById[taskId]
-    return task?.status === 'failed' || task?.status === 'cancelled'
+    return task ? isRetryableTaskStatus(task.status) : false
   })
   const exportableTaskIds = selectedTaskIds.filter((taskId) => {
     const task = tasksById[taskId]
-    return task?.status === 'completed'
+    return task ? isExportableTaskStatus(task.status) : false
   })
 
   async function runBatchAction(

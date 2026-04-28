@@ -9,6 +9,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import {
+  DEFAULT_TASK_FILTER_STATUS,
+  TASK_FILTER_STATUS_OPTIONS,
+  TASK_ORDER_OPTIONS,
+  TASK_SORT_OPTIONS,
+} from '@/shared/lib/task-query-options'
 import type { SortOrder, TaskFilterStatus, TaskSortBy } from '@/shared/types'
 
 export interface ListToolbarProps {
@@ -24,19 +30,6 @@ export interface ListToolbarProps {
   disabled?: boolean
   className?: string
 }
-
-const STATUS_OPTIONS: TaskFilterStatus[] = [
-  'all',
-  'pending',
-  'processing',
-  'completed',
-  'failed',
-  'cancelled',
-]
-
-const SORT_OPTIONS: TaskSortBy[] = ['created_at', 'completed_at', 'status', 'progress', 'filename']
-
-const ORDER_OPTIONS: SortOrder[] = ['desc', 'asc']
 
 /**
  * Keep list query controls consistent between recent and history panels.
@@ -87,9 +80,11 @@ export function ListToolbar({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {STATUS_OPTIONS.map((option) => (
+          {TASK_FILTER_STATUS_OPTIONS.map((option) => (
             <SelectItem key={option} value={option}>
-              {option === 'all' ? t('tasks.filters.statusAll') : t(`tasks.status.${option}`)}
+              {option === DEFAULT_TASK_FILTER_STATUS
+                ? t('tasks.filters.statusAll')
+                : t(`tasks.status.${option}`)}
             </SelectItem>
           ))}
         </SelectContent>
@@ -106,7 +101,7 @@ export function ListToolbar({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {SORT_OPTIONS.map((option) => (
+          {TASK_SORT_OPTIONS.map((option) => (
             <SelectItem key={option} value={option}>
               {t(`tasks.filters.sortBy.${option}`)}
             </SelectItem>
@@ -125,7 +120,7 @@ export function ListToolbar({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {ORDER_OPTIONS.map((option) => (
+          {TASK_ORDER_OPTIONS.map((option) => (
             <SelectItem key={option} value={option}>
               {t(`tasks.filters.order.${option}`)}
             </SelectItem>

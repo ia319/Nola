@@ -5,6 +5,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import logger from '@/config/logger'
+import {
+  isActiveTaskStatus,
+  isDeletableTaskRecordStatus,
+  isExportableTaskStatus,
+  isRetryableTaskStatus,
+} from '@/shared/lib/task-status'
 import type { TaskSummary } from '@/shared/types'
 import type { TaskActionHandler } from './types'
 
@@ -205,11 +211,10 @@ export function TaskListPanel({
           tasks.map((task) => {
             const fileLabel =
               task.filename?.trim() || resolveFileName?.(task)?.trim() || task.file_id
-            const pendingOrProcessing = task.status === 'pending' || task.status === 'processing'
-            const retryable = task.status === 'failed' || task.status === 'cancelled'
-            const deletable =
-              task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
-            const exportable = task.status === 'completed'
+            const pendingOrProcessing = isActiveTaskStatus(task.status)
+            const retryable = isRetryableTaskStatus(task.status)
+            const deletable = isDeletableTaskRecordStatus(task.status)
+            const exportable = isExportableTaskStatus(task.status)
             const progress = clampProgress(task.progress)
 
             const cancelBusy = runningActions.has(buildActionKey(task.task_id, 'cancel'))
