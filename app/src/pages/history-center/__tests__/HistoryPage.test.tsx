@@ -267,6 +267,53 @@ vi.mock('@/app/locale/use-active-locale', () => ({
 
 vi.mock('@/components/common', () => ({
   ErrorBoundary: ({ children }: { children: ReactNode }) => children,
+  InteractiveTablePagination: ({
+    page,
+    pageSize,
+    total,
+    labels,
+    onPageChange,
+  }: {
+    page: number
+    pageSize: number
+    total: number
+    labels?: {
+      summary?: (model: {
+        page: number
+        pageSize: number
+        total: number
+        totalPages: number
+        start: number
+        end: number
+      }) => ReactNode
+      page?: (page: number) => ReactNode
+      previous?: string
+      next?: string
+    }
+    onPageChange: (page: number) => void
+  }) => {
+    const totalPages = Math.max(1, Math.ceil(total / pageSize))
+    const start = total === 0 ? 0 : (page - 1) * pageSize + 1
+    const end = total === 0 ? 0 : Math.min(total, page * pageSize)
+    const summary =
+      labels?.summary?.({ page, pageSize, total, totalPages, start, end }) ??
+      `Showing ${start}-${end} of ${total}`
+
+    return (
+      <footer data-slot="mock-interactive-table-pagination">
+        <p>{summary}</p>
+        <button type="button" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
+          {labels?.previous ?? 'Previous page'}
+        </button>
+        <button type="button" aria-label={String(labels?.page?.(page) ?? `Page ${page}`)}>
+          {page}
+        </button>
+        <button type="button" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
+          {labels?.next ?? 'Next page'}
+        </button>
+      </footer>
+    )
+  },
 }))
 
 vi.mock('@/features/export', () => ({
