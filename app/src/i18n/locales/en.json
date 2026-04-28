@@ -226,8 +226,15 @@
       "selection": {
         "selectCurrentPage": "Select current page",
         "clearCurrentPage": "Clear current page",
+        "clear": "Clear selection",
         "selectedCount_one": "{{count}} selected",
         "selectedCount_other": "{{count}} selected"
+      },
+      "filters": {
+        "clearSearch": "Clear search"
+      },
+      "table": {
+        "rowActions": "Actions for task {{taskId}}"
       },
       "batchActions": {
         "cancel_one": "Cancel selected ({{count}})",

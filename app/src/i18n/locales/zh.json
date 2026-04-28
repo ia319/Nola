@@ -225,8 +225,15 @@
       "selection": {
         "selectCurrentPage": "选择当前页",
         "clearCurrentPage": "清空当前页",
+        "clear": "清除选择",
         "selectedCount_one": "已选择 {{count}} 项",
         "selectedCount_other": "已选择 {{count}} 项"
+      },
+      "filters": {
+        "clearSearch": "清除搜索"
+      },
+      "table": {
+        "rowActions": "任务 {{taskId}} 的操作"
       },
       "batchActions": {
         "cancel_one": "取消所选 ({{count}})",
