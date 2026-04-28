@@ -7,9 +7,17 @@ import { MetricCard } from '@/components/ui'
 import logger from '@/config/logger'
 import { useAppConfig } from '@/config/use-app-config'
 import {
+  batchCancelTasks,
+  batchRetryTasks,
   cancelTaskAndRefresh,
   createTask,
+  CurrentBatchTasksPanel,
+  deleteTaskRecordAction,
   requestTaskRefresh,
+  TaskDetailSheet,
+  type TaskDetailSheetAction,
+  useTaskDetail,
+  useTaskDetailSheet,
   useSessionTasksStore,
 } from '@/features/tasks'
 import type { TaskCreateResult } from '@/features/transcription-options'
@@ -17,20 +25,47 @@ import { useFileUpload } from '@/features/upload'
 import { ContentCanvas, TwoColumnLayout } from '@/layouts'
 import { queryClient } from '@/shared/lib/query-client'
 import { queryKeys } from '@/shared/lib/query-keys'
-import type { AppError, TaskSummary } from '@/shared/types'
-import { TaskWorkbenchActivityMonitor } from './TaskWorkbenchActivityMonitor'
+import {
+  isActiveTaskStatus,
+  isDeletableTaskRecordStatus,
+  isRetryableTaskStatus,
+} from '@/shared/lib/task-status'
+import type { AppError, BatchTaskActionResponse, TaskSummary } from '@/shared/types'
 import { buildTaskWorkbenchSummary } from './task-workbench-summary'
 import { TaskWorkbenchSessionConfig } from './TaskWorkbenchSessionConfig'
 import { TaskWorkbenchUploadQueue } from './TaskWorkbenchUploadQueue'
+
+type WorkbenchTaskDetailAction = 'cancel' | 'delete' | 'retry'
+
+function normalizeTaskIds(taskIds: string[]): string[] {
+  return Array.from(new Set(taskIds.map((taskId) => taskId.trim()).filter(Boolean)))
+}
+
+function buildEmptyBatchResponse(
+  action: BatchTaskActionResponse['action'],
+): BatchTaskActionResponse {
+  return {
+    action,
+    summary: { requested: 0, succeeded: 0, failed: 0 },
+    results: [],
+  }
+}
 
 export function TaskWorkbenchPage() {
   const { t } = useTranslation()
   const { fileValidationConfig, isLoading: isConfigLoading } = useAppConfig()
   const displayedBatchErrorRef = useRef<AppError | null>(null)
   const addCreatedTask = useSessionTasksStore((state) => state.addCreatedTask)
+  const removeSessionTask = useSessionTasksStore((state) => state.removeSessionTask)
   const sessionTaskOrder = useSessionTasksStore((state) => state.order)
   const sessionTaskById = useSessionTasksStore((state) => state.byId)
   const upsertSessionTask = useSessionTasksStore((state) => state.upsertSessionTask)
+  const taskDetailSheet = useTaskDetailSheet<WorkbenchTaskDetailAction>({
+    onActionError: (action, error) => {
+      logger.error('tasks.workbench.detailActionFailed', { action, error })
+    },
+  })
+  const taskDetail = useTaskDetail(taskDetailSheet.selectedTask?.task_id ?? null)
 
   const {
     uploads,
@@ -60,6 +95,44 @@ export function TaskWorkbenchPage() {
     () => buildTaskWorkbenchSummary(uploads, sessionTasks),
     [sessionTasks, uploads],
   )
+  const detailActionTask = taskDetail.task ?? taskDetailSheet.selectedTask
+  const canCancelDetail = detailActionTask ? isActiveTaskStatus(detailActionTask.status) : false
+  const canRetryDetail = detailActionTask ? isRetryableTaskStatus(detailActionTask.status) : false
+  const canDeleteDetail = detailActionTask
+    ? isDeletableTaskRecordStatus(detailActionTask.status)
+    : false
+  const detailActions: readonly TaskDetailSheetAction<WorkbenchTaskDetailAction>[] = [
+    {
+      id: 'retry',
+      label: t('tasks.actions.retry'),
+      enabled: Boolean(canRetryDetail),
+      run: async (task) => {
+        await handleBatchRetryRecentTasks([task.task_id])
+        await taskDetail.refresh()
+      },
+    },
+    {
+      id: 'cancel',
+      label: t('tasks.actions.cancel'),
+      enabled: Boolean(canCancelDetail),
+      run: async (task) => {
+        await handleBatchCancelRecentTasks([task.task_id])
+        await taskDetail.refresh()
+      },
+    },
+    {
+      id: 'delete',
+      label: t('tasks.actions.deleteRecord'),
+      enabled: Boolean(canDeleteDetail),
+      placement: 'danger',
+      run: async (task) => {
+        const deleted = await handleDeleteRecentTaskRecord(task)
+        if (deleted) {
+          taskDetailSheet.closeTaskDetail()
+        }
+      },
+    },
+  ]
 
   const summaryCards = useMemo(() => {
     return [
@@ -139,6 +212,111 @@ export function TaskWorkbenchPage() {
     }
   }
 
+  async function handleDeleteRecentTaskRecord(task: TaskSummary): Promise<boolean> {
+    try {
+      await deleteTaskRecordAction(task.task_id)
+      removeSessionTask(task.task_id)
+      toast.success(t('tasks.toast.recordDeleted', { taskId: task.task_id }))
+      return true
+    } catch (error: unknown) {
+      logger.error('tasks.workbench.deleteTaskRecordFailed', { error, taskId: task.task_id })
+      toast.error(t('tasks.toast.actionFailed'))
+      return false
+    } finally {
+      await refreshTaskLists()
+    }
+  }
+
+  async function handleDeleteRecentTaskRecordAction(task: TaskSummary): Promise<void> {
+    await handleDeleteRecentTaskRecord(task)
+  }
+
+  async function refreshTaskLists(): Promise<void> {
+    try {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.lists() })
+    } catch (error: unknown) {
+      logger.error('tasks.workbench.refreshTasksFailed', { error })
+    } finally {
+      requestTaskRefresh()
+    }
+  }
+
+  function notifyBatchActionSummary(
+    action: BatchTaskActionResponse['action'],
+    response: BatchTaskActionResponse,
+  ): void {
+    const { succeeded, failed } = response.summary
+    if (succeeded > 0 && failed === 0) {
+      toast.success(t(`tasks.toast.batch.${action}.success`, { count: succeeded }))
+      return
+    }
+    if (succeeded > 0 && failed > 0) {
+      toast.warning(t(`tasks.toast.batch.${action}.partial`, { succeeded, failed }))
+      return
+    }
+    if (failed > 0) {
+      toast.error(t(`tasks.toast.batch.${action}.failed`, { count: failed }))
+    }
+  }
+
+  async function handleBatchCancelRecentTasks(taskIds: string[]): Promise<BatchTaskActionResponse> {
+    const normalizedTaskIds = normalizeTaskIds(taskIds)
+    if (normalizedTaskIds.length === 0) {
+      return buildEmptyBatchResponse('cancel')
+    }
+
+    try {
+      const response = await batchCancelTasks(normalizedTaskIds)
+      for (const result of response.results) {
+        if (result.ok && result.status && result.file_id) {
+          upsertSessionTask({
+            task_id: result.task_id,
+            file_id: result.file_id,
+            filename: result.filename ?? undefined,
+            status: result.status,
+          })
+        }
+      }
+      notifyBatchActionSummary('cancel', response)
+      return response
+    } catch (error: unknown) {
+      logger.error('tasks.workbench.batchCancelFailed', { error, taskIds: normalizedTaskIds })
+      toast.error(t('tasks.toast.actionFailed'))
+      throw error
+    } finally {
+      await refreshTaskLists()
+    }
+  }
+
+  async function handleBatchRetryRecentTasks(taskIds: string[]): Promise<BatchTaskActionResponse> {
+    const normalizedTaskIds = normalizeTaskIds(taskIds)
+    if (normalizedTaskIds.length === 0) {
+      return buildEmptyBatchResponse('retry')
+    }
+
+    try {
+      const response = await batchRetryTasks(normalizedTaskIds)
+      for (const result of response.results) {
+        if (result.ok && result.new_task_id && result.file_id) {
+          addCreatedTask({
+            task_id: result.new_task_id,
+            file_id: result.file_id,
+            filename: result.filename ?? undefined,
+            status: 'pending',
+          })
+        }
+      }
+      notifyBatchActionSummary('retry', response)
+      return response
+    } catch (error: unknown) {
+      logger.error('tasks.workbench.batchRetryFailed', { error, taskIds: normalizedTaskIds })
+      toast.error(t('tasks.toast.actionFailed'))
+      throw error
+    } finally {
+      await refreshTaskLists()
+    }
+  }
+
   // Surface batch-level errors such as duplicate file skips as toast feedback.
   useEffect(() => {
     if (!batchError) {
@@ -208,12 +386,31 @@ export function TaskWorkbenchPage() {
 
       <section data-slot="task-workbench-activity" className="min-h-0">
         <ErrorBoundary>
-          <TaskWorkbenchActivityMonitor
-            tasks={sessionTasks}
+          <CurrentBatchTasksPanel
+            title={t('tasks.workbench.sections.activity.title')}
+            description={t('tasks.workbench.sections.activity.description')}
+            emptyText={t('tasks.workbench.sections.activity.empty')}
             onCancelTask={handleCancelRecentTask}
+            onDeleteTaskRecord={handleDeleteRecentTaskRecordAction}
+            onBatchCancelTasks={handleBatchCancelRecentTasks}
+            onBatchRetryTasks={handleBatchRetryRecentTasks}
+            onOpenTaskDetail={taskDetailSheet.openTaskDetail}
           />
         </ErrorBoundary>
       </section>
+
+      <TaskDetailSheet
+        open={taskDetailSheet.open}
+        summaryTask={taskDetailSheet.selectedTask}
+        detailTask={taskDetail.task}
+        error={taskDetail.error}
+        actions={detailActions}
+        runningAction={taskDetailSheet.runningAction}
+        onOpenChange={taskDetailSheet.onOpenChange}
+        onRunAction={(action, task) => {
+          void taskDetailSheet.runDetailAction(action.id, () => action.run(task))
+        }}
+      />
     </ContentCanvas>
   )
 }

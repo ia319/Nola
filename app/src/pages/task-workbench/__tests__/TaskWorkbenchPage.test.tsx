@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { TaskWorkbenchActivityMonitorProps } from '../TaskWorkbenchActivityMonitor'
+import type { CurrentBatchTasksPanelProps } from '@/features/tasks'
 import type { TaskWorkbenchSessionConfigProps } from '../TaskWorkbenchSessionConfig'
 import type { TaskWorkbenchUploadQueueProps } from '../TaskWorkbenchUploadQueue'
 
@@ -23,10 +23,16 @@ const taskWorkbenchMocks = vi.hoisted(() => ({
   useSessionTasksStore: vi.fn(),
   addCreatedTask: vi.fn(),
   upsertSessionTask: vi.fn(),
+  removeSessionTask: vi.fn(),
   createTask: vi.fn(),
   cancelTaskAndRefresh: vi.fn(),
+  deleteTaskRecordAction: vi.fn(),
+  batchCancelTasks: vi.fn(),
+  batchRetryTasks: vi.fn(),
   retryTaskAndRefresh: vi.fn(),
   requestTaskRefresh: vi.fn(),
+  useTaskDetail: vi.fn(),
+  useTaskDetailSheet: vi.fn(),
   taskWorkbenchUploadQueue: vi.fn((_props: TaskWorkbenchUploadQueueProps) => (
     <div data-slot="mock-task-workbench-upload-queue">upload queue</div>
   )),
@@ -36,8 +42,11 @@ const taskWorkbenchMocks = vi.hoisted(() => ({
       <div>session config</div>
     </section>
   )),
-  taskWorkbenchActivityMonitor: vi.fn((_props: TaskWorkbenchActivityMonitorProps) => (
-    <div data-slot="mock-task-workbench-activity-monitor">activity monitor</div>
+  currentBatchTasksPanel: vi.fn((_props: CurrentBatchTasksPanelProps) => (
+    <div data-slot="mock-current-batch-tasks-panel">current batch tasks</div>
+  )),
+  taskDetailSheet: vi.fn((_props: { open: boolean }) => (
+    <div data-open={String(_props.open)} data-slot="mock-task-detail-sheet" />
   )),
 }))
 
@@ -63,6 +72,7 @@ vi.mock('react-i18next', () => ({
         'upload.startUpload': 'Start Upload',
         'upload.reset': 'Reset All',
         'tasks.toast.actionFailed': 'Task action failed, please retry',
+        'tasks.toast.recordDeleted': `Task record deleted: ${String(params?.taskId ?? '')}`,
       }
 
       if (key === 'tasks.workbench.sections.uploadQueue.maxFileSize') {
@@ -95,9 +105,16 @@ vi.mock('@/features/upload', () => ({
 }))
 
 vi.mock('@/features/tasks', () => ({
+  batchCancelTasks: taskWorkbenchMocks.batchCancelTasks,
+  batchRetryTasks: taskWorkbenchMocks.batchRetryTasks,
   cancelTaskAndRefresh: taskWorkbenchMocks.cancelTaskAndRefresh,
   createTask: taskWorkbenchMocks.createTask,
+  CurrentBatchTasksPanel: taskWorkbenchMocks.currentBatchTasksPanel,
+  deleteTaskRecordAction: taskWorkbenchMocks.deleteTaskRecordAction,
   requestTaskRefresh: taskWorkbenchMocks.requestTaskRefresh,
+  TaskDetailSheet: taskWorkbenchMocks.taskDetailSheet,
+  useTaskDetail: taskWorkbenchMocks.useTaskDetail,
+  useTaskDetailSheet: taskWorkbenchMocks.useTaskDetailSheet,
   useSessionTasksStore: taskWorkbenchMocks.useSessionTasksStore,
 }))
 
@@ -107,10 +124,6 @@ vi.mock('../TaskWorkbenchUploadQueue', () => ({
 
 vi.mock('../TaskWorkbenchSessionConfig', () => ({
   TaskWorkbenchSessionConfig: taskWorkbenchMocks.taskWorkbenchSessionConfig,
-}))
-
-vi.mock('../TaskWorkbenchActivityMonitor', () => ({
-  TaskWorkbenchActivityMonitor: taskWorkbenchMocks.taskWorkbenchActivityMonitor,
 }))
 
 import { TaskWorkbenchPage } from '../TaskWorkbenchPage'
@@ -131,12 +144,20 @@ describe('TaskWorkbenchPage', () => {
     taskWorkbenchMocks.useSessionTasksStore.mockReset()
     taskWorkbenchMocks.addCreatedTask.mockReset()
     taskWorkbenchMocks.upsertSessionTask.mockReset()
+    taskWorkbenchMocks.removeSessionTask.mockReset()
+    taskWorkbenchMocks.deleteTaskRecordAction.mockReset()
+    taskWorkbenchMocks.batchCancelTasks.mockReset()
+    taskWorkbenchMocks.batchRetryTasks.mockReset()
+    taskWorkbenchMocks.useTaskDetail.mockReset()
+    taskWorkbenchMocks.useTaskDetailSheet.mockReset()
     taskWorkbenchMocks.taskWorkbenchUploadQueue.mockClear()
     taskWorkbenchMocks.taskWorkbenchSessionConfig.mockClear()
-    taskWorkbenchMocks.taskWorkbenchActivityMonitor.mockClear()
+    taskWorkbenchMocks.currentBatchTasksPanel.mockClear()
+    taskWorkbenchMocks.taskDetailSheet.mockClear()
 
     const sessionState = {
       addCreatedTask: taskWorkbenchMocks.addCreatedTask,
+      removeSessionTask: taskWorkbenchMocks.removeSessionTask,
       upsertSessionTask: taskWorkbenchMocks.upsertSessionTask,
       order: ['task-processing', 'task-pending', 'task-completed'],
       byId: {
@@ -225,6 +246,22 @@ describe('TaskWorkbenchPage', () => {
       batchError: null,
       clearBatchError: vi.fn(),
     })
+
+    taskWorkbenchMocks.useTaskDetail.mockReturnValue({
+      task: null,
+      isLoading: false,
+      error: null,
+      refresh: vi.fn().mockResolvedValue(undefined),
+    })
+    taskWorkbenchMocks.useTaskDetailSheet.mockReturnValue({
+      open: false,
+      selectedTask: null,
+      runningAction: null,
+      openTaskDetail: vi.fn(),
+      closeTaskDetail: vi.fn(),
+      onOpenChange: vi.fn(),
+      runDetailAction: vi.fn(),
+    })
   })
 
   it('renders the planned workbench skeleton and session summary cards', () => {
@@ -262,16 +299,19 @@ describe('TaskWorkbenchPage', () => {
     expect(screen.getByRole('heading', { name: 'Session Configuration', level: 2 })).toBeTruthy()
     expect(screen.getByText('upload queue')).toBeTruthy()
     expect(screen.getByText('session config')).toBeTruthy()
-    expect(screen.getByText('activity monitor')).toBeTruthy()
+    expect(screen.getByText('current batch tasks')).toBeTruthy()
   })
 
-  it('passes the current session task list into the workbench activity monitor', () => {
+  it('passes current task actions into the workbench current batch panel', () => {
     render(<TaskWorkbenchPage />)
 
-    expect(taskWorkbenchMocks.taskWorkbenchActivityMonitor).toHaveBeenCalledTimes(1)
-    expect(taskWorkbenchMocks.taskWorkbenchActivityMonitor.mock.calls[0]?.[0]).toMatchObject({
-      tasks: expect.any(Array),
+    expect(taskWorkbenchMocks.currentBatchTasksPanel).toHaveBeenCalledTimes(1)
+    expect(taskWorkbenchMocks.currentBatchTasksPanel.mock.calls[0]?.[0]).toMatchObject({
       onCancelTask: expect.any(Function),
+      onDeleteTaskRecord: expect.any(Function),
+      onBatchCancelTasks: expect.any(Function),
+      onBatchRetryTasks: expect.any(Function),
+      onOpenTaskDetail: expect.any(Function),
     })
     expect(taskWorkbenchMocks.taskWorkbenchSessionConfig.mock.calls[0]?.[0]).toMatchObject({
       fileIds: ['file-ready', 'file-created'],
@@ -320,9 +360,9 @@ describe('TaskWorkbenchPage', () => {
 
     render(<TaskWorkbenchPage />)
 
-    const monitorProps = taskWorkbenchMocks.taskWorkbenchActivityMonitor.mock.calls[0]?.[0]
-    expect(monitorProps).toBeTruthy()
-    const onCancelTask = monitorProps?.onCancelTask
+    const panelProps = taskWorkbenchMocks.currentBatchTasksPanel.mock.calls[0]?.[0]
+    expect(panelProps).toBeTruthy()
+    const onCancelTask = panelProps?.onCancelTask
     expect(onCancelTask).toBeTypeOf('function')
     if (!onCancelTask) {
       throw new Error('Expected onCancelTask to be defined')
@@ -346,6 +386,39 @@ describe('TaskWorkbenchPage', () => {
       }),
     )
     expect(taskWorkbenchMocks.toast.error).toHaveBeenCalledWith('Task action failed, please retry')
+  })
+
+  it('deletes current task records through the current batch panel action', async () => {
+    taskWorkbenchMocks.deleteTaskRecordAction.mockResolvedValueOnce({
+      task_id: 'task-completed',
+      message: 'deleted',
+    })
+
+    render(<TaskWorkbenchPage />)
+
+    const panelProps = taskWorkbenchMocks.currentBatchTasksPanel.mock.calls[0]?.[0]
+    expect(panelProps).toBeTruthy()
+    const onDeleteTaskRecord = panelProps?.onDeleteTaskRecord
+    expect(onDeleteTaskRecord).toBeTypeOf('function')
+    if (!onDeleteTaskRecord) {
+      throw new Error('Expected onDeleteTaskRecord to be defined')
+    }
+
+    await onDeleteTaskRecord({
+      task_id: 'task-completed',
+      file_id: 'file-completed',
+      filename: 'completed.wav',
+      status: 'completed',
+      progress: 100,
+      created_at: '2026-04-10T10:02:00.000Z',
+      completed_at: '2026-04-10T10:03:00.000Z',
+    })
+
+    expect(taskWorkbenchMocks.deleteTaskRecordAction).toHaveBeenCalledWith('task-completed')
+    expect(taskWorkbenchMocks.removeSessionTask).toHaveBeenCalledWith('task-completed')
+    expect(taskWorkbenchMocks.toast.success).toHaveBeenCalledWith(
+      'Task record deleted: task-completed',
+    )
   })
 
   it('shows each batch warning once without clearing the upload hook state', () => {
