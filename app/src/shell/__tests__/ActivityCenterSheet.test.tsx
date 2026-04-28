@@ -50,6 +50,7 @@ const messages: Record<string, string> = {
 }
 
 vi.mock('react-i18next', () => ({
+  withTranslation: () => (Component: unknown) => Component,
   useTranslation: () => ({
     t: (key: string, params?: TranslationParams) => {
       let message = messages[key] ?? key
