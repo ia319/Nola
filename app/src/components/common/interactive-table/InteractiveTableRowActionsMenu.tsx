@@ -111,7 +111,14 @@ export function InteractiveTableRowActionsMenu({
           </Button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align={align} sideOffset={6} className="min-w-36">
+        <DropdownMenuContent
+          align={align}
+          sideOffset={6}
+          className="min-w-36"
+          onClick={(event) => {
+            event.stopPropagation()
+          }}
+        >
           {visibleActions.map((action) => (
             <DropdownMenuItem
               key={action.id}
