@@ -16,6 +16,8 @@ ModelStatusLiteral = Literal[
 ]
 ModelDirSourceLiteral = Literal["environment", "database", "default"]
 DownloadStatusLiteral = Literal["downloading", "completed", "failed", "cancelled"]
+ModelListSortField = Literal["name", "languages", "size", "status", "profile"]
+ModelListSortOrder = Literal["asc", "desc"]
 
 
 class DownloadProgressResponse(BaseModel):

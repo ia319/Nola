@@ -2440,7 +2440,16 @@ export interface operations {
   }
   list_all_models_api_models_get: {
     parameters: {
-      query?: never
+      query?: {
+        /** @description Filter by model cache/download status */
+        status?: ('not_downloaded' | 'downloading' | 'partial_download' | 'downloaded') | null
+        /** @description Search by model id, alias, name, repo id, language, status, or description */
+        q?: string | null
+        /** @description Sort field */
+        sort_by?: ('name' | 'languages' | 'size' | 'status' | 'profile') | null
+        /** @description Sort order */
+        order?: 'asc' | 'desc'
+      }
       header?: never
       path?: never
       cookie?: never
@@ -2454,6 +2463,15 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ModelListResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
         }
       }
     }

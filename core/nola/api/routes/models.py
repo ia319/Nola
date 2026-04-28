@@ -9,7 +9,7 @@ from collections.abc import AsyncGenerator
 from contextlib import suppress
 from pathlib import Path
 
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 
 from nola.api.deps import (
@@ -35,6 +35,8 @@ from nola.api.schemas.models import (
     ModelDetailResponse,
     ModelDownloadStartedResponse,
     ModelListResponse,
+    ModelListSortField,
+    ModelListSortOrder,
     ModelResponse,
     ModelSelectResponse,
     ModelSettingsResponse,
@@ -61,6 +63,15 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 _SSE_KEEPALIVE_INTERVAL_SECONDS = 20.0
+_MODEL_STATUS_SORT_RANK: dict[ModelStatusLiteral, int] = {
+    "not_downloaded": 0,
+    "partial_download": 1,
+    "downloading": 2,
+    "downloaded": 3,
+}
+
+
+_ModelListEntry = tuple[ModelResponse, tuple[str, ...]]
 
 
 def _read_model_config() -> ConfigMap:
@@ -127,10 +138,75 @@ def _build_active_downloads_response() -> ActiveModelDownloadsResponse:
     )
 
 
-def _build_model_response(
+def _normalize_search_text(value: str) -> str:
+    """Return a case-insensitive search token with separator variants merged."""
+    return " ".join(value.replace("_", " ").replace("-", " ").casefold().split())
+
+
+def _model_matches_query(search_values: tuple[str, ...], query: str | None) -> bool:
+    """Return whether one model matches the free-text query."""
+    if query is None:
+        return True
+
+    raw_query = query.strip().casefold()
+    normalized_query = _normalize_search_text(query)
+    if not raw_query:
+        return True
+
+    for value in search_values:
+        raw_value = value.casefold()
+        if raw_query in raw_value or normalized_query in _normalize_search_text(value):
+            return True
+
+    return False
+
+
+def _get_model_profile_score(model: ModelResponse) -> int:
+    """Rank one model by accuracy first, then speed."""
+    return model.accuracy_rank * 100 - model.speed_rank
+
+
+def _default_model_order_key(entry: _ModelListEntry) -> tuple[bool, int, int, str]:
+    """Keep the configured model first, then prefer stronger compact models."""
+    model, _ = entry
+    return (
+        not model.is_configured,
+        -model.accuracy_rank,
+        model.size_bytes,
+        model.name.casefold(),
+    )
+
+
+def _sort_model_entries(
+    entries: list[_ModelListEntry],
+    sort_by: ModelListSortField | None,
+    order: ModelListSortOrder,
+) -> list[_ModelListEntry]:
+    """Return model entries in API-requested order."""
+    if sort_by is None:
+        return sorted(entries, key=_default_model_order_key)
+
+    reverse = order == "desc"
+
+    def sort_key(entry: _ModelListEntry) -> str | int:
+        model, _ = entry
+        if sort_by == "name":
+            return model.name.casefold()
+        if sort_by == "languages":
+            return model.languages.casefold()
+        if sort_by == "size":
+            return model.size_bytes
+        if sort_by == "status":
+            return _MODEL_STATUS_SORT_RANK[model.status]
+        return _get_model_profile_score(model)
+
+    return sorted(entries, key=sort_key, reverse=reverse)
+
+
+def _build_model_response_entries(
     model_config: ConfigMap,
     worker_state: ConfigMap,
-) -> list[ModelResponse]:
+) -> list[_ModelListEntry]:
     """Assemble response items for all registered models."""
     configured_id = canonicalize_optional_model_id(
         model_config.get("configured_model_id")
@@ -141,7 +217,7 @@ def _build_model_response(
 
     storage = get_model_storage()
     downloader = get_model_downloader()
-    items: list[ModelResponse] = []
+    items: list[_ModelListEntry] = []
 
     for info in list_models():
         download = downloader.get_download(info.model_id)
@@ -156,26 +232,55 @@ def _build_model_response(
         if download is not None:
             progress_resp = _to_download_progress_response(download)
 
-        items.append(
-            ModelResponse(
-                model_id=info.model_id,
-                name=info.name,
-                size_bytes=info.size_bytes,
-                repo_id=info.repo_id,
-                languages=info.languages,
-                speed_rank=info.speed_rank,
-                accuracy_rank=info.accuracy_rank,
-                description=info.description,
-                description_key=info.description_key,
-                status=model_status,
-                disk_usage=storage.get_disk_usage(info.repo_id),
-                is_configured=(info.model_id == configured_id),
-                is_last_loaded=(info.model_id == last_loaded_id),
-                download_progress=progress_resp,
-            )
+        model = ModelResponse(
+            model_id=info.model_id,
+            name=info.name,
+            size_bytes=info.size_bytes,
+            repo_id=info.repo_id,
+            languages=info.languages,
+            speed_rank=info.speed_rank,
+            accuracy_rank=info.accuracy_rank,
+            description=info.description,
+            description_key=info.description_key,
+            status=model_status,
+            disk_usage=storage.get_disk_usage(info.repo_id),
+            is_configured=(info.model_id == configured_id),
+            is_last_loaded=(info.model_id == last_loaded_id),
+            download_progress=progress_resp,
         )
+        search_values = (
+            info.model_id,
+            info.name,
+            info.repo_id,
+            info.languages,
+            info.description,
+            info.description_key,
+            model_status,
+            *info.aliases,
+        )
+        items.append((model, search_values))
 
     return items
+
+
+def _build_model_response(
+    model_config: ConfigMap,
+    worker_state: ConfigMap,
+    *,
+    model_status: ModelStatusLiteral | None,
+    q: str | None,
+    sort_by: ModelListSortField | None,
+    order: ModelListSortOrder,
+) -> list[ModelResponse]:
+    """Apply API query controls over model response entries."""
+    entries = [
+        entry
+        for entry in _build_model_response_entries(model_config, worker_state)
+        if (model_status is None or entry[0].status == model_status)
+        and _model_matches_query(entry[1], q)
+    ]
+
+    return [entry[0] for entry in _sort_model_entries(entries, sort_by, order)]
 
 
 # --- Endpoints ---
@@ -187,14 +292,35 @@ def _build_model_response(
     response_model=ModelListResponse,
     status_code=status.HTTP_200_OK,
 )
-def list_all_models() -> ModelListResponse:
+def list_all_models(
+    model_status: ModelStatusLiteral | None = Query(
+        None,
+        alias="status",
+        description="Filter by model cache/download status",
+    ),
+    q: str | None = Query(
+        None,
+        description=(
+            "Search by model id, alias, name, repo id, language, status, or description"
+        ),
+    ),
+    sort_by: ModelListSortField | None = Query(None, description="Sort field"),
+    order: ModelListSortOrder = Query("asc", description="Sort order"),
+) -> ModelListResponse:
     """Return all registered models with local state and download progress."""
     model_config = _read_model_config()
     worker_state = _read_worker_state()
     effective_dir, _ = _resolve_effective_dir(model_config)
 
     return ModelListResponse(
-        models=_build_model_response(model_config, worker_state),
+        models=_build_model_response(
+            model_config,
+            worker_state,
+            model_status=model_status,
+            q=q,
+            sort_by=sort_by,
+            order=order,
+        ),
         configured_model_id=canonicalize_optional_model_id(
             model_config.get("configured_model_id")
         ),

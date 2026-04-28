@@ -404,6 +404,55 @@ class TestModelsAPI:
             == "models.catalog.largeV3.description"
         )
 
+    def test_model_list_supports_search_status_filter_and_sort(
+        self, client: TestClient
+    ) -> None:
+        """Apply model list query controls before returning the full result set."""
+        downloaded_repo_ids = {
+            "Systran/faster-whisper-small",
+            "Systran/faster-whisper-medium",
+        }
+
+        class _FakeStorage:
+            def get_cache_state(self, repo_id: str) -> str:
+                if repo_id in downloaded_repo_ids:
+                    return "downloaded"
+                return "not_downloaded"
+
+            def get_disk_usage(self, repo_id: str) -> int | None:
+                if repo_id in downloaded_repo_ids:
+                    return 100
+                return None
+
+        class _FakeDownloader:
+            def get_download(self, model_id: str) -> None:
+                return None
+
+        with (
+            patch(
+                "nola.api.routes.models.get_model_storage", return_value=_FakeStorage()
+            ),
+            patch(
+                "nola.api.routes.models.get_model_downloader",
+                return_value=_FakeDownloader(),
+            ),
+        ):
+            repo_search = client.get("/api/models?q=faster-whisper-small.en")
+            filtered = client.get(
+                "/api/models?status=downloaded&sort_by=size&order=desc"
+            )
+
+        assert repo_search.status_code == 200
+        assert [model["model_id"] for model in repo_search.json()["models"]] == [
+            "small.en"
+        ]
+
+        assert filtered.status_code == 200
+        assert [model["model_id"] for model in filtered.json()["models"]] == [
+            "medium",
+            "small",
+        ]
+
     def test_start_download_rejects_models_already_cached(
         self, client: TestClient
     ) -> None:
