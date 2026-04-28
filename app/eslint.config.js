@@ -1,3 +1,6 @@
+// For more info, see https://github.com/storybookjs/eslint-plugin-storybook#configuration-flat-config-format
+import storybook from 'eslint-plugin-storybook'
+
 import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
@@ -55,15 +58,13 @@ export default defineConfig([
       // Warn on console.log (allow warn/error)
       'no-console': ['warn', { allow: ['warn', 'error', 'info', 'debug'] }],
     },
-  },
-  // shadcn/ui generated files co-export components and variant helpers by design
+  }, // shadcn/ui generated files co-export components and variant helpers by design
   {
     files: ['src/components/ui/**/*.{ts,tsx}'],
     rules: {
       'react-refresh/only-export-components': 'off',
     },
-  },
-  // Keep common components feature-agnostic.
+  }, // Keep common components feature-agnostic.
   {
     files: ['src/components/common/**/*.{ts,tsx}'],
     rules: {
@@ -74,8 +75,7 @@ export default defineConfig([
         },
       ],
     },
-  },
-  // Enforce feature public API imports outside feature internals.
+  }, // Enforce feature public API imports outside feature internals.
   {
     files: [
       'src/App.tsx',
@@ -95,8 +95,7 @@ export default defineConfig([
       ],
     },
   },
-  ...crossFeatureDeepImportRules,
-  // Keep option domain independent from task runtime domain.
+  ...crossFeatureDeepImportRules, // Keep option domain independent from task runtime domain.
   {
     files: ['src/features/transcription-options/**/*.{ts,tsx}'],
     rules: {
@@ -109,4 +108,5 @@ export default defineConfig([
     },
   },
   prettierConfig,
+  ...storybook.configs['flat/recommended'],
 ])
