@@ -1,16 +1,18 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { DownloadState } from '@/features/models'
 import type { ModelResponse } from '@/shared/types'
 
-import { ModelList } from '../ModelList'
+import type { ModelListQuery } from '../../lib/model-query-options'
+import { ModelList, type ModelListProps } from '../ModelList'
 
 type TranslationParams = Record<string, string | number | boolean | null | undefined>
 
 vi.mock('react-i18next', () => ({
+  withTranslation: () => (Component: unknown) => Component,
   useTranslation: () => ({
     t: (key: string, params?: TranslationParams) => {
       const messages: Record<string, string> = {
@@ -32,11 +34,26 @@ vi.mock('react-i18next', () => ({
         'models.table.columns.status': 'Status',
         'models.table.columns.profile': 'Profile',
         'models.table.columns.actions': 'Actions',
+        'models.table.rowActions': `More actions for ${String(params?.name)}`,
         'models.table.empty.title': 'No models available',
         'models.table.empty.description': 'Download a model to start configuring local runs.',
+        'models.filters.searchPlaceholder': 'Search models',
+        'models.filters.clearSearch': 'Clear search',
+        'models.filters.status': 'Status filter',
+        'models.filters.statusAll': 'All Statuses',
+        'models.selection.selectAll': 'Select all models',
+        'models.selection.selectRow': `Select ${String(params?.name)}`,
+        'models.selection.clear': 'Clear selection',
+        'models.batchActions.download': 'Download selected',
+        'models.batchActions.cancel': 'Cancel selected',
+        'models.batchActions.delete': 'Delete selected',
         'models.catalog.largeV3.description': 'Localized large multilingual engine',
         'error.generic': 'An error occurred',
         'error.boundary.retry': 'Try Again',
+      }
+
+      if (key === 'models.selection.selectedCount') {
+        return `${String(params?.count)} selected`
       }
 
       if (key === 'models.table.diskUsage') {
@@ -92,6 +109,32 @@ function createModel(overrides: Partial<ModelResponse> = {}): ModelResponse {
   }
 }
 
+const DEFAULT_QUERY: ModelListQuery = {
+  q: '',
+  status: 'all',
+  sort_by: null,
+  order: 'asc',
+}
+
+function renderModelList(overrides: Partial<ModelListProps> = {}) {
+  const props: ModelListProps = {
+    models: [],
+    downloads: new Map(),
+    query: DEFAULT_QUERY,
+    onSearchChange: vi.fn(),
+    onStatusFilterChange: vi.fn(),
+    onSortChange: vi.fn(),
+    onDownload: vi.fn(),
+    onCancel: vi.fn(),
+    onDelete: vi.fn(),
+    onSelect: vi.fn(),
+    onOpenDetail: vi.fn(),
+    ...overrides,
+  }
+
+  return render(<ModelList {...props} />)
+}
+
 function createDownloadState(overrides: Partial<DownloadState> = {}): DownloadState {
   return {
     status: 'downloading',
@@ -104,37 +147,31 @@ function createDownloadState(overrides: Partial<DownloadState> = {}): DownloadSt
   }
 }
 
+function openRowActionMenu(name: string): void {
+  fireEvent.pointerDown(screen.getByRole('button', { name }), {
+    button: 0,
+    ctrlKey: false,
+    pointerType: 'mouse',
+  })
+}
+
+function getModelRowTexts(): string[] {
+  return screen
+    .getAllByRole('row')
+    .slice(1)
+    .map((row) => row.textContent ?? '')
+}
+
 describe('ModelList', () => {
   it('renders an empty state when no models are available', () => {
-    render(
-      <ModelList
-        models={[]}
-        downloads={new Map()}
-        onDownload={vi.fn()}
-        onCancel={vi.fn()}
-        onDelete={vi.fn()}
-        onSelect={vi.fn()}
-        onOpenDetail={vi.fn()}
-      />,
-    )
+    renderModelList()
 
     expect(screen.getByText('No models available')).toBeTruthy()
     expect(screen.getByText('Download a model to start configuring local runs.')).toBeTruthy()
   })
 
   it('renders table skeleton rows while models load', () => {
-    render(
-      <ModelList
-        models={[]}
-        downloads={new Map()}
-        isLoading
-        onDownload={vi.fn()}
-        onCancel={vi.fn()}
-        onDelete={vi.fn()}
-        onSelect={vi.fn()}
-        onOpenDetail={vi.fn()}
-      />,
-    )
+    renderModelList({ isLoading: true })
 
     expect(screen.getByRole('table')).toBeTruthy()
     expect(screen.queryByText('No models available')).toBeNull()
@@ -143,19 +180,10 @@ describe('ModelList', () => {
   it('renders a retryable error state when models fail to load', () => {
     const onRetry = vi.fn()
 
-    render(
-      <ModelList
-        models={[]}
-        downloads={new Map()}
-        errorMessage="Server error"
-        onDownload={vi.fn()}
-        onCancel={vi.fn()}
-        onDelete={vi.fn()}
-        onSelect={vi.fn()}
-        onOpenDetail={vi.fn()}
-        onRetry={onRetry}
-      />,
-    )
+    renderModelList({
+      errorMessage: 'Server error',
+      onRetry,
+    })
 
     expect(screen.getByText('An error occurred')).toBeTruthy()
     expect(screen.getByText('Server error')).toBeTruthy()
@@ -163,7 +191,7 @@ describe('ModelList', () => {
     expect(onRetry).toHaveBeenCalledTimes(1)
   })
 
-  it('renders model rows with table columns and action variants', () => {
+  it('renders model rows with table columns and action variants', async () => {
     const onDownload = vi.fn()
     const onCancel = vi.fn()
     const onDelete = vi.fn()
@@ -199,17 +227,15 @@ describe('ModelList', () => {
       speed_rank: 4,
     })
 
-    render(
-      <ModelList
-        models={[pendingModel, configuredModel, downloadingModel, selectableModel]}
-        downloads={new Map([['nola-medium-v3', createDownloadState()]])}
-        onDownload={onDownload}
-        onCancel={onCancel}
-        onDelete={onDelete}
-        onSelect={onSelect}
-        onOpenDetail={onOpenDetail}
-      />,
-    )
+    renderModelList({
+      models: [configuredModel, pendingModel, downloadingModel, selectableModel],
+      downloads: new Map([['nola-medium-v3', createDownloadState()]]),
+      onDownload,
+      onCancel,
+      onDelete,
+      onSelect,
+      onOpenDetail,
+    })
 
     expect(screen.getByText('Name')).toBeTruthy()
     expect(screen.getByText('Supported Languages')).toBeTruthy()
@@ -217,6 +243,7 @@ describe('ModelList', () => {
     expect(screen.getByText('Status')).toBeTruthy()
     expect(screen.getByText('Profile')).toBeTruthy()
     expect(screen.getByText('Actions')).toBeTruthy()
+    expect(getModelRowTexts()[0]).toContain('Nola Large V3')
 
     const configuredRow = screen.getByRole('row', { name: /Nola Large V3/i })
     expect(within(configuredRow).getAllByText('Default')).toHaveLength(2)
@@ -235,36 +262,142 @@ describe('ModelList', () => {
 
     const pendingRow = screen.getByRole('row', { name: /Nola Small V3/i })
     expect(within(pendingRow).getByText('Partial Download')).toBeTruthy()
-    expect(within(pendingRow).getByRole('button', { name: 'Download' })).toBeTruthy()
-    expect(within(pendingRow).getByRole('button', { name: 'Delete' })).toBeTruthy()
+    openRowActionMenu('More actions for Nola Small V3')
+    expect(await screen.findByRole('menuitem', { name: 'Download' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Download' }))
+    expect(onDownload).toHaveBeenCalledWith('nola-small-v3')
     expect(within(pendingRow).getByText('Accuracy 3 · Speed 4')).toBeTruthy()
 
-    const selectableRow = screen.getByRole('row', { name: /Nola Base V3/i })
-    expect(within(selectableRow).getByRole('button', { name: 'Set as Default' })).toBeTruthy()
-    expect(within(selectableRow).getByRole('button', { name: 'Delete' })).toBeTruthy()
+    screen.getByRole('row', { name: /Nola Base V3/i })
+    openRowActionMenu('More actions for Nola Base V3')
+    expect(await screen.findByRole('menuitem', { name: 'Set as Default' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeTruthy()
   })
 
-  it('opens detail on row click without hijacking action buttons', () => {
+  it('requests API-backed sort changes through sortable headers', () => {
+    const onSortChange = vi.fn()
+
+    renderModelList({
+      models: [
+        createModel({
+          model_id: 'nola-large-v3',
+          name: 'Nola Large V3',
+          is_configured: true,
+        }),
+        createModel({
+          model_id: 'nola-small-v3',
+          name: 'Nola Small V3',
+          status: 'partial_download',
+          is_configured: false,
+          accuracy_rank: 3,
+        }),
+        createModel({
+          model_id: 'nola-base-v3',
+          name: 'Nola Base V3',
+          is_configured: false,
+          accuracy_rank: 4,
+        }),
+      ],
+      onSortChange,
+    })
+
+    expect(getModelRowTexts()[0]).toContain('Nola Large V3')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sort Name ascending' }))
+
+    expect(onSortChange).toHaveBeenCalledWith({ key: 'name', direction: 'asc' })
+    expect(getModelRowTexts()[0]).toContain('Nola Large V3')
+  })
+
+  it('renders API query controls without moving selected actions into a new row', () => {
+    const onSearchChange = vi.fn()
+    const onStatusFilterChange = vi.fn()
+
+    renderModelList({
+      query: {
+        ...DEFAULT_QUERY,
+        q: 'large',
+        status: 'downloaded',
+      },
+      models: [createModel({ model_id: 'nola-large-v3', name: 'Nola Large V3' })],
+      onSearchChange,
+      onStatusFilterChange,
+    })
+
+    expect(screen.getByRole('textbox', { name: 'Search models' })).toHaveValue('large')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), {
+      target: { value: 'repo' },
+    })
+    expect(onSearchChange).toHaveBeenCalledWith('repo')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+    expect(onSearchChange).toHaveBeenCalledWith('')
+
+    const toolbar = screen
+      .getByRole('textbox', { name: 'Search models' })
+      .closest('[data-slot="interactive-table-toolbar"]')
+    if (!(toolbar instanceof HTMLElement)) {
+      throw new Error('Expected table toolbar to be rendered')
+    }
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select all models' }))
+    expect(within(toolbar).getByText('1 selected')).toBeTruthy()
+  })
+
+  it('runs batch actions only for eligible selected models', async () => {
+    const onDelete = vi.fn()
+
+    renderModelList({
+      models: [
+        createModel({ model_id: 'nola-large-v3', name: 'Nola Large V3', is_configured: true }),
+        createModel({
+          model_id: 'nola-base-v3',
+          name: 'Nola Base V3',
+          is_configured: false,
+          status: 'downloaded',
+        }),
+        createModel({
+          model_id: 'nola-small-v3',
+          name: 'Nola Small V3',
+          is_configured: false,
+          status: 'partial_download',
+        }),
+      ],
+      onDelete,
+    })
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select all models' }))
+
+    expect(screen.getByText('3 selected')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Download selected(1)' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Cancel selected(0)' })).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected(2)' }))
+
+    await waitFor(() => {
+      expect(onDelete).toHaveBeenCalledTimes(2)
+    })
+    expect(onDelete).toHaveBeenNthCalledWith(1, 'nola-base-v3')
+    expect(onDelete).toHaveBeenNthCalledWith(2, 'nola-small-v3')
+  })
+
+  it('opens detail on row click without hijacking action buttons', async () => {
     const onOpenDetail = vi.fn()
     const onSelect = vi.fn()
 
-    render(
-      <ModelList
-        models={[createModel({ model_id: 'nola-base-v3', name: 'Nola Base V3' })]}
-        downloads={new Map()}
-        onDownload={vi.fn()}
-        onCancel={vi.fn()}
-        onDelete={vi.fn()}
-        onSelect={onSelect}
-        onOpenDetail={onOpenDetail}
-      />,
-    )
+    renderModelList({
+      models: [createModel({ model_id: 'nola-base-v3', name: 'Nola Base V3' })],
+      onSelect,
+      onOpenDetail,
+    })
 
     const row = screen.getByRole('row', { name: /Nola Base V3/i })
     fireEvent.click(row)
     expect(onOpenDetail).toHaveBeenCalledWith('nola-base-v3')
 
-    fireEvent.click(within(row).getByRole('button', { name: 'Set as Default' }))
+    openRowActionMenu('More actions for Nola Base V3')
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Set as Default' }))
     expect(onSelect).toHaveBeenCalledWith('nola-base-v3')
     expect(onOpenDetail).toHaveBeenCalledTimes(1)
   })

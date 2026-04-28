@@ -51,6 +51,31 @@ describe('models api', () => {
     expect(apiClientMocks.get).toHaveBeenNthCalledWith(4, '/api/models/downloads', { signal })
   })
 
+  it('passes list query controls to the models endpoint', async () => {
+    const signal = new AbortController().signal
+    apiClientMocks.get.mockResolvedValueOnce({ data: { models: [] } })
+
+    await listModels(
+      {
+        q: 'Systran',
+        status: 'downloaded',
+        sort_by: 'size',
+        order: 'desc',
+      },
+      signal,
+    )
+
+    expect(apiClientMocks.get).toHaveBeenCalledWith('/api/models', {
+      signal,
+      params: {
+        q: 'Systran',
+        status: 'downloaded',
+        sort_by: 'size',
+        order: 'desc',
+      },
+    })
+  })
+
   it('uses model mutation endpoints', async () => {
     apiClientMocks.post.mockResolvedValue({ data: {} })
     apiClientMocks.delete.mockResolvedValue({ data: {} })

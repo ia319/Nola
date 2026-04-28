@@ -34,9 +34,21 @@ export {
   formatSpeed,
   getModelActionState,
   resolveModelDescription,
-  sortModelsForDisplay,
   splitModelLanguages,
 } from './lib/model-helpers'
+export {
+  DEFAULT_MODEL_LIST_QUERY,
+  DEFAULT_MODEL_LIST_STATUS,
+  MODEL_LIST_STATUS_OPTIONS,
+  toModelListApiQuery,
+} from './lib/model-query-options'
+export type {
+  ModelListApiQuery,
+  ModelListQuery,
+  ModelListSortBy,
+  ModelListSortOrder,
+  ModelListStatusFilter,
+} from './lib/model-query-options'
 export type {
   ActiveModelDownloadsResponse,
   DownloadProgressResponse,

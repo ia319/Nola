@@ -102,16 +102,3 @@ export function resolveModelDescription<T extends ModelDescriptionLike>(
 
   return fallback
 }
-
-/**
- * Sort order: configured first, then accuracy descending, then size ascending.
- */
-export function sortModelsForDisplay<
-  T extends { is_configured: boolean; accuracy_rank: number; size_bytes: number },
->(models: readonly T[]): T[] {
-  return [...models].sort((a, b) => {
-    if (a.is_configured !== b.is_configured) return a.is_configured ? -1 : 1
-    if (a.accuracy_rank !== b.accuracy_rank) return b.accuracy_rank - a.accuracy_rank
-    return a.size_bytes - b.size_bytes
-  })
-}
