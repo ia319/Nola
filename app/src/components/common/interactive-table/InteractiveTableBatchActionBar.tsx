@@ -1,4 +1,5 @@
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
+import { X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -17,6 +18,10 @@ export type InteractiveTableBatchActionBarProps<Row> = Omit<
 
 function defaultSelectedRowsLabel(count: number): string {
   return `${count} selected`
+}
+
+function resolveClearSelectionLabel(label: ReactNode): string {
+  return typeof label === 'string' ? label : 'Clear selection'
 }
 
 /**
@@ -39,14 +44,15 @@ export function InteractiveTableBatchActionBar<Row>({
     <div
       data-slot="interactive-table-batch-action-bar"
       className={cn(
-        'border-outline-variant/70 bg-surface-container-low flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-2',
+        'bg-surface-container flex min-h-9 flex-wrap items-center gap-3 rounded-lg p-1.5',
         className,
       )}
       {...props}
     >
-      <p className="text-muted-foreground text-xs font-medium">
+      <p className="px-1 text-xs font-semibold tracking-[0.18em] uppercase">
         {selectedRowsLabel(selectedRows.length)}
       </p>
+      <div className="bg-border hidden h-4 w-px lg:block" />
 
       <div className="flex flex-wrap items-center gap-2">
         {actions.map((action) => {
@@ -57,12 +63,11 @@ export function InteractiveTableBatchActionBar<Row>({
             <Button
               key={action.id}
               type="button"
-              size="sm"
+              size="xs"
               variant={action.variant ?? 'outline'}
               aria-label={action.ariaLabel}
               aria-busy={action.isRunning || undefined}
               disabled={disabled}
-              className="h-8"
               onClick={() => {
                 if (disabled) return
                 void action.run(eligibleRows)
@@ -75,8 +80,14 @@ export function InteractiveTableBatchActionBar<Row>({
           )
         })}
 
-        <Button type="button" size="sm" variant="ghost" className="h-8" onClick={onClearSelection}>
-          {clearSelectionLabel}
+        <Button
+          type="button"
+          size="icon-xs"
+          variant="ghost"
+          aria-label={resolveClearSelectionLabel(clearSelectionLabel)}
+          onClick={onClearSelection}
+        >
+          <X />
         </Button>
       </div>
     </div>

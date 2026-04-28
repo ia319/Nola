@@ -144,6 +144,8 @@ export function InteractiveTable<Row, SortKey extends string = string>({
   const allRowsSelected = selectableRows.length > 0 && selectedRows.length === selectableRows.length
   const partiallySelected = selectedRows.length > 0 && selectedRows.length < selectableRows.length
   const canToggleCurrentPage = !isLoading && !errorState && selectableRows.length > 0
+  const hasBatchActionBar = Boolean(selection && batchActions.length > 0 && selectedRows.length > 0)
+  const hasToolbar = Boolean(filters || hasBatchActionBar)
   const resolvedRowClassName = useMemo<DataTableProps<Row>['rowClassName']>(() => {
     if (!selection) {
       return rowClassName
@@ -228,17 +230,37 @@ export function InteractiveTable<Row, SortKey extends string = string>({
   ])
 
   return (
-    <div data-slot="interactive-table" className={cn('space-y-3', className)} {...props}>
-      {filters ? <div data-slot="interactive-table-filters">{filters}</div> : null}
+    <div
+      data-slot="interactive-table"
+      className={cn(
+        'bg-card flex min-h-0 flex-col overflow-hidden rounded-xl border shadow-sm',
+        className,
+      )}
+      {...props}
+    >
+      {hasToolbar ? (
+        <div
+          data-slot="interactive-table-toolbar"
+          className="bg-surface-container-low/30 flex flex-col gap-3 border-b px-5 py-4 lg:flex-row lg:items-center lg:justify-between"
+        >
+          {filters ? (
+            <div data-slot="interactive-table-filters" className="min-w-0 flex-1">
+              {filters}
+            </div>
+          ) : (
+            <div className="min-w-0 flex-1" />
+          )}
 
-      {selection ? (
-        <InteractiveTableBatchActionBar
-          selectedRows={selectedRows}
-          actions={batchActions}
-          onClearSelection={selection.onClearSelection}
-          selectedRowsLabel={selection.selectedRowsLabel}
-          clearSelectionLabel={selection.clearSelectionLabel}
-        />
+          {selection && hasBatchActionBar ? (
+            <InteractiveTableBatchActionBar
+              selectedRows={selectedRows}
+              actions={batchActions}
+              onClearSelection={selection.onClearSelection}
+              selectedRowsLabel={selection.selectedRowsLabel}
+              clearSelectionLabel={selection.clearSelectionLabel}
+            />
+          ) : null}
+        </div>
       ) : null}
 
       <DataTable
@@ -255,10 +277,10 @@ export function InteractiveTable<Row, SortKey extends string = string>({
         rowClassName={resolvedRowClassName}
         scrollAreaClassName={scrollAreaClassName}
         stickyHeader={stickyHeader}
-        className={tableClassName}
+        className={cn('rounded-none border-0 shadow-none', tableClassName)}
       />
 
-      {pagination ? <div data-slot="interactive-table-pagination">{pagination}</div> : null}
+      {pagination}
     </div>
   )
 }

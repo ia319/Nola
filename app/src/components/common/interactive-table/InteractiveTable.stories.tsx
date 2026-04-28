@@ -1,16 +1,23 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { RefreshCcw, Trash2, X } from 'lucide-react'
+import { Download, Eye, RotateCcw, Search, Trash2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 import {
   InteractiveTable,
   InteractiveTableFilterBar,
+  InteractiveTablePagination,
+  InteractiveTableRowActionsMenu,
   type InteractiveBatchAction,
+  type InteractiveTableRowAction,
+  type LocalInteractiveTableSortComparator,
   type InteractiveSortState,
   type InteractiveTableColumn,
+  useInteractiveTableSelection,
+  useLocalInteractiveTableQuery,
 } from '.'
 
 type PreviewStatus = 'pending' | 'processing' | 'completed' | 'failed'
@@ -60,13 +67,6 @@ const previewRows: readonly PreviewRow[] = [
   },
 ]
 
-const statusStyles: Record<PreviewStatus, string> = {
-  pending: 'border-border bg-surface-container text-muted-foreground',
-  processing: 'border-primary/30 bg-primary/10 text-primary',
-  completed: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-  failed: 'border-destructive/30 bg-destructive/10 text-destructive',
-}
-
 const columns: readonly InteractiveTableColumn<PreviewRow, PreviewSortKey>[] = [
   {
     id: 'filename',
@@ -78,13 +78,7 @@ const columns: readonly InteractiveTableColumn<PreviewRow, PreviewSortKey>[] = [
     id: 'status',
     header: 'Status',
     sortKey: 'status',
-    cell: (row) => (
-      <span
-        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${statusStyles[row.status]}`}
-      >
-        {row.status}
-      </span>
-    ),
+    cell: (row) => <StatusBadge status={row.status} />,
   },
   {
     id: 'size',
@@ -114,10 +108,13 @@ const columns: readonly InteractiveTableColumn<PreviewRow, PreviewSortKey>[] = [
   {
     id: 'actions',
     header: 'Actions',
+    className: 'text-right',
+    headerClassName: 'text-right',
     cell: (row) => (
-      <Button type="button" size="sm" variant="outline" disabled={row.status === 'processing'}>
-        Open
-      </Button>
+      <InteractiveTableRowActionsMenu
+        actions={getPreviewRowActions(row)}
+        triggerLabel={`Actions for ${row.filename}`}
+      />
     ),
   },
 ]
@@ -145,66 +142,89 @@ function compareValues(left: string | number, right: string | number): number {
   return String(left).localeCompare(String(right))
 }
 
-function getSortValue(row: PreviewRow, key: PreviewSortKey): string | number {
-  switch (key) {
-    case 'filename':
-      return row.filename
-    case 'status':
-      return row.status
-    case 'size':
-      return row.size
-    case 'progress':
-      return row.progress
-    case 'createdAt':
-      return row.createdAt
-  }
-}
+const sortComparators = {
+  filename: (left, right) => compareValues(left.filename, right.filename),
+  status: (left, right) => compareValues(left.status, right.status),
+  size: (left, right) => compareValues(left.size, right.size),
+  progress: (left, right) => compareValues(left.progress, right.progress),
+  createdAt: (left, right) => compareValues(left.createdAt, right.createdAt),
+} satisfies Partial<Record<PreviewSortKey, LocalInteractiveTableSortComparator<PreviewRow>>>
 
-function sortRows(
-  rows: readonly PreviewRow[],
-  sort: InteractiveSortState<PreviewSortKey>,
-): readonly PreviewRow[] {
-  return [...rows].sort((left, right) => {
-    const result =
-      compareValues(getSortValue(left, sort.key), getSortValue(right, sort.key)) ||
-      left.id.localeCompare(right.id)
-
-    return sort.direction === 'asc' ? result : -result
-  })
+function getPreviewRowActions(row: PreviewRow): readonly InteractiveTableRowAction[] {
+  return [
+    {
+      id: 'details',
+      label: 'Details',
+      icon: <Eye />,
+      run: () => undefined,
+    },
+    {
+      id: 'retry',
+      label: 'Retry',
+      icon: <RotateCcw />,
+      hidden: row.status !== 'failed',
+      run: () => undefined,
+    },
+    {
+      id: 'delete',
+      label: 'Delete',
+      icon: <Trash2 />,
+      variant: 'destructive',
+      disabled: row.status === 'processing',
+      run: () => undefined,
+    },
+  ]
 }
 
 function InteractiveTableHarness() {
-  const [query, setQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(2)
   const [sort, setSort] = useState<InteractiveSortState<PreviewSortKey>>({
     key: 'createdAt',
     direction: 'desc',
   })
-  const [selectedRowIds, setSelectedRowIds] = useState<readonly string[]>([])
-
-  const visibleRows = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
-    const filteredRows = normalizedQuery
-      ? previewRows.filter((row) => row.filename.toLowerCase().includes(normalizedQuery))
-      : previewRows
-
-    return sortRows(filteredRows, sort)
-  }, [query, sort])
+  const queryResult = useLocalInteractiveTableQuery({
+    rows: previewRows,
+    search: {
+      query: searchQuery,
+      getText: (row) => row.filename,
+    },
+    sort,
+    sortComparators,
+    pagination: {
+      page,
+      pageSize,
+    },
+  })
+  const tableSelection = useInteractiveTableSelection({
+    rows: queryResult.pageRows,
+    getRowId: (row) => row.id,
+    getRowSelectable: (row) => row.status !== 'processing',
+    resetToken: `${searchQuery}|${sort.key}|${sort.direction}|${queryResult.page}|${queryResult.pageSize}`,
+  })
 
   const batchActions = useMemo<readonly InteractiveBatchAction<PreviewRow>[]>(
     () => [
       {
+        id: 'cancel',
+        label: 'Cancel',
+        icon: <X />,
+        getEligibleRows: (rows) => rows.filter((row) => row.status === 'processing'),
+        run: () => undefined,
+      },
+      {
         id: 'retry',
         label: 'Retry',
-        icon: <RefreshCcw className="size-4" />,
+        icon: <RotateCcw />,
         getEligibleRows: (rows) => rows.filter((row) => row.status === 'failed'),
         run: () => undefined,
       },
       {
-        id: 'delete',
-        label: 'Delete',
-        icon: <Trash2 className="size-4" />,
-        variant: 'destructive',
-        getEligibleRows: (rows) => rows.filter((row) => row.status !== 'processing'),
+        id: 'export',
+        label: 'Export',
+        icon: <Download />,
+        getEligibleRows: (rows) => rows.filter((row) => row.status === 'completed'),
         run: () => undefined,
       },
     ],
@@ -216,68 +236,65 @@ function InteractiveTableHarness() {
       <InteractiveTable
         caption="Interactive table preview"
         columns={columns}
-        rows={visibleRows}
+        rows={queryResult.pageRows}
         getRowId={(row) => row.id}
         sort={sort}
-        onSortChange={setSort}
+        onSortChange={(nextSort) => {
+          setSort(nextSort)
+          setPage(1)
+        }}
         filters={
           <InteractiveTableFilterBar
             leading={
-              <div className="relative max-w-xs flex-1">
+              <label className="relative block w-full max-w-md">
+                <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
                 <Input
-                  value={query}
+                  value={searchQuery}
                   aria-label="Search files"
                   placeholder="Search filename"
-                  className="pr-9"
+                  className="bg-background pr-9 pl-9"
                   onChange={(event) => {
-                    setQuery(event.target.value)
+                    setSearchQuery(event.target.value)
+                    setPage(1)
                   }}
                 />
-                {query ? (
+                {searchQuery ? (
                   <button
                     type="button"
                     aria-label="Clear search"
                     className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/40 absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
                     onClick={() => {
-                      setQuery('')
+                      setSearchQuery('')
+                      setPage(1)
                     }}
                   >
                     <X aria-hidden="true" className="size-4" />
                   </button>
                 ) : null}
-              </div>
+              </label>
             }
           />
         }
         selection={{
-          selectedRowIds,
-          getRowSelectable: (row) => row.status !== 'processing',
+          ...tableSelection.selection,
           getRowLabel: (row) => `Select ${row.filename}`,
           selectAllLabel: 'Select all visible selectable rows',
           selectedRowsLabel: (count) => `${count} selected`,
           clearSelectionLabel: 'Clear',
-          onToggleRow: (row, checked) => {
-            setSelectedRowIds((current) =>
-              checked ? [...current, row.id] : current.filter((rowId) => rowId !== row.id),
-            )
-          },
-          onToggleCurrentPage: (checked, rows) => {
-            const rowIds = rows.map((row) => row.id)
-            setSelectedRowIds((current) =>
-              checked
-                ? Array.from(new Set([...current, ...rowIds]))
-                : current.filter((rowId) => !rowIds.includes(rowId)),
-            )
-          },
-          onClearSelection: () => {
-            setSelectedRowIds([])
-          },
         }}
         batchActions={batchActions}
         pagination={
-          <p className="text-muted-foreground text-xs">
-            Showing {visibleRows.length} of {previewRows.length} preview rows
-          </p>
+          <InteractiveTablePagination
+            page={queryResult.page}
+            pageSize={queryResult.pageSize}
+            total={queryResult.filteredRowCount}
+            pageSizeOptions={[2, 4]}
+            onPageChange={setPage}
+            onPageSizeChange={(nextPageSize) => {
+              setPageSize(nextPageSize)
+              setPage(1)
+            }}
+          />
         }
         emptyState={{
           title: 'No files match the current filters',
