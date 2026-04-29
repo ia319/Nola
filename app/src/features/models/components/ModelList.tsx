@@ -23,6 +23,7 @@ import {
   SelectValue,
   StatusBadge,
 } from '@/components/ui'
+import logger from '@/config/logger'
 import type { DownloadState } from '@/features/models/hooks/useModelDownload'
 import {
   formatMegabytes,
@@ -65,6 +66,7 @@ type ModelTableRow = {
 }
 
 type ModelBatchActionType = 'download' | 'cancel' | 'delete'
+type ModelRowActionType = 'download' | 'cancel' | 'delete' | 'select'
 
 function canDeleteModelRow(row: ModelTableRow): boolean {
   return row.actionState.canDelete && !row.model.is_configured
@@ -89,6 +91,8 @@ export function ModelList({
   const { t } = useTranslation()
   const [runningBatchAction, setRunningBatchAction] = useState<ModelBatchActionType | null>(null)
   const runningBatchActionRef = useRef(false)
+  const runningRowActionsRef = useRef<Set<string>>(new Set())
+  const [runningRowActions, setRunningRowActions] = useState<Set<string>>(() => new Set())
 
   const rows = useMemo<ModelTableRow[]>(() => {
     return models.map((model) => {
@@ -130,13 +134,85 @@ export function ModelList({
     runningBatchActionRef.current = true
     setRunningBatchAction(action)
     try {
+      let handled = false
       for (const row of targetRows) {
-        await handler(row.model.model_id)
+        try {
+          await handler(row.model.model_id)
+          handled = true
+        } catch (error: unknown) {
+          logger.error('models.list.batchActionFailed', {
+            action,
+            error,
+            modelId: row.model.model_id,
+          })
+        }
       }
-      tableSelection.onClearSelection()
+      if (handled) {
+        tableSelection.onClearSelection()
+      }
     } finally {
       runningBatchActionRef.current = false
       setRunningBatchAction(null)
+    }
+  }
+
+  function buildActionKey(modelId: string, action: ModelRowActionType): string {
+    return `${modelId}:${action}`
+  }
+
+  function markRowActionRunning(actionKey: string): boolean {
+    if (runningRowActionsRef.current.has(actionKey)) {
+      return false
+    }
+
+    runningRowActionsRef.current.add(actionKey)
+    setRunningRowActions((previous) => {
+      if (previous.has(actionKey)) {
+        return previous
+      }
+      const next = new Set(previous)
+      next.add(actionKey)
+      return next
+    })
+    return true
+  }
+
+  function clearRowActionRunning(actionKey: string): void {
+    if (!runningRowActionsRef.current.has(actionKey)) {
+      return
+    }
+
+    runningRowActionsRef.current.delete(actionKey)
+    setRunningRowActions((previous) => {
+      if (!previous.has(actionKey)) {
+        return previous
+      }
+      const next = new Set(previous)
+      next.delete(actionKey)
+      return next
+    })
+  }
+
+  async function runRowAction(
+    modelId: string,
+    action: ModelRowActionType,
+    handler: (modelId: string) => void | Promise<void>,
+  ): Promise<void> {
+    const actionKey = buildActionKey(modelId, action)
+    if (!markRowActionRunning(actionKey)) {
+      return
+    }
+
+    try {
+      await handler(modelId)
+    } catch (error: unknown) {
+      logger.error('models.list.rowActionFailed', {
+        action,
+        error,
+        modelId,
+      })
+    } finally {
+      clearRowActionRunning(actionKey)
     }
   }
 
@@ -174,6 +250,10 @@ export function ModelList({
 
   function buildRowActions(row: ModelTableRow): readonly InteractiveTableRowAction[] {
     const { model, actionState } = row
+    const downloadBusy = runningRowActions.has(buildActionKey(model.model_id, 'download'))
+    const cancelBusy = runningRowActions.has(buildActionKey(model.model_id, 'cancel'))
+    const selectBusy = runningRowActions.has(buildActionKey(model.model_id, 'select'))
+    const deleteBusy = runningRowActions.has(buildActionKey(model.model_id, 'delete'))
 
     return [
       {
@@ -182,8 +262,8 @@ export function ModelList({
         ariaLabel: t('models.actions.download'),
         icon: <Download />,
         hidden: !actionState.canDownload,
-        disabled: runningBatchAction !== null,
-        run: () => onDownload(model.model_id),
+        disabled: downloadBusy || runningBatchAction !== null,
+        run: () => runRowAction(model.model_id, 'download', onDownload),
       },
       {
         id: 'cancel',
@@ -191,8 +271,8 @@ export function ModelList({
         ariaLabel: t('models.actions.cancel'),
         icon: <X />,
         hidden: !actionState.isDownloading,
-        disabled: runningBatchAction !== null,
-        run: () => onCancel(model.model_id),
+        disabled: cancelBusy || runningBatchAction !== null,
+        run: () => runRowAction(model.model_id, 'cancel', onCancel),
       },
       {
         id: 'select',
@@ -200,8 +280,8 @@ export function ModelList({
         ariaLabel: t('models.actions.select'),
         icon: <CheckCircle2 />,
         hidden: !actionState.isDownloaded || model.is_configured,
-        disabled: runningBatchAction !== null,
-        run: () => onSelect(model.model_id),
+        disabled: selectBusy || runningBatchAction !== null,
+        run: () => runRowAction(model.model_id, 'select', onSelect),
       },
       {
         id: 'delete',
@@ -209,9 +289,9 @@ export function ModelList({
         ariaLabel: t('models.actions.delete'),
         icon: <Trash2 />,
         hidden: !actionState.canDelete,
-        disabled: model.is_configured || runningBatchAction !== null,
+        disabled: model.is_configured || deleteBusy || runningBatchAction !== null,
         variant: 'destructive',
-        run: () => onDelete(model.model_id),
+        run: () => runRowAction(model.model_id, 'delete', onDelete),
       },
     ]
   }

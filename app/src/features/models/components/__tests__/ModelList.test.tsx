@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { DownloadState } from '@/features/models'
@@ -10,6 +10,16 @@ import type { ModelListQuery } from '../../lib/model-query-options'
 import { ModelList, type ModelListProps } from '../ModelList'
 
 type TranslationParams = Record<string, string | number | boolean | null | undefined>
+
+const modelListMocks = vi.hoisted(() => ({
+  logger: {
+    error: vi.fn(),
+  },
+}))
+
+vi.mock('@/config/logger', () => ({
+  default: modelListMocks.logger,
+}))
 
 vi.mock('react-i18next', () => ({
   withTranslation: () => (Component: unknown) => Component,
@@ -120,7 +130,7 @@ function renderModelList(overrides: Partial<ModelListProps> = {}) {
   const props: ModelListProps = {
     models: [],
     downloads: new Map(),
-    query: DEFAULT_QUERY,
+    query: { ...DEFAULT_QUERY },
     onSearchChange: vi.fn(),
     onStatusFilterChange: vi.fn(),
     onSortChange: vi.fn(),
@@ -160,6 +170,17 @@ function getModelRowTexts(): string[] {
     .getAllByRole('row')
     .slice(1)
     .map((row) => row.textContent ?? '')
+}
+
+function createDeferred<T = void>(): {
+  promise: Promise<T>
+  resolve: (value: T | PromiseLike<T>) => void
+} {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>((res) => {
+    resolve = res
+  })
+  return { promise, resolve }
 }
 
 describe('ModelList', () => {
@@ -378,8 +399,47 @@ describe('ModelList', () => {
     await waitFor(() => {
       expect(onDelete).toHaveBeenCalledTimes(2)
     })
-    expect(onDelete).toHaveBeenNthCalledWith(1, 'nola-base-v3')
-    expect(onDelete).toHaveBeenNthCalledWith(2, 'nola-small-v3')
+    expect(onDelete).toHaveBeenCalledWith('nola-base-v3')
+    expect(onDelete).toHaveBeenCalledWith('nola-small-v3')
+  })
+
+  it('continues batch actions after one selected model fails', async () => {
+    const onDelete = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('delete failed'))
+      .mockResolvedValue(undefined)
+
+    renderModelList({
+      models: [
+        createModel({
+          model_id: 'nola-base-v3',
+          name: 'Nola Base V3',
+          is_configured: false,
+          status: 'downloaded',
+        }),
+        createModel({
+          model_id: 'nola-small-v3',
+          name: 'Nola Small V3',
+          is_configured: false,
+          status: 'partial_download',
+        }),
+      ],
+      onDelete,
+    })
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select all models' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected (2)' }))
+
+    await waitFor(() => {
+      expect(onDelete).toHaveBeenCalledTimes(2)
+    })
+    expect(modelListMocks.logger.error).toHaveBeenCalledWith(
+      'models.list.batchActionFailed',
+      expect.objectContaining({
+        action: 'delete',
+        modelId: 'nola-base-v3',
+      }),
+    )
   })
 
   it('opens detail on row click without hijacking action buttons', async () => {
@@ -400,5 +460,30 @@ describe('ModelList', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Set as Default' }))
     expect(onSelect).toHaveBeenCalledWith('nola-base-v3')
     expect(onOpenDetail).toHaveBeenCalledTimes(1)
+  })
+
+  it('prevents duplicate row actions while one is pending', async () => {
+    const selectAction = createDeferred()
+    const onSelect = vi.fn().mockReturnValue(selectAction.promise)
+
+    renderModelList({
+      models: [createModel({ model_id: 'nola-base-v3', name: 'Nola Base V3' })],
+      onSelect,
+    })
+
+    openRowActionMenu('More actions for Nola Base V3')
+
+    const selectItem = await screen.findByRole('menuitem', { name: 'Set as Default' })
+    fireEvent.click(selectItem)
+
+    openRowActionMenu('More actions for Nola Base V3')
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Set as Default' }))
+
+    expect(onSelect).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      selectAction.resolve()
+      await selectAction.promise
+    })
   })
 })
