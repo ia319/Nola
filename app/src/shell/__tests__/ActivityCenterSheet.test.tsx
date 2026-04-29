@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import type { ComponentType } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -49,16 +50,21 @@ const messages: Record<string, string> = {
   'tasks.status.processing': 'Processing',
 }
 
+function t(key: string, params?: TranslationParams): string {
+  let message = messages[key] ?? key
+  for (const [name, value] of Object.entries(params ?? {})) {
+    message = message.replace(`{{${name}}}`, String(value))
+  }
+  return message
+}
+
 vi.mock('react-i18next', () => ({
-  withTranslation: () => (Component: unknown) => Component,
-  useTranslation: () => ({
-    t: (key: string, params?: TranslationParams) => {
-      let message = messages[key] ?? key
-      for (const [name, value] of Object.entries(params ?? {})) {
-        message = message.replace(`{{${name}}}`, String(value))
-      }
-      return message
+  withTranslation: () => (Component: ComponentType<Record<string, unknown>>) =>
+    function WithTranslationMock(props: Record<string, unknown>) {
+      return <Component {...props} t={t} />
     },
+  useTranslation: () => ({
+    t,
   }),
 }))
 
