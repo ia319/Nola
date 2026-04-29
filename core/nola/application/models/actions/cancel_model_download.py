@@ -18,10 +18,10 @@ def cancel_model_download(
     except ModelDownloadNotFoundError as exc:
         raise ModelUseCaseError(
             status_code=404,
-            detail=f"No active download: {model_id}",
+            detail=f"No active download: {canonical_id}",
         ) from exc
 
     return {
         "model_id": canonical_id,
-        "message": f"Download cancelled for {model_id}",
+        "message": f"Download cancelled for {canonical_id}",
     }
