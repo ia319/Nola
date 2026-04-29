@@ -25,11 +25,13 @@ export interface UploadListProps {
 function UploadListCheckbox({
   label,
   checked,
+  disabled = false,
   indeterminate = false,
   onChange,
 }: {
   label: string
   checked: boolean
+  disabled?: boolean
   indeterminate?: boolean
   onChange: (checked: boolean) => void
 }) {
@@ -47,7 +49,9 @@ function UploadListCheckbox({
       className="border-border h-4 w-4 rounded"
       aria-label={label}
       checked={checked}
+      disabled={disabled}
       onChange={(event) => {
+        if (disabled) return
         onChange(event.target.checked)
       }}
     />
@@ -99,14 +103,66 @@ export function UploadList({
     () => new Set(selection?.selectedRowIds ?? []),
     [selection?.selectedRowIds],
   )
-  const selectedRows = useMemo(
-    () => uploads.filter((item) => selectedRowIdSet.has(item.id)),
-    [selectedRowIdSet, uploads],
+  const selectableRows = useMemo(
+    () => (selection ? uploads.filter((item) => selection.getRowSelectable?.(item) ?? true) : []),
+    [selection, uploads],
   )
-  const allRowsSelected = uploads.length > 0 && selectedRows.length === uploads.length
-  const partiallySelected = selectedRows.length > 0 && selectedRows.length < uploads.length
+  const selectedRows = useMemo(
+    () => selectableRows.filter((item) => selectedRowIdSet.has(item.id)),
+    [selectableRows, selectedRowIdSet],
+  )
+  const selectedSelectableRowIdSet = useMemo(
+    () => new Set(selectedRows.map((item) => item.id)),
+    [selectedRows],
+  )
+  const allRowsSelected = selectableRows.length > 0 && selectedRows.length === selectableRows.length
+  const partiallySelected = selectedRows.length > 0 && selectedRows.length < selectableRows.length
 
   if (uploads.length === 0) return null
+
+  function renderUploadProgress(item: UploadItem) {
+    const selectable = selection?.getRowSelectable?.(item) ?? true
+    const selected = selectedSelectableRowIdSet.has(item.id)
+
+    return (
+      <UploadProgress
+        key={item.id}
+        fileName={item.file.name}
+        fileSize={item.file.size}
+        progress={item.progress}
+        status={item.status}
+        errorKey={item.error?.i18nKey}
+        errorParams={item.error?.params}
+        selected={selected}
+        leading={
+          selection ? (
+            <UploadListCheckbox
+              label={selection.getRowLabel?.(item) ?? t('tasks.uploadQueue.selection.selectRow')}
+              checked={selected}
+              disabled={!selectable}
+              onChange={(checked) => {
+                selection.onToggleRow(item, checked)
+              }}
+            />
+          ) : null
+        }
+        onRowClick={
+          selection && selectable
+            ? () => {
+                selection.onToggleRow(item, !selected)
+              }
+            : undefined
+        }
+        onCancel={() => onCancel(item.id)}
+        onRetry={() => {
+          onRetry(item.id).catch((e) => logger.warn('retryUpload unexpected', e))
+        }}
+        onRemove={() => {
+          onRemove(item.id).catch((e) => logger.warn('removeFile unexpected', e))
+        }}
+      />
+    )
+  }
 
   return (
     <div data-slot="upload-list" className="flex flex-col">
@@ -121,9 +177,10 @@ export function UploadList({
             <UploadListCheckbox
               label={selection.selectAllLabel ?? t('tasks.uploadQueue.selection.selectAll')}
               checked={allRowsSelected}
+              disabled={selectableRows.length === 0}
               indeterminate={partiallySelected}
               onChange={(checked) => {
-                selection.onToggleCurrentPage(checked, uploads)
+                selection.onToggleCurrentPage(checked, selectableRows)
               }}
             />
           ) : null}
@@ -155,43 +212,7 @@ export function UploadList({
         <span className="text-right">{t('tasks.uploadQueue.table.action')}</span>
       </div>
 
-      {uploads.map((item) => (
-        <UploadProgress
-          key={item.id}
-          fileName={item.file.name}
-          fileSize={item.file.size}
-          progress={item.progress}
-          status={item.status}
-          errorKey={item.error?.i18nKey}
-          errorParams={item.error?.params}
-          selected={selectedRowIdSet.has(item.id)}
-          leading={
-            selection ? (
-              <UploadListCheckbox
-                label={selection.getRowLabel?.(item) ?? t('tasks.uploadQueue.selection.selectRow')}
-                checked={selectedRowIdSet.has(item.id)}
-                onChange={(checked) => {
-                  selection.onToggleRow(item, checked)
-                }}
-              />
-            ) : null
-          }
-          onRowClick={
-            selection
-              ? () => {
-                  selection.onToggleRow(item, !selectedRowIdSet.has(item.id))
-                }
-              : undefined
-          }
-          onCancel={() => onCancel(item.id)}
-          onRetry={() => {
-            onRetry(item.id).catch((e) => logger.warn('retryUpload unexpected', e))
-          }}
-          onRemove={() => {
-            onRemove(item.id).catch((e) => logger.warn('removeFile unexpected', e))
-          }}
-        />
-      ))}
+      {uploads.map(renderUploadProgress)}
     </div>
   )
 }

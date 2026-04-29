@@ -367,6 +367,74 @@ describe('useFileUpload', () => {
     )
   })
 
+  it('does not clear controllers for non-retryable retry targets', async () => {
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
+    const uploadingFile = fakeFile('uploading.mp3', 1024)
+    const failedFile = fakeFile('failed.mp3', 1024)
+    const uploadingUpload = deferred<FileUploadResponse>()
+    let uploadingSignal: AbortSignal | undefined
+    let failedCalls = 0
+
+    uploadFileMock.mockImplementation(async (file, _onProgress, signal) => {
+      if (file.name === uploadingFile.name) {
+        uploadingSignal = signal
+        return uploadingUpload.promise
+      }
+      if (file.name === failedFile.name) {
+        failedCalls += 1
+        if (failedCalls === 1) {
+          throw new Error('first failure')
+        }
+        return buildUploadResponse('failed-id', file)
+      }
+      throw new Error(`Unexpected file ${file.name}`)
+    })
+
+    act(() => {
+      result.current.addFiles([uploadingFile, failedFile])
+    })
+
+    const uploadingId = result.current.uploads.find((upload) => upload.file === uploadingFile)?.id
+    const failedId = result.current.uploads.find((upload) => upload.file === failedFile)?.id
+    if (!uploadingId || !failedId) {
+      throw new Error('Expected upload ids to exist')
+    }
+
+    await act(async () => {
+      await result.current.startUploads([failedId])
+    })
+    expect(result.current.uploads.find((upload) => upload.id === failedId)?.status).toBe('error')
+
+    let uploadingStartPromise: Promise<void> | null = null
+    act(() => {
+      uploadingStartPromise = result.current.startUploads([uploadingId])
+    })
+
+    await waitFor(() => {
+      expect(result.current.uploads.find((upload) => upload.id === uploadingId)?.status).toBe(
+        'uploading',
+      )
+    })
+
+    await act(async () => {
+      await result.current.retryUploads([uploadingId, failedId])
+    })
+
+    act(() => {
+      result.current.cancelUpload(uploadingId)
+    })
+    expect(uploadingSignal?.aborted).toBe(true)
+
+    await act(async () => {
+      uploadingUpload.reject(new axios.CanceledError('cancelled'))
+      await uploadingStartPromise
+    })
+
+    expect(result.current.uploads.find((upload) => upload.id === uploadingId)?.status).toBe(
+      'cancelled',
+    )
+  })
+
   it('limits concurrent uploads to configured batch size', async () => {
     const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
     const f1 = fakeFile('a.mp3', 1024)

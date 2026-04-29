@@ -152,4 +152,32 @@ describe('UploadList', () => {
     expect(onRetry).toHaveBeenCalledWith('failed')
     expect(onRemove).toHaveBeenCalledWith('failed')
   })
+
+  it('only selects rows allowed by getRowSelectable', () => {
+    const onToggleCurrentPage = vi.fn()
+    const onToggleRow = vi.fn()
+    renderUploadList({
+      selection: {
+        selectedRowIds: ['upload-small'],
+        onToggleCurrentPage,
+        onToggleRow,
+        onClearSelection: vi.fn(),
+        getRowSelectable: (upload) => upload.status === 'success',
+        getRowLabel: (upload) => `Select ${upload.file.name}`,
+        selectAllLabel: 'Select uploads',
+      },
+    })
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select uploads' }))
+    expect(onToggleCurrentPage).toHaveBeenCalledWith(
+      true,
+      expect.arrayContaining([expect.objectContaining({ id: 'upload-large' })]),
+    )
+    expect(onToggleCurrentPage.mock.calls[0]?.[1]).toHaveLength(1)
+
+    expect(screen.getByRole('checkbox', { name: 'Select small.mp3' })).toBeDisabled()
+    expect(screen.getByRole('checkbox', { name: 'Select small.mp3' })).not.toBeChecked()
+    fireEvent.click(screen.getByText('small.mp3'))
+    expect(onToggleRow).not.toHaveBeenCalled()
+  })
 })

@@ -231,20 +231,29 @@ export function useFileUpload(validationConfig: FileValidationConfig): UseFileUp
     async (ids: readonly string[]) => {
       const targetIds = new Set(ids)
       if (targetIds.size === 0) return
+      const retryableIds = uploadsRef.current
+        .filter(
+          (item) =>
+            targetIds.has(item.id) && (item.status === 'error' || item.status === 'cancelled'),
+        )
+        .map((item) => item.id)
+
+      if (retryableIds.length === 0) return
+      const retryableIdSet = new Set(retryableIds)
 
       setUploadsSync((prev) =>
         prev.map((item) =>
-          targetIds.has(item.id) && (item.status === 'error' || item.status === 'cancelled')
+          retryableIdSet.has(item.id)
             ? { ...item, status: 'pending', error: null, progress: 0 }
             : item,
         ),
       )
 
-      for (const id of targetIds) {
+      for (const id of retryableIds) {
         controllersRef.current.delete(id)
       }
 
-      await startUploads(Array.from(targetIds))
+      await startUploads(retryableIds)
     },
     [setUploadsSync, startUploads],
   )

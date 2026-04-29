@@ -76,8 +76,6 @@ export function UploadProgress({
 
   return (
     <div
-      aria-selected={selected || undefined}
-      tabIndex={onRowClick ? 0 : undefined}
       className={cn(
         'grid items-center gap-4 px-5 py-4 transition-colors',
         UPLOAD_PROGRESS_GRID_COLUMNS,
@@ -86,13 +84,6 @@ export function UploadProgress({
         selected && 'bg-surface-container-low',
       )}
       onClick={onRowClick}
-      onKeyDown={(event) => {
-        if (!onRowClick) return
-        if (event.target !== event.currentTarget) return
-        if (event.key !== 'Enter' && event.key !== ' ') return
-        event.preventDefault()
-        onRowClick()
-      }}
     >
       <div data-row-click-ignore onClick={(event) => event.stopPropagation()}>
         {leading}
