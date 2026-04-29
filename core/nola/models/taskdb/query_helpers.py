@@ -1,4 +1,4 @@
-"""Task query helpers shared by repositories."""
+"""Task row parsing helpers shared by repositories."""
 
 import json
 import logging
@@ -8,11 +8,6 @@ from typing import Any, cast
 from nola.models.taskdb.types import TaskRow
 
 logger = logging.getLogger(__name__)
-
-
-def escape_like_fragment(fragment: str) -> str:
-    """Escape LIKE wildcards so search keeps literal contains semantics."""
-    return fragment.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def parse_task_row(row: sqlite3.Row, task_id: str) -> TaskRow:

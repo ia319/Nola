@@ -116,9 +116,12 @@ class BatchTaskActionResultPayload(BatchTaskActionResultPayloadBase, total=False
     filename: str | None
 
 
+BatchTaskActionName = Literal["cancel", "retry", "delete_record"]
+
+
 class BatchTaskActionPayload(TypedDict):
     """Batch task action response payload."""
 
-    action: Literal["cancel", "retry"]
+    action: BatchTaskActionName
     summary: BatchTaskActionSummaryPayload
     results: list[BatchTaskActionResultPayload]

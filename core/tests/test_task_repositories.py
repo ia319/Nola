@@ -61,6 +61,68 @@ def test_task_store_filename_search_escapes_like_wildcards(task_repositories):
     assert rows[0]["id"] == "task-a"
 
 
+def test_task_store_searches_task_id_and_filename(task_repositories):
+    """q filtering should match task ids and filenames."""
+    file_db, queue_repo, store_repo = task_repositories
+
+    file_db.create_file("file-alpha", "meeting-alpha.wav", "/tmp/a.wav", 100)
+    file_db.create_file("file-beta", "lecture-beta.wav", "/tmp/b.wav", 100)
+
+    queue_repo.enqueue("task-needle", "file-alpha")
+    queue_repo.enqueue("task-other", "file-beta")
+
+    id_rows = store_repo.list_tasks(q="needle", limit=10, offset=0)
+    filename_rows = store_repo.list_tasks(q="lecture", limit=10, offset=0)
+
+    assert [row["id"] for row in id_rows] == ["task-needle"]
+    assert [row["id"] for row in filename_rows] == ["task-other"]
+    assert store_repo.count_tasks(q="needle") == 1
+    assert store_repo.count_tasks(q="lecture") == 1
+
+
+def test_task_store_supports_task_id_and_duration_sort(task_repositories):
+    """list_tasks() should support task id and duration sort fields."""
+    file_db, queue_repo, store_repo = task_repositories
+
+    file_db.create_file("file-001", "audio.wav", "/tmp/audio.wav", 1024)
+    queue_repo.enqueue("task-c", "file-001")
+    queue_repo.enqueue("task-a", "file-001")
+    queue_repo.enqueue("task-b", "file-001")
+
+    with sqlite3.connect(queue_repo.db_path) as conn:
+        conn.execute(
+            "UPDATE transcription_tasks SET duration = ? WHERE id = ?",
+            (8, "task-c"),
+        )
+        conn.execute(
+            "UPDATE transcription_tasks SET duration = ? WHERE id = ?",
+            (2, "task-a"),
+        )
+
+    task_id_rows = store_repo.list_tasks(
+        sort_by="task_id",
+        order="asc",
+        limit=10,
+        offset=0,
+    )
+    duration_asc_rows = store_repo.list_tasks(
+        sort_by="duration",
+        order="asc",
+        limit=10,
+        offset=0,
+    )
+    duration_desc_rows = store_repo.list_tasks(
+        sort_by="duration",
+        order="desc",
+        limit=10,
+        offset=0,
+    )
+
+    assert [row["id"] for row in task_id_rows] == ["task-a", "task-b", "task-c"]
+    assert [row["id"] for row in duration_asc_rows] == ["task-a", "task-c", "task-b"]
+    assert [row["id"] for row in duration_desc_rows] == ["task-c", "task-a", "task-b"]
+
+
 def test_task_store_delete_task_record_only_deletes_terminal_tasks(task_repositories):
     """delete_task_record() should reject pending tasks and allow terminal tasks."""
     file_db, queue_repo, store_repo = task_repositories

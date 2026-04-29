@@ -14,6 +14,7 @@ from nola.api.schemas import (
 )
 from nola.application.tasks.actions import (
     batch_cancel_tasks,
+    batch_delete_task_records,
     batch_retry_tasks,
     cancel_task,
     create_task,
@@ -147,6 +148,22 @@ async def batch_retry_transcriptions(
 ) -> BatchTaskActionPayload:
     """Retry failed or cancelled tasks by creating new pending tasks."""
     return batch_retry_tasks(
+        task_store=get_task_db(),
+        file_store=get_file_db(),
+        task_ids=request.task_ids,
+    )
+
+
+@router.post(
+    "/batch/delete-records",
+    summary="Batch delete terminal task records",
+    response_model=BatchTaskActionResponse,
+)
+async def batch_delete_task_record_transcriptions(
+    request: BatchTaskActionRequest,
+) -> BatchTaskActionPayload:
+    """Delete multiple terminal task records and return per-task outcomes."""
+    return batch_delete_task_records(
         task_store=get_task_db(),
         file_store=get_file_db(),
         task_ids=request.task_ids,

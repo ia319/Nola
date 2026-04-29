@@ -4,7 +4,12 @@ from collections import deque
 
 import pytest
 
-from nola.application.tasks import batch_cancel_tasks, batch_retry_tasks, create_task
+from nola.application.tasks import (
+    batch_cancel_tasks,
+    batch_delete_task_records,
+    batch_retry_tasks,
+    create_task,
+)
 from nola.application.tasks.errors import TaskUseCaseError
 
 
@@ -163,6 +168,43 @@ def test_batch_cancel_tasks_returns_mixed_outcomes() -> None:
     assert results[1]["error_code"] == "invalid_status"
     assert results[2]["error_code"] == "not_found"
     assert results[3]["error_code"] == "duplicate_task_id"
+
+
+def test_batch_delete_task_records_returns_mixed_outcomes() -> None:
+    file_store = FakeFileStore(
+        files={
+            "f1": {"id": "f1", "filename": "completed.mp3"},
+            "f2": {"id": "f2", "filename": "pending.mp3"},
+        }
+    )
+    task_store = FakeTaskStore(
+        tasks={
+            "completed": _base_task(
+                task_id="completed",
+                file_id="f1",
+                status="completed",
+            ),
+            "pending": _base_task(task_id="pending", file_id="f2", status="pending"),
+        }
+    )
+
+    payload = batch_delete_task_records(
+        task_store=task_store,
+        file_store=file_store,
+        task_ids=["completed", "pending", "missing", "completed"],
+    )
+
+    assert payload["action"] == "delete_record"
+    assert payload["summary"] == {"requested": 4, "succeeded": 1, "failed": 3}
+    results = payload["results"]
+    assert results[0]["task_id"] == "completed"
+    assert results[0]["ok"] is True
+    assert results[0]["filename"] == "completed.mp3"
+    assert results[1]["error_code"] == "invalid_status"
+    assert results[2]["error_code"] == "not_found"
+    assert results[3]["error_code"] == "duplicate_task_id"
+    assert task_store.get_task("completed") is None
+    assert task_store.get_task("pending") is not None
 
 
 def test_create_task_persists_execution_config() -> None:

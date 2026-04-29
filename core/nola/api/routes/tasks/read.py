@@ -28,7 +28,10 @@ def list_transcriptions(
     status: StatusFilter | None = Query(None, description="Filter by status"),
     limit: int = Query(50, ge=1, le=100, description="Max results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
-    q: str | None = Query(None, description="Search keyword for filename"),
+    q: str | None = Query(
+        None,
+        description="Search keyword for task id or filename",
+    ),
     sort_by: TaskSortField = Query(DEFAULT_TASK_SORT_BY, description="Sort field"),
     order: TaskSortOrder = Query(DEFAULT_TASK_SORT_ORDER, description="Sort order"),
 ) -> TaskListPayload:
@@ -39,7 +42,7 @@ def list_transcriptions(
             (pending, processing, completed, failed, cancelled)
         limit: Maximum number of results
         offset: Pagination offset
-        q: Optional filename search keyword
+        q: Optional task id or filename search keyword
         sort_by: Sort field
         order: Sort order (asc or desc)
 
