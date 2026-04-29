@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import { localizePath } from '@/app/locale/locale-routing'
 import { useActiveLocale } from '@/app/locale/use-active-locale'
-import { ErrorBoundary } from '@/components/common'
+import { ErrorBoundary, type InteractiveSortState } from '@/components/common'
 import { HISTORY_PAGE_SIZE } from '@/config/constants'
 import { ContentCanvas } from '@/layouts'
 import {
@@ -14,7 +14,8 @@ import {
   type HistoryPageSize,
   type HistoryRouteSearch,
 } from '@/routes/history-search'
-import type { SortOrder, TaskFilterStatus, TaskSortBy } from '@/shared/types'
+import { DEFAULT_FILE_CONTENT_TYPE_FILTER } from '@/shared/lib/file-query-options'
+import type { FileSortBy, FileSortOrder, TaskFilterStatus, TaskSortBy } from '@/shared/types'
 import { HistoryFileModeView } from './HistoryFileModeView'
 import { HistoryTaskModeView } from './HistoryTaskModeView'
 
@@ -51,11 +52,12 @@ export function HistoryPage({ search, updateSearch }: HistoryPageProps) {
     [updateSearch],
   )
 
-  const handleSortByChange = useCallback(
-    (value: TaskSortBy) => {
+  const handleTaskSortChange = useCallback(
+    (sort: InteractiveSortState<TaskSortBy>) => {
       updateSearch(
         {
-          sort_by: value === 'created_at' ? undefined : value,
+          sort_by: sort.key === 'created_at' ? undefined : sort.key,
+          order: sort.direction === 'desc' ? undefined : sort.direction,
           page: undefined,
         },
         false,
@@ -64,11 +66,25 @@ export function HistoryPage({ search, updateSearch }: HistoryPageProps) {
     [updateSearch],
   )
 
-  const handleOrderChange = useCallback(
-    (value: SortOrder) => {
+  const handleFileContentTypeChange = useCallback(
+    (value: string) => {
       updateSearch(
         {
-          order: value === 'desc' ? undefined : value,
+          content_type: value === DEFAULT_FILE_CONTENT_TYPE_FILTER ? undefined : value,
+          page: undefined,
+        },
+        true,
+      )
+    },
+    [updateSearch],
+  )
+
+  const handleFileSortChange = useCallback(
+    (sort: InteractiveSortState<FileSortBy>) => {
+      updateSearch(
+        {
+          sort_by: sort.key === 'created_at' ? undefined : sort.key,
+          order: sort.direction === 'desc' ? undefined : (sort.direction as FileSortOrder),
           page: undefined,
         },
         false,
@@ -109,8 +125,8 @@ export function HistoryPage({ search, updateSearch }: HistoryPageProps) {
       updateSearch(
         {
           mode: nextMode === 'tasks' ? undefined : nextMode,
-          q: undefined,
           status: undefined,
+          content_type: undefined,
           sort_by: undefined,
           order: undefined,
           page: undefined,
@@ -140,8 +156,7 @@ export function HistoryPage({ search, updateSearch }: HistoryPageProps) {
             query={taskQuery}
             onSearchChange={handleSearchChange}
             onStatusChange={handleStatusChange}
-            onSortByChange={handleSortByChange}
-            onOrderChange={handleOrderChange}
+            onSortChange={handleTaskSortChange}
             onPageChange={handlePageChange}
             onPageSizeChange={handlePageSizeChange}
             onPageClamp={handlePageClamp}
@@ -151,6 +166,9 @@ export function HistoryPage({ search, updateSearch }: HistoryPageProps) {
         ) : (
           <HistoryFileModeView
             query={fileQuery}
+            onSearchChange={handleSearchChange}
+            onContentTypeChange={handleFileContentTypeChange}
+            onSortChange={handleFileSortChange}
             onPageClamp={handlePageClamp}
             onPageChange={handlePageChange}
             onPageSizeChange={handlePageSizeChange}

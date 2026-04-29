@@ -34,23 +34,25 @@ export function useHistoryFiles({
   query,
   onPageClamp,
 }: UseHistoryFilesOptions): UseHistoryFilesResult {
-  // Keep file-mode fetching in the page layer until file-detail flows settle into a reusable boundary.
   const limit = query.page_size
   const offset = (query.page - 1) * query.page_size
+  const search = query.q.trim()
+  const contentType =
+    query.content_type === 'all' || query.content_type.trim() === ''
+      ? undefined
+      : query.content_type.trim()
+  const params = {
+    q: search === '' ? undefined : search,
+    content_type: contentType,
+    sort_by: query.sort_by,
+    order: query.order,
+    limit,
+    offset,
+  }
 
   const fileListQuery = useQuery({
-    queryKey: queryKeys.files.list({
-      limit,
-      offset,
-    }),
-    queryFn: ({ signal }) =>
-      listFiles(
-        {
-          limit,
-          offset,
-        },
-        signal,
-      ),
+    queryKey: queryKeys.files.list(params),
+    queryFn: ({ signal }) => listFiles(params, signal),
   })
 
   useEffect(() => {

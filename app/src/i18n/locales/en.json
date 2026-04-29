@@ -505,6 +505,13 @@
           "failed_one": "Retry failed for {{count}} task",
           "failed_other": "Retry failed for {{count}} tasks"
         },
+        "deleteRecord": {
+          "success_one": "Deleted {{count}} task record",
+          "success_other": "Deleted {{count}} task records",
+          "partial": "Deleted {{succeeded}} task records, {{failed}} failed",
+          "failed_one": "Delete failed for {{count}} task record",
+          "failed_other": "Delete failed for {{count}} task records"
+        },
         "export": {
           "success_one": "Exported {{count}} task",
           "success_other": "Exported {{count}} tasks"
@@ -1138,6 +1145,7 @@
     "toolbar": {
       "searchLabel": "Search history records",
       "searchPlaceholder": "Search by task ID or filename",
+      "clearSearch": "Clear search",
       "exportSelected": "Export Selected",
       "status": "Status",
       "sortBy": "Sort by",
@@ -1182,7 +1190,8 @@
         "export": "Export record",
         "cancel": "Cancel task",
         "retry": "Retry task",
-        "deleteRecord": "Delete record"
+        "deleteRecord": "Delete record",
+        "more": "More actions for {{taskId}}"
       }
     },
     "pagination": {
@@ -1203,7 +1212,13 @@
         "selectedCount_other": "{{count}} selected"
       },
       "batch": {
+        "delete": "Delete selected",
         "deleteComingSoon": "Delete selected coming soon"
+      },
+      "filters": {
+        "searchPlaceholder": "Search by file ID, filename, or content type",
+        "contentType": "Content type",
+        "contentTypeAll": "All Types"
       },
       "table": {
         "caption": "History file records",
@@ -1223,7 +1238,8 @@
         },
         "actions": {
           "delete": "Delete file",
-          "openDetail": "Open details for {{filename}}"
+          "openDetail": "Open details for {{filename}}",
+          "more": "More actions for {{filename}}"
         }
       },
       "detail": {
@@ -1260,13 +1276,24 @@
       "deleteDialog": {
         "title": "Delete file",
         "description": "Delete {{filename}} and its associated data?",
+        "batchDescription": "Delete {{count}} selected files and their associated data?",
+        "batchCount": "{{count}} files selected",
         "cancel": "Cancel",
         "confirm": "Delete file",
         "deleting": "Deleting..."
       },
       "toast": {
         "deleted": "File deleted: {{filename}}",
-        "deleteFailed": "File delete failed, please retry"
+        "deleteFailed": "File delete failed, please retry",
+        "batchDelete": {
+          "success_one": "Deleted {{count}} file",
+          "success_other": "Deleted {{count}} files",
+          "partial": "Deleted {{succeeded}} files, {{failed}} failed",
+          "failed_one": "Delete failed for {{count}} file",
+          "failed_other": "Delete failed for {{count}} files",
+          "linkedTasks_one": "{{count}} file still has linked tasks",
+          "linkedTasks_other": "{{count}} files still have linked tasks"
+        }
       }
     },
     "taskDetail": {

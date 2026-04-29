@@ -504,6 +504,13 @@
           "failed_one": "{{count}} 个任务重试失败",
           "failed_other": "{{count}} 个任务重试失败"
         },
+        "deleteRecord": {
+          "success_one": "已删除 {{count}} 条任务记录",
+          "success_other": "已删除 {{count}} 条任务记录",
+          "partial": "已删除 {{succeeded}} 条任务记录，{{failed}} 条失败",
+          "failed_one": "{{count}} 条任务记录删除失败",
+          "failed_other": "{{count}} 条任务记录删除失败"
+        },
         "export": {
           "success_one": "已导出 {{count}} 个任务",
           "success_other": "已导出 {{count}} 个任务"
@@ -1137,6 +1144,7 @@
     "toolbar": {
       "searchLabel": "搜索历史记录",
       "searchPlaceholder": "按任务 ID 或文件名搜索",
+      "clearSearch": "清除搜索",
       "exportSelected": "导出所选",
       "status": "状态",
       "sortBy": "排序字段",
@@ -1181,7 +1189,8 @@
         "export": "导出记录",
         "cancel": "取消任务",
         "retry": "重试任务",
-        "deleteRecord": "删除记录"
+        "deleteRecord": "删除记录",
+        "more": "{{taskId}} 的更多操作"
       }
     },
     "pagination": {
@@ -1202,7 +1211,13 @@
         "selectedCount_other": "已选择 {{count}} 项"
       },
       "batch": {
+        "delete": "删除所选",
         "deleteComingSoon": "批量删除即将支持"
+      },
+      "filters": {
+        "searchPlaceholder": "按文件 ID、文件名或内容类型搜索",
+        "contentType": "内容类型",
+        "contentTypeAll": "全部类型"
       },
       "table": {
         "caption": "历史文件记录",
@@ -1222,7 +1237,8 @@
         },
         "actions": {
           "delete": "删除文件",
-          "openDetail": "打开 {{filename}} 的详情"
+          "openDetail": "打开 {{filename}} 的详情",
+          "more": "{{filename}} 的更多操作"
         }
       },
       "detail": {
@@ -1259,13 +1275,24 @@
       "deleteDialog": {
         "title": "删除文件",
         "description": "删除 {{filename}} 及其关联数据？",
+        "batchDescription": "删除选中的 {{count}} 个文件及其关联数据？",
+        "batchCount": "已选择 {{count}} 个文件",
         "cancel": "取消",
         "confirm": "删除文件",
         "deleting": "删除中..."
       },
       "toast": {
         "deleted": "文件已删除: {{filename}}",
-        "deleteFailed": "文件删除失败，请重试"
+        "deleteFailed": "文件删除失败，请重试",
+        "batchDelete": {
+          "success_one": "已删除 {{count}} 个文件",
+          "success_other": "已删除 {{count}} 个文件",
+          "partial": "已删除 {{succeeded}} 个文件，{{failed}} 个失败",
+          "failed_one": "{{count}} 个文件删除失败",
+          "failed_other": "{{count}} 个文件删除失败",
+          "linkedTasks_one": "{{count}} 个文件仍有关联任务",
+          "linkedTasks_other": "{{count}} 个文件仍有关联任务"
+        }
       }
     },
     "taskDetail": {

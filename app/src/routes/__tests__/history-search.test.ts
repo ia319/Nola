@@ -12,6 +12,7 @@ describe('history-search', () => {
     expect(
       normalizeHistorySearch({
         mode: 'files',
+        content_type: 'audio/wav',
         order: 'asc',
         page: '2',
         page_size: '50',
@@ -21,8 +22,12 @@ describe('history-search', () => {
       }),
     ).toEqual({
       mode: 'files',
+      content_type: 'audio/wav',
+      order: 'asc',
       page: 2,
       page_size: 50,
+      q: 'briefing',
+      sort_by: 'filename',
     })
   })
 
@@ -39,6 +44,7 @@ describe('history-search', () => {
   it('builds independent task and file queries from one search model', () => {
     const search = normalizeHistorySearch({
       mode: 'files',
+      content_type: 'audio/wav',
       order: 'asc',
       page: 3,
       page_size: 100,
@@ -56,8 +62,12 @@ describe('history-search', () => {
       status: 'all',
     })
     expect(buildHistoryFileQuery(search)).toEqual({
+      content_type: 'audio/wav',
+      order: 'asc',
       page: 3,
       page_size: 100,
+      q: 'delta',
+      sort_by: 'filename',
     })
   })
 

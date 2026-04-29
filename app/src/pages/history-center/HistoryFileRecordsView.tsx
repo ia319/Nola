@@ -1,14 +1,24 @@
-import { useMemo, useState } from 'react'
-import { AudioLines, Trash2, X } from 'lucide-react'
+import { useMemo } from 'react'
+import { AudioLines, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import {
+  InteractiveTable,
+  InteractiveTableRowActionsMenu,
+  type InteractiveBatchAction,
+  type InteractiveSortState,
+  type InteractiveTableColumn,
+  type InteractiveTableRowAction,
+  useInteractiveTableSelection,
+} from '@/components/common'
 import { Button } from '@/components/ui/button'
-import { DataTable, type DataTableColumn } from '@/components/ui/DataTable'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { HistoryPagination } from './HistoryPagination'
 import { HistoryToolbar } from './HistoryToolbar'
+import { useHistorySearchDraft } from './useHistorySearchDraft'
 import type { HistoryFileQuery, HistoryPageSize, HistoryRecordsMode } from '@/routes/history-search'
-import type { FileInfo } from '@/shared/types'
+import type { FileContentTypeFilterValue } from '@/shared/lib/file-query-options'
+import type { FileInfo, FileSortBy } from '@/shared/types'
 
 export interface HistoryFileRecordRow {
   file: FileInfo
@@ -22,7 +32,11 @@ export interface HistoryFileRecordsViewProps {
   isLoading?: boolean
   errorMessage?: string | null
   deletingFileId?: string | null
+  isDeletingFiles?: boolean
   mode?: HistoryRecordsMode
+  onSearchChange: (value: string) => void
+  onContentTypeChange: (value: FileContentTypeFilterValue) => void
+  onSortChange: (value: InteractiveSortState<FileSortBy>) => void
   onPageChange: (value: number) => void
   onPageSizeChange: (value: HistoryPageSize) => void
   onModeChange?: (mode: HistoryRecordsMode) => void
@@ -30,6 +44,7 @@ export interface HistoryFileRecordsViewProps {
   onRetry?: () => void | Promise<void>
   onOpenFileDetail?: (file: FileInfo) => void
   onRequestDeleteFile?: (file: FileInfo) => void
+  onRequestDeleteFiles?: (files: readonly FileInfo[]) => void
 }
 
 function formatFileSize(sizeInBytes: number): string {
@@ -56,8 +71,6 @@ function formatTimestamp(value: string, formatter: Intl.DateTimeFormat): string 
   return formatter.format(new Date(timestamp))
 }
 
-const NOOP = () => {}
-
 export function HistoryFileRecordsView({
   rows,
   query,
@@ -65,7 +78,11 @@ export function HistoryFileRecordsView({
   isLoading = false,
   errorMessage,
   deletingFileId = null,
+  isDeletingFiles = false,
   mode = 'files',
+  onSearchChange,
+  onContentTypeChange,
+  onSortChange,
   onPageChange,
   onPageSizeChange,
   onModeChange,
@@ -73,30 +90,16 @@ export function HistoryFileRecordsView({
   onRetry,
   onOpenFileDetail,
   onRequestDeleteFile,
+  onRequestDeleteFiles,
 }: HistoryFileRecordsViewProps) {
   const { t } = useTranslation()
-  const selectionResetToken = `${query.page}|${query.page_size}|${rows
-    .map((row) => row.file.file_id)
-    .join('|')}`
-  const currentPageFileIds = useMemo(() => rows.map((row) => row.file.file_id), [rows])
-  const currentPageFileIdSet = useMemo(() => new Set(currentPageFileIds), [currentPageFileIds])
-  const [selectionState, setSelectionState] = useState<{
-    resetToken: string
-    ids: string[]
-  }>(() => ({
+  const [searchDraft, setSearchDraft] = useHistorySearchDraft(query.q)
+  const selectionResetToken = `${mode}|${query.content_type}|${query.order}|${query.page}|${query.page_size}|${query.q}|${query.sort_by}`
+  const tableSelection = useInteractiveTableSelection({
+    rows,
+    getRowId: (row) => row.file.file_id,
     resetToken: selectionResetToken,
-    ids: [],
-  }))
-
-  const rawSelectedFileIds = useMemo(() => {
-    return selectionState.resetToken === selectionResetToken ? selectionState.ids : []
-  }, [selectionResetToken, selectionState.ids, selectionState.resetToken])
-  const selectedFileIds = useMemo(() => {
-    return rawSelectedFileIds.filter((fileId) => currentPageFileIdSet.has(fileId))
-  }, [currentPageFileIdSet, rawSelectedFileIds])
-  const selectedFileIdSet = useMemo(() => new Set(selectedFileIds), [selectedFileIds])
-  const allCurrentPageSelected =
-    rows.length > 0 && rows.every((row) => selectedFileIdSet.has(row.file.file_id))
+  })
   const timestampFormatter = useMemo(
     () =>
       new Intl.DateTimeFormat(undefined, {
@@ -110,23 +113,22 @@ export function HistoryFileRecordsView({
     [],
   )
 
-  function getScopedSelectedIds(previous: { resetToken: string; ids: string[] }): string[] {
-    const previousIds = previous.resetToken === selectionResetToken ? previous.ids : []
-    return previousIds.filter((fileId) => currentPageFileIdSet.has(fileId))
-  }
+  const sort = useMemo<InteractiveSortState<FileSortBy>>(
+    () => ({
+      key: query.sort_by,
+      direction: query.order,
+    }),
+    [query.order, query.sort_by],
+  )
 
-  function clearSelection(): void {
-    setSelectionState({
-      resetToken: selectionResetToken,
-      ids: [],
-    })
-  }
-
-  const columns = useMemo<readonly DataTableColumn<HistoryFileRecordRow>[]>(() => {
+  const columns = useMemo<
+    readonly InteractiveTableColumn<HistoryFileRecordRow, FileSortBy>[]
+  >(() => {
     return [
       {
-        key: 'file',
+        id: 'file',
         header: t('history.files.table.columns.file'),
+        sortKey: 'filename',
         className: 'min-w-[280px]',
         cell: ({ file }) => (
           <div className="min-w-0 space-y-1">
@@ -138,7 +140,7 @@ export function HistoryFileRecordsView({
         ),
       },
       {
-        key: 'tasks',
+        id: 'tasks',
         header: t('history.files.table.columns.tasks'),
         className: 'min-w-[140px]',
         cell: ({ file, knownTaskCount }) => {
@@ -171,14 +173,17 @@ export function HistoryFileRecordsView({
         },
       },
       {
-        key: 'size',
+        id: 'size',
         header: t('history.files.table.columns.size'),
+        sortKey: 'size',
+        defaultSortDirection: 'desc',
         className: 'min-w-[120px]',
         cell: ({ file }) => <span className="text-sm">{formatFileSize(file.size)}</span>,
       },
       {
-        key: 'contentType',
+        id: 'contentType',
         header: t('history.files.table.columns.contentType'),
+        sortKey: 'content_type',
         className: 'min-w-[180px]',
         cell: ({ file }) => (
           <span className="text-sm">
@@ -187,189 +192,150 @@ export function HistoryFileRecordsView({
         ),
       },
       {
-        key: 'uploadedAt',
+        id: 'uploadedAt',
         header: t('history.files.table.columns.uploadedAt'),
+        sortKey: 'created_at',
+        defaultSortDirection: 'desc',
         className: 'min-w-[220px]',
         cell: ({ file }) => (
           <span className="text-sm">{formatTimestamp(file.created_at, timestampFormatter)}</span>
         ),
       },
       {
-        key: 'actions',
+        id: 'actions',
         header: t('history.files.table.columns.actions'),
         className: 'w-[96px]',
         headerClassName: 'text-right',
-        cell: ({ file }) => (
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              size="icon-xs"
-              variant="ghost"
-              aria-label={t('history.files.table.actions.delete')}
-              disabled={deletingFileId === file.file_id || !onRequestDeleteFile}
-              onClick={(event) => {
-                event.stopPropagation()
-                onRequestDeleteFile?.(file)
-              }}
-            >
-              <Trash2 />
-            </Button>
-          </div>
-        ),
+        cell: ({ file }) => {
+          const rowActions: readonly InteractiveTableRowAction[] = [
+            {
+              id: 'delete',
+              label: t('history.files.table.actions.delete'),
+              ariaLabel: t('history.files.table.actions.delete'),
+              icon: <Trash2 />,
+              hidden: !onRequestDeleteFile,
+              disabled: deletingFileId === file.file_id || isDeletingFiles,
+              variant: 'destructive',
+              run: () => onRequestDeleteFile?.(file),
+            },
+          ]
+
+          return (
+            <div className="flex justify-end">
+              <InteractiveTableRowActionsMenu
+                actions={rowActions}
+                triggerLabel={t('history.files.table.actions.more', { filename: file.filename })}
+              />
+            </div>
+          )
+        },
       },
     ]
-  }, [deletingFileId, onOpenFileDetail, onRequestDeleteFile, t, timestampFormatter])
+  }, [
+    deletingFileId,
+    isDeletingFiles,
+    onOpenFileDetail,
+    onRequestDeleteFile,
+    t,
+    timestampFormatter,
+  ])
+
+  const batchActions: readonly InteractiveBatchAction<HistoryFileRecordRow>[] = [
+    {
+      id: 'delete',
+      label: t('history.files.batch.delete'),
+      icon: <Trash2 />,
+      run: (selectedRows) => {
+        onRequestDeleteFiles?.(selectedRows.map((row) => row.file))
+      },
+      disabled: isDeletingFiles || !onRequestDeleteFiles,
+      isRunning: isDeletingFiles,
+      variant: 'destructive',
+    },
+  ]
 
   return (
-    <section
+    <InteractiveTable
       data-slot="history-file-records-view"
-      className="bg-card flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-sm"
-    >
-      <HistoryToolbar
-        mode={mode}
-        searchValue=""
-        statusValue="all"
-        sortByValue="created_at"
-        orderValue="desc"
-        isLoading={isLoading}
-        canExportSelection={false}
-        showExportSelection={false}
-        onSearchChange={NOOP}
-        onSearchSubmit={NOOP}
-        onStatusChange={NOOP}
-        onSortByChange={NOOP}
-        onOrderChange={NOOP}
-        onModeChange={onModeChange}
-      />
-
-      {selectedFileIds.length > 0 ? (
-        <div
-          data-slot="history-file-selection-bar"
-          className="bg-surface-container flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
-        >
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs font-semibold tracking-[0.18em] uppercase">
-              {t('history.files.selection.selectedCount', { count: selectedFileIds.length })}
-            </span>
-            <div className="bg-border hidden h-4 w-px lg:block" />
-            <Button type="button" size="xs" variant="outline" disabled>
-              <Trash2 />
-              {t('history.files.batch.deleteComingSoon')}
-            </Button>
-          </div>
-
-          <Button
-            type="button"
-            size="icon-xs"
-            variant="ghost"
-            aria-label={t('history.selection.clear')}
-            onClick={clearSelection}
-          >
-            <X />
-          </Button>
-        </div>
-      ) : null}
-
-      <DataTable
-        className="rounded-none border-0 shadow-none"
-        columns={columns}
-        rows={rows}
-        getRowId={(row) => row.file.file_id}
-        caption={t('history.files.table.caption')}
-        isLoading={isLoading}
-        errorState={
-          errorMessage
-            ? {
-                title: t('error.generic'),
-                description: errorMessage,
-                action: onRetry ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      void onRetry()
-                    }}
-                  >
-                    {t('error.boundary.retry')}
-                  </Button>
-                ) : null,
-              }
-            : null
-        }
-        onRowClick={
-          onOpenFileDetail
-            ? (row) => {
-                onOpenFileDetail(row.file)
-              }
-            : undefined
-        }
-        scrollAreaClassName="max-h-[56vh] overflow-auto"
-        stickyHeader
-        selection={{
-          selectedRowIds: selectedFileIds,
-          selectAllLabel: t('history.files.table.selectAll'),
-          getRowLabel: (row) => t('history.files.table.selectRow', { fileId: row.file.file_id }),
-          onToggleRow: (rowId, checked) => {
-            setSelectionState((previous) => {
-              const scopedIds = getScopedSelectedIds(previous)
-              if (checked) {
-                return {
-                  resetToken: selectionResetToken,
-                  ids: scopedIds.includes(rowId) ? scopedIds : [...scopedIds, rowId],
-                }
-              }
-
-              return {
-                resetToken: selectionResetToken,
-                ids: scopedIds.filter((value) => value !== rowId),
-              }
-            })
-          },
-          onToggleAllRows: () => {
-            setSelectionState((previous) => {
-              const scopedIds = getScopedSelectedIds(previous)
-              if (allCurrentPageSelected) {
-                return {
-                  resetToken: selectionResetToken,
-                  ids: scopedIds.filter((fileId) => !currentPageFileIdSet.has(fileId)),
-                }
-              }
-
-              const next = new Set(scopedIds)
-              for (const fileId of currentPageFileIds) {
-                next.add(fileId)
-              }
-              return {
-                resetToken: selectionResetToken,
-                ids: Array.from(next),
-              }
-            })
-          },
-        }}
-        emptyState={
-          <EmptyState
-            icon={<AudioLines className="size-6" />}
-            title={t('history.files.empty.title')}
-            description={t('history.files.empty.description')}
-            action={
-              onCreateTask ? (
-                <Button type="button" onClick={onCreateTask}>
-                  {t('history.files.empty.action')}
+      columns={columns}
+      rows={rows}
+      getRowId={(row) => row.file.file_id}
+      caption={t('history.files.table.caption')}
+      sort={sort}
+      onSortChange={onSortChange}
+      filters={
+        <HistoryToolbar
+          mode={mode}
+          searchValue={searchDraft}
+          contentTypeValue={query.content_type}
+          isLoading={isLoading}
+          onSearchChange={setSearchDraft}
+          onSearchSubmit={onSearchChange}
+          onContentTypeChange={onContentTypeChange}
+          onModeChange={onModeChange}
+        />
+      }
+      selection={{
+        ...tableSelection.selection,
+        selectAllLabel: t('history.files.table.selectAll'),
+        getRowLabel: (row) => t('history.files.table.selectRow', { fileId: row.file.file_id }),
+        selectedRowsLabel: (count) => t('history.files.selection.selectedCount', { count }),
+        clearSelectionLabel: t('history.selection.clear'),
+      }}
+      batchActions={batchActions}
+      isLoading={isLoading}
+      errorState={
+        errorMessage
+          ? {
+              title: t('error.generic'),
+              description: errorMessage,
+              action: onRetry ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    void onRetry()
+                  }}
+                >
+                  {t('error.boundary.retry')}
                 </Button>
-              ) : null
+              ) : null,
             }
-          />
-        }
-      />
-
-      <HistoryPagination
-        page={query.page}
-        pageSize={query.page_size}
-        total={total}
-        isLoading={isLoading}
-        onPageChange={onPageChange}
-        onPageSizeChange={onPageSizeChange}
-      />
-    </section>
+          : null
+      }
+      onRowClick={
+        onOpenFileDetail
+          ? (row) => {
+              onOpenFileDetail(row.file)
+            }
+          : undefined
+      }
+      scrollAreaClassName="max-h-[56vh] overflow-auto"
+      stickyHeader
+      pagination={
+        <HistoryPagination
+          page={query.page}
+          pageSize={query.page_size}
+          total={total}
+          isLoading={isLoading}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+        />
+      }
+      emptyState={
+        <EmptyState
+          icon={<AudioLines className="size-6" />}
+          title={t('history.files.empty.title')}
+          description={t('history.files.empty.description')}
+          action={
+            onCreateTask ? (
+              <Button type="button" onClick={onCreateTask}>
+                {t('history.files.empty.action')}
+              </Button>
+            ) : null
+          }
+        />
+      }
+    />
   )
 }

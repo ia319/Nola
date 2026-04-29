@@ -1,5 +1,13 @@
 import { HISTORY_PAGE_SIZE } from '@/config/constants'
 import {
+  DEFAULT_FILE_CONTENT_TYPE_FILTER,
+  DEFAULT_FILE_SORT_BY,
+  DEFAULT_FILE_SORT_ORDER,
+  FILE_ORDER_OPTIONS,
+  FILE_SORT_OPTIONS,
+  type FileContentTypeFilterValue,
+} from '@/shared/lib/file-query-options'
+import {
   DEFAULT_TASK_FILTER_STATUS,
   DEFAULT_TASK_ORDER,
   DEFAULT_TASK_SORT_BY,
@@ -7,13 +15,22 @@ import {
   TASK_ORDER_OPTIONS,
   TASK_SORT_OPTIONS,
 } from '@/shared/lib/task-query-options'
-import type { SortOrder, TaskFilterStatus, TaskQueryModel, TaskSortBy } from '@/shared/types'
+import type {
+  FileSortBy,
+  FileSortOrder,
+  SortOrder,
+  TaskFilterStatus,
+  TaskQueryModel,
+  TaskSortBy,
+} from '@/shared/types'
 
 export const HISTORY_PAGE_SIZE_OPTIONS = [20, 50, 100] as const
 
 const STATUS_SET = new Set<TaskFilterStatus>(TASK_FILTER_STATUS_OPTIONS)
 const SORT_SET = new Set<TaskSortBy>(TASK_SORT_OPTIONS)
 const ORDER_SET = new Set<SortOrder>(TASK_ORDER_OPTIONS)
+const FILE_SORT_SET = new Set<FileSortBy>(FILE_SORT_OPTIONS)
+const FILE_ORDER_SET = new Set<FileSortOrder>(FILE_ORDER_OPTIONS)
 const PAGE_SIZE_SET = new Set<number>(HISTORY_PAGE_SIZE_OPTIONS)
 
 export type HistoryPageSize = (typeof HISTORY_PAGE_SIZE_OPTIONS)[number]
@@ -26,6 +43,10 @@ const MODE_OPTIONS: readonly HistoryRecordsMode[] = ['tasks', 'files']
 const MODE_SET = new Set(MODE_OPTIONS)
 
 export interface HistoryFileQuery {
+  q: string
+  content_type: FileContentTypeFilterValue
+  sort_by: FileSortBy
+  order: FileSortOrder
   page: number
   page_size: HistoryPageSize
 }
@@ -34,8 +55,9 @@ export interface HistoryRouteSearch {
   mode?: HistoryRecordsMode
   q?: string
   status?: TaskFilterStatus
-  sort_by?: TaskSortBy
-  order?: SortOrder
+  content_type?: FileContentTypeFilterValue
+  sort_by?: TaskSortBy | FileSortBy
+  order?: SortOrder | FileSortOrder
   page?: number
   page_size?: HistoryPageSize
 }
@@ -71,6 +93,8 @@ export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
   const modeValue = typeof searchRecord.mode === 'string' ? searchRecord.mode : ''
   const qValue = typeof searchRecord.q === 'string' ? searchRecord.q.trim() : ''
   const statusValue = typeof searchRecord.status === 'string' ? searchRecord.status : ''
+  const contentTypeValue =
+    typeof searchRecord.content_type === 'string' ? searchRecord.content_type.trim() : ''
   const sortByValue = typeof searchRecord.sort_by === 'string' ? searchRecord.sort_by : ''
   const orderValue = typeof searchRecord.order === 'string' ? searchRecord.order : ''
   const pageValue = parsePositiveInt(searchRecord.page)
@@ -82,6 +106,21 @@ export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
 
   if (normalizedMode === 'files') {
     next.mode = 'files'
+    if (qValue !== '') {
+      next.q = qValue
+    }
+
+    if (contentTypeValue !== '' && contentTypeValue !== DEFAULT_FILE_CONTENT_TYPE_FILTER) {
+      next.content_type = contentTypeValue
+    }
+
+    if (FILE_SORT_SET.has(sortByValue as FileSortBy) && sortByValue !== DEFAULT_FILE_SORT_BY) {
+      next.sort_by = sortByValue as FileSortBy
+    }
+
+    if (FILE_ORDER_SET.has(orderValue as FileSortOrder) && orderValue !== DEFAULT_FILE_SORT_ORDER) {
+      next.order = orderValue as FileSortOrder
+    }
   }
 
   if (normalizedMode === 'tasks') {
@@ -122,11 +161,18 @@ export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
 
 /** Convert normalized route search params into backend query model. */
 export function buildHistoryTaskQuery(search: HistoryRouteSearch): HistoryTaskQuery {
+  const isTaskMode = search.mode !== 'files'
   return {
-    q: search.q ?? '',
-    status: search.status ?? DEFAULT_TASK_FILTER_STATUS,
-    sort_by: search.sort_by ?? DEFAULT_TASK_SORT_BY,
-    order: search.order ?? DEFAULT_TASK_ORDER,
+    q: isTaskMode ? (search.q ?? '') : '',
+    status: isTaskMode ? (search.status ?? DEFAULT_TASK_FILTER_STATUS) : DEFAULT_TASK_FILTER_STATUS,
+    sort_by:
+      isTaskMode && SORT_SET.has(search.sort_by as TaskSortBy)
+        ? (search.sort_by as TaskSortBy)
+        : DEFAULT_TASK_SORT_BY,
+    order:
+      isTaskMode && ORDER_SET.has(search.order as SortOrder)
+        ? (search.order as SortOrder)
+        : DEFAULT_TASK_ORDER,
     page: search.page ?? 1,
     page_size: search.page_size ?? HISTORY_PAGE_SIZE,
   }
@@ -134,7 +180,20 @@ export function buildHistoryTaskQuery(search: HistoryRouteSearch): HistoryTaskQu
 
 /** Convert normalized route search params into filename-mode query model. */
 export function buildHistoryFileQuery(search: HistoryRouteSearch): HistoryFileQuery {
+  const isFileMode = search.mode === 'files'
   return {
+    q: isFileMode ? (search.q ?? '') : '',
+    content_type: isFileMode
+      ? (search.content_type ?? DEFAULT_FILE_CONTENT_TYPE_FILTER)
+      : DEFAULT_FILE_CONTENT_TYPE_FILTER,
+    sort_by:
+      isFileMode && FILE_SORT_SET.has(search.sort_by as FileSortBy)
+        ? (search.sort_by as FileSortBy)
+        : DEFAULT_FILE_SORT_BY,
+    order:
+      isFileMode && FILE_ORDER_SET.has(search.order as FileSortOrder)
+        ? (search.order as FileSortOrder)
+        : DEFAULT_FILE_SORT_ORDER,
     page: search.page ?? 1,
     page_size: search.page_size ?? HISTORY_PAGE_SIZE,
   }
@@ -146,6 +205,7 @@ export function isSameHistorySearch(a: HistoryRouteSearch, b: HistoryRouteSearch
     a.mode === b.mode &&
     a.q === b.q &&
     a.status === b.status &&
+    a.content_type === b.content_type &&
     a.sort_by === b.sort_by &&
     a.order === b.order &&
     a.page === b.page &&

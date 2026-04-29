@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import logger from '@/config/logger'
+import type { InteractiveSortState } from '@/components/common'
 import { useExportDefaults, type ExportRequestOptions } from '@/features/export'
 import type { SingleExportRequestOptions } from '@/features/export'
 import {
@@ -24,7 +25,7 @@ import {
   isExportableTaskStatus,
   isRetryableTaskStatus,
 } from '@/shared/lib/task-status'
-import type { SortOrder, TaskFilterStatus, TaskSortBy, TaskSummary } from '@/shared/types'
+import type { TaskFilterStatus, TaskSortBy, TaskSummary } from '@/shared/types'
 
 type HistoryTaskDetailAction = 'cancel' | 'delete' | 'export' | 'retry'
 
@@ -32,8 +33,7 @@ export interface HistoryTaskModeViewProps {
   query: HistoryTaskQuery
   onSearchChange: (value: string) => void
   onStatusChange: (value: TaskFilterStatus) => void
-  onSortByChange: (value: TaskSortBy) => void
-  onOrderChange: (value: SortOrder) => void
+  onSortChange: (value: InteractiveSortState<TaskSortBy>) => void
   onPageChange: (value: number) => void
   onPageSizeChange: (value: HistoryPageSize) => void
   onPageClamp?: (page: number) => void
@@ -45,8 +45,7 @@ export function HistoryTaskModeView({
   query,
   onSearchChange,
   onStatusChange,
-  onSortByChange,
-  onOrderChange,
+  onSortChange,
   onPageChange,
   onPageSizeChange,
   onPageClamp,
@@ -92,6 +91,9 @@ export function HistoryTaskModeView({
         filename: task.filename,
         status: task.status,
       })
+    },
+    onDeletedTaskRecord: (taskId) => {
+      removeSessionTask(taskId)
     },
     onActionSettled: requestTaskRefresh,
   })
@@ -214,8 +216,7 @@ export function HistoryTaskModeView({
         }
         onSearchChange={onSearchChange}
         onStatusChange={onStatusChange}
-        onSortByChange={onSortByChange}
-        onOrderChange={onOrderChange}
+        onSortChange={onSortChange}
         onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}
         onModeChange={onModeChange}
@@ -229,6 +230,7 @@ export function HistoryTaskModeView({
         onBatchCancelTasks={historyTaskActions.cancelTasks}
         onBatchRetryTasks={historyTaskActions.retryTasks}
         onBatchExportTasks={historyTaskActions.exportTasks}
+        onBatchDeleteTaskRecords={historyTaskActions.deleteTaskRecords}
       />
 
       <TaskDetailSheet

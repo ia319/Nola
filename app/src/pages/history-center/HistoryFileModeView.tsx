@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import { useExportDefaults } from '@/features/export'
 import { requestTaskRefresh, useHistoryTaskActions, useSessionTasksStore } from '@/features/tasks'
+import type { InteractiveSortState } from '@/components/common'
 import { useDetailOverlayCloseRequest } from '@/shared/lib/overlay-events'
 import { queryKeys } from '@/shared/lib/query-keys'
 import { HistoryFileRecordsView } from './HistoryFileRecordsView'
@@ -24,7 +25,8 @@ import { useHistoryFileActions } from './useHistoryFileActions'
 import { useHistoryFileTaskCounts } from './useHistoryFileTaskCounts'
 import { useHistoryFiles } from './useHistoryFiles'
 import type { HistoryFileQuery, HistoryPageSize, HistoryRecordsMode } from '@/routes/history-search'
-import type { FileInfo, TaskSummary } from '@/shared/types'
+import type { FileContentTypeFilterValue } from '@/shared/lib/file-query-options'
+import type { FileInfo, FileSortBy, TaskSummary } from '@/shared/types'
 
 const LazyFileDetailContent = lazy(async () => {
   const module = await import('@/features/upload/components/FileDetailContent')
@@ -33,6 +35,9 @@ const LazyFileDetailContent = lazy(async () => {
 
 export interface HistoryFileModeViewProps {
   query: HistoryFileQuery
+  onSearchChange: (value: string) => void
+  onContentTypeChange: (value: FileContentTypeFilterValue) => void
+  onSortChange: (value: InteractiveSortState<FileSortBy>) => void
   onPageClamp?: (page: number) => void
   onPageChange: (value: number) => void
   onPageSizeChange: (value: HistoryPageSize) => void
@@ -42,6 +47,9 @@ export interface HistoryFileModeViewProps {
 
 export function HistoryFileModeView({
   query,
+  onSearchChange,
+  onContentTypeChange,
+  onSortChange,
   onPageClamp,
   onPageChange,
   onPageSizeChange,
@@ -55,7 +63,7 @@ export function HistoryFileModeView({
   const exportDefaults = useExportDefaults()
   const addCreatedTask = useSessionTasksStore((state) => state.addCreatedTask)
   const upsertSessionTask = useSessionTasksStore((state) => state.upsertSessionTask)
-  const [pendingDeleteFile, setPendingDeleteFile] = useState<FileInfo | null>(null)
+  const [pendingDeleteFiles, setPendingDeleteFiles] = useState<readonly FileInfo[]>([])
   const [selectedDetailFile, setSelectedDetailFile] = useState<FileInfo | null>(null)
   const closeFileDetail = useCallback(() => {
     setSelectedDetailFile(null)
@@ -69,7 +77,8 @@ export function HistoryFileModeView({
   })
   const knownTaskCounts = useHistoryFileTaskCounts()
   const associatedTasks = useHistoryFileAssociatedTasks(selectedDetailFile?.file_id ?? null)
-  const { deleteHistoryFile, deletingFileId } = useHistoryFileActions()
+  const { batchDeleteHistoryFiles, deleteHistoryFile, deletingFileId, isDeletingFiles } =
+    useHistoryFileActions()
   const historyTaskActions = useHistoryTaskActions({
     refresh: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.lists() })
@@ -127,20 +136,32 @@ export function HistoryFileModeView({
   }, [])
 
   const handleConfirmDelete = useCallback(async (): Promise<void> => {
-    if (!pendingDeleteFile) {
+    if (pendingDeleteFiles.length === 0) {
       return
     }
 
     try {
-      await deleteHistoryFile(pendingDeleteFile)
+      const deletedFileIds = new Set<string>()
+      if (pendingDeleteFiles.length === 1 && pendingDeleteFiles[0]) {
+        await deleteHistoryFile(pendingDeleteFiles[0])
+        deletedFileIds.add(pendingDeleteFiles[0].file_id)
+      } else {
+        const response = await batchDeleteHistoryFiles(pendingDeleteFiles)
+        for (const result of response.results) {
+          if (result.ok) {
+            deletedFileIds.add(result.file_id)
+          }
+        }
+      }
+
       setSelectedDetailFile((current) =>
-        current?.file_id === pendingDeleteFile.file_id ? null : current,
+        current && deletedFileIds.has(current.file_id) ? null : current,
       )
-      setPendingDeleteFile(null)
+      setPendingDeleteFiles([])
     } catch {
       return
     }
-  }, [deleteHistoryFile, pendingDeleteFile])
+  }, [batchDeleteHistoryFiles, deleteHistoryFile, pendingDeleteFiles])
 
   const handleExportAssociatedTask = useCallback(
     async (task: TaskSummary): Promise<void> => {
@@ -167,6 +188,10 @@ export function HistoryFileModeView({
     [retryTasks],
   )
 
+  const pendingDeleteCount = pendingDeleteFiles.length
+  const pendingSingleDeleteFile = pendingDeleteCount === 1 ? pendingDeleteFiles[0] : null
+  const deleteBusy = deletingFileId !== null || isDeletingFiles
+
   return (
     <>
       <HistoryFileRecordsView
@@ -175,9 +200,13 @@ export function HistoryFileModeView({
         total={historyFiles.total}
         isLoading={historyFiles.isLoading}
         deletingFileId={deletingFileId}
+        isDeletingFiles={isDeletingFiles}
         errorMessage={
           historyFiles.error ? t(historyFiles.error.i18nKey, historyFiles.error.params ?? {}) : null
         }
+        onSearchChange={onSearchChange}
+        onContentTypeChange={onContentTypeChange}
+        onSortChange={onSortChange}
         onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}
         onModeChange={onModeChange}
@@ -186,7 +215,13 @@ export function HistoryFileModeView({
         onOpenFileDetail={openFileDetail}
         onRequestDeleteFile={(file) => {
           setSelectedDetailFile((current) => (current?.file_id === file.file_id ? null : current))
-          setPendingDeleteFile(file)
+          setPendingDeleteFiles([file])
+        }}
+        onRequestDeleteFiles={(files) => {
+          setSelectedDetailFile((current) =>
+            current && files.some((file) => file.file_id === current.file_id) ? null : current,
+          )
+          setPendingDeleteFiles(files)
         }}
       />
 
@@ -224,10 +259,10 @@ export function HistoryFileModeView({
               <Button
                 type="button"
                 variant="destructive"
-                disabled={deletingFileId !== null}
+                disabled={deleteBusy}
                 onClick={() => {
                   setSelectedDetailFile(null)
-                  setPendingDeleteFile(selectedDetailRow.file)
+                  setPendingDeleteFiles([selectedDetailRow.file])
                 }}
               >
                 {t('history.files.table.actions.delete')}
@@ -257,10 +292,10 @@ export function HistoryFileModeView({
       </DetailSheet>
 
       <Dialog
-        open={pendingDeleteFile !== null}
+        open={pendingDeleteCount > 0}
         onOpenChange={(open) => {
-          if (!open && deletingFileId === null) {
-            setPendingDeleteFile(null)
+          if (!open && !deleteBusy) {
+            setPendingDeleteFiles([])
           }
         }}
       >
@@ -268,20 +303,30 @@ export function HistoryFileModeView({
           <DialogHeader>
             <DialogTitle>{t('history.files.deleteDialog.title')}</DialogTitle>
             <DialogDescription className="min-w-0 break-words">
-              {t('history.files.deleteDialog.description', {
-                filename: pendingDeleteFile?.filename ?? '',
-              })}
+              {pendingSingleDeleteFile
+                ? t('history.files.deleteDialog.description', {
+                    filename: pendingSingleDeleteFile.filename,
+                  })
+                : t('history.files.deleteDialog.batchDescription', {
+                    count: pendingDeleteCount,
+                  })}
             </DialogDescription>
           </DialogHeader>
 
-          {pendingDeleteFile ? (
+          {pendingSingleDeleteFile ? (
             <div className="bg-surface-container-low max-w-full min-w-0 overflow-hidden rounded-lg border px-3 py-2">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{pendingDeleteFile.filename}</p>
+                <p className="truncate text-sm font-semibold">{pendingSingleDeleteFile.filename}</p>
                 <p className="text-muted-foreground truncate font-mono text-xs tracking-tight">
-                  {pendingDeleteFile.file_id}
+                  {pendingSingleDeleteFile.file_id}
                 </p>
               </div>
+            </div>
+          ) : pendingDeleteCount > 0 ? (
+            <div className="bg-surface-container-low max-w-full min-w-0 overflow-hidden rounded-lg border px-3 py-2">
+              <p className="text-sm font-semibold">
+                {t('history.files.deleteDialog.batchCount', { count: pendingDeleteCount })}
+              </p>
             </div>
           ) : null}
 
@@ -289,9 +334,9 @@ export function HistoryFileModeView({
             <Button
               type="button"
               variant="outline"
-              disabled={deletingFileId !== null}
+              disabled={deleteBusy}
               onClick={() => {
-                setPendingDeleteFile(null)
+                setPendingDeleteFiles([])
               }}
             >
               {t('history.files.deleteDialog.cancel')}
@@ -299,12 +344,12 @@ export function HistoryFileModeView({
             <Button
               type="button"
               variant="destructive"
-              disabled={pendingDeleteFile === null || deletingFileId !== null}
+              disabled={pendingDeleteCount === 0 || deleteBusy}
               onClick={() => {
                 void handleConfirmDelete()
               }}
             >
-              {deletingFileId !== null
+              {deleteBusy
                 ? t('history.files.deleteDialog.deleting')
                 : t('history.files.deleteDialog.confirm')}
             </Button>
