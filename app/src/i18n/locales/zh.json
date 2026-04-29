@@ -1243,6 +1243,7 @@
       },
       "deleteDialog": {
         "title": "删除文件",
+        "batchTitle": "批量删除文件",
         "description": "删除 {{filename}} 及其关联数据？",
         "batchDescription": "删除选中的 {{count}} 个文件及其关联数据？",
         "batchCount": "已选择 {{count}} 个文件",
@@ -1257,6 +1258,8 @@
           "success_one": "已删除 {{count}} 个文件",
           "success_other": "已删除 {{count}} 个文件",
           "partial": "已删除 {{succeeded}} 个文件，{{failed}} 个失败",
+          "partialLinkedTasks_one": "已删除 {{succeeded}} 个文件，{{failed}} 个失败；其中 {{count}} 个仍有关联任务",
+          "partialLinkedTasks_other": "已删除 {{succeeded}} 个文件，{{failed}} 个失败；其中 {{count}} 个仍有关联任务",
           "failed_one": "{{count}} 个文件删除失败",
           "failed_other": "{{count}} 个文件删除失败",
           "linkedTasks_one": "{{count}} 个文件仍有关联任务",

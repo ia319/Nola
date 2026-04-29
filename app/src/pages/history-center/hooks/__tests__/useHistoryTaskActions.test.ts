@@ -134,6 +134,7 @@ describe('useHistoryTaskActions', () => {
     })
 
     expect(batchDeleteMock).toHaveBeenCalledWith(['task-a', 'task-b'])
+    expect(onDeletedTaskRecord).toHaveBeenCalledTimes(1)
     expect(onDeletedTaskRecord).toHaveBeenCalledWith('task-a')
     expect(refresh).toHaveBeenCalledTimes(1)
     expect(toast.warning).toHaveBeenCalledWith('tasks.toast.batch.deleteRecord.partial')

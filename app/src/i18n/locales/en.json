@@ -1244,6 +1244,7 @@
       },
       "deleteDialog": {
         "title": "Delete file",
+        "batchTitle": "Delete files",
         "description": "Delete {{filename}} and its associated data?",
         "batchDescription": "Delete {{count}} selected files and their associated data?",
         "batchCount": "{{count}} files selected",
@@ -1258,6 +1259,8 @@
           "success_one": "Deleted {{count}} file",
           "success_other": "Deleted {{count}} files",
           "partial": "Deleted {{succeeded}} files, {{failed}} failed",
+          "partialLinkedTasks_one": "Deleted {{succeeded}} files, {{failed}} failed; {{count}} file still has linked tasks",
+          "partialLinkedTasks_other": "Deleted {{succeeded}} files, {{failed}} failed; {{count}} files still have linked tasks",
           "failed_one": "Delete failed for {{count}} file",
           "failed_other": "Delete failed for {{count}} files",
           "linkedTasks_one": "{{count}} file still has linked tasks",

@@ -12,7 +12,9 @@ const historyFileActionMocks = vi.hoisted(() => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
+    warning: vi.fn(),
   },
+  batchDeleteFiles: vi.fn(),
   deleteFile: vi.fn(),
   requestTaskRefresh: vi.fn(),
 }))
@@ -26,6 +28,12 @@ vi.mock('react-i18next', () => ({
 
       if (key === 'history.files.toast.deleteFailed') {
         return 'File delete failed, please retry'
+      }
+
+      if (key === 'history.files.toast.batchDelete.partialLinkedTasks') {
+        return `Deleted ${String(params?.succeeded)} files, ${String(
+          params?.failed,
+        )} failed; ${String(params?.count)} file still has linked tasks`
       }
 
       return key
@@ -46,6 +54,7 @@ vi.mock('@/features/tasks', () => ({
 }))
 
 vi.mock('@/features/upload', () => ({
+  batchDeleteFiles: historyFileActionMocks.batchDeleteFiles,
   deleteFile: historyFileActionMocks.deleteFile,
 }))
 
@@ -63,6 +72,8 @@ describe('useHistoryFileActions', () => {
     historyFileActionMocks.logger.error.mockReset()
     historyFileActionMocks.toast.success.mockReset()
     historyFileActionMocks.toast.error.mockReset()
+    historyFileActionMocks.toast.warning.mockReset()
+    historyFileActionMocks.batchDeleteFiles.mockReset()
     historyFileActionMocks.deleteFile.mockReset()
     historyFileActionMocks.requestTaskRefresh.mockReset()
   })
@@ -181,5 +192,101 @@ describe('useHistoryFileActions', () => {
     })
 
     expect(result.current.deletingFileId).toBeNull()
+  })
+
+  it('surfaces linked-task failures in partial batch delete results', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    })
+    historyFileActionMocks.batchDeleteFiles.mockResolvedValueOnce({
+      action: 'delete',
+      summary: { requested: 2, succeeded: 1, failed: 1 },
+      results: [
+        {
+          file_id: 'file-deleted',
+          ok: true,
+          message: 'File file-deleted deleted',
+          filename: 'deleted.wav',
+        },
+        {
+          file_id: 'file-linked',
+          ok: false,
+          message: 'File still has linked tasks',
+          error_code: 'linked_tasks',
+          status_code: 409,
+          filename: 'linked.wav',
+        },
+      ],
+    })
+
+    const { result } = renderHook(() => useHistoryFileActions(), {
+      wrapper: createWrapper(queryClient),
+    })
+
+    await act(async () => {
+      await result.current.batchDeleteHistoryFiles([
+        {
+          file_id: 'file-deleted',
+          filename: 'deleted.wav',
+          size: 1024,
+          content_type: 'audio/wav',
+          created_at: '2026-04-12T12:00:00.000Z',
+        },
+        {
+          file_id: 'file-linked',
+          filename: 'linked.wav',
+          size: 2048,
+          content_type: 'audio/wav',
+          created_at: '2026-04-12T13:00:00.000Z',
+        },
+      ])
+    })
+
+    expect(historyFileActionMocks.batchDeleteFiles).toHaveBeenCalledWith([
+      'file-deleted',
+      'file-linked',
+    ])
+    expect(historyFileActionMocks.toast.warning).toHaveBeenCalledWith(
+      'Deleted 1 files, 1 failed; 1 file still has linked tasks',
+    )
+    expect(historyFileActionMocks.requestTaskRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses API detail when batch delete request fails with an AppError', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    })
+    historyFileActionMocks.batchDeleteFiles.mockRejectedValueOnce({
+      code: 'API_CLIENT_409',
+      i18nKey: 'error.api.clientError',
+      params: { detail: 'Cannot delete selected files while tasks still reference them' },
+      retriable: false,
+    })
+
+    const { result } = renderHook(() => useHistoryFileActions(), {
+      wrapper: createWrapper(queryClient),
+    })
+
+    await expect(
+      result.current.batchDeleteHistoryFiles([
+        {
+          file_id: 'file-linked',
+          filename: 'linked.wav',
+          size: 2048,
+          content_type: 'audio/wav',
+          created_at: '2026-04-12T13:00:00.000Z',
+        },
+      ]),
+    ).rejects.toMatchObject({ code: 'API_CLIENT_409' })
+
+    expect(historyFileActionMocks.toast.error).toHaveBeenCalledWith(
+      'Cannot delete selected files while tasks still reference them',
+    )
   })
 })

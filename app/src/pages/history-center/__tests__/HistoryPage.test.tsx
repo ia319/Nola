@@ -157,6 +157,7 @@ vi.mock('react-i18next', () => ({
         'history.files.detail.associatedTasksEmpty.description':
           'This file has no known tasks in the current history context.',
         'history.files.deleteDialog.title': 'Delete file',
+        'history.files.deleteDialog.batchTitle': 'Delete files',
         'history.files.deleteDialog.cancel': 'Cancel',
         'history.files.deleteDialog.confirm': 'Delete file',
         'history.files.deleteDialog.deleting': 'Deleting...',

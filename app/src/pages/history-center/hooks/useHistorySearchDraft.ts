@@ -10,7 +10,17 @@ export function useHistorySearchDraft(committedValue: string) {
     committedValue,
     draftValue: committedValue,
   }))
-  const draftValue = state.committedValue === committedValue ? state.draftValue : committedValue
+  let currentState = state
+
+  if (currentState.committedValue !== committedValue) {
+    currentState = {
+      committedValue,
+      draftValue: committedValue,
+    }
+    setState(currentState)
+  }
+
+  const draftValue = currentState.draftValue
   const setDraftValue = useCallback(
     (nextDraftValue: string) => {
       setState({

@@ -302,7 +302,11 @@ export function HistoryFileModeView({
       >
         <DialogContent className="w-full max-w-md overflow-hidden">
           <DialogHeader>
-            <DialogTitle>{t('history.files.deleteDialog.title')}</DialogTitle>
+            <DialogTitle>
+              {pendingSingleDeleteFile
+                ? t('history.files.deleteDialog.title')
+                : t('history.files.deleteDialog.batchTitle')}
+            </DialogTitle>
             <DialogDescription className="min-w-0 break-words">
               {pendingSingleDeleteFile
                 ? t('history.files.deleteDialog.description', {

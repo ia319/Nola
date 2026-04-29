@@ -17,6 +17,11 @@ export interface UseHistoryFileActionsResult {
   batchDeleteHistoryFiles: (files: readonly FileInfo[]) => Promise<BatchFileDeleteResponse>
 }
 
+function getAppErrorDetail(error: unknown): string | null {
+  const detail = isAppError(error) ? error.params?.detail : null
+  return typeof detail === 'string' && detail.trim() ? detail : null
+}
+
 export function useHistoryFileActions(): UseHistoryFileActionsResult {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -42,8 +47,8 @@ export function useHistoryFileActions(): UseHistoryFileActionsResult {
     },
     onError: (error, file) => {
       logger.error('history.deleteFileFailed', { error, fileId: file.file_id })
-      const detail = isAppError(error) ? error.params?.detail : null
-      if (typeof detail === 'string' && detail.trim()) {
+      const detail = getAppErrorDetail(error)
+      if (detail) {
         toast.error(detail)
         return
       }
@@ -77,6 +82,14 @@ export function useHistoryFileActions(): UseHistoryFileActionsResult {
 
       if (summary.succeeded > 0 && summary.failed === 0) {
         toast.success(t('history.files.toast.batchDelete.success', { count: summary.succeeded }))
+      } else if (summary.succeeded > 0 && summary.failed > 0 && linkedTaskFailures > 0) {
+        toast.warning(
+          t('history.files.toast.batchDelete.partialLinkedTasks', {
+            succeeded: summary.succeeded,
+            failed: summary.failed,
+            count: linkedTaskFailures,
+          }),
+        )
       } else if (summary.succeeded > 0 && summary.failed > 0) {
         toast.warning(
           t('history.files.toast.batchDelete.partial', {
@@ -96,6 +109,12 @@ export function useHistoryFileActions(): UseHistoryFileActionsResult {
     },
     onError: (error) => {
       logger.error('history.batchDeleteFilesFailed', { error })
+      const detail = getAppErrorDetail(error)
+      if (detail) {
+        toast.error(detail)
+        return
+      }
+
       toast.error(t('history.files.toast.deleteFailed'))
     },
   })
