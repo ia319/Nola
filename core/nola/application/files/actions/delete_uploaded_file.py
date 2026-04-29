@@ -1,6 +1,7 @@
 """Delete-uploaded-file use-case."""
 
 import sqlite3
+from contextlib import suppress
 from pathlib import Path
 
 from nola.application.files.contracts import SupportsFileActions
@@ -60,7 +61,9 @@ def delete_uploaded_file(
             error_code="not_found",
         )
 
-    file_path.unlink(missing_ok=True)
+    # Keep filesystem cleanup best-effort after the database row is gone.
+    with suppress(OSError):
+        file_path.unlink(missing_ok=True)
 
     return {
         "file_id": file_id,

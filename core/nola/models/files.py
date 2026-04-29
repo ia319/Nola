@@ -184,7 +184,7 @@ class FileDatabase:
             params.extend([pattern, pattern, pattern])
 
         if content_type:
-            where_clauses.append("content_type = ?")
+            where_clauses.append("LOWER(content_type) = LOWER(?)")
             params.append(content_type)
 
         where_sql = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""

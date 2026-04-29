@@ -4,13 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from nola.application.files.types import FileDeleteErrorCode, FileIntegrityStatus
 from nola.config.constants import MAX_BATCH_FILE_IDS
-
-BatchFileDeleteErrorCode = Literal[
-    "not_found",
-    "linked_tasks",
-    "duplicate_file_id",
-]
 
 
 class FileResponse(BaseModel):
@@ -58,7 +53,7 @@ class MissingFileInfo(BaseModel):
 class IntegrityCheckResponse(BaseModel):
     """File integrity check result."""
 
-    status: str
+    status: FileIntegrityStatus
     missing_files: list[MissingFileInfo]
     missing_count: int
 
@@ -102,7 +97,7 @@ class BatchFileDeleteResultResponse(BaseModel):
     file_id: str
     ok: bool
     message: str
-    error_code: BatchFileDeleteErrorCode | None = None
+    error_code: FileDeleteErrorCode | None = None
     status_code: int | None = None
     filename: str | None = None
 

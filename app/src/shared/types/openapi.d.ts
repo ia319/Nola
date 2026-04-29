@@ -1116,8 +1116,11 @@ export interface components {
      * @description File integrity check result.
      */
     IntegrityCheckResponse: {
-      /** Status */
-      status: string
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'ok' | 'inconsistent'
       /** Missing Files */
       missing_files: components['schemas']['MissingFileInfo'][]
       /** Missing Count */

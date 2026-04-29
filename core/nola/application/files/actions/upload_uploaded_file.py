@@ -1,5 +1,6 @@
 """Upload-file use-case."""
 
+import asyncio
 import uuid
 from collections.abc import Callable, Set
 from pathlib import Path
@@ -72,7 +73,7 @@ async def upload_uploaded_file(
                         ),
                         error_code="file_too_large",
                     )
-                target.write(chunk)
+                await asyncio.to_thread(target.write, chunk)
     except FileUseCaseError:
         file_path.unlink(missing_ok=True)
         raise

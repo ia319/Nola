@@ -3,6 +3,7 @@
 from typing import Literal, TypedDict
 
 FileDeleteErrorCode = Literal["not_found", "linked_tasks", "duplicate_file_id"]
+FileIntegrityStatus = Literal["ok", "inconsistent"]
 FileUseCaseErrorCode = Literal[
     "not_found",
     "linked_tasks",
@@ -53,7 +54,7 @@ class MissingFilePayload(TypedDict):
 class IntegrityCheckPayload(TypedDict):
     """File integrity check result payload."""
 
-    status: str
+    status: FileIntegrityStatus
     missing_files: list[MissingFilePayload]
     missing_count: int
 

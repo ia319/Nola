@@ -69,7 +69,11 @@ class FakeFileStore:
         if q:
             rows = [row for row in rows if q.casefold() in str(row).casefold()]
         if content_type:
-            rows = [row for row in rows if row["content_type"] == content_type]
+            rows = [
+                row
+                for row in rows
+                if str(row["content_type"]).casefold() == content_type.casefold()
+            ]
         reverse = order == "desc"
         return sorted(rows, key=lambda row: str(row[sort_by]), reverse=reverse)[
             offset : offset + limit
@@ -80,14 +84,16 @@ class FakeFileStore:
         q: str | None = None,
         content_type: str | None = None,
     ) -> int:
-        return len(
-            self.list_files(
-                q=q,
-                content_type=content_type,
-                sort_by=DEFAULT_FILE_SORT_BY,
-                order=DEFAULT_FILE_SORT_ORDER,
-            )
-        )
+        rows = list(self.files.values())
+        if q:
+            rows = [row for row in rows if q.casefold() in str(row).casefold()]
+        if content_type:
+            rows = [
+                row
+                for row in rows
+                if str(row["content_type"]).casefold() == content_type.casefold()
+            ]
+        return len(rows)
 
 
 class FakeUploadStream:

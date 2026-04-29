@@ -12,6 +12,11 @@ from nola.application.files.types import (
 from nola.models.files import FileCleanupResult, FileIntegrityResult, FileRow
 
 
+def _string_or_empty(value: object) -> str:
+    """Return an empty string for missing payload values."""
+    return "" if value is None else str(value)
+
+
 def to_file_payload(file: FileRow) -> FilePayload:
     """Build uploaded-file payload from one database row."""
     return {
@@ -50,9 +55,9 @@ def normalize_missing_files(raw_missing_files: object) -> list[MissingFilePayloa
             continue
         missing_files.append(
             {
-                "id": str(raw_file.get("id", "")),
-                "filename": str(raw_file.get("filename", "")),
-                "path": str(raw_file.get("path", "")),
+                "id": _string_or_empty(raw_file.get("id")),
+                "filename": _string_or_empty(raw_file.get("filename")),
+                "path": _string_or_empty(raw_file.get("path")),
             }
         )
     return missing_files
