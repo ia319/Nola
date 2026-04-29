@@ -10,13 +10,13 @@ import {
   requestTaskRefresh,
   TaskDetailSheet,
   type TaskDetailSheetAction,
-  useHistoryTaskActions,
-  useHistoryTasks,
   useSessionTasksStore,
   useTaskDetailSheet,
 } from '@/features/tasks'
 import { HistoryTaskRecordsView } from './HistoryTaskRecordsView'
-import { useHistoryTaskDetail } from './useHistoryTaskDetail'
+import { useHistoryTaskActions } from './hooks/useHistoryTaskActions'
+import { useHistoryTaskDetail } from './hooks/useHistoryTaskDetail'
+import { useHistoryTasks } from './hooks/useHistoryTasks'
 import type { HistoryPageSize, HistoryRecordsMode, HistoryTaskQuery } from '@/routes/history-search'
 import { useDetailOverlayCloseRequest } from '@/shared/lib/overlay-events'
 import {

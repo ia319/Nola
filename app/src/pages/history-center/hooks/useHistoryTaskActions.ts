@@ -11,11 +11,7 @@ import {
   saveExport,
 } from '@/features/export'
 import type { ExportRequestOptions, SingleExportRequestOptions } from '@/features/export'
-import {
-  batchCancelHistoryTasks,
-  batchDeleteHistoryTaskRecords,
-  batchRetryHistoryTasks,
-} from '@/features/tasks/history/api'
+import { batchCancelTasks, batchDeleteTaskRecords, batchRetryTasks } from '@/features/tasks'
 import { downloadBlob } from '@/shared/lib/utils'
 import type { BatchTaskActionResponse, TaskStatus, TaskSummary } from '@/shared/types'
 
@@ -185,21 +181,21 @@ export function useHistoryTaskActions({
 
   const cancelTasks = useCallback(
     async (taskIds: string[]): Promise<BatchTaskActionResponse> => {
-      return runAction('cancel', taskIds, batchCancelHistoryTasks)
+      return runAction('cancel', taskIds, batchCancelTasks)
     },
     [runAction],
   )
 
   const retryTasks = useCallback(
     async (taskIds: string[]): Promise<BatchTaskActionResponse> => {
-      return runAction('retry', taskIds, batchRetryHistoryTasks)
+      return runAction('retry', taskIds, batchRetryTasks)
     },
     [runAction],
   )
 
   const deleteTaskRecords = useCallback(
     async (taskIds: string[]): Promise<BatchTaskActionResponse> => {
-      return runAction('delete_record', taskIds, batchDeleteHistoryTaskRecords)
+      return runAction('delete_record', taskIds, batchDeleteTaskRecords)
     },
     [runAction],
   )

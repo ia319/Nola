@@ -3,19 +3,15 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { batchExport, downloadExport, saveExport } from '@/features/export'
-import {
-  batchCancelHistoryTasks,
-  batchDeleteHistoryTaskRecords,
-  batchRetryHistoryTasks,
-} from '@/features/tasks/history/api'
-import { useHistoryTaskActions } from '@/features/tasks/history/hooks/useHistoryTaskActions'
+import { batchCancelTasks, batchDeleteTaskRecords, batchRetryTasks } from '@/features/tasks'
+import { useHistoryTaskActions } from '../useHistoryTaskActions'
 import { downloadBlob } from '@/shared/lib/utils'
 import { toast } from 'sonner'
 
-vi.mock('@/features/tasks/history/api', () => ({
-  batchCancelHistoryTasks: vi.fn(),
-  batchDeleteHistoryTaskRecords: vi.fn(),
-  batchRetryHistoryTasks: vi.fn(),
+vi.mock('@/features/tasks', () => ({
+  batchCancelTasks: vi.fn(),
+  batchDeleteTaskRecords: vi.fn(),
+  batchRetryTasks: vi.fn(),
 }))
 
 vi.mock('@/features/export', async () => {
@@ -46,9 +42,9 @@ vi.mock('sonner', () => ({
   },
 }))
 
-const batchCancelMock = vi.mocked(batchCancelHistoryTasks)
-const batchDeleteMock = vi.mocked(batchDeleteHistoryTaskRecords)
-const batchRetryMock = vi.mocked(batchRetryHistoryTasks)
+const batchCancelMock = vi.mocked(batchCancelTasks)
+const batchDeleteMock = vi.mocked(batchDeleteTaskRecords)
+const batchRetryMock = vi.mocked(batchRetryTasks)
 const batchExportMock = vi.mocked(batchExport)
 const downloadExportMock = vi.mocked(downloadExport)
 const saveExportMock = vi.mocked(saveExport)

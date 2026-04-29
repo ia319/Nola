@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
-import { listHistoryTasks } from '@/features/tasks/history/api'
+import { listTasks } from '@/features/tasks'
 import { isAppError } from '@/shared/lib/error-factory'
 import { queryKeys } from '@/shared/lib/query-keys'
 import type { AppError, TaskQueryModel, TaskSummary } from '@/shared/types'
@@ -46,7 +46,7 @@ export function useHistoryTasks({
 
   const taskListQuery = useQuery({
     queryKey: queryKeys.tasks.list(params),
-    queryFn: ({ signal }) => listHistoryTasks(params, signal),
+    queryFn: ({ signal }) => listTasks(params, signal),
   })
 
   useEffect(() => {

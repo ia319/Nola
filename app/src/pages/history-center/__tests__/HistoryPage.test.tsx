@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { isSameHistorySearch, normalizeHistorySearch } from '@/routes/history-search'
 import type { ExportDialogValue, ExportRequestOptions } from '@/features/export'
-import type { UseHistoryTaskActionsResult } from '@/features/tasks'
+import type { UseHistoryTaskActionsResult } from '../hooks/useHistoryTaskActions'
 import type { FileInfo, TaskDetail, TaskSummary } from '@/shared/types'
 
 const historyPageMocks = vi.hoisted(() => ({
@@ -94,10 +94,7 @@ vi.mock('react-i18next', () => ({
         'history.toolbar.searchLabel': 'Search history records',
         'history.toolbar.searchPlaceholder': 'Search by task ID or filename',
         'history.toolbar.clearSearch': 'Clear search',
-        'history.toolbar.exportSelected': 'Export Selected',
         'history.toolbar.status': 'Status',
-        'history.toolbar.sortBy': 'Sort by',
-        'history.toolbar.order': 'Order',
         'history.selection.clear': 'Clear selection',
         'history.files.table.caption': 'History file records',
         'history.files.table.typeFallback': 'Unknown',
@@ -192,9 +189,6 @@ vi.mock('react-i18next', () => ({
         'tasks.filters.sortBy.filename': 'Filename',
         'tasks.filters.order.desc': 'Desc',
         'tasks.filters.order.asc': 'Asc',
-        'tasks.history.batchActions.cancel': `Cancel selected (${String(params?.count)})`,
-        'tasks.history.batchActions.retry': `Retry selected (${String(params?.count)})`,
-        'tasks.history.batchActions.export': `Export selected (${String(params?.count)})`,
         'tasks.actions.cancel': 'Cancel',
         'tasks.actions.retry': 'Retry',
         'tasks.actions.export': 'Export',
@@ -366,29 +360,35 @@ vi.mock('@/features/tasks', async () => {
     ...actual,
     deleteTaskRecordAction: historyPageMocks.deleteTaskRecordAction,
     requestTaskRefresh: historyPageMocks.requestTaskRefresh,
-    useHistoryTaskActions: historyPageMocks.useHistoryTaskActions,
-    useHistoryTasks: historyPageMocks.useHistoryTasks,
     useSessionTasksStore: historyPageMocks.useSessionTasksStore,
   }
 })
 
-vi.mock('../useHistoryFiles', () => ({
+vi.mock('../hooks/useHistoryTasks', () => ({
+  useHistoryTasks: historyPageMocks.useHistoryTasks,
+}))
+
+vi.mock('../hooks/useHistoryTaskActions', () => ({
+  useHistoryTaskActions: historyPageMocks.useHistoryTaskActions,
+}))
+
+vi.mock('../hooks/useHistoryFiles', () => ({
   useHistoryFiles: historyPageMocks.useHistoryFiles,
 }))
 
-vi.mock('../useHistoryTaskDetail', () => ({
+vi.mock('../hooks/useHistoryTaskDetail', () => ({
   useHistoryTaskDetail: historyPageMocks.useHistoryTaskDetail,
 }))
 
-vi.mock('../useHistoryFileAssociatedTasks', () => ({
+vi.mock('../hooks/useHistoryFileAssociatedTasks', () => ({
   useHistoryFileAssociatedTasks: historyPageMocks.useHistoryFileAssociatedTasks,
 }))
 
-vi.mock('../useHistoryFileTaskCounts', () => ({
+vi.mock('../hooks/useHistoryFileTaskCounts', () => ({
   useHistoryFileTaskCounts: historyPageMocks.useHistoryFileTaskCounts,
 }))
 
-vi.mock('../useHistoryFileActions', () => ({
+vi.mock('../hooks/useHistoryFileActions', () => ({
   useHistoryFileActions: historyPageMocks.useHistoryFileActions,
 }))
 

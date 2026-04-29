@@ -4,16 +4,16 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { listHistoryTasks } from '@/features/tasks/history/api'
+import { listTasks } from '@/features/tasks'
 import type { TaskListResponse, TaskQueryModel, TaskSummary } from '@/shared/types'
 
 import { useHistoryTasks } from '../useHistoryTasks'
 
-vi.mock('@/features/tasks/history/api', () => ({
-  listHistoryTasks: vi.fn(),
+vi.mock('@/features/tasks', () => ({
+  listTasks: vi.fn(),
 }))
 
-const listTasksMock = vi.mocked(listHistoryTasks)
+const listTasksMock = vi.mocked(listTasks)
 
 function buildTask(taskId: string, status: TaskSummary['status']): TaskSummary {
   return {

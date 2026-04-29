@@ -38,7 +38,7 @@ import type {
 import type { HistoryPageSize, HistoryRecordsMode, HistoryTaskQuery } from '@/routes/history-search'
 import { HistoryPagination } from './HistoryPagination'
 import { HistoryToolbar } from './HistoryToolbar'
-import { useHistorySearchDraft } from './useHistorySearchDraft'
+import { useHistorySearchDraft } from './hooks/useHistorySearchDraft'
 
 type BatchTaskHandler = (taskIds: string[]) => Promise<void | BatchTaskActionResponse>
 type BatchExportHandler = (
