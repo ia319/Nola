@@ -223,7 +223,6 @@
       "newTasksNotice_other": "有 {{count}} 个新任务",
       "selection": {
         "selectCurrentPage": "选择当前页",
-        "clearCurrentPage": "清空当前页",
         "clear": "清除选择",
         "selectedCount_one": "已选择 {{count}} 项",
         "selectedCount_other": "已选择 {{count}} 项"
@@ -233,14 +232,6 @@
       },
       "table": {
         "rowActions": "任务 {{taskId}} 的操作"
-      },
-      "batchActions": {
-        "cancel_one": "取消所选 ({{count}})",
-        "cancel_other": "取消所选 ({{count}})",
-        "retry_one": "重试所选 ({{count}})",
-        "retry_other": "重试所选 ({{count}})",
-        "export_one": "导出所选 ({{count}})",
-        "export_other": "导出所选 ({{count}})"
       },
       "backToFirstPage": "返回第一页"
     },
@@ -372,25 +363,6 @@
         "ready": "就绪",
         "failed": "失败",
         "cancelled": "已取消"
-      }
-    },
-    "history": {
-      "title": "任务历史",
-      "description": "所有转写任务",
-      "empty": "暂无历史任务",
-      "selection": {
-        "selectCurrentPage": "选择当前页",
-        "clearCurrentPage": "清空当前页",
-        "selectedCount_one": "已选择 {{count}} 项",
-        "selectedCount_other": "已选择 {{count}} 项"
-      },
-      "batchActions": {
-        "cancel_one": "取消所选 ({{count}})",
-        "cancel_other": "取消所选 ({{count}})",
-        "retry_one": "重试所选 ({{count}})",
-        "retry_other": "重试所选 ({{count}})",
-        "export_one": "导出所选 ({{count}})",
-        "export_other": "导出所选 ({{count}})"
       }
     },
     "exportDialog": {
@@ -1145,10 +1117,7 @@
       "searchLabel": "搜索历史记录",
       "searchPlaceholder": "按任务 ID 或文件名搜索",
       "clearSearch": "清除搜索",
-      "exportSelected": "导出所选",
-      "status": "状态",
-      "sortBy": "排序字段",
-      "order": "排序方向"
+      "status": "状态"
     },
     "selection": {
       "clear": "清除选择",

@@ -224,7 +224,6 @@
       "newTasksNotice_other": "{{count}} new tasks available",
       "selection": {
         "selectCurrentPage": "Select current page",
-        "clearCurrentPage": "Clear current page",
         "clear": "Clear selection",
         "selectedCount_one": "{{count}} selected",
         "selectedCount_other": "{{count}} selected"
@@ -234,14 +233,6 @@
       },
       "table": {
         "rowActions": "Actions for task {{taskId}}"
-      },
-      "batchActions": {
-        "cancel_one": "Cancel selected ({{count}})",
-        "cancel_other": "Cancel selected ({{count}})",
-        "retry_one": "Retry selected ({{count}})",
-        "retry_other": "Retry selected ({{count}})",
-        "export_one": "Export selected ({{count}})",
-        "export_other": "Export selected ({{count}})"
       },
       "backToFirstPage": "Back to first page"
     },
@@ -373,25 +364,6 @@
         "ready": "Ready",
         "failed": "Failed",
         "cancelled": "Cancelled"
-      }
-    },
-    "history": {
-      "title": "Task History",
-      "description": "All transcription tasks",
-      "empty": "No history tasks",
-      "selection": {
-        "selectCurrentPage": "Select current page",
-        "clearCurrentPage": "Clear current page",
-        "selectedCount_one": "{{count}} selected",
-        "selectedCount_other": "{{count}} selected"
-      },
-      "batchActions": {
-        "cancel_one": "Cancel selected ({{count}})",
-        "cancel_other": "Cancel selected ({{count}})",
-        "retry_one": "Retry selected ({{count}})",
-        "retry_other": "Retry selected ({{count}})",
-        "export_one": "Export selected ({{count}})",
-        "export_other": "Export selected ({{count}})"
       }
     },
     "exportDialog": {
@@ -1146,10 +1118,7 @@
       "searchLabel": "Search history records",
       "searchPlaceholder": "Search by task ID or filename",
       "clearSearch": "Clear search",
-      "exportSelected": "Export Selected",
-      "status": "Status",
-      "sortBy": "Sort by",
-      "order": "Order"
+      "status": "Status"
     },
     "selection": {
       "clear": "Clear selection",

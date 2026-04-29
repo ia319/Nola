@@ -8,6 +8,4 @@
 
 export { ErrorBoundary } from './ErrorBoundary'
 export * from './interactive-table'
-export { ListToolbar } from './ListToolbar'
-export { TaskListPanel } from './TaskListPanel'
 export type { TaskActionHandler } from './types'
