@@ -29,6 +29,8 @@ export function useFileUpload(validationConfig: FileValidationConfig): UseFileUp
   const [uploads, setUploads] = useState<UploadItem[]>([])
   const [batchError, setBatchError] = useState<AppError | null>(null)
   const controllersRef = useRef<Map<string, AbortController>>(new Map())
+  // Preserve retry/start requests made while another selected upload batch owns the lock.
+  const queuedStartIdsRef = useRef<Set<string>>(new Set())
   const lockRef = useRef(false)
 
   const uploadsRef = useRef<UploadItem[]>([])
@@ -128,25 +130,58 @@ export function useFileUpload(validationConfig: FileValidationConfig): UseFileUp
     [updateItem],
   )
 
-  const startUpload = useCallback(async () => {
-    if (lockRef.current) return
-    lockRef.current = true
+  const startPendingUploads = useCallback(
+    async (resolvePendingIds: () => string[]) => {
+      if (lockRef.current) return
+      lockRef.current = true
 
-    try {
-      // Drain pending uploads with fixed-size batches; retries added mid-run are picked up next loop.
-      while (true) {
-        const pendingIds = uploadsRef.current.filter((u) => u.status === 'pending').map((u) => u.id)
-        if (pendingIds.length === 0) break
+      try {
+        // Drain the requested pending subset with fixed-size batches.
+        while (true) {
+          const targetIds = new Set(resolvePendingIds())
+          for (const queuedId of queuedStartIdsRef.current) {
+            targetIds.add(queuedId)
+          }
+          queuedStartIdsRef.current.clear()
 
-        for (let i = 0; i < pendingIds.length; i += UPLOAD_CONCURRENCY) {
-          const batch = pendingIds.slice(i, i + UPLOAD_CONCURRENCY)
-          await Promise.all(batch.map((id) => uploadSingleFile(id)))
+          const pendingIds = uploadsRef.current
+            .filter((u) => targetIds.has(u.id) && u.status === 'pending')
+            .map((u) => u.id)
+
+          if (pendingIds.length === 0) break
+
+          for (let i = 0; i < pendingIds.length; i += UPLOAD_CONCURRENCY) {
+            const batch = pendingIds.slice(i, i + UPLOAD_CONCURRENCY)
+            await Promise.all(batch.map((id) => uploadSingleFile(id)))
+          }
         }
+      } finally {
+        lockRef.current = false
       }
-    } finally {
-      lockRef.current = false
-    }
-  }, [uploadSingleFile])
+    },
+    [uploadSingleFile],
+  )
+
+  const startUploads = useCallback(
+    async (ids: readonly string[]) => {
+      const targetIds = new Set(ids)
+      if (targetIds.size === 0) return
+
+      if (lockRef.current) {
+        for (const id of targetIds) {
+          queuedStartIdsRef.current.add(id)
+        }
+        return
+      }
+
+      await startPendingUploads(() =>
+        uploadsRef.current
+          .filter((u) => targetIds.has(u.id) && u.status === 'pending')
+          .map((u) => u.id),
+      )
+    },
+    [startPendingUploads],
+  )
 
   const removeFile = useCallback(
     async (id: string) => {
@@ -174,17 +209,51 @@ export function useFileUpload(validationConfig: FileValidationConfig): UseFileUp
     [deleteRemoteFileQuietly, setUploadsSync],
   )
 
+  const removeFiles = useCallback(
+    async (ids: readonly string[]) => {
+      for (const id of Array.from(new Set(ids))) {
+        await removeFile(id)
+      }
+    },
+    [removeFile],
+  )
+
+  const cancelUploads = useCallback(
+    (ids: readonly string[]) => {
+      for (const id of Array.from(new Set(ids))) {
+        cancelUpload(id)
+      }
+    },
+    [cancelUpload],
+  )
+
+  const retryUploads = useCallback(
+    async (ids: readonly string[]) => {
+      const targetIds = new Set(ids)
+      if (targetIds.size === 0) return
+
+      setUploadsSync((prev) =>
+        prev.map((item) =>
+          targetIds.has(item.id) && (item.status === 'error' || item.status === 'cancelled')
+            ? { ...item, status: 'pending', error: null, progress: 0 }
+            : item,
+        ),
+      )
+
+      for (const id of targetIds) {
+        controllersRef.current.delete(id)
+      }
+
+      await startUploads(Array.from(targetIds))
+    },
+    [setUploadsSync, startUploads],
+  )
+
   const retryUpload = useCallback(
     async (id: string) => {
-      const item = uploadsRef.current.find((u) => u.id === id)
-      if (!item || (item.status !== 'error' && item.status !== 'cancelled')) return
-
-      updateItem(id, { status: 'pending', error: null, progress: 0 })
-      controllersRef.current.delete(id)
-
-      if (!lockRef.current) await startUpload()
+      await retryUploads([id])
     },
-    [updateItem, startUpload],
+    [retryUploads],
   )
 
   const markTaskCreated = useCallback(
@@ -199,6 +268,7 @@ export function useFileUpload(validationConfig: FileValidationConfig): UseFileUp
   const reset = useCallback(async () => {
     controllersRef.current.forEach((c) => c.abort())
     controllersRef.current.clear()
+    queuedStartIdsRef.current.clear()
 
     // NOTE: An in-flight upload that wins the abort race may write its fileId
     // after this snapshot, leaving the remote file uncleaned. Backend TTL
@@ -223,9 +293,11 @@ export function useFileUpload(validationConfig: FileValidationConfig): UseFileUp
 
   useEffect(() => {
     const controllers = controllersRef.current
+    const queuedStartIds = queuedStartIdsRef.current
     return () => {
       controllers.forEach((c) => c.abort())
       controllers.clear()
+      queuedStartIds.clear()
     }
   }, [])
 
@@ -237,9 +309,12 @@ export function useFileUpload(validationConfig: FileValidationConfig): UseFileUp
     uploads,
     addFiles,
     removeFile,
-    startUpload,
+    removeFiles,
+    startUploads,
     cancelUpload,
+    cancelUploads,
     retryUpload,
+    retryUploads,
     markTaskCreated,
     reset,
     isUploading,

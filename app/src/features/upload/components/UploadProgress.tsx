@@ -1,11 +1,16 @@
 import { useTranslation } from 'react-i18next'
 import { RefreshCcw, X } from 'lucide-react'
+import type { ReactNode } from 'react'
+
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import type { UploadStatus } from '@/features/upload/types'
 import { formatFileSize } from '@/shared/lib/format'
 import type { AppError } from '@/shared/types'
 import { cn } from '@/lib/utils'
+
+export const UPLOAD_PROGRESS_GRID_COLUMNS =
+  'grid-cols-[1.5rem_minmax(0,1.4fr)_minmax(8rem,1fr)_5.5rem_minmax(6rem,0.6fr)_auto]'
 
 interface UploadProgressProps {
   fileName: string
@@ -17,6 +22,16 @@ interface UploadProgressProps {
   onCancel?: () => void
   onRetry?: () => void
   onRemove?: () => void
+  leading?: ReactNode
+  selected?: boolean
+  onRowClick?: () => void
+}
+
+function clampProgress(progress: number): number {
+  if (!Number.isFinite(progress)) return 0
+  if (progress <= 0) return 0
+  if (progress >= 100) return 100
+  return progress
 }
 
 /**
@@ -32,8 +47,12 @@ export function UploadProgress({
   onCancel,
   onRetry,
   onRemove,
+  leading,
+  selected = false,
+  onRowClick,
 }: UploadProgressProps) {
   const { t } = useTranslation()
+  const resolvedProgress = status === 'success' ? 100 : clampProgress(progress)
   const statusLabel = (() => {
     switch (status) {
       case 'pending':
@@ -57,11 +76,28 @@ export function UploadProgress({
 
   return (
     <div
+      aria-selected={selected || undefined}
+      tabIndex={onRowClick ? 0 : undefined}
       className={cn(
-        'grid grid-cols-[minmax(0,1.4fr)_minmax(8rem,1fr)_5.5rem_auto] items-center gap-4 px-5 py-4',
-        status === 'error' && 'bg-surface-container-lowest/30',
+        'grid items-center gap-4 px-5 py-4 transition-colors',
+        UPLOAD_PROGRESS_GRID_COLUMNS,
+        onRowClick && 'hover:bg-surface-container-low cursor-pointer',
+        status === 'error' && !selected && 'bg-surface-container-lowest/30',
+        selected && 'bg-surface-container-low',
       )}
+      onClick={onRowClick}
+      onKeyDown={(event) => {
+        if (!onRowClick) return
+        if (event.target !== event.currentTarget) return
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        onRowClick()
+      }}
     >
+      <div data-row-click-ignore onClick={(event) => event.stopPropagation()}>
+        {leading}
+      </div>
+
       <div className="min-w-0 space-y-1">
         <p
           className={cn(
@@ -82,9 +118,9 @@ export function UploadProgress({
       <div className="min-w-0">
         {status === 'uploading' ? (
           <div className="flex max-w-32 flex-col gap-2">
-            <Progress value={progress} className="h-1.5" />
+            <Progress value={resolvedProgress} className="h-1.5" />
             <span className="text-muted-foreground text-[11px] font-semibold tracking-[0.18em] uppercase">
-              {progress}% {statusLabel}
+              {Math.round(resolvedProgress)}% {statusLabel}
             </span>
           </div>
         ) : (
@@ -96,12 +132,19 @@ export function UploadProgress({
 
       <span className="text-muted-foreground text-sm tabular-nums">{formatFileSize(fileSize)}</span>
 
+      <span className="text-muted-foreground text-sm tabular-nums">
+        {Math.round(resolvedProgress)}%
+      </span>
+
       <div className="flex shrink-0 justify-end gap-1">
         {status === 'uploading' && onCancel && (
           <Button
             variant="ghost"
             size="icon-xs"
-            onClick={onCancel}
+            onClick={(event) => {
+              event.stopPropagation()
+              onCancel()
+            }}
             aria-label={t('upload.progress.cancel')}
           >
             <X className="size-3.5" />
@@ -109,7 +152,15 @@ export function UploadProgress({
         )}
 
         {(status === 'error' || status === 'cancelled') && onRetry && (
-          <Button variant="ghost" size="xs" onClick={onRetry} className="uppercase">
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={(event) => {
+              event.stopPropagation()
+              onRetry()
+            }}
+            className="uppercase"
+          >
             <RefreshCcw className="size-3" />
             {t('upload.progress.retry')}
           </Button>
@@ -119,7 +170,10 @@ export function UploadProgress({
           <Button
             variant="ghost"
             size="icon-xs"
-            onClick={onRemove}
+            onClick={(event) => {
+              event.stopPropagation()
+              onRemove()
+            }}
             aria-label={t('upload.progress.remove')}
           >
             <X className="size-3.5" />
