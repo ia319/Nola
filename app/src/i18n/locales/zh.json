@@ -24,7 +24,6 @@
       "uploadFailed": "上传失败，请重试",
       "duplicateFiles": "已跳过 {{count}} 个重复文件"
     },
-    "startUpload": "开始上传",
     "reset": "全部重置"
   },
   "options": {
@@ -347,10 +346,25 @@
         "fileName": "文件名",
         "status": "状态",
         "size": "大小",
+        "progress": "进度",
         "action": "操作"
       },
       "actions": {
         "addMoreFiles": "继续添加文件"
+      },
+      "selection": {
+        "selectAll": "选择所有上传项",
+        "selectRow": "选择 {{name}}"
+      },
+      "batchActions": {
+        "uploadSelected_one": "上传选择的 ({{count}})",
+        "uploadSelected_other": "上传选择的 ({{count}})",
+        "cancel_one": "取消 ({{count}})",
+        "cancel_other": "取消 ({{count}})",
+        "retry_one": "重试 ({{count}})",
+        "retry_other": "重试 ({{count}})",
+        "remove_one": "移除 ({{count}})",
+        "remove_other": "移除 ({{count}})"
       },
       "status": {
         "pending": "等待上传",

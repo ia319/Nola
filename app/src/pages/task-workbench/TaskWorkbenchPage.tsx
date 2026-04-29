@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -21,7 +21,7 @@ import {
   useSessionTasksStore,
 } from '@/features/tasks'
 import type { TaskCreateResult } from '@/features/transcription-options'
-import { useFileUpload } from '@/features/upload'
+import { selectAvailableFileIds, useFileUpload, type UploadItem } from '@/features/upload'
 import { ContentCanvas, TwoColumnLayout } from '@/layouts'
 import { queryClient } from '@/shared/lib/query-client'
 import { queryKeys } from '@/shared/lib/query-keys'
@@ -51,10 +51,15 @@ function buildEmptyBatchResponse(
   }
 }
 
+function areStringArraysEqual(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index])
+}
+
 export function TaskWorkbenchPage() {
   const { t } = useTranslation()
   const { fileValidationConfig, isLoading: isConfigLoading } = useAppConfig()
   const displayedBatchErrorRef = useRef<AppError | null>(null)
+  const [selectedUploadIds, setSelectedUploadIds] = useState<string[]>([])
   const addCreatedTask = useSessionTasksStore((state) => state.addCreatedTask)
   const removeSessionTask = useSessionTasksStore((state) => state.removeSessionTask)
   const sessionTaskOrder = useSessionTasksStore((state) => state.order)
@@ -71,13 +76,15 @@ export function TaskWorkbenchPage() {
     uploads,
     addFiles,
     removeFile,
-    startUpload,
+    removeFiles,
+    startUploads,
     cancelUpload,
+    cancelUploads,
     retryUpload,
+    retryUploads,
     markTaskCreated,
     reset,
     isUploading,
-    availableFileIds,
     batchError,
   } = useFileUpload(fileValidationConfig)
 
@@ -94,6 +101,11 @@ export function TaskWorkbenchPage() {
   const summary = useMemo(
     () => buildTaskWorkbenchSummary(uploads, sessionTasks),
     [sessionTasks, uploads],
+  )
+  const selectedUploadIdSet = useMemo(() => new Set(selectedUploadIds), [selectedUploadIds])
+  const selectedAvailableFileIds = useMemo(
+    () => selectAvailableFileIds(uploads.filter((upload) => selectedUploadIdSet.has(upload.id))),
+    [selectedUploadIdSet, uploads],
   )
   const detailActionTask = taskDetail.task ?? taskDetailSheet.selectedTask
   const canCancelDetail = detailActionTask ? isActiveTaskStatus(detailActionTask.status) : false
@@ -166,6 +178,14 @@ export function TaskWorkbenchPage() {
   function handleFilesSelected(files: File[]) {
     addFiles(files)
   }
+
+  const handleSelectedUploadsChange = useCallback((selectedUploads: readonly UploadItem[]) => {
+    const nextSelectedUploadIds = selectedUploads.map((upload) => upload.id)
+
+    setSelectedUploadIds((previous) =>
+      areStringArraysEqual(previous, nextSelectedUploadIds) ? previous : nextSelectedUploadIds,
+    )
+  }, [])
 
   function handleTasksCreated(results: TaskCreateResult[]) {
     let hasNewTask = false
@@ -365,17 +385,21 @@ export function TaskWorkbenchPage() {
               hasPending={hasPending}
               onFilesSelected={handleFilesSelected}
               onCancelUpload={cancelUpload}
+              onCancelUploads={cancelUploads}
               onRetryUpload={retryUpload}
+              onRetryUploads={retryUploads}
               onRemoveUpload={removeFile}
-              onStartUpload={startUpload}
+              onRemoveUploads={removeFiles}
+              onStartUploads={startUploads}
               onReset={handleReset}
+              onSelectedUploadsChange={handleSelectedUploadsChange}
             />
           </ErrorBoundary>
         }
         right={
           <ErrorBoundary>
             <TaskWorkbenchSessionConfig
-              fileIds={availableFileIds}
+              fileIds={selectedAvailableFileIds}
               onCreateTask={createTask}
               onTasksCreated={handleTasksCreated}
               disabled={controlsDisabled}

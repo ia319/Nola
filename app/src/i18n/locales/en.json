@@ -25,7 +25,6 @@
       "duplicateFiles_one": "{{count}} duplicate file skipped",
       "duplicateFiles_other": "{{count}} duplicate files skipped"
     },
-    "startUpload": "Start Upload",
     "reset": "Reset All"
   },
   "options": {
@@ -348,10 +347,25 @@
         "fileName": "File Name",
         "status": "Status",
         "size": "Size",
+        "progress": "Progress",
         "action": "Action"
       },
       "actions": {
         "addMoreFiles": "Add More Files"
+      },
+      "selection": {
+        "selectAll": "Select all uploads",
+        "selectRow": "Select {{name}}"
+      },
+      "batchActions": {
+        "uploadSelected_one": "Upload selected ({{count}})",
+        "uploadSelected_other": "Upload selected ({{count}})",
+        "cancel_one": "Cancel ({{count}})",
+        "cancel_other": "Cancel ({{count}})",
+        "retry_one": "Retry ({{count}})",
+        "retry_other": "Retry ({{count}})",
+        "remove_one": "Remove ({{count}})",
+        "remove_other": "Remove ({{count}})"
       },
       "status": {
         "pending": "Pending",

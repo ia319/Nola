@@ -1,12 +1,34 @@
+import { useEffect, useRef, useState } from 'react'
 import { CloudUpload, Plus, Upload } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import {
+  useInteractiveTableSelection,
+  useLocalInteractiveTableQuery,
+  type InteractiveSortState,
+  type LocalInteractiveTableSortComparator,
+} from '@/components/common/interactive-table'
 import { EmptyState } from '@/components/ui'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { FileUploader, UploadList } from '@/features/upload'
-import type { UploadItem } from '@/features/upload'
+import logger from '@/config/logger'
+import {
+  FileUploader,
+  selectCancellableUploads,
+  selectRemovableUploads,
+  selectRetryableUploads,
+  selectStartableUploads,
+  UploadList,
+  UPLOAD_STATUS_SORT_ORDER,
+  type UploadItem,
+  type UploadQueueSortBy,
+} from '@/features/upload'
 import { formatFileSize } from '@/shared/lib/format'
+
+type UploadBatchActionType = 'cancel' | 'remove' | 'retry' | 'start'
+type UploadQueueSortComparators = Partial<
+  Record<UploadQueueSortBy, LocalInteractiveTableSortComparator<UploadItem>>
+>
 
 export interface TaskWorkbenchUploadQueueProps {
   uploads: UploadItem[]
@@ -16,10 +38,32 @@ export interface TaskWorkbenchUploadQueueProps {
   hasPending: boolean
   onFilesSelected: (files: File[]) => void
   onCancelUpload: (id: string) => void
+  onCancelUploads: (ids: readonly string[]) => void
   onRetryUpload: (id: string) => Promise<void>
+  onRetryUploads: (ids: readonly string[]) => Promise<void>
   onRemoveUpload: (id: string) => Promise<void>
-  onStartUpload: () => Promise<void>
+  onRemoveUploads: (ids: readonly string[]) => Promise<void>
+  onStartUploads: (ids: readonly string[]) => Promise<void>
   onReset: () => Promise<void>
+  onSelectedUploadsChange?: (uploads: readonly UploadItem[]) => void
+}
+
+function resolveProgressSortValue(upload: UploadItem): number {
+  if (upload.status === 'success') {
+    return 100
+  }
+  if (!Number.isFinite(upload.progress)) {
+    return 0
+  }
+  return upload.progress
+}
+
+const UPLOAD_QUEUE_SORT_COMPARATORS: UploadQueueSortComparators = {
+  filename: (left, right) => left.file.name.localeCompare(right.file.name),
+  status: (left, right) =>
+    UPLOAD_STATUS_SORT_ORDER[left.status] - UPLOAD_STATUS_SORT_ORDER[right.status],
+  size: (left, right) => left.file.size - right.file.size,
+  progress: (left, right) => resolveProgressSortValue(left) - resolveProgressSortValue(right),
 }
 
 export function TaskWorkbenchUploadQueue({
@@ -30,14 +74,60 @@ export function TaskWorkbenchUploadQueue({
   hasPending,
   onFilesSelected,
   onCancelUpload,
+  onCancelUploads,
   onRetryUpload,
+  onRetryUploads,
   onRemoveUpload,
-  onStartUpload,
+  onRemoveUploads,
+  onStartUploads,
   onReset,
+  onSelectedUploadsChange,
 }: TaskWorkbenchUploadQueueProps) {
   const { t } = useTranslation()
+  const [sort, setSort] = useState<InteractiveSortState<UploadQueueSortBy> | null>(null)
+  const [runningBatchAction, setRunningBatchAction] = useState<UploadBatchActionType | null>(null)
+  const runningBatchActionRef = useRef(false)
   const hasUploads = uploads.length > 0
   const controlsDisabled = disabled || isUploading
+  const uploadQuery = useLocalInteractiveTableQuery<UploadItem, UploadQueueSortBy>({
+    rows: uploads,
+    sort,
+    sortComparators: UPLOAD_QUEUE_SORT_COMPARATORS,
+  })
+  const selectionResetToken = uploads.map((upload) => upload.id).join('|')
+  const tableSelection = useInteractiveTableSelection({
+    rows: uploadQuery.sortedRows,
+    getRowId: (upload) => upload.id,
+    resetToken: selectionResetToken,
+  })
+  const selectedRows = tableSelection.selectedRows
+  const startableRows = selectStartableUploads(selectedRows)
+  const cancellableRows = selectCancellableUploads(selectedRows)
+  const retryableRows = selectRetryableUploads(selectedRows)
+  const removableRows = selectRemovableUploads(selectedRows)
+
+  useEffect(() => {
+    onSelectedUploadsChange?.(selectedRows)
+  }, [onSelectedUploadsChange, selectedRows])
+
+  async function runBatchAction(
+    action: UploadBatchActionType,
+    rows: readonly UploadItem[],
+    handler: (ids: readonly string[]) => void | Promise<void>,
+  ): Promise<void> {
+    if (rows.length === 0 || runningBatchActionRef.current) return
+
+    runningBatchActionRef.current = true
+    setRunningBatchAction(action)
+    try {
+      await handler(rows.map((row) => row.id))
+    } catch (error) {
+      logger.warn(`upload.${action}Batch unexpected`, error)
+    } finally {
+      runningBatchActionRef.current = false
+      setRunningBatchAction(null)
+    }
+  }
 
   return (
     <section data-slot="task-workbench-upload-queue" className="flex h-full flex-col gap-4">
@@ -57,7 +147,15 @@ export function TaskWorkbenchUploadQueue({
           <CardContent className="flex flex-1 flex-col px-0 py-0">
             <div className="min-h-0 flex-1 overflow-auto">
               <UploadList
-                uploads={uploads}
+                uploads={uploadQuery.sortedRows}
+                sort={sort}
+                onSortChange={setSort}
+                selection={{
+                  ...tableSelection.selection,
+                  getRowLabel: (upload) =>
+                    t('tasks.uploadQueue.selection.selectRow', { name: upload.file.name }),
+                  selectAllLabel: t('tasks.uploadQueue.selection.selectAll'),
+                }}
                 onCancel={onCancelUpload}
                 onRetry={onRetryUpload}
                 onRemove={onRemoveUpload}
@@ -78,14 +176,54 @@ export function TaskWorkbenchUploadQueue({
               </FileUploader>
 
               <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    void runBatchAction('cancel', cancellableRows, onCancelUploads)
+                  }}
+                  disabled={disabled || runningBatchAction !== null || cancellableRows.length === 0}
+                >
+                  {t('tasks.uploadQueue.batchActions.cancel', { count: cancellableRows.length })}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void runBatchAction('retry', retryableRows, onRetryUploads)}
+                  disabled={
+                    controlsDisabled || runningBatchAction !== null || retryableRows.length === 0
+                  }
+                >
+                  {t('tasks.uploadQueue.batchActions.retry', { count: retryableRows.length })}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void runBatchAction('remove', removableRows, onRemoveUploads)}
+                  disabled={disabled || runningBatchAction !== null || removableRows.length === 0}
+                  className="text-destructive hover:text-destructive"
+                >
+                  {t('tasks.uploadQueue.batchActions.remove', { count: removableRows.length })}
+                </Button>
                 {hasPending ? (
                   <Button
                     type="button"
                     size="sm"
-                    onClick={() => void onStartUpload()}
-                    disabled={controlsDisabled}
+                    onClick={() => {
+                      void runBatchAction('start', startableRows, onStartUploads)
+                    }}
+                    disabled={
+                      controlsDisabled || runningBatchAction !== null || startableRows.length === 0
+                    }
                   >
-                    {isUploading ? t('upload.progress.uploading') : t('upload.startUpload')}
+                    {isUploading
+                      ? t('upload.progress.uploading')
+                      : t('tasks.uploadQueue.batchActions.uploadSelected', {
+                          count: startableRows.length,
+                        })}
                   </Button>
                 ) : null}
                 <Button

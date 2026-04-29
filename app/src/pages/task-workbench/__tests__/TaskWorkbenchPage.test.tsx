@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { CurrentBatchTasksPanelProps } from '@/features/tasks'
@@ -69,7 +69,6 @@ vi.mock('react-i18next', () => ({
         'tasks.workbench.sections.sessionConfig.title': 'Session Configuration',
         'tasks.workbench.sections.sessionConfig.description':
           'Choose language and task settings before starting transcription.',
-        'upload.startUpload': 'Start Upload',
         'upload.reset': 'Reset All',
         'tasks.toast.actionFailed': 'Task action failed, please retry',
         'tasks.toast.recordDeleted': `Task record deleted: ${String(params?.taskId ?? '')}`,
@@ -101,6 +100,12 @@ vi.mock('@/config/use-app-config', () => ({
 }))
 
 vi.mock('@/features/upload', () => ({
+  selectAvailableFileIds: (
+    uploads: Array<{ status: string; taskCreated: boolean; fileId: string | null }>,
+  ) =>
+    uploads
+      .filter((upload) => upload.status === 'success' && !upload.taskCreated && upload.fileId)
+      .map((upload) => upload.fileId as string),
   useFileUpload: taskWorkbenchMocks.useFileUpload,
 }))
 
@@ -236,9 +241,12 @@ describe('TaskWorkbenchPage', () => {
       ],
       addFiles: vi.fn(),
       removeFile: vi.fn(),
-      startUpload: vi.fn(),
+      removeFiles: vi.fn(),
+      startUploads: vi.fn(),
       cancelUpload: vi.fn(),
+      cancelUploads: vi.fn(),
       retryUpload: vi.fn(),
+      retryUploads: vi.fn(),
       markTaskCreated: vi.fn(),
       reset: vi.fn(),
       isUploading: false,
@@ -314,7 +322,7 @@ describe('TaskWorkbenchPage', () => {
       onOpenTaskDetail: expect.any(Function),
     })
     expect(taskWorkbenchMocks.taskWorkbenchSessionConfig.mock.calls[0]?.[0]).toMatchObject({
-      fileIds: ['file-ready', 'file-created'],
+      fileIds: [],
       disabled: false,
       onCreateTask: expect.any(Function),
       onTasksCreated: expect.any(Function),
@@ -329,8 +337,22 @@ describe('TaskWorkbenchPage', () => {
       onCancelUpload: expect.any(Function),
       onRetryUpload: expect.any(Function),
       onRemoveUpload: expect.any(Function),
-      onStartUpload: expect.any(Function),
+      onStartUploads: expect.any(Function),
       onReset: expect.any(Function),
+      onSelectedUploadsChange: expect.any(Function),
+    })
+
+    const uploadQueueProps = taskWorkbenchMocks.taskWorkbenchUploadQueue.mock.calls[0]?.[0]
+    if (!uploadQueueProps) {
+      throw new Error('Expected upload queue props to be captured')
+    }
+
+    act(() => {
+      uploadQueueProps.onSelectedUploadsChange?.(uploadQueueProps.uploads)
+    })
+
+    expect(taskWorkbenchMocks.taskWorkbenchSessionConfig.mock.calls.at(-1)?.[0]).toMatchObject({
+      fileIds: ['file-ready'],
     })
   })
 
@@ -434,9 +456,12 @@ describe('TaskWorkbenchPage', () => {
       uploads: [],
       addFiles: vi.fn(),
       removeFile: vi.fn(),
-      startUpload: vi.fn(),
+      removeFiles: vi.fn(),
+      startUploads: vi.fn(),
       cancelUpload: vi.fn(),
+      cancelUploads: vi.fn(),
       retryUpload: vi.fn(),
+      retryUploads: vi.fn(),
       markTaskCreated: vi.fn(),
       reset: vi.fn(),
       isUploading: false,
