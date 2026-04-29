@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
-import { listFiles } from '@/features/upload/api'
+import { listFiles } from '@/features/upload'
 import { isAppError } from '@/shared/lib/error-factory'
 import { queryKeys } from '@/shared/lib/query-keys'
 import type { AppError, FileInfo } from '@/shared/types'

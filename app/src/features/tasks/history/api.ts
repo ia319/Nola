@@ -5,7 +5,12 @@ import type {
   TaskListResponse,
 } from '@/shared/types'
 
-import { batchCancelTasks, batchRetryTasks, listTasks } from '@/features/tasks/api'
+import {
+  batchCancelTasks,
+  batchDeleteTaskRecords,
+  batchRetryTasks,
+  listTasks,
+} from '@/features/tasks/api'
 
 export async function listHistoryTasks(
   params: TaskListApiQuery = {},
@@ -24,4 +29,10 @@ export async function batchRetryHistoryTasks(
   taskIds: BatchTaskActionRequest['task_ids'],
 ): Promise<BatchTaskActionResponse> {
   return batchRetryTasks(taskIds)
+}
+
+export async function batchDeleteHistoryTaskRecords(
+  taskIds: BatchTaskActionRequest['task_ids'],
+): Promise<BatchTaskActionResponse> {
+  return batchDeleteTaskRecords(taskIds)
 }

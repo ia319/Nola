@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CreateTaskPayload } from '@/shared/types'
 import {
   batchCancelTasks,
+  batchDeleteTaskRecords,
   batchRetryTasks,
   cancelTask,
   createTask,
@@ -66,13 +67,30 @@ describe('tasks api', () => {
     apiClientMocks.delete.mockResolvedValueOnce({ data: { task_id: 'task-1' } })
     apiClientMocks.delete.mockResolvedValueOnce({ data: { task_id: 'task-1' } })
 
-    await listTasks({ status: 'processing', limit: 20, offset: 0 }, signal)
+    await listTasks(
+      {
+        status: 'processing',
+        q: 'task-1',
+        sort_by: 'duration',
+        order: 'asc',
+        limit: 20,
+        offset: 0,
+      },
+      signal,
+    )
     await getTask('task-1', signal)
     await cancelTask('task-1')
     await deleteTaskRecord('task-1')
 
     expect(apiClientMocks.get).toHaveBeenNthCalledWith(1, '/api/transcription-tasks/', {
-      params: { status: 'processing', limit: 20, offset: 0 },
+      params: {
+        status: 'processing',
+        q: 'task-1',
+        sort_by: 'duration',
+        order: 'asc',
+        limit: 20,
+        offset: 0,
+      },
       signal,
     })
     expect(apiClientMocks.get).toHaveBeenNthCalledWith(2, '/api/transcription-tasks/task-1', {
@@ -90,6 +108,7 @@ describe('tasks api', () => {
 
     await batchCancelTasks(['task-1', 'task-2'])
     await batchRetryTasks(['task-3'])
+    await batchDeleteTaskRecords(['task-4', 'task-5'])
 
     expect(apiClientMocks.post).toHaveBeenNthCalledWith(
       1,
@@ -101,5 +120,12 @@ describe('tasks api', () => {
     expect(apiClientMocks.post).toHaveBeenNthCalledWith(2, '/api/transcription-tasks/batch/retry', {
       task_ids: ['task-3'],
     })
+    expect(apiClientMocks.post).toHaveBeenNthCalledWith(
+      3,
+      '/api/transcription-tasks/batch/delete-records',
+      {
+        task_ids: ['task-4', 'task-5'],
+      },
+    )
   })
 })

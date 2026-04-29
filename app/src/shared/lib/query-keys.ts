@@ -1,11 +1,8 @@
-import type { TaskListApiQuery } from '@/shared/types'
+import type { FileListApiQuery, TaskListApiQuery } from '@/shared/types'
 
 type TaskListKeyParams = TaskListApiQuery
 
-type FileListKeyParams = {
-  limit?: number
-  offset?: number
-}
+type FileListKeyParams = FileListApiQuery
 
 function normalizeTaskListParams(params: TaskListKeyParams = {}) {
   return {
@@ -20,6 +17,10 @@ function normalizeTaskListParams(params: TaskListKeyParams = {}) {
 
 function normalizeFileListParams(params: FileListKeyParams = {}) {
   return {
+    q: params.q ?? '',
+    content_type: params.content_type ?? null,
+    sort_by: params.sort_by ?? null,
+    order: params.order ?? null,
     limit: params.limit ?? null,
     offset: params.offset ?? null,
   }

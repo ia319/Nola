@@ -1,4 +1,4 @@
-export { listHistoryTasks } from './api'
+export { batchDeleteHistoryTaskRecords, listHistoryTasks } from './api'
 export { TaskHistoryPanel } from './components/TaskHistoryPanel'
 export type { TaskHistoryPanelProps } from './components/TaskHistoryPanel'
 export { useHistoryTaskActions } from './hooks/useHistoryTaskActions'

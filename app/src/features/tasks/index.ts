@@ -1,5 +1,6 @@
 export {
   batchCancelTasks,
+  batchDeleteTaskRecords,
   batchRetryTasks,
   cancelTask,
   createTask,

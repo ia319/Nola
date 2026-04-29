@@ -11,6 +11,8 @@ const TASK_SORT_OPTION_FLAGS: Record<TaskSortBy, true> = {
   status: true,
   progress: true,
   filename: true,
+  task_id: true,
+  duration: true,
 }
 
 const TASK_ORDER_OPTION_FLAGS: Record<SortOrder, true> = {

@@ -470,7 +470,9 @@
         "completed_at": "Completed Time",
         "status": "Status",
         "progress": "Progress",
-        "filename": "Filename"
+        "filename": "Filename",
+        "task_id": "Task ID",
+        "duration": "Duration"
       },
       "order": {
         "desc": "Desc",

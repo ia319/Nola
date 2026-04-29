@@ -1,8 +1,11 @@
 import apiClient from '@/shared/lib/api-client'
 import type {
+  BatchFileDeleteRequest,
+  BatchFileDeleteResponse,
   CleanupResponse,
   DeleteResponse,
   FileInfo,
+  FileListApiQuery,
   FileListResponse,
   FileUploadResponse,
   IntegrityCheckResponse,
@@ -42,12 +45,22 @@ export async function uploadFile(
 
 /** List uploaded files with pagination. */
 export async function listFiles(
-  params: { limit?: number; offset?: number } = {},
+  params: FileListApiQuery = {},
   signal?: AbortSignal,
 ): Promise<FileListResponse> {
   const { data } = await apiClient.get<FileListResponse>(BASE + '/', {
     params,
     signal,
+  })
+  return data
+}
+
+/** Delete multiple files and return per-file outcomes. */
+export async function batchDeleteFiles(
+  fileIds: BatchFileDeleteRequest['file_ids'],
+): Promise<BatchFileDeleteResponse> {
+  const { data } = await apiClient.post<BatchFileDeleteResponse>(BASE + '/batch/delete', {
+    file_ids: fileIds,
   })
   return data
 }

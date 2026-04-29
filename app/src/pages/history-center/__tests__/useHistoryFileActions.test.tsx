@@ -45,7 +45,7 @@ vi.mock('@/features/tasks', () => ({
   requestTaskRefresh: historyFileActionMocks.requestTaskRefresh,
 }))
 
-vi.mock('@/features/upload/api', () => ({
+vi.mock('@/features/upload', () => ({
   deleteFile: historyFileActionMocks.deleteFile,
 }))
 

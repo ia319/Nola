@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 
 import logger from '@/config/logger'
 import { requestTaskRefresh } from '@/features/tasks'
-import { deleteFile } from '@/features/upload/api'
+import { deleteFile } from '@/features/upload'
 import { isAppError } from '@/shared/lib/error-factory'
 import { queryKeys } from '@/shared/lib/query-keys'
 import type { FileInfo } from '@/shared/types'

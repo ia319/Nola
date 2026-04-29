@@ -320,7 +320,7 @@ export interface paths {
      *             (pending, processing, completed, failed, cancelled)
      *         limit: Maximum number of results
      *         offset: Pagination offset
-     *         q: Optional filename search keyword
+     *         q: Optional task id or filename search keyword
      *         sort_by: Sort field
      *         order: Sort order (asc or desc)
      *
@@ -425,6 +425,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/transcription-tasks/batch/delete-records': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch delete terminal task records
+     * @description Delete multiple terminal task records and return per-task outcomes.
+     */
+    post: operations['batch_delete_task_record_transcriptions_api_transcription_tasks_batch_delete_records_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/transcription-tasks/{task_id}/record': {
     parameters: {
       query?: never
@@ -514,6 +534,26 @@ export interface paths {
      *     Max file size: 500 MB
      */
     post: operations['upload_file_api_files__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/files/batch/delete': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch delete uploaded files
+     * @description Delete multiple files and return per-file outcomes.
+     */
+    post: operations['batch_delete_files_api_files_batch_delete_post']
     delete?: never
     options?: never
     head?: never
@@ -720,6 +760,61 @@ export interface components {
       zip_name?: string | null
     }
     /**
+     * BatchFileDeleteRequest
+     * @description Batch delete request for file records.
+     */
+    BatchFileDeleteRequest: {
+      /**
+       * File Ids
+       * @description List of file IDs to delete
+       */
+      file_ids: string[]
+    }
+    /**
+     * BatchFileDeleteResponse
+     * @description Response for batch file deletion.
+     */
+    BatchFileDeleteResponse: {
+      /**
+       * Action
+       * @constant
+       */
+      action: 'delete'
+      summary: components['schemas']['BatchFileDeleteSummaryResponse']
+      /** Results */
+      results: components['schemas']['BatchFileDeleteResultResponse'][]
+    }
+    /**
+     * BatchFileDeleteResultResponse
+     * @description Per-file result for batch file deletion.
+     */
+    BatchFileDeleteResultResponse: {
+      /** File Id */
+      file_id: string
+      /** Ok */
+      ok: boolean
+      /** Message */
+      message: string
+      /** Error Code */
+      error_code?: ('not_found' | 'linked_tasks' | 'duplicate_file_id') | null
+      /** Status Code */
+      status_code?: number | null
+      /** Filename */
+      filename?: string | null
+    }
+    /**
+     * BatchFileDeleteSummaryResponse
+     * @description Batch file deletion summary counts.
+     */
+    BatchFileDeleteSummaryResponse: {
+      /** Requested */
+      requested: number
+      /** Succeeded */
+      succeeded: number
+      /** Failed */
+      failed: number
+    }
+    /**
      * BatchTaskActionRequest
      * @description Batch action request for task-level operations.
      */
@@ -732,14 +827,14 @@ export interface components {
     }
     /**
      * BatchTaskActionResponse
-     * @description Response for batch cancel/retry actions.
+     * @description Response for batch task actions.
      */
     BatchTaskActionResponse: {
       /**
        * Action
        * @enum {string}
        */
-      action: 'cancel' | 'retry'
+      action: 'cancel' | 'retry' | 'delete_record'
       summary: components['schemas']['BatchTaskActionSummaryResponse']
       /** Results */
       results: components['schemas']['BatchTaskActionResultResponse'][]
@@ -2798,10 +2893,17 @@ export interface operations {
         limit?: number
         /** @description Offset for pagination */
         offset?: number
-        /** @description Search keyword for filename */
+        /** @description Search keyword for task id or filename */
         q?: string | null
         /** @description Sort field */
-        sort_by?: 'created_at' | 'completed_at' | 'status' | 'progress' | 'filename'
+        sort_by?:
+          | 'created_at'
+          | 'completed_at'
+          | 'status'
+          | 'progress'
+          | 'filename'
+          | 'task_id'
+          | 'duration'
         /** @description Sort order */
         order?: 'asc' | 'desc'
       }
@@ -2992,6 +3094,39 @@ export interface operations {
       }
     }
   }
+  batch_delete_task_record_transcriptions_api_transcription_tasks_batch_delete_records_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BatchTaskActionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BatchTaskActionResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   delete_task_api_transcription_tasks__task_id__record_delete: {
     parameters: {
       query?: never
@@ -3107,6 +3242,14 @@ export interface operations {
         limit?: number
         /** @description Offset for pagination */
         offset?: number
+        /** @description Search keyword for file id, filename, or content type */
+        q?: string | null
+        /** @description Filter by content type */
+        content_type?: string | null
+        /** @description Sort field */
+        sort_by?: 'filename' | 'size' | 'content_type' | 'created_at'
+        /** @description Sort order */
+        order?: 'asc' | 'desc'
       }
       header?: never
       path?: never
@@ -3154,6 +3297,39 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['FileUploadResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  batch_delete_files_api_files_batch_delete_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BatchFileDeleteRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BatchFileDeleteResponse']
         }
       }
       /** @description Validation Error */

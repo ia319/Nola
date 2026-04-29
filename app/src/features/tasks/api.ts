@@ -64,6 +64,15 @@ export async function batchRetryTasks(
   return data
 }
 
+export async function batchDeleteTaskRecords(
+  taskIds: BatchTaskActionRequest['task_ids'],
+): Promise<BatchTaskActionResponse> {
+  const { data } = await apiClient.post<BatchTaskActionResponse>(`${BASE}/batch/delete-records`, {
+    task_ids: taskIds,
+  })
+  return data
+}
+
 export async function deleteTaskRecord(taskId: string): Promise<DeleteTaskRecordResponse> {
   const { data } = await apiClient.delete<DeleteTaskRecordResponse>(`${BASE}/${taskId}/record`)
   return data

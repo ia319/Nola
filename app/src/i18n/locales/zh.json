@@ -469,7 +469,9 @@
         "completed_at": "完成时间",
         "status": "状态",
         "progress": "进度",
-        "filename": "文件名"
+        "filename": "文件名",
+        "task_id": "任务 ID",
+        "duration": "时长"
       },
       "order": {
         "desc": "降序",

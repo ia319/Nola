@@ -8,7 +8,7 @@ import {
 } from '@/shared/lib/task-query-options'
 import type { SortOrder, TaskFilterStatus, TaskSortBy, TaskSummary } from '@/shared/types'
 
-export type RecentTaskSortBy = TaskSortBy | 'task_id'
+export type RecentTaskSortBy = Exclude<TaskSortBy, 'duration'>
 
 export interface RecentTaskQueryModel {
   q: string
