@@ -167,7 +167,7 @@ export interface paths {
      * List active model downloads
      * @description Return active model downloads with real current speed snapshots.
      */
-    get: operations['list_active_downloads_api_models_downloads_get']
+    get: operations['list_active_model_downloads_api_models_downloads_get']
     put?: never
     post?: never
     delete?: never
@@ -187,7 +187,7 @@ export interface paths {
      * Get model settings
      * @description Return model directory configuration and worker runtime state.
      */
-    get: operations['get_model_settings_api_models_settings_get']
+    get: operations['read_model_settings_api_models_settings_get']
     put?: never
     post?: never
     delete?: never
@@ -231,7 +231,7 @@ export interface paths {
      * Get model detail
      * @description Return one model with full detail.
      */
-    get: operations['get_model_detail_api_models__model_id__get']
+    get: operations['read_model_detail_api_models__model_id__get']
     put?: never
     post?: never
     /**
@@ -2571,7 +2571,7 @@ export interface operations {
       }
     }
   }
-  list_active_downloads_api_models_downloads_get: {
+  list_active_model_downloads_api_models_downloads_get: {
     parameters: {
       query?: never
       header?: never
@@ -2591,7 +2591,7 @@ export interface operations {
       }
     }
   }
-  get_model_settings_api_models_settings_get: {
+  read_model_settings_api_models_settings_get: {
     parameters: {
       query?: never
       header?: never
@@ -2673,7 +2673,7 @@ export interface operations {
       }
     }
   }
-  get_model_detail_api_models__model_id__get: {
+  read_model_detail_api_models__model_id__get: {
     parameters: {
       query?: never
       header?: never
