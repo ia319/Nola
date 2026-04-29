@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { ComponentType } from 'react'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useSessionTasksStore } from '@/features/tasks/store/session-tasks-store'
@@ -112,6 +112,17 @@ function requireHtmlElement(value: Element | null, label: string): HTMLElement {
   throw new Error(`Expected ${label} to exist`)
 }
 
+function createDeferred<T = void>(): {
+  promise: Promise<T>
+  resolve: (value: T | PromiseLike<T>) => void
+} {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>((res) => {
+    resolve = res
+  })
+  return { promise, resolve }
+}
+
 beforeEach(() => {
   setSessionTasks([
     buildTask('task-beta', 'failed', {
@@ -211,6 +222,44 @@ describe('CurrentBatchTasksPanel', () => {
 
     await waitFor(() => {
       expect(onBatchRetryTasks).toHaveBeenCalledWith(['task-beta'])
+    })
+  })
+
+  it('disables delete while a batch action is running', async () => {
+    const batchRetry = createDeferred()
+    const onBatchRetryTasks = vi.fn().mockReturnValue(batchRetry.promise)
+    const onDeleteTaskRecord = vi.fn().mockResolvedValue(undefined)
+
+    render(
+      <CurrentBatchTasksPanel
+        pageSize={10}
+        onBatchRetryTasks={onBatchRetryTasks}
+        onDeleteTaskRecord={onDeleteTaskRecord}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select task task-beta' }))
+    fireEvent.click(screen.getByRole('button', { name: /Retry/ }))
+
+    await waitFor(() => {
+      expect(onBatchRetryTasks).toHaveBeenCalledWith(['task-beta'])
+    })
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Actions for task task-beta' }), {
+      button: 0,
+      ctrlKey: false,
+      pointerType: 'mouse',
+    })
+
+    const deleteItem = await screen.findByRole('menuitem', { name: 'Delete Record' })
+    expect(deleteItem).toHaveAttribute('data-disabled')
+
+    fireEvent.click(deleteItem)
+    expect(onDeleteTaskRecord).not.toHaveBeenCalled()
+
+    await act(async () => {
+      batchRetry.resolve()
+      await batchRetry.promise
     })
   })
 

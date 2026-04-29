@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Download, ListTodo, RotateCcw, Search, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -89,10 +89,6 @@ function clampProgress(progress: number): number {
   return progress
 }
 
-function buildActionKey(taskId: string, action: TaskActionType): string {
-  return `${taskId}:${action}`
-}
-
 function canCancelTask(task: TaskSummary): boolean {
   return isActiveTaskStatus(task.status)
 }
@@ -122,8 +118,10 @@ export function CurrentBatchTasksPanel({
   const { t } = useTranslation()
   const [runningBatchAction, setRunningBatchAction] = useState<'cancel' | 'retry' | null>(null)
   const runningBatchActionRef = useRef(false)
-  const runningRowActionsRef = useRef<Set<string>>(new Set())
-  const [runningRowActions, setRunningRowActions] = useState<Set<string>>(() => new Set())
+  const runningRowActionsRef = useRef<Map<string, TaskActionType>>(new Map())
+  const [runningRowActions, setRunningRowActions] = useState<Map<string, TaskActionType>>(
+    () => new Map(),
+  )
 
   // NOTE: Keep selectors independent to avoid object-identity churn from composed selectors;
   // consolidate only after profiling shows re-render pressure in this panel.
@@ -134,6 +132,10 @@ export function CurrentBatchTasksPanel({
     return order.map((taskId) => byId[taskId]).filter((task): task is TaskSummary => Boolean(task))
   }, [byId, order])
   const hasActiveTasks = tasks.some(canCancelTask)
+  const getTaskFileLabel = useCallback(
+    (task: TaskSummary) => resolveFileLabel(task, resolveFileName),
+    [resolveFileName],
+  )
 
   const {
     query,
@@ -147,7 +149,7 @@ export function CurrentBatchTasksPanel({
     setOrder,
     setPage,
     goToFirstPageForNewTasks,
-  } = useRecentTaskQuery(tasks, pageSize)
+  } = useRecentTaskQuery(tasks, pageSize, { getFileLabel: getTaskFileLabel })
 
   const pagedTaskMap = useMemo(() => {
     return Object.fromEntries(pagedTasks.map((task) => [task.task_id, task]))
@@ -168,35 +170,35 @@ export function CurrentBatchTasksPanel({
     [query.order, query.sort_by],
   )
 
-  function markRowActionRunning(actionKey: string): boolean {
-    if (runningRowActionsRef.current.has(actionKey)) {
+  function markRowActionRunning(taskId: string, action: TaskActionType): boolean {
+    if (runningRowActionsRef.current.has(taskId)) {
       return false
     }
 
-    runningRowActionsRef.current.add(actionKey)
+    runningRowActionsRef.current.set(taskId, action)
     setRunningRowActions((previous) => {
-      if (previous.has(actionKey)) {
+      if (previous.has(taskId)) {
         return previous
       }
-      const next = new Set(previous)
-      next.add(actionKey)
+      const next = new Map(previous)
+      next.set(taskId, action)
       return next
     })
     return true
   }
 
-  function clearRowActionRunning(actionKey: string): void {
-    if (!runningRowActionsRef.current.has(actionKey)) {
+  function clearRowActionRunning(taskId: string, action: TaskActionType): void {
+    if (runningRowActionsRef.current.get(taskId) !== action) {
       return
     }
 
-    runningRowActionsRef.current.delete(actionKey)
+    runningRowActionsRef.current.delete(taskId)
     setRunningRowActions((previous) => {
-      if (!previous.has(actionKey)) {
+      if (previous.get(taskId) !== action) {
         return previous
       }
-      const next = new Set(previous)
-      next.delete(actionKey)
+      const next = new Map(previous)
+      next.delete(taskId)
       return next
     })
   }
@@ -249,8 +251,7 @@ export function CurrentBatchTasksPanel({
     action: TaskActionType,
     handler: TaskActionHandler,
   ): Promise<void> {
-    const actionKey = buildActionKey(task.task_id, action)
-    if (!markRowActionRunning(actionKey)) {
+    if (!markRowActionRunning(task.task_id, action)) {
       return
     }
 
@@ -263,7 +264,7 @@ export function CurrentBatchTasksPanel({
         error,
       })
     } finally {
-      clearRowActionRunning(actionKey)
+      clearRowActionRunning(task.task_id, action)
     }
   }
 
@@ -298,10 +299,12 @@ export function CurrentBatchTasksPanel({
 
   const columns: readonly InteractiveTableColumn<TaskSummary, RecentTaskSortBy>[] = (() => {
     function buildRowActions(task: TaskSummary): readonly InteractiveTableRowAction[] {
-      const cancelBusy = runningRowActions.has(buildActionKey(task.task_id, 'cancel'))
-      const retryBusy = runningRowActions.has(buildActionKey(task.task_id, 'retry'))
-      const exportBusy = runningRowActions.has(buildActionKey(task.task_id, 'export'))
-      const deleteBusy = runningRowActions.has(buildActionKey(task.task_id, 'delete'))
+      const rowRunningAction = runningRowActions.get(task.task_id) ?? null
+      const rowBusy = rowRunningAction !== null
+      const cancelBusy = rowRunningAction === 'cancel'
+      const retryBusy = rowRunningAction === 'retry'
+      const exportBusy = rowRunningAction === 'export'
+      const deleteBusy = rowRunningAction === 'delete'
 
       return [
         {
@@ -309,7 +312,7 @@ export function CurrentBatchTasksPanel({
           label: cancelBusy ? t('tasks.actions.cancelling') : t('tasks.actions.cancel'),
           icon: <X />,
           hidden: !canCancelTask(task) || !hasBatchCancelHandler,
-          disabled: cancelBusy || runningBatchAction !== null,
+          disabled: rowBusy || runningBatchAction !== null,
           run: () => {
             if (onCancelTask) {
               return runRowAction(task, 'cancel', onCancelTask)
@@ -322,7 +325,7 @@ export function CurrentBatchTasksPanel({
           label: retryBusy ? t('tasks.actions.retrying') : t('tasks.actions.retry'),
           icon: <RotateCcw />,
           hidden: !canRetryTask(task) || !hasBatchRetryHandler,
-          disabled: retryBusy || runningBatchAction !== null,
+          disabled: rowBusy || runningBatchAction !== null,
           run: () => {
             if (onRetryTask) {
               return runRowAction(task, 'retry', onRetryTask)
@@ -335,7 +338,7 @@ export function CurrentBatchTasksPanel({
           label: exportBusy ? t('tasks.actions.exporting') : t('tasks.actions.export'),
           icon: <Download />,
           hidden: !isExportableTaskStatus(task.status) || !onExportTask,
-          disabled: exportBusy,
+          disabled: rowBusy || runningBatchAction !== null,
           run: () => (onExportTask ? runRowAction(task, 'export', onExportTask) : undefined),
         },
         {
@@ -343,7 +346,7 @@ export function CurrentBatchTasksPanel({
           label: deleteBusy ? t('tasks.actions.deleting') : t('tasks.actions.deleteRecord'),
           icon: <Trash2 />,
           hidden: !canDeleteTaskRecord(task) || !onDeleteTaskRecord,
-          disabled: deleteBusy,
+          disabled: rowBusy || runningBatchAction !== null,
           variant: 'destructive',
           run: () =>
             onDeleteTaskRecord ? runRowAction(task, 'delete', onDeleteTaskRecord) : undefined,

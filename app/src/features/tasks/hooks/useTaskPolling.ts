@@ -5,12 +5,14 @@ import { listTasks } from '@/features/tasks/api'
 import { subscribeTaskRefresh } from '@/features/tasks/lib/task-refresh'
 import { useSessionTasksStore } from '@/features/tasks/store/session-tasks-store'
 import { useTaskBoardStore } from '@/features/tasks/store/task-board-store'
-import { DEFAULT_TASK_ORDER, DEFAULT_TASK_SORT_BY } from '@/shared/lib/task-query-options'
 import { isActiveTaskStatus } from '@/shared/lib/task-status'
+import type { SortOrder, TaskSortBy } from '@/shared/types'
 
 const BACKGROUND_POLL_INTERVAL_MS = 6000
 const RETRY_BACKOFF_MS = [2000, 4000, 8000] as const
 const TASK_LIST_LIMIT = 100
+const TASK_POLL_SORT_BY = 'created_at' satisfies TaskSortBy
+const TASK_POLL_ORDER = 'desc' satisfies SortOrder
 
 function getBasePollIntervalMs(): number {
   if (typeof document !== 'undefined' && document.hidden) {
@@ -97,8 +99,8 @@ export function useTaskPolling(): UseTaskPollingReturn {
         const response = await listTasks(
           {
             limit: TASK_LIST_LIMIT,
-            sort_by: DEFAULT_TASK_SORT_BY,
-            order: DEFAULT_TASK_ORDER,
+            sort_by: TASK_POLL_SORT_BY,
+            order: TASK_POLL_ORDER,
           },
           controller.signal,
         )

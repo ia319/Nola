@@ -23,8 +23,13 @@ export function useTaskDetailSheet<ActionId extends string = string>({
   onActionError,
 }: UseTaskDetailSheetOptions<ActionId> = {}): UseTaskDetailSheetResult<ActionId> {
   const [selectedTask, setSelectedTask] = useState<TaskSummary | null>(null)
-  const [runningAction, setRunningAction] = useState<ActionId | null>(null)
-  const runningActionRef = useRef<ActionId | null>(null)
+  const [runningActionsByTaskId, setRunningActionsByTaskId] = useState<
+    ReadonlyMap<string, ActionId>
+  >(() => new Map())
+  const runningActionsRef = useRef<Map<string, ActionId>>(new Map())
+  const runningAction = selectedTask
+    ? (runningActionsByTaskId.get(selectedTask.task_id) ?? null)
+    : null
 
   const closeTaskDetail = useCallback(() => {
     setSelectedTask(null)
@@ -41,22 +46,29 @@ export function useTaskDetailSheet<ActionId extends string = string>({
 
   const runDetailAction = useCallback(
     async (action: ActionId, handler: () => void | Promise<void>): Promise<void> => {
-      if (runningActionRef.current !== null) {
+      if (!selectedTask) {
         return
       }
 
-      runningActionRef.current = action
-      setRunningAction(action)
+      const taskId = selectedTask.task_id
+      if (runningActionsRef.current.has(taskId)) {
+        return
+      }
+
+      runningActionsRef.current.set(taskId, action)
+      setRunningActionsByTaskId(new Map(runningActionsRef.current))
       try {
         await handler()
       } catch (error: unknown) {
         onActionError?.(action, error)
       } finally {
-        runningActionRef.current = null
-        setRunningAction(null)
+        if (runningActionsRef.current.get(taskId) === action) {
+          runningActionsRef.current.delete(taskId)
+          setRunningActionsByTaskId(new Map(runningActionsRef.current))
+        }
       }
     },
-    [onActionError],
+    [onActionError, selectedTask],
   )
 
   return {

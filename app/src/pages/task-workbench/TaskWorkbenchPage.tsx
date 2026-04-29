@@ -288,11 +288,13 @@ export function TaskWorkbenchPage() {
     try {
       const response = await batchCancelTasks(normalizedTaskIds)
       for (const result of response.results) {
-        if (result.ok && result.status && result.file_id) {
+        const existingTask = sessionTaskById[result.task_id]
+        const fileId = result.file_id ?? existingTask?.file_id
+        if (result.ok && result.status && fileId) {
           upsertSessionTask({
             task_id: result.task_id,
-            file_id: result.file_id,
-            filename: result.filename ?? undefined,
+            file_id: fileId,
+            filename: result.filename ?? existingTask?.filename,
             status: result.status,
           })
         }
@@ -317,11 +319,13 @@ export function TaskWorkbenchPage() {
     try {
       const response = await batchRetryTasks(normalizedTaskIds)
       for (const result of response.results) {
-        if (result.ok && result.new_task_id && result.file_id) {
+        const existingTask = sessionTaskById[result.task_id]
+        const fileId = result.file_id ?? existingTask?.file_id
+        if (result.ok && result.new_task_id && fileId) {
           addCreatedTask({
             task_id: result.new_task_id,
-            file_id: result.file_id,
-            filename: result.filename ?? undefined,
+            file_id: fileId,
+            filename: result.filename ?? existingTask?.filename,
             status: 'pending',
           })
         }

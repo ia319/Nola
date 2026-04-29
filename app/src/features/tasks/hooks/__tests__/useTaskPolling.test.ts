@@ -84,6 +84,14 @@ describe('useTaskPolling', () => {
     await flushAsyncWork()
 
     expect(listTasksMock).toHaveBeenCalledTimes(1)
+    expect(listTasksMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        limit: 100,
+        order: 'desc',
+        sort_by: 'created_at',
+      }),
+      expect.any(AbortSignal),
+    )
     expect(useTaskBoardStore.getState().tasks.map((task) => task.task_id)).toEqual(['task-1'])
     expect(useTaskBoardStore.getState().isPolling).toBe(true)
   })

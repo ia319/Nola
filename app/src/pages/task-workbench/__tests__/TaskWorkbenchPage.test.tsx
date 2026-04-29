@@ -356,6 +356,68 @@ describe('TaskWorkbenchPage', () => {
     })
   })
 
+  it('uses the session task file id when batch cancel results omit it', async () => {
+    taskWorkbenchMocks.batchCancelTasks.mockResolvedValueOnce({
+      action: 'cancel',
+      summary: { requested: 1, succeeded: 1, failed: 0 },
+      results: [
+        {
+          task_id: 'task-processing',
+          ok: true,
+          message: 'cancelled',
+          status: 'cancelled',
+        },
+      ],
+    })
+
+    render(<TaskWorkbenchPage />)
+
+    const panelProps = taskWorkbenchMocks.currentBatchTasksPanel.mock.calls[0]?.[0]
+    if (!panelProps?.onBatchCancelTasks) {
+      throw new Error('Expected batch cancel handler to be defined')
+    }
+
+    await panelProps.onBatchCancelTasks(['task-processing'])
+
+    expect(taskWorkbenchMocks.upsertSessionTask).toHaveBeenCalledWith({
+      task_id: 'task-processing',
+      file_id: 'file-processing',
+      filename: 'processing.wav',
+      status: 'cancelled',
+    })
+  })
+
+  it('uses the original session file id when batch retry results omit it', async () => {
+    taskWorkbenchMocks.batchRetryTasks.mockResolvedValueOnce({
+      action: 'retry',
+      summary: { requested: 1, succeeded: 1, failed: 0 },
+      results: [
+        {
+          task_id: 'task-pending',
+          ok: true,
+          message: 'created',
+          new_task_id: 'task-retry',
+        },
+      ],
+    })
+
+    render(<TaskWorkbenchPage />)
+
+    const panelProps = taskWorkbenchMocks.currentBatchTasksPanel.mock.calls[0]?.[0]
+    if (!panelProps?.onBatchRetryTasks) {
+      throw new Error('Expected batch retry handler to be defined')
+    }
+
+    await panelProps.onBatchRetryTasks(['task-pending'])
+
+    expect(taskWorkbenchMocks.addCreatedTask).toHaveBeenCalledWith({
+      task_id: 'task-retry',
+      file_id: 'file-pending',
+      filename: 'pending.wav',
+      status: 'pending',
+    })
+  })
+
   it('disables upload and task creation controls while app config is still loading', () => {
     taskWorkbenchMocks.useAppConfig.mockReturnValue({
       fileValidationConfig: {

@@ -45,6 +45,9 @@ export function useTaskDetail(taskId: string | null): UseTaskDetailResult {
     isLoading: taskDetailQuery.isPending,
     error: taskDetailQuery.error ? toAppError(taskDetailQuery.error) : null,
     refresh: async () => {
+      if (!taskId) {
+        return
+      }
       await taskDetailQuery.refetch()
     },
   }

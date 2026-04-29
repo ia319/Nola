@@ -33,18 +33,31 @@ export interface UseRecentTaskQueryResult {
   goToFirstPageForNewTasks: () => void
 }
 
+export interface UseRecentTaskQueryOptions {
+  getFileLabel?: (task: TaskSummary) => string
+}
+
 function toTimestamp(value: string | null): number {
   if (!value) return Number.NEGATIVE_INFINITY
   const parsed = Date.parse(value)
   return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed
 }
 
-function compareBySortField(a: TaskSummary, b: TaskSummary, sortBy: RecentTaskSortBy): number {
+function getDefaultFileLabel(task: TaskSummary): string {
+  return task.filename?.trim() || task.file_id
+}
+
+function compareBySortField(
+  a: TaskSummary,
+  b: TaskSummary,
+  sortBy: RecentTaskSortBy,
+  getFileLabel: (task: TaskSummary) => string,
+): number {
   if (sortBy === 'task_id') {
     return a.task_id.localeCompare(b.task_id)
   }
   if (sortBy === 'filename') {
-    return (a.filename?.trim() || a.file_id).localeCompare(b.filename?.trim() || b.file_id)
+    return getFileLabel(a).localeCompare(getFileLabel(b))
   }
   if (sortBy === 'created_at') {
     return toTimestamp(a.created_at) - toTimestamp(b.created_at)
@@ -63,8 +76,9 @@ function compareTasks(
   b: TaskSummary,
   sortBy: RecentTaskSortBy,
   order: RecentTaskQueryModel['order'],
+  getFileLabel: (task: TaskSummary) => string,
 ): number {
-  const primary = compareBySortField(a, b, sortBy)
+  const primary = compareBySortField(a, b, sortBy, getFileLabel)
   if (primary !== 0) {
     return order === 'asc' ? primary : -primary
   }
@@ -74,19 +88,24 @@ function compareTasks(
   return b.task_id.localeCompare(a.task_id)
 }
 
-function includeByKeyword(task: TaskSummary, keyword: string): boolean {
+function includeByKeyword(
+  task: TaskSummary,
+  keyword: string,
+  getFileLabel: (task: TaskSummary) => string,
+): boolean {
   if (!keyword) return true
   const normalized = keyword.toLowerCase()
   return (
     task.task_id.toLowerCase().includes(normalized) ||
     task.file_id.toLowerCase().includes(normalized) ||
-    (task.filename ?? '').toLowerCase().includes(normalized)
+    getFileLabel(task).toLowerCase().includes(normalized)
   )
 }
 
 export function useRecentTaskQuery(
   sourceTasks: TaskSummary[],
   pageSize: number = RECENT_PAGE_SIZE,
+  options: UseRecentTaskQueryOptions = {},
 ): UseRecentTaskQueryResult {
   const [query, setQuery] = useState<RecentTaskQueryModel>({
     q: '',
@@ -99,16 +118,17 @@ export function useRecentTaskQuery(
 
   const filteredTasks = useMemo(() => {
     const keyword = query.q.trim()
+    const getFileLabel = options.getFileLabel ?? getDefaultFileLabel
     return sourceTasks
       .filter((task) => {
         if (query.status !== DEFAULT_TASK_FILTER_STATUS && task.status !== query.status) {
           return false
         }
-        return includeByKeyword(task, keyword)
+        return includeByKeyword(task, keyword, getFileLabel)
       })
       .slice()
-      .sort((a, b) => compareTasks(a, b, query.sort_by, query.order))
-  }, [query.order, query.q, query.sort_by, query.status, sourceTasks])
+      .sort((a, b) => compareTasks(a, b, query.sort_by, query.order, getFileLabel))
+  }, [options.getFileLabel, query.order, query.q, query.sort_by, query.status, sourceTasks])
 
   const total = filteredTasks.length
   const totalPages = Math.max(1, Math.ceil(total / Math.max(query.page_size, 1)))
