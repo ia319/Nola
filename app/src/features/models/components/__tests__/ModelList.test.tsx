@@ -370,10 +370,10 @@ describe('ModelList', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select all models' }))
 
     expect(screen.getByText('3 selected')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Download selected(1)' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Cancel selected(0)' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Download selected (1)' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Cancel selected (0)' })).toBeDisabled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete selected(2)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected (2)' }))
 
     await waitFor(() => {
       expect(onDelete).toHaveBeenCalledTimes(2)

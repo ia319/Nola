@@ -24,6 +24,15 @@ function resolveClearSelectionLabel(label: ReactNode): string {
   return typeof label === 'string' ? label : 'Clear selection'
 }
 
+function resolveBatchActionLabel(
+  label: ReactNode,
+  count: number,
+  ariaLabel?: string,
+): string | undefined {
+  const baseLabel = ariaLabel ?? (typeof label === 'string' ? label : null)
+  return baseLabel ? `${baseLabel} (${count})` : undefined
+}
+
 /**
  * Render batch actions for the currently selected table rows.
  */
@@ -65,7 +74,11 @@ export function InteractiveTableBatchActionBar<Row>({
               type="button"
               size="xs"
               variant={action.variant ?? 'outline'}
-              aria-label={action.ariaLabel}
+              aria-label={resolveBatchActionLabel(
+                action.label,
+                eligibleRows.length,
+                action.ariaLabel,
+              )}
               aria-busy={action.isRunning || undefined}
               disabled={disabled}
               onClick={() => {
