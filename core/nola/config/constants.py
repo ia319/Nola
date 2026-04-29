@@ -34,6 +34,9 @@ ALLOWED_EXTENSIONS = {
 # Maximum task IDs allowed in a single batch request.
 MAX_BATCH_TASK_IDS = 500
 
+# Maximum file IDs allowed in a single batch request.
+MAX_BATCH_FILE_IDS = 500
+
 # Supported language codes from whisper/tokenizer.py LANGUAGES dict.
 SUPPORTED_LANGUAGES: frozenset[str] = frozenset(
     {

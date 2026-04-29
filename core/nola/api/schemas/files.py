@@ -1,6 +1,16 @@
 """File-related Pydantic response schemas."""
 
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+from nola.config.constants import MAX_BATCH_FILE_IDS
+
+BatchFileDeleteErrorCode = Literal[
+    "not_found",
+    "linked_tasks",
+    "duplicate_file_id",
+]
 
 
 class FileResponse(BaseModel):
@@ -65,3 +75,41 @@ class DeleteResponse(BaseModel):
     """Generic deletion confirmation."""
 
     message: str
+
+
+class BatchFileDeleteRequest(BaseModel):
+    """Batch delete request for file records."""
+
+    file_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_BATCH_FILE_IDS,
+        description="List of file IDs to delete",
+    )
+
+
+class BatchFileDeleteSummaryResponse(BaseModel):
+    """Batch file deletion summary counts."""
+
+    requested: int
+    succeeded: int
+    failed: int
+
+
+class BatchFileDeleteResultResponse(BaseModel):
+    """Per-file result for batch file deletion."""
+
+    file_id: str
+    ok: bool
+    message: str
+    error_code: BatchFileDeleteErrorCode | None = None
+    status_code: int | None = None
+    filename: str | None = None
+
+
+class BatchFileDeleteResponse(BaseModel):
+    """Response for batch file deletion."""
+
+    action: Literal["delete"]
+    summary: BatchFileDeleteSummaryResponse
+    results: list[BatchFileDeleteResultResponse]

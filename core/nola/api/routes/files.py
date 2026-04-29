@@ -1,14 +1,13 @@
 """File management API endpoints."""
 
-import sqlite3
-import uuid
-from pathlib import Path
-from typing import Any
+from typing import NoReturn
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
 from nola.api.deps import get_file_db
 from nola.api.schemas import (
+    BatchFileDeleteRequest,
+    BatchFileDeleteResponse,
     CleanupResponse,
     DeleteResponse,
     FileListResponse,
@@ -16,38 +15,78 @@ from nola.api.schemas import (
     FileUploadResponse,
     IntegrityCheckResponse,
 )
+from nola.application.files import (
+    batch_delete_uploaded_files,
+    check_file_integrity,
+    cleanup_orphan_files,
+    delete_uploaded_file,
+    get_uploaded_file,
+    list_uploaded_files,
+    upload_uploaded_file,
+)
+from nola.application.files.errors import FileUseCaseError
+from nola.application.files.types import (
+    BatchFileDeletePayload,
+    CleanupPayload,
+    FileListPayload,
+    FilePayload,
+    FileUploadPayload,
+    IntegrityCheckPayload,
+)
 from nola.config import ALLOWED_AUDIO_TYPES, ALLOWED_EXTENSIONS, settings
+from nola.models.files import (
+    DEFAULT_FILE_SORT_BY,
+    DEFAULT_FILE_SORT_ORDER,
+    FileSortField,
+    FileSortOrder,
+)
 from nola.utils import infer_content_type
 
 router = APIRouter(prefix="/api/files", tags=["files"])
+
+
+def _raise_file_http_error(error: FileUseCaseError) -> NoReturn:
+    """Raise an HTTPException from a file use-case error."""
+    raise HTTPException(status_code=error.status_code, detail=error.detail) from error
 
 
 @router.get("/", summary="List all uploaded files", response_model=FileListResponse)
 async def list_files(
     limit: int = Query(50, ge=1, le=100, description="Max results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
-) -> dict[str, Any]:
+    q: str | None = Query(
+        None,
+        description="Search keyword for file id, filename, or content type",
+    ),
+    content_type: str | None = Query(None, description="Filter by content type"),
+    sort_by: FileSortField = Query(DEFAULT_FILE_SORT_BY, description="Sort field"),
+    order: FileSortOrder = Query(DEFAULT_FILE_SORT_ORDER, description="Sort order"),
+) -> FileListPayload:
     """List all uploaded files with pagination."""
-    file_db = get_file_db()
+    return list_uploaded_files(
+        file_store=get_file_db(),
+        limit=limit,
+        offset=offset,
+        q=q,
+        content_type=content_type,
+        sort_by=sort_by,
+        order=order,
+    )
 
-    files = file_db.list_files(limit=limit, offset=offset)
-    total = file_db.count_files()
 
-    return {
-        "files": [
-            {
-                "file_id": f["id"],
-                "filename": f["filename"],
-                "size": f["size"],
-                "content_type": f["content_type"],
-                "created_at": f["created_at"],
-            }
-            for f in files
-        ],
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-    }
+@router.post(
+    "/batch/delete",
+    summary="Batch delete uploaded files",
+    response_model=BatchFileDeleteResponse,
+)
+async def batch_delete_files(
+    request: BatchFileDeleteRequest,
+) -> BatchFileDeletePayload:
+    """Delete multiple files and return per-file outcomes."""
+    return batch_delete_uploaded_files(
+        file_store=get_file_db(),
+        file_ids=request.file_ids,
+    )
 
 
 @router.get(
@@ -55,46 +94,32 @@ async def list_files(
     summary="Check database-file consistency",
     response_model=IntegrityCheckResponse,
 )
-async def check_integrity() -> dict[str, Any]:
+async def check_integrity() -> IntegrityCheckPayload:
     """Check consistency between database records and files on disk.
 
     Returns a list of 'missing_files' - database records that reference
     files which no longer exist on disk. This can happen if files are
     manually deleted from the uploads directory.
     """
-    file_db = get_file_db()
-    result = file_db.check_integrity()
-
-    return {
-        "status": "ok" if not result["missing_files"] else "inconsistent",
-        "missing_files": result["missing_files"],
-        "missing_count": len(result["missing_files"]),
-    }
+    return check_file_integrity(file_store=get_file_db())
 
 
 @router.post(
     "/cleanup", summary="Remove orphan database records", response_model=CleanupResponse
 )
-async def cleanup_orphans() -> dict[str, Any]:
+async def cleanup_orphans() -> CleanupPayload:
     """Remove database records for files that no longer exist on disk.
 
     This is useful after manually deleting files from the uploads directory.
     Use GET /check-integrity first to see what will be cleaned up.
     """
-    file_db = get_file_db()
-    result = file_db.cleanup_orphans()
-
-    return {
-        "message": f"Cleaned up {result['deleted_count']} orphan record(s)",
-        "deleted_count": result["deleted_count"],
-        "deleted_files": result["deleted_files"],
-    }
+    return cleanup_orphan_files(file_store=get_file_db())
 
 
 @router.post("/", summary="Upload an audio file", response_model=FileUploadResponse)
 async def upload_file(
     file: UploadFile = File(..., description="Audio file to upload"),
-) -> dict[str, Any]:
+) -> FileUploadPayload:
     """Upload an audio file for later transcription.
 
     The file is saved to the server and a file_id is returned.
@@ -103,74 +128,24 @@ async def upload_file(
     Supported formats: mp3, wav, flac, m4a, ogg, webm, aac
     Max file size: 500 MB
     """
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No filename provided")
-
-    file_ext = Path(file.filename).suffix.lower()
-    if file_ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file format: {file_ext}. "
-            f"Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
-        )
-
-    if file.content_type and file.content_type not in ALLOWED_AUDIO_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported content type: {file.content_type}",
-        )
-
-    file_id = str(uuid.uuid4())
-
-    settings.upload_dir.mkdir(parents=True, exist_ok=True)
-    file_path = settings.upload_dir / f"{file_id}{file_ext}"
-
-    file_size = 0
     try:
-        with open(file_path, "wb") as f:
-            while True:
-                chunk = await file.read(1024 * 1024)  # 1 MB chunks, async
-                if not chunk:
-                    break
-                file_size += len(chunk)
-                if file_size > settings.max_file_size:
-                    raise HTTPException(
-                        status_code=413,
-                        detail=(
-                            "File too large. Maximum size: "
-                            f"{settings.max_file_size // (1024 * 1024)} MB"
-                        ),
-                    )
-                f.write(chunk)
-    except HTTPException:
-        file_path.unlink(missing_ok=True)
-        raise
-    finally:
-        await file.close()
-
-    file_db = get_file_db()
-    try:
-        file_db.create_file(
-            file_id=file_id,
+        return await upload_uploaded_file(
+            file_store=get_file_db(),
+            stream=file,
             filename=file.filename,
-            path=str(file_path),
-            size=file_size,
-            content_type=file.content_type or infer_content_type(file.filename),
+            content_type=file.content_type,
+            upload_dir=settings.upload_dir,
+            max_file_size=settings.max_file_size,
+            allowed_extensions=ALLOWED_EXTENSIONS,
+            allowed_content_types=ALLOWED_AUDIO_TYPES,
+            infer_content_type=infer_content_type,
         )
-    except Exception:
-        file_path.unlink(missing_ok=True)
-        raise
-
-    return {
-        "file_id": file_id,
-        "filename": file.filename,
-        "size": file_size,
-        "content_type": file.content_type or infer_content_type(file.filename),
-    }
+    except FileUseCaseError as error:
+        _raise_file_http_error(error)
 
 
 @router.get("/{file_id}", summary="Get file metadata", response_model=FileResponse)
-async def get_file(file_id: str) -> dict[str, Any]:
+async def get_file(file_id: str) -> FilePayload:
     """Get file metadata.
 
     Args:
@@ -179,19 +154,10 @@ async def get_file(file_id: str) -> dict[str, Any]:
     Returns:
         File metadata
     """
-    file_db = get_file_db()
-    file = file_db.get_file(file_id)
-
-    if file is None:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    return {
-        "file_id": file["id"],
-        "filename": file["filename"],
-        "size": file["size"],
-        "content_type": file["content_type"],
-        "created_at": file["created_at"],
-    }
+    try:
+        return get_uploaded_file(file_store=get_file_db(), file_id=file_id)
+    except FileUseCaseError as error:
+        _raise_file_http_error(error)
 
 
 @router.delete("/{file_id}", summary="Delete a file", response_model=DeleteResponse)
@@ -204,42 +170,8 @@ async def delete_file(file_id: str) -> dict[str, str]:
     Returns:
         Deletion confirmation
     """
-    file_db = get_file_db()
-
-    file = file_db.get_file(file_id)
-    if file is None:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    linked_task_count = file_db.count_linked_tasks(file_id)
-    if linked_task_count > 0:
-        # TODO(backend): Decide whether file deletion should cascade to related
-        # task records instead of rejecting the request [2026-04-15]
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"Cannot delete file {file_id}: "
-                f"{linked_task_count} transcription task(s) still reference it"
-            ),
-        )
-
-    file_path = Path(file["path"])
-
-    # DB first: orphan file is safer than orphan DB record
     try:
-        deleted = file_db.delete_file(file_id)
-    except sqlite3.IntegrityError as exc:
-        linked_task_count = max(1, file_db.count_linked_tasks(file_id))
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"Cannot delete file {file_id}: "
-                f"{linked_task_count} transcription task(s) still reference it"
-            ),
-        ) from exc
-
-    if not deleted:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    file_path.unlink(missing_ok=True)
-
-    return {"message": f"File {file_id} deleted"}
+        payload = delete_uploaded_file(file_store=get_file_db(), file_id=file_id)
+    except FileUseCaseError as error:
+        _raise_file_http_error(error)
+    return {"message": payload["message"]}

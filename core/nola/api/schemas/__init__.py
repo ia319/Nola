@@ -8,6 +8,10 @@ from nola.api.schemas.config import (
     SessionExecutionDefaultsUpdateRequest,
 )
 from nola.api.schemas.files import (
+    BatchFileDeleteRequest,
+    BatchFileDeleteResponse,
+    BatchFileDeleteResultResponse,
+    BatchFileDeleteSummaryResponse,
     CleanupResponse,
     DeleteResponse,
     FileDetailResponse,
@@ -44,6 +48,10 @@ __all__ = [
     "BatchTaskActionResultResponse",
     "BatchTaskActionSummaryResponse",
     "BatchExportRequest",
+    "BatchFileDeleteRequest",
+    "BatchFileDeleteResponse",
+    "BatchFileDeleteResultResponse",
+    "BatchFileDeleteSummaryResponse",
     "CancelTaskResponse",
     "CleanupResponse",
     "CreateTaskResponse",

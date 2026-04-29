@@ -757,6 +757,53 @@ class TestTranscriptionTasksPhaseA:
         assert data["tasks"][0]["task_id"] == "search-task-1"
         assert data["tasks"][0]["filename"] == "meeting-alpha.mp3"
 
+    def test_list_supports_task_id_search_and_status_filter(
+        self,
+        client: TestClient,
+    ):
+        """List endpoint should search task ids and combine with status."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="task-id-search-file-1",
+            filename="alpha.mp3",
+            path="/tmp/alpha.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="task-id-search-file-2",
+            filename="beta.mp3",
+            path="/tmp/beta.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="needle-pending-task",
+            file_id="task-id-search-file-1",
+            options=None,
+        )
+        task_db.enqueue(
+            task_id="needle-completed-task",
+            file_id="task-id-search-file-2",
+            options=None,
+        )
+        _claim_pending_task(task_db, "needle-pending-task")
+        task_db.complete(
+            task_id="needle-pending-task",
+            segments=[{"start": 0.0, "end": 1.0, "text": "done"}],
+            duration=1.0,
+        )
+
+        response = client.get(
+            "/api/transcription-tasks",
+            params={"q": "needle", "status": "completed"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["tasks"][0]["task_id"] == "needle-pending-task"
+
     def test_list_search_escapes_like_wildcards(self, client: TestClient):
         """List search should treat % and _ as literal characters."""
         file_db = get_file_db()
@@ -907,6 +954,71 @@ class TestTranscriptionTasksPhaseA:
         assert response.status_code == 200
         tasks = response.json()["tasks"]
         assert [task["filename"] for task in tasks] == ["alpha.mp3", "zeta.mp3"]
+
+    def test_list_supports_task_id_and_duration_sort(self, client: TestClient):
+        """List endpoint should support task_id and duration sort fields."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="duration-sort-file",
+            filename="duration.mp3",
+            path="/tmp/duration.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="duration-long",
+            file_id="duration-sort-file",
+            options=None,
+            priority=10,
+        )
+        _claim_pending_task(task_db, "duration-long")
+        task_db.complete(
+            task_id="duration-long",
+            segments=[{"start": 0.0, "end": 1.0, "text": "long"}],
+            duration=8.0,
+        )
+        task_db.enqueue(
+            task_id="duration-null",
+            file_id="duration-sort-file",
+            options=None,
+            priority=0,
+        )
+        task_db.enqueue(
+            task_id="duration-short",
+            file_id="duration-sort-file",
+            options=None,
+            priority=10,
+        )
+        _claim_pending_task(task_db, "duration-short")
+        task_db.complete(
+            task_id="duration-short",
+            segments=[{"start": 0.0, "end": 1.0, "text": "short"}],
+            duration=2.0,
+        )
+
+        task_id_response = client.get(
+            "/api/transcription-tasks",
+            params={"sort_by": "task_id", "order": "asc", "limit": 3},
+        )
+        duration_response = client.get(
+            "/api/transcription-tasks",
+            params={"sort_by": "duration", "order": "asc", "limit": 3},
+        )
+
+        assert task_id_response.status_code == 200
+        assert [task["task_id"] for task in task_id_response.json()["tasks"]] == [
+            "duration-long",
+            "duration-null",
+            "duration-short",
+        ]
+
+        assert duration_response.status_code == 200
+        assert [task["task_id"] for task in duration_response.json()["tasks"]] == [
+            "duration-short",
+            "duration-long",
+            "duration-null",
+        ]
 
     def test_batch_cancel_returns_mixed_outcomes(self, client: TestClient):
         """Batch cancel should return per-item outcomes and summary counts."""
@@ -1130,6 +1242,64 @@ class TestTranscriptionTasksPhaseA:
         get_response = client.get("/api/transcription-tasks/delete-completed-task")
         assert get_response.status_code == 404
 
+    def test_batch_delete_records_returns_mixed_outcomes(self, client: TestClient):
+        """Batch delete-record endpoint should return per-task outcomes."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        file_db.create_file(
+            file_id="batch-delete-completed-file",
+            filename="completed.mp3",
+            path="/tmp/completed.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="batch-delete-pending-file",
+            filename="pending.mp3",
+            path="/tmp/pending.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="batch-delete-completed",
+            file_id="batch-delete-completed-file",
+            options=None,
+        )
+        _claim_pending_task(task_db, "batch-delete-completed")
+        task_db.complete(
+            task_id="batch-delete-completed",
+            segments=[{"start": 0.0, "end": 1.0, "text": "done"}],
+            duration=1.0,
+        )
+        task_db.enqueue(
+            task_id="batch-delete-pending",
+            file_id="batch-delete-pending-file",
+            options=None,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks/batch/delete-records",
+            json={
+                "task_ids": [
+                    "batch-delete-completed",
+                    "batch-delete-pending",
+                    "batch-delete-missing",
+                    "batch-delete-completed",
+                ]
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["action"] == "delete_record"
+        assert payload["summary"] == {"requested": 4, "succeeded": 1, "failed": 3}
+        results = payload["results"]
+        assert results[0]["ok"] is True
+        assert results[0]["task_id"] == "batch-delete-completed"
+        assert results[1]["error_code"] == "invalid_status"
+        assert results[2]["error_code"] == "not_found"
+        assert results[3]["error_code"] == "duplicate_task_id"
+        assert task_db.get_task("batch-delete-completed") is None
+        assert task_db.get_task("batch-delete-pending") is not None
+
     def test_legacy_delete_record_alias_is_removed(self, client: TestClient):
         """Legacy delete-record path should not be exposed."""
         response = client.delete("/api/transcriptions/some-task-id/record")
@@ -1325,6 +1495,106 @@ class TestFilesAPIExtended:
         data = response.json()
         assert data["limit"] == 10
         assert data["offset"] == 5
+
+    def test_list_files_supports_query_filter_and_sort(self, client: TestClient):
+        """File list endpoint should search, filter, and sort in the API."""
+        file_db = get_file_db()
+        file_db.create_file(
+            file_id="api-file-zeta",
+            filename="zeta.wav",
+            path="/tmp/zeta.wav",
+            size=300,
+            content_type="audio/wav",
+        )
+        file_db.create_file(
+            file_id="api-needle-file",
+            filename="alpha.mp3",
+            path="/tmp/alpha.mp3",
+            size=100,
+            content_type="audio/mpeg",
+        )
+        file_db.create_file(
+            file_id="api-file-beta",
+            filename="beta.flac",
+            path="/tmp/beta.flac",
+            size=200,
+            content_type="audio/flac",
+        )
+
+        search_response = client.get("/api/files/", params={"q": "needle"})
+        filter_response = client.get(
+            "/api/files/",
+            params={"content_type": "audio/mpeg"},
+        )
+        sort_response = client.get(
+            "/api/files/",
+            params={"sort_by": "filename", "order": "asc", "limit": 3},
+        )
+
+        assert search_response.status_code == 200
+        assert search_response.json()["total"] == 1
+        assert search_response.json()["files"][0]["file_id"] == "api-needle-file"
+
+        assert filter_response.status_code == 200
+        assert filter_response.json()["total"] == 1
+        assert filter_response.json()["files"][0]["content_type"] == "audio/mpeg"
+
+        assert sort_response.status_code == 200
+        assert [file["filename"] for file in sort_response.json()["files"]] == [
+            "alpha.mp3",
+            "beta.flac",
+            "zeta.wav",
+        ]
+
+    def test_batch_delete_files_returns_mixed_outcomes(self, client: TestClient):
+        """Batch file deletion should keep per-file 404/409 outcomes."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="batch-file-ok",
+            filename="ok.mp3",
+            path="/tmp/ok.mp3",
+            size=1000,
+        )
+        file_db.create_file(
+            file_id="batch-file-linked",
+            filename="linked.mp3",
+            path="/tmp/linked.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="batch-file-linked-task",
+            file_id="batch-file-linked",
+            options=None,
+        )
+
+        response = client.post(
+            "/api/files/batch/delete",
+            json={
+                "file_ids": [
+                    "batch-file-ok",
+                    "batch-file-linked",
+                    "batch-file-missing",
+                    "batch-file-ok",
+                ]
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["action"] == "delete"
+        assert payload["summary"] == {"requested": 4, "succeeded": 1, "failed": 3}
+        results = payload["results"]
+        assert results[0]["ok"] is True
+        assert results[0]["filename"] == "ok.mp3"
+        assert results[1]["error_code"] == "linked_tasks"
+        assert results[1]["status_code"] == 409
+        assert results[2]["error_code"] == "not_found"
+        assert results[2]["status_code"] == 404
+        assert results[3]["error_code"] == "duplicate_file_id"
+        assert file_db.get_file("batch-file-ok") is None
+        assert file_db.get_file("batch-file-linked") is not None
 
     def test_check_integrity_empty(self, client):
         """Test integrity check when no files exist."""
