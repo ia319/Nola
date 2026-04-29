@@ -231,6 +231,7 @@ export function InteractiveTablePagination({
               size="icon-sm"
               variant={item === model.page ? 'default' : 'ghost'}
               aria-label={pageLabel(item)}
+              aria-current={item === model.page ? 'page' : undefined}
               disabled={isLoading}
               onClick={() => {
                 onPageChange(item)

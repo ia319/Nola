@@ -10,6 +10,7 @@ export interface InteractiveTableSortableHeaderProps<SortKey extends string> {
   sort?: InteractiveSortState<SortKey> | null
   defaultSortDirection?: InteractiveSortDirection
   onSortChange: (sort: InteractiveSortState<SortKey>) => void
+  /** Accessible column label used when label content is not plain text. */
   ariaLabel?: string
   className?: string
 }
@@ -26,8 +27,12 @@ function resolveNextDirection<SortKey extends string>(
   return sort.direction === 'asc' ? 'desc' : 'asc'
 }
 
-function resolveSortLabel(label: ReactNode, nextDirection: InteractiveSortDirection): string {
-  const text = typeof label === 'string' ? label : 'column'
+function resolveSortLabel(
+  label: ReactNode,
+  nextDirection: InteractiveSortDirection,
+  ariaLabel?: string,
+): string {
+  const text = ariaLabel ?? (typeof label === 'string' ? label : 'column')
   return `Sort ${text} ${nextDirection === 'asc' ? 'ascending' : 'descending'}`
 }
 
@@ -50,7 +55,7 @@ export function InteractiveTableSortableHeader<SortKey extends string>({
   return (
     <button
       type="button"
-      aria-label={ariaLabel ?? resolveSortLabel(label, nextDirection)}
+      aria-label={resolveSortLabel(label, nextDirection, ariaLabel)}
       data-sort-state={sortState}
       className={cn(
         'inline-flex max-w-full items-center gap-1.5 rounded-sm text-left text-[11px] font-semibold tracking-[0.18em] uppercase transition-colors',

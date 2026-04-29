@@ -10,6 +10,7 @@ export type InteractiveTableBatchActionBarProps<Row> = Omit<
   'children'
 > & {
   selectedRows: readonly Row[]
+  /** Optional commands for selected rows; clear selection remains available without actions. */
   actions: readonly InteractiveBatchAction<Row>[]
   onClearSelection: () => void
   selectedRowsLabel?: (count: number) => ReactNode
@@ -45,7 +46,7 @@ export function InteractiveTableBatchActionBar<Row>({
   className,
   ...props
 }: InteractiveTableBatchActionBarProps<Row>) {
-  if (selectedRows.length === 0 || actions.length === 0) {
+  if (selectedRows.length === 0) {
     return null
   }
 

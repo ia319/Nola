@@ -91,6 +91,36 @@ describe('InteractiveTable', () => {
     expect(onSortChange).toHaveBeenLastCalledWith({ key: 'status', direction: 'desc' })
   })
 
+  it('uses sortAriaLabel for non-string sortable headers', () => {
+    const onSortChange = vi.fn()
+
+    render(
+      <InteractiveTable
+        rows={rows}
+        getRowId={(row) => row.id}
+        columns={[
+          {
+            id: 'name',
+            header: (
+              <span>
+                <span aria-hidden="true">#</span>
+                Name
+              </span>
+            ),
+            sortKey: 'name',
+            sortAriaLabel: 'Name',
+            cell: (row) => row.name,
+          },
+        ]}
+        sort={null}
+        onSortChange={onSortChange}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sort Name ascending' }))
+    expect(onSortChange).toHaveBeenCalledWith({ key: 'name', direction: 'asc' })
+  })
+
   it('exposes neutral, ascending, and descending sort states', () => {
     const onSortChange = vi.fn()
     const { rerender } = render(
@@ -264,6 +294,29 @@ describe('InteractiveTable', () => {
 
     expect(toolbar).toContainElement(screen.getByLabelText('Search rows'))
     expect(toolbar).toContainElement(screen.getByRole('button', { name: /Delete/ }))
+  })
+
+  it('keeps clear selection available when no batch actions are provided', () => {
+    const onClearSelection = vi.fn()
+
+    render(
+      <InteractiveTable
+        rows={rows}
+        getRowId={(row) => row.id}
+        columns={buildColumns()}
+        selection={{
+          selectedRowIds: ['row-1'],
+          onToggleRow: vi.fn(),
+          onToggleCurrentPage: vi.fn(),
+          onClearSelection,
+        }}
+      />,
+    )
+
+    expect(screen.getByText('1 selected')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }))
+    expect(onClearSelection).toHaveBeenCalledTimes(1)
   })
 
   it('skips unselectable rows when selecting the current page', () => {

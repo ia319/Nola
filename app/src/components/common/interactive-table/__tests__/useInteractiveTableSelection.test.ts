@@ -64,6 +64,32 @@ describe('useInteractiveTableSelection', () => {
     expect(result.current.selectedRowIds).toEqual([])
   })
 
+  it('does not restore stale selection when resetToken cycles back', () => {
+    const rows = [buildRow('row-1')]
+    const { result, rerender } = renderHook(
+      ({ token }) =>
+        useInteractiveTableSelection({
+          rows,
+          getRowId: (row) => row.id,
+          resetToken: token,
+        }),
+      {
+        initialProps: { token: 'a' },
+      },
+    )
+
+    act(() => {
+      result.current.onToggleRow(rows[0], true)
+    })
+    expect(result.current.selectedRowIds).toEqual(['row-1'])
+
+    rerender({ token: 'b' })
+    expect(result.current.selectedRowIds).toEqual([])
+
+    rerender({ token: 'a' })
+    expect(result.current.selectedRowIds).toEqual([])
+  })
+
   it('excludes unselectable rows from row and current-page selection', () => {
     const rows = [buildRow('row-1'), buildRow('row-2', 'locked'), buildRow('row-3')]
     const { result } = renderHook(() =>

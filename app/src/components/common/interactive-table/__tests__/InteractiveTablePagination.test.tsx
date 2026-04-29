@@ -61,7 +61,7 @@ describe('InteractiveTablePagination', () => {
     expect(screen.getByLabelText('Rows')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Forward' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Go to 2' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Go to 2' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('hides the page-size control when no page-size handler is provided', () => {

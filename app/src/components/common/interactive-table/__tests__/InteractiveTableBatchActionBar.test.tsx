@@ -65,4 +65,21 @@ describe('InteractiveTableBatchActionBar', () => {
     fireEvent.click(archiveButton)
     expect(run).not.toHaveBeenCalled()
   })
+
+  it('keeps the clear selection button available without actions', () => {
+    const onClearSelection = vi.fn()
+
+    render(
+      <InteractiveTableBatchActionBar
+        selectedRows={rows}
+        actions={[]}
+        onClearSelection={onClearSelection}
+      />,
+    )
+
+    expect(screen.getByText('2 selected')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }))
+    expect(onClearSelection).toHaveBeenCalledTimes(1)
+  })
 })

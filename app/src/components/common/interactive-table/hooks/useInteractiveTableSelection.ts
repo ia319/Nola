@@ -32,6 +32,7 @@ export interface UseInteractiveTableSelectionResult<Row> {
 
 type SelectionState = {
   resetToken: string | undefined
+  resetVersion: number
   ids: string[]
 }
 
@@ -51,8 +52,21 @@ export function useInteractiveTableSelection<Row>({
 }: UseInteractiveTableSelectionOptions<Row>): UseInteractiveTableSelectionResult<Row> {
   const [selectionState, setSelectionState] = useState<SelectionState>(() => ({
     resetToken,
+    resetVersion: 0,
     ids: uniqueIds(initialSelectedRowIds),
   }))
+  let currentSelectionState = selectionState
+
+  if (currentSelectionState.resetToken !== resetToken) {
+    currentSelectionState = {
+      resetToken,
+      resetVersion: currentSelectionState.resetVersion + 1,
+      ids: [],
+    }
+    setSelectionState(currentSelectionState)
+  }
+
+  const resetVersion = currentSelectionState.resetVersion
 
   const selectableRows = useMemo(() => {
     return rows.filter((row) => getRowSelectable?.(row) ?? true)
@@ -66,9 +80,7 @@ export function useInteractiveTableSelection<Row>({
     return new Set(selectableRowIds)
   }, [selectableRowIds])
 
-  const rawSelectedRowIds = useMemo(() => {
-    return selectionState.resetToken === resetToken ? selectionState.ids : []
-  }, [resetToken, selectionState.ids, selectionState.resetToken])
+  const rawSelectedRowIds = currentSelectionState.ids
 
   const selectedRowIds = useMemo(() => {
     return rawSelectedRowIds.filter((rowId) => selectableRowIdSet.has(rowId))
@@ -87,10 +99,10 @@ export function useInteractiveTableSelection<Row>({
 
   const getScopedSelectedIds = useCallback(
     (previous: SelectionState): string[] => {
-      const previousIds = previous.resetToken === resetToken ? previous.ids : []
+      const previousIds = previous.resetVersion === resetVersion ? previous.ids : []
       return previousIds.filter((rowId) => selectableRowIdSet.has(rowId))
     },
-    [resetToken, selectableRowIdSet],
+    [resetVersion, selectableRowIdSet],
   )
 
   const onToggleRow = useCallback<InteractiveTableSelection<Row>['onToggleRow']>(
@@ -108,6 +120,7 @@ export function useInteractiveTableSelection<Row>({
         if (!checked) {
           return {
             resetToken,
+            resetVersion,
             ids: scopedIds.filter((value) => value !== rowId),
           }
         }
@@ -115,17 +128,19 @@ export function useInteractiveTableSelection<Row>({
         if (scopedIds.includes(rowId)) {
           return {
             resetToken,
+            resetVersion,
             ids: scopedIds,
           }
         }
 
         return {
           resetToken,
+          resetVersion,
           ids: [...scopedIds, rowId],
         }
       })
     },
-    [getRowId, getRowSelectable, getScopedSelectedIds, resetToken],
+    [getRowId, getRowSelectable, getScopedSelectedIds, resetToken, resetVersion],
   )
 
   const onToggleCurrentPage = useCallback<InteractiveTableSelection<Row>['onToggleCurrentPage']>(
@@ -141,6 +156,7 @@ export function useInteractiveTableSelection<Row>({
           const targetRowIdSet = new Set(targetRowIds)
           return {
             resetToken,
+            resetVersion,
             ids: scopedIds.filter((rowId) => !targetRowIdSet.has(rowId)),
           }
         }
@@ -152,19 +168,21 @@ export function useInteractiveTableSelection<Row>({
 
         return {
           resetToken,
+          resetVersion,
           ids: Array.from(next),
         }
       })
     },
-    [getRowId, getRowSelectable, getScopedSelectedIds, resetToken],
+    [getRowId, getRowSelectable, getScopedSelectedIds, resetToken, resetVersion],
   )
 
   const onClearSelection = useCallback(() => {
     setSelectionState({
       resetToken,
+      resetVersion,
       ids: [],
     })
-  }, [resetToken])
+  }, [resetToken, resetVersion])
 
   const selection = useMemo<UseInteractiveTableSelectionResult<Row>['selection']>(
     () => ({

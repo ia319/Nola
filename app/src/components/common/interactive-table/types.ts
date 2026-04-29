@@ -12,6 +12,8 @@ export interface InteractiveTableColumn<Row, SortKey extends string = string> {
   header: ReactNode
   cell: (row: Row) => ReactNode
   sortKey?: SortKey
+  /** Accessible column label used when sortable header content is not plain text. */
+  sortAriaLabel?: string
   defaultSortDirection?: InteractiveSortDirection
   className?: string
   headerClassName?: string

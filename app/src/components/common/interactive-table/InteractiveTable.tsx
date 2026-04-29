@@ -144,8 +144,8 @@ export function InteractiveTable<Row, SortKey extends string = string>({
   const allRowsSelected = selectableRows.length > 0 && selectedRows.length === selectableRows.length
   const partiallySelected = selectedRows.length > 0 && selectedRows.length < selectableRows.length
   const canToggleCurrentPage = !isLoading && !errorState && selectableRows.length > 0
-  const hasBatchActionBar = Boolean(selection && batchActions.length > 0 && selectedRows.length > 0)
-  const hasToolbar = Boolean(filters || hasBatchActionBar)
+  const hasSelectionBar = Boolean(selection && selectedRows.length > 0)
+  const hasToolbar = Boolean(filters || hasSelectionBar)
   const resolvedRowClassName = useMemo<DataTableProps<Row>['rowClassName']>(() => {
     if (!selection) {
       return rowClassName
@@ -169,6 +169,7 @@ export function InteractiveTable<Row, SortKey extends string = string>({
             sort={sort}
             defaultSortDirection={column.defaultSortDirection}
             onSortChange={onSortChange}
+            ariaLabel={column.sortAriaLabel}
           />
         ) : (
           column.header
@@ -251,7 +252,7 @@ export function InteractiveTable<Row, SortKey extends string = string>({
             <div className="min-w-0 flex-1" />
           )}
 
-          {selection && hasBatchActionBar ? (
+          {selection && hasSelectionBar ? (
             <InteractiveTableBatchActionBar
               selectedRows={selectedRows}
               actions={batchActions}
