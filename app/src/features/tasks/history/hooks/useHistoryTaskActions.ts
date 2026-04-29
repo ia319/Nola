@@ -11,7 +11,11 @@ import {
   saveExport,
 } from '@/features/export'
 import type { ExportRequestOptions, SingleExportRequestOptions } from '@/features/export'
-import { batchCancelHistoryTasks, batchRetryHistoryTasks } from '@/features/tasks/history/api'
+import {
+  batchCancelHistoryTasks,
+  batchDeleteHistoryTaskRecords,
+  batchRetryHistoryTasks,
+} from '@/features/tasks/history/api'
 import { downloadBlob } from '@/shared/lib/utils'
 import type { BatchTaskActionResponse, TaskStatus, TaskSummary } from '@/shared/types'
 
@@ -32,12 +36,14 @@ export interface UseHistoryTaskActionsOptions {
   refresh: () => Promise<void>
   onRetryCreatedTask?: (task: RetryCreatedTask) => void
   onCancelledTask?: (task: CancelledTask) => void
+  onDeletedTaskRecord?: (taskId: string) => void
   onActionSettled?: () => void
 }
 
 export interface UseHistoryTaskActionsResult {
   cancelTasks: (taskIds: string[]) => Promise<BatchTaskActionResponse>
   retryTasks: (taskIds: string[]) => Promise<BatchTaskActionResponse>
+  deleteTaskRecords: (taskIds: string[]) => Promise<BatchTaskActionResponse>
   exportTask: (
     task: Pick<TaskSummary, 'task_id' | 'filename'>,
     options: SingleExportRequestOptions,
@@ -48,7 +54,14 @@ export interface UseHistoryTaskActionsResult {
   ) => Promise<void>
 }
 
-type HistoryTaskAction = 'cancel' | 'retry'
+type HistoryTaskAction = BatchTaskActionResponse['action']
+type HistoryTaskToastAction = 'cancel' | 'deleteRecord' | 'retry'
+
+const TOAST_ACTION_KEY: Record<HistoryTaskAction, HistoryTaskToastAction> = {
+  cancel: 'cancel',
+  delete_record: 'deleteRecord',
+  retry: 'retry',
+}
 
 function normalizeTaskIds(taskIds: string[]): string[] {
   return Array.from(new Set(taskIds.map((value) => value.trim()).filter((value) => value !== '')))
@@ -59,13 +72,15 @@ function notifyBatchActionSummary(
   summary: BatchTaskActionResponse['summary'],
   t: TFunction,
 ): void {
+  const toastAction = TOAST_ACTION_KEY[action]
+
   if (summary.succeeded > 0 && summary.failed === 0) {
-    toast.success(t(`tasks.toast.batch.${action}.success`, { count: summary.succeeded }))
+    toast.success(t(`tasks.toast.batch.${toastAction}.success`, { count: summary.succeeded }))
     return
   }
   if (summary.succeeded > 0 && summary.failed > 0) {
     toast.warning(
-      t(`tasks.toast.batch.${action}.partial`, {
+      t(`tasks.toast.batch.${toastAction}.partial`, {
         succeeded: summary.succeeded,
         failed: summary.failed,
       }),
@@ -73,7 +88,7 @@ function notifyBatchActionSummary(
     return
   }
   if (summary.failed > 0) {
-    toast.error(t(`tasks.toast.batch.${action}.failed`, { count: summary.failed }))
+    toast.error(t(`tasks.toast.batch.${toastAction}.failed`, { count: summary.failed }))
   }
 }
 
@@ -81,6 +96,7 @@ export function useHistoryTaskActions({
   refresh,
   onRetryCreatedTask,
   onCancelledTask,
+  onDeletedTaskRecord,
   onActionSettled,
 }: UseHistoryTaskActionsOptions): UseHistoryTaskActionsResult {
   const { t } = useTranslation()
@@ -137,6 +153,14 @@ export function useHistoryTaskActions({
           }
         }
 
+        if (action === 'delete_record' && onDeletedTaskRecord) {
+          for (const result of response.results) {
+            if (result.ok) {
+              onDeletedTaskRecord(result.task_id)
+            }
+          }
+        }
+
         notifyBatchActionSummary(action, response.summary, t)
         return response
       } catch (error: unknown) {
@@ -156,7 +180,7 @@ export function useHistoryTaskActions({
         }
       }
     },
-    [onActionSettled, onCancelledTask, onRetryCreatedTask, refresh, t],
+    [onActionSettled, onCancelledTask, onDeletedTaskRecord, onRetryCreatedTask, refresh, t],
   )
 
   const cancelTasks = useCallback(
@@ -169,6 +193,13 @@ export function useHistoryTaskActions({
   const retryTasks = useCallback(
     async (taskIds: string[]): Promise<BatchTaskActionResponse> => {
       return runAction('retry', taskIds, batchRetryHistoryTasks)
+    },
+    [runAction],
+  )
+
+  const deleteTaskRecords = useCallback(
+    async (taskIds: string[]): Promise<BatchTaskActionResponse> => {
+      return runAction('delete_record', taskIds, batchDeleteHistoryTaskRecords)
     },
     [runAction],
   )
@@ -249,6 +280,7 @@ export function useHistoryTaskActions({
 
   return {
     cancelTasks,
+    deleteTaskRecords,
     retryTasks,
     exportTask,
     exportTasks,

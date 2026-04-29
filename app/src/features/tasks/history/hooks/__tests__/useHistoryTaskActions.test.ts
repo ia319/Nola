@@ -3,13 +3,18 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { batchExport, downloadExport, saveExport } from '@/features/export'
-import { batchCancelHistoryTasks, batchRetryHistoryTasks } from '@/features/tasks/history/api'
+import {
+  batchCancelHistoryTasks,
+  batchDeleteHistoryTaskRecords,
+  batchRetryHistoryTasks,
+} from '@/features/tasks/history/api'
 import { useHistoryTaskActions } from '@/features/tasks/history/hooks/useHistoryTaskActions'
 import { downloadBlob } from '@/shared/lib/utils'
 import { toast } from 'sonner'
 
 vi.mock('@/features/tasks/history/api', () => ({
   batchCancelHistoryTasks: vi.fn(),
+  batchDeleteHistoryTaskRecords: vi.fn(),
   batchRetryHistoryTasks: vi.fn(),
 }))
 
@@ -42,6 +47,7 @@ vi.mock('sonner', () => ({
 }))
 
 const batchCancelMock = vi.mocked(batchCancelHistoryTasks)
+const batchDeleteMock = vi.mocked(batchDeleteHistoryTaskRecords)
 const batchRetryMock = vi.mocked(batchRetryHistoryTasks)
 const batchExportMock = vi.mocked(batchExport)
 const downloadExportMock = vi.mocked(downloadExport)
@@ -96,6 +102,45 @@ describe('useHistoryTaskActions', () => {
     expect(toast.success).toHaveBeenCalledWith('tasks.toast.batch.cancel.success')
     expect(refresh).toHaveBeenCalledTimes(1)
     expect(onActionSettled).toHaveBeenCalledTimes(1)
+  })
+
+  it('runs batch delete records and reports deleted task ids', async () => {
+    batchDeleteMock.mockResolvedValue({
+      action: 'delete_record',
+      summary: { requested: 2, succeeded: 1, failed: 1 },
+      results: [
+        {
+          task_id: 'task-a',
+          ok: true,
+          message: 'Task record deleted',
+        },
+        {
+          task_id: 'task-b',
+          ok: false,
+          message: 'Task still active',
+          error_code: 'invalid_status',
+        },
+      ],
+    })
+
+    const refresh = vi.fn().mockResolvedValue(undefined)
+    const onDeletedTaskRecord = vi.fn()
+
+    const { result } = renderHook(() =>
+      useHistoryTaskActions({
+        refresh,
+        onDeletedTaskRecord,
+      }),
+    )
+
+    await act(async () => {
+      await result.current.deleteTaskRecords(['task-a', 'task-b'])
+    })
+
+    expect(batchDeleteMock).toHaveBeenCalledWith(['task-a', 'task-b'])
+    expect(onDeletedTaskRecord).toHaveBeenCalledWith('task-a')
+    expect(refresh).toHaveBeenCalledTimes(1)
+    expect(toast.warning).toHaveBeenCalledWith('tasks.toast.batch.deleteRecord.partial')
   })
 
   it('runs batch retry and handles partial outcome', async () => {
