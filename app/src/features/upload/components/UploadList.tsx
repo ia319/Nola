@@ -1,51 +1,218 @@
+import { useEffect, useMemo, useRef } from 'react'
 import type { UploadItem } from '@/features/upload/types'
 import { useTranslation } from 'react-i18next'
 
+import {
+  InteractiveTableSortableHeader,
+  type InteractiveSortState,
+  type InteractiveTableSelection,
+} from '@/components/common/interactive-table'
 import logger from '@/config/logger'
-import { UploadProgress } from './UploadProgress'
+import type { UploadQueueSortBy } from '@/features/upload/types'
+import { cn } from '@/lib/utils'
+import { UploadProgress, UPLOAD_PROGRESS_GRID_COLUMNS } from './UploadProgress'
 
 export interface UploadListProps {
-  uploads: UploadItem[]
+  uploads: readonly UploadItem[]
   onCancel: (id: string) => void
   onRetry: (id: string) => Promise<void>
   onRemove: (id: string) => Promise<void>
+  sort?: InteractiveSortState<UploadQueueSortBy> | null
+  onSortChange?: (sort: InteractiveSortState<UploadQueueSortBy>) => void
+  selection?: InteractiveTableSelection<UploadItem>
+}
+
+function UploadListCheckbox({
+  label,
+  checked,
+  disabled = false,
+  indeterminate = false,
+  onChange,
+}: {
+  label: string
+  checked: boolean
+  disabled?: boolean
+  indeterminate?: boolean
+  onChange: (checked: boolean) => void
+}) {
+  const checkboxRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (!checkboxRef.current) return
+    checkboxRef.current.indeterminate = indeterminate
+  }, [indeterminate])
+
+  return (
+    <input
+      ref={checkboxRef}
+      type="checkbox"
+      className="border-border h-4 w-4 rounded"
+      aria-label={label}
+      checked={checked}
+      disabled={disabled}
+      onChange={(event) => {
+        if (disabled) return
+        onChange(event.target.checked)
+      }}
+    />
+  )
+}
+
+function SortableUploadHeader({
+  label,
+  sortKey,
+  sort,
+  onSortChange,
+  className,
+}: {
+  label: string
+  sortKey: UploadQueueSortBy
+  sort?: InteractiveSortState<UploadQueueSortBy> | null
+  onSortChange?: (sort: InteractiveSortState<UploadQueueSortBy>) => void
+  className?: string
+}) {
+  if (!onSortChange) {
+    return <span className={className}>{label}</span>
+  }
+
+  return (
+    <InteractiveTableSortableHeader
+      label={label}
+      sortKey={sortKey}
+      sort={sort}
+      onSortChange={onSortChange}
+      className={className}
+    />
+  )
 }
 
 /**
  * Render a list of UploadProgress items. Returns null when the list is empty.
  */
-export function UploadList({ uploads, onCancel, onRetry, onRemove }: UploadListProps) {
+export function UploadList({
+  uploads,
+  onCancel,
+  onRetry,
+  onRemove,
+  sort,
+  onSortChange,
+  selection,
+}: UploadListProps) {
   const { t } = useTranslation()
+  const selectedRowIdSet = useMemo(
+    () => new Set(selection?.selectedRowIds ?? []),
+    [selection?.selectedRowIds],
+  )
+  const selectableRows = useMemo(
+    () => (selection ? uploads.filter((item) => selection.getRowSelectable?.(item) ?? true) : []),
+    [selection, uploads],
+  )
+  const selectedRows = useMemo(
+    () => selectableRows.filter((item) => selectedRowIdSet.has(item.id)),
+    [selectableRows, selectedRowIdSet],
+  )
+  const selectedSelectableRowIdSet = useMemo(
+    () => new Set(selectedRows.map((item) => item.id)),
+    [selectedRows],
+  )
+  const allRowsSelected = selectableRows.length > 0 && selectedRows.length === selectableRows.length
+  const partiallySelected = selectedRows.length > 0 && selectedRows.length < selectableRows.length
 
   if (uploads.length === 0) return null
 
+  function renderUploadProgress(item: UploadItem) {
+    const selectable = selection?.getRowSelectable?.(item) ?? true
+    const selected = selectedSelectableRowIdSet.has(item.id)
+
+    return (
+      <UploadProgress
+        key={item.id}
+        fileName={item.file.name}
+        fileSize={item.file.size}
+        progress={item.progress}
+        status={item.status}
+        errorKey={item.error?.i18nKey}
+        errorParams={item.error?.params}
+        selected={selected}
+        leading={
+          selection ? (
+            <UploadListCheckbox
+              label={selection.getRowLabel?.(item) ?? t('tasks.uploadQueue.selection.selectRow')}
+              checked={selected}
+              disabled={!selectable}
+              onChange={(checked) => {
+                selection.onToggleRow(item, checked)
+              }}
+            />
+          ) : null
+        }
+        onRowClick={
+          selection && selectable
+            ? () => {
+                selection.onToggleRow(item, !selected)
+              }
+            : undefined
+        }
+        onCancel={() => onCancel(item.id)}
+        onRetry={() => {
+          onRetry(item.id).catch((e) => logger.warn('retryUpload unexpected', e))
+        }}
+        onRemove={() => {
+          onRemove(item.id).catch((e) => logger.warn('removeFile unexpected', e))
+        }}
+      />
+    )
+  }
+
   return (
     <div data-slot="upload-list" className="flex flex-col">
-      <div className="text-muted-foreground grid grid-cols-[minmax(0,1.4fr)_minmax(8rem,1fr)_5.5rem_auto] gap-4 border-b px-5 py-3 text-[11px] font-semibold tracking-[0.24em] uppercase">
-        <span>{t('tasks.uploadQueue.table.fileName')}</span>
-        <span>{t('tasks.uploadQueue.table.status')}</span>
-        <span>{t('tasks.uploadQueue.table.size')}</span>
+      <div
+        className={cn(
+          'text-muted-foreground grid gap-4 border-b px-5 py-3 text-[11px] font-semibold tracking-[0.24em] uppercase',
+          UPLOAD_PROGRESS_GRID_COLUMNS,
+        )}
+      >
+        <div>
+          {selection ? (
+            <UploadListCheckbox
+              label={selection.selectAllLabel ?? t('tasks.uploadQueue.selection.selectAll')}
+              checked={allRowsSelected}
+              disabled={selectableRows.length === 0}
+              indeterminate={partiallySelected}
+              onChange={(checked) => {
+                selection.onToggleCurrentPage(checked, selectableRows)
+              }}
+            />
+          ) : null}
+        </div>
+        <SortableUploadHeader
+          label={t('tasks.uploadQueue.table.fileName')}
+          sortKey="filename"
+          sort={sort}
+          onSortChange={onSortChange}
+        />
+        <SortableUploadHeader
+          label={t('tasks.uploadQueue.table.status')}
+          sortKey="status"
+          sort={sort}
+          onSortChange={onSortChange}
+        />
+        <SortableUploadHeader
+          label={t('tasks.uploadQueue.table.size')}
+          sortKey="size"
+          sort={sort}
+          onSortChange={onSortChange}
+        />
+        <SortableUploadHeader
+          label={t('tasks.uploadQueue.table.progress')}
+          sortKey="progress"
+          sort={sort}
+          onSortChange={onSortChange}
+        />
         <span className="text-right">{t('tasks.uploadQueue.table.action')}</span>
       </div>
 
-      {uploads.map((item) => (
-        <UploadProgress
-          key={item.id}
-          fileName={item.file.name}
-          fileSize={item.file.size}
-          progress={item.progress}
-          status={item.status}
-          errorKey={item.error?.i18nKey}
-          errorParams={item.error?.params}
-          onCancel={() => onCancel(item.id)}
-          onRetry={() => {
-            onRetry(item.id).catch((e) => logger.warn('retryUpload unexpected', e))
-          }}
-          onRemove={() => {
-            onRemove(item.id).catch((e) => logger.warn('removeFile unexpected', e))
-          }}
-        />
-      ))}
+      {uploads.map(renderUploadProgress)}
     </div>
   )
 }

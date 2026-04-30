@@ -7,6 +7,5 @@
  */
 
 export { ErrorBoundary } from './ErrorBoundary'
-export { ListToolbar } from './ListToolbar'
-export { TaskListPanel } from './TaskListPanel'
+export * from './interactive-table'
 export type { TaskActionHandler } from './types'

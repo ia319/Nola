@@ -1,8 +1,7 @@
 """Build stable payloads shared by task use-cases."""
 
-from typing import Literal
-
 from nola.application.tasks.types import (
+    BatchTaskActionName,
     BatchTaskActionPayload,
     BatchTaskActionResultPayload,
     TaskSummaryPayload,
@@ -29,7 +28,7 @@ def to_task_summary_payload(
 
 
 def build_batch_action_response(
-    action: Literal["cancel", "retry"],
+    action: BatchTaskActionName,
     results: list[BatchTaskActionResultPayload],
 ) -> BatchTaskActionPayload:
     """Build a stable batch response with summary counts."""

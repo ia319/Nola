@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import logger from '@/config/logger'
-import { checkIntegrity, cleanupOrphans } from '@/features/upload/api'
+import { checkIntegrity, cleanupOrphans } from '@/features/upload'
 import { FormRow } from '@/layouts'
 import { isAppError } from '@/shared/lib/error-factory'
 import type { AppError, CleanupResponse, IntegrityCheckResponse } from '@/shared/types'

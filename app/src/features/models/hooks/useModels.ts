@@ -4,6 +4,7 @@ import { isAppError } from '@/shared/lib/error-factory'
 import type { AppError } from '@/shared/types'
 
 import { listModels } from '../api'
+import { DEFAULT_MODEL_LIST_QUERY, type ModelListQuery } from '../lib/model-query-options'
 import { subscribeModelRefresh } from '../lib/model-refresh'
 import type { ModelListResponse, ModelResponse } from '../types'
 
@@ -33,7 +34,7 @@ export interface UseModelsResult {
  * Fetch model list on mount; expose `refresh` for imperative re-fetch
  * (e.g. after download completes or model selection changes).
  */
-export function useModels(): UseModelsResult {
+export function useModels(query: ModelListQuery = DEFAULT_MODEL_LIST_QUERY): UseModelsResult {
   const [data, setData] = useState<ModelListResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -62,7 +63,7 @@ export function useModels(): UseModelsResult {
     }
 
     try {
-      const response = await listModels(controller.signal)
+      const response = await listModels(query, controller.signal)
       if (!controller.signal.aborted) {
         setData(response)
       }
@@ -75,7 +76,7 @@ export function useModels(): UseModelsResult {
         setIsRefreshing(false)
       }
     }
-  }, [])
+  }, [query])
 
   const updateSnapshot = useCallback(
     (updater: (current: ModelListResponse) => ModelListResponse) => {

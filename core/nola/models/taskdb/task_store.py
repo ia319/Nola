@@ -4,8 +4,9 @@ from contextlib import closing
 from datetime import datetime
 from typing import cast
 
+from nola.models.query_helpers import build_contains_like_pattern
 from nola.models.taskdb.base import TaskRepositoryBase
-from nola.models.taskdb.query_helpers import escape_like_fragment, parse_task_row
+from nola.models.taskdb.query_helpers import parse_task_row
 from nola.models.taskdb.types import (
     CANCELLABLE_TASK_STATUSES,
     DEFAULT_TASK_SORT_BY,
@@ -18,6 +19,33 @@ from nola.models.taskdb.types import (
     TaskSortOrder,
     TaskStatus,
 )
+
+
+def _build_task_filter_sql(
+    *,
+    status: str | None,
+    q: str | None,
+) -> tuple[str, list[str]]:
+    """Build safe task list filters."""
+    where_clauses: list[str] = []
+    params: list[str] = []
+
+    if q:
+        pattern = build_contains_like_pattern(q)
+        where_clauses.append(
+            "("
+            "LOWER(t.id) LIKE ? ESCAPE '\\' OR "
+            "LOWER(COALESCE(f.filename, '')) LIKE ? ESCAPE '\\'"
+            ")"
+        )
+        params.extend([pattern, pattern])
+
+    if status:
+        where_clauses.append("t.status = ?")
+        params.append(status)
+
+    where_sql = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    return where_sql, params
 
 
 class TaskStoreRepository(TaskRepositoryBase):
@@ -109,21 +137,8 @@ class TaskStoreRepository(TaskRepositoryBase):
         sort_order = "ASC" if order == "asc" else "DESC"
 
         from_sql = "FROM transcription_tasks t LEFT JOIN files f ON f.id = t.file_id"
-        where_clauses: list[str] = []
-        params: list[str | int] = []
-
-        if q:
-            # Keep contains search semantics (%keyword%) for UX consistency.
-            # This may full-scan on SQLite; move to FTS when data volume grows.
-            escaped_q = escape_like_fragment(q.lower())
-            where_clauses.append("LOWER(f.filename) LIKE ? ESCAPE '\\'")
-            params.append(f"%{escaped_q}%")
-
-        if status:
-            where_clauses.append("t.status = ?")
-            params.append(status)
-
-        where_sql = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+        where_sql, filter_params = _build_task_filter_sql(status=status, q=q)
+        params: list[str | int] = [*filter_params]
         query = (
             "SELECT t.*, f.filename AS filename "
             f"{from_sql}{where_sql} "
@@ -138,23 +153,8 @@ class TaskStoreRepository(TaskRepositoryBase):
 
     def count_tasks(self, status: str | None = None, q: str | None = None) -> int:
         """Count tasks with optional status/search filters."""
-        from_sql = "FROM transcription_tasks t"
-        where_clauses: list[str] = []
-        params: list[str] = []
-
-        if q:
-            from_sql += " JOIN files f ON f.id = t.file_id"
-            # Keep contains search semantics (%keyword%) for UX consistency.
-            # This may full-scan on SQLite; move to FTS when data volume grows.
-            escaped_q = escape_like_fragment(q.lower())
-            where_clauses.append("LOWER(f.filename) LIKE ? ESCAPE '\\'")
-            params.append(f"%{escaped_q}%")
-
-        if status:
-            where_clauses.append("t.status = ?")
-            params.append(status)
-
-        where_sql = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+        from_sql = "FROM transcription_tasks t LEFT JOIN files f ON f.id = t.file_id"
+        where_sql, params = _build_task_filter_sql(status=status, q=q)
         query = f"SELECT COUNT(*) {from_sql}{where_sql}"
 
         with closing(self._connect()) as conn:

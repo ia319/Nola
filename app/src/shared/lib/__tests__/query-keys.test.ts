@@ -29,7 +29,34 @@ describe('queryKeys', () => {
       'files',
       'list',
       {
+        q: '',
+        content_type: null,
+        sort_by: null,
+        order: null,
         limit: null,
+        offset: null,
+      },
+    ])
+  })
+
+  it('builds stable file list keys with normalized query controls', () => {
+    expect(
+      queryKeys.files.list({
+        q: 'meeting',
+        content_type: 'audio/wav',
+        sort_by: 'filename',
+        order: 'asc',
+        limit: 20,
+      }),
+    ).toEqual([
+      'files',
+      'list',
+      {
+        q: 'meeting',
+        content_type: 'audio/wav',
+        sort_by: 'filename',
+        order: 'asc',
+        limit: 20,
         offset: null,
       },
     ])

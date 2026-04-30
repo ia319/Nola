@@ -2,6 +2,7 @@
 
 from nola.application.tasks.actions import (
     batch_cancel_tasks,
+    batch_delete_task_records,
     batch_retry_tasks,
     cancel_task,
     create_task,
@@ -12,6 +13,7 @@ from nola.application.tasks.queries import get_task_detail, list_tasks
 
 __all__ = [
     "batch_cancel_tasks",
+    "batch_delete_task_records",
     "batch_export_tasks",
     "batch_retry_tasks",
     "cancel_task",

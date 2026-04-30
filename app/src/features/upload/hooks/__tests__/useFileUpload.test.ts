@@ -69,6 +69,10 @@ const TEST_CONFIG: FileValidationConfig = {
   maxFileSize: 500 * 1024 * 1024,
 }
 
+function uploadIds(uploads: readonly { id: string }[]): string[] {
+  return uploads.map((upload) => upload.id)
+}
+
 describe('useFileUpload', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -185,7 +189,7 @@ describe('useFileUpload', () => {
     })
 
     await act(async () => {
-      await result.current.startUpload()
+      await result.current.startUploads(uploadIds(result.current.uploads))
     })
 
     expect(result.current.uploads[0].status).toBe('success')
@@ -210,7 +214,7 @@ describe('useFileUpload', () => {
     })
 
     await act(async () => {
-      await result.current.startUpload()
+      await result.current.startUploads(uploadIds(result.current.uploads))
     })
 
     expect(result.current.uploads[0].status).toBe('error')
@@ -239,7 +243,7 @@ describe('useFileUpload', () => {
 
     let startPromise: Promise<void> | null = null
     act(() => {
-      startPromise = result.current.startUpload()
+      startPromise = result.current.startUploads(uploadIds(result.current.uploads))
     })
 
     await waitFor(() => {
@@ -275,7 +279,7 @@ describe('useFileUpload', () => {
     })
 
     await act(async () => {
-      await result.current.startUpload()
+      await result.current.startUploads(uploadIds(result.current.uploads))
     })
     expect(result.current.uploads[0].status).toBe('error')
 
@@ -286,6 +290,149 @@ describe('useFileUpload', () => {
 
     expect(result.current.uploads[0].status).toBe('success')
     expect(result.current.uploads[0].fileId).toBe('retry-1')
+  })
+
+  it('queues retry requests made while another selected upload is active', async () => {
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
+    const activeFile = fakeFile('active.mp3', 1024)
+    const retryFile = fakeFile('retry-queued.mp3', 1024)
+    const activeUpload = deferred<FileUploadResponse>()
+    let retryCalls = 0
+
+    uploadFileMock.mockImplementation(async (file) => {
+      if (file.name === retryFile.name) {
+        retryCalls += 1
+        if (retryCalls === 1) {
+          throw new Error('temporary failure')
+        }
+        return buildUploadResponse('retry-queued-id', file)
+      }
+
+      if (file.name === activeFile.name) {
+        return activeUpload.promise
+      }
+
+      throw new Error(`Unexpected file ${file.name}`)
+    })
+
+    act(() => {
+      result.current.addFiles([activeFile, retryFile])
+    })
+
+    const activeUploadId = result.current.uploads.find((upload) => upload.file === activeFile)?.id
+    const retryUploadId = result.current.uploads.find((upload) => upload.file === retryFile)?.id
+
+    if (!activeUploadId || !retryUploadId) {
+      throw new Error('Expected upload ids to exist')
+    }
+
+    await act(async () => {
+      await result.current.startUploads([retryUploadId])
+    })
+    expect(result.current.uploads.find((upload) => upload.id === retryUploadId)?.status).toBe(
+      'error',
+    )
+
+    let activeStartPromise: Promise<void> | null = null
+    act(() => {
+      activeStartPromise = result.current.startUploads([activeUploadId])
+    })
+
+    await waitFor(() => {
+      expect(result.current.uploads.find((upload) => upload.id === activeUploadId)?.status).toBe(
+        'uploading',
+      )
+    })
+
+    await act(async () => {
+      await result.current.retryUpload(retryUploadId)
+    })
+    expect(result.current.uploads.find((upload) => upload.id === retryUploadId)?.status).toBe(
+      'pending',
+    )
+
+    await act(async () => {
+      activeUpload.resolve(buildUploadResponse('active-id', activeFile))
+      await activeStartPromise
+    })
+
+    expect(result.current.uploads.find((upload) => upload.id === activeUploadId)?.status).toBe(
+      'success',
+    )
+    expect(result.current.uploads.find((upload) => upload.id === retryUploadId)?.status).toBe(
+      'success',
+    )
+    expect(result.current.uploads.find((upload) => upload.id === retryUploadId)?.fileId).toBe(
+      'retry-queued-id',
+    )
+  })
+
+  it('does not clear controllers for non-retryable retry targets', async () => {
+    const { result } = renderHook(() => useFileUpload(TEST_CONFIG))
+    const uploadingFile = fakeFile('uploading.mp3', 1024)
+    const failedFile = fakeFile('failed.mp3', 1024)
+    const uploadingUpload = deferred<FileUploadResponse>()
+    let uploadingSignal: AbortSignal | undefined
+    let failedCalls = 0
+
+    uploadFileMock.mockImplementation(async (file, _onProgress, signal) => {
+      if (file.name === uploadingFile.name) {
+        uploadingSignal = signal
+        return uploadingUpload.promise
+      }
+      if (file.name === failedFile.name) {
+        failedCalls += 1
+        if (failedCalls === 1) {
+          throw new Error('first failure')
+        }
+        return buildUploadResponse('failed-id', file)
+      }
+      throw new Error(`Unexpected file ${file.name}`)
+    })
+
+    act(() => {
+      result.current.addFiles([uploadingFile, failedFile])
+    })
+
+    const uploadingId = result.current.uploads.find((upload) => upload.file === uploadingFile)?.id
+    const failedId = result.current.uploads.find((upload) => upload.file === failedFile)?.id
+    if (!uploadingId || !failedId) {
+      throw new Error('Expected upload ids to exist')
+    }
+
+    await act(async () => {
+      await result.current.startUploads([failedId])
+    })
+    expect(result.current.uploads.find((upload) => upload.id === failedId)?.status).toBe('error')
+
+    let uploadingStartPromise: Promise<void> | null = null
+    act(() => {
+      uploadingStartPromise = result.current.startUploads([uploadingId])
+    })
+
+    await waitFor(() => {
+      expect(result.current.uploads.find((upload) => upload.id === uploadingId)?.status).toBe(
+        'uploading',
+      )
+    })
+
+    await act(async () => {
+      await result.current.retryUploads([uploadingId, failedId])
+    })
+
+    act(() => {
+      result.current.cancelUpload(uploadingId)
+    })
+    expect(uploadingSignal?.aborted).toBe(true)
+
+    await act(async () => {
+      uploadingUpload.reject(new axios.CanceledError('cancelled'))
+      await uploadingStartPromise
+    })
+
+    expect(result.current.uploads.find((upload) => upload.id === uploadingId)?.status).toBe(
+      'cancelled',
+    )
   })
 
   it('limits concurrent uploads to configured batch size', async () => {
@@ -320,7 +467,7 @@ describe('useFileUpload', () => {
 
     let startPromise: Promise<void> | null = null
     act(() => {
-      startPromise = result.current.startUpload()
+      startPromise = result.current.startUploads(uploadIds(result.current.uploads))
     })
 
     await waitFor(() => {
@@ -353,7 +500,7 @@ describe('useFileUpload', () => {
       result.current.addFiles([file])
     })
     await act(async () => {
-      await result.current.startUpload()
+      await result.current.startUploads(uploadIds(result.current.uploads))
     })
 
     const id = result.current.uploads[0].id
@@ -386,7 +533,7 @@ describe('useFileUpload', () => {
 
     let startPromise: Promise<void> | null = null
     act(() => {
-      startPromise = result.current.startUpload()
+      startPromise = result.current.startUploads(uploadIds(result.current.uploads))
     })
 
     await waitFor(() => {
@@ -414,7 +561,7 @@ describe('useFileUpload', () => {
       result.current.addFiles([file])
     })
     await act(async () => {
-      await result.current.startUpload()
+      await result.current.startUploads(uploadIds(result.current.uploads))
     })
 
     await act(async () => {
@@ -434,7 +581,7 @@ describe('useFileUpload', () => {
       result.current.addFiles([file])
     })
     await act(async () => {
-      await result.current.startUpload()
+      await result.current.startUploads(uploadIds(result.current.uploads))
     })
 
     act(() => {

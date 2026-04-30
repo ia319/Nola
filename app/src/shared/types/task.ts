@@ -1,6 +1,7 @@
-import type { components } from './openapi'
+import type { components, operations } from './openapi'
 
 type Schemas = components['schemas']
+type ListTasksOperation = operations['list_transcriptions_api_transcription_tasks__get']
 
 // Thin aliases over generated OpenAPI schemas.
 
@@ -17,9 +18,18 @@ export type Segment = Schemas['SegmentResponse']
 
 /** Task status derived from OpenAPI enum constraint. */
 export type TaskStatus = Schemas['TaskSummaryResponse']['status']
-// NOTE: Keep local aliases here. Avoid coupling shared query types to generated operation paths.
-export type TaskSortBy = 'created_at' | 'completed_at' | 'status' | 'progress' | 'filename'
-export type SortOrder = 'asc' | 'desc'
+
+/** GET /api/transcription-tasks query parameters. */
+export type TaskListApiQuery = NonNullable<ListTasksOperation['parameters']['query']>
+
+/** GET /api/transcription-tasks status filter. */
+export type TaskListFilterStatus = NonNullable<TaskListApiQuery['status']>
+
+/** GET /api/transcription-tasks sort field. */
+export type TaskSortBy = NonNullable<TaskListApiQuery['sort_by']>
+
+/** GET /api/transcription-tasks sort order. */
+export type SortOrder = NonNullable<TaskListApiQuery['order']>
 
 /** GET /{task_id}/export?save=true response. */
 export type SavedExportResponse = Schemas['SavedExportResponse']

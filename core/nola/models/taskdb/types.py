@@ -68,7 +68,15 @@ class TaskStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-TaskSortField = Literal["created_at", "completed_at", "status", "progress", "filename"]
+TaskSortField = Literal[
+    "created_at",
+    "completed_at",
+    "status",
+    "progress",
+    "filename",
+    "task_id",
+    "duration",
+]
 TaskSortOrder = Literal["asc", "desc"]
 
 DEFAULT_TASK_SORT_BY: TaskSortField = "created_at"
@@ -79,6 +87,8 @@ TASK_SORT_COLUMNS: dict[TaskSortField, str] = {
     "status": "t.status",
     "progress": "t.progress",
     "filename": "LOWER(COALESCE(f.filename, ''))",
+    "task_id": "t.id",
+    "duration": "t.duration IS NULL, t.duration",
 }
 
 TERMINAL_TASK_STATUSES = (

@@ -1,13 +1,15 @@
-import type { TaskStatus } from '@/shared/types'
-
-export const ACTIVE_TASK_STATUSES: ReadonlySet<TaskStatus> = new Set(['pending', 'processing'])
-
-export const TERMINAL_TASK_STATUSES: ReadonlySet<TaskStatus> = new Set([
-  'completed',
-  'failed',
-  'cancelled',
-])
-
-export function isTerminalTaskStatus(status: TaskStatus): boolean {
-  return TERMINAL_TASK_STATUSES.has(status)
-}
+export {
+  ACTIVE_TASK_STATUSES,
+  COMPLETED_TASK_STATUSES,
+  DELETABLE_TASK_RECORD_STATUSES,
+  EXPORTABLE_TASK_STATUSES,
+  RETRYABLE_TASK_STATUSES,
+  TASK_STATUS_OPTIONS,
+  TERMINAL_TASK_STATUSES,
+  isActiveTaskStatus,
+  isCompletedTaskStatus,
+  isDeletableTaskRecordStatus,
+  isExportableTaskStatus,
+  isRetryableTaskStatus,
+  isTerminalTaskStatus,
+} from '@/shared/lib/task-status'

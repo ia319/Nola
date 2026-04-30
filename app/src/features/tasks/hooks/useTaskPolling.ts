@@ -3,13 +3,16 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { POLL_INTERVAL_MS } from '@/config/constants'
 import { listTasks } from '@/features/tasks/api'
 import { subscribeTaskRefresh } from '@/features/tasks/lib/task-refresh'
-import { ACTIVE_TASK_STATUSES } from '@/features/tasks/lib/task-status-groups'
 import { useSessionTasksStore } from '@/features/tasks/store/session-tasks-store'
 import { useTaskBoardStore } from '@/features/tasks/store/task-board-store'
+import { isActiveTaskStatus } from '@/shared/lib/task-status'
+import type { SortOrder, TaskSortBy } from '@/shared/types'
 
 const BACKGROUND_POLL_INTERVAL_MS = 6000
 const RETRY_BACKOFF_MS = [2000, 4000, 8000] as const
 const TASK_LIST_LIMIT = 100
+const TASK_POLL_SORT_BY = 'created_at' satisfies TaskSortBy
+const TASK_POLL_ORDER = 'desc' satisfies SortOrder
 
 function getBasePollIntervalMs(): number {
   if (typeof document !== 'undefined' && document.hidden) {
@@ -32,11 +35,9 @@ export function useTaskPolling(): UseTaskPollingReturn {
   const setPolling = useTaskBoardStore((state) => state.setPolling)
 
   const hasActiveTasks = useMemo(() => {
-    const sessionActive = Object.values(sessionById).some((task) =>
-      ACTIVE_TASK_STATUSES.has(task.status),
-    )
+    const sessionActive = Object.values(sessionById).some((task) => isActiveTaskStatus(task.status))
     if (sessionActive) return true
-    return boardTasks.some((task) => ACTIVE_TASK_STATUSES.has(task.status))
+    return boardTasks.some((task) => isActiveTaskStatus(task.status))
   }, [boardTasks, sessionById])
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -98,8 +99,8 @@ export function useTaskPolling(): UseTaskPollingReturn {
         const response = await listTasks(
           {
             limit: TASK_LIST_LIMIT,
-            sort_by: 'created_at',
-            order: 'desc',
+            sort_by: TASK_POLL_SORT_BY,
+            order: TASK_POLL_ORDER,
           },
           controller.signal,
         )

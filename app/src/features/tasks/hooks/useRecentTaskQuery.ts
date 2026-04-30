@@ -1,20 +1,40 @@
 import { useCallback, useMemo, useState } from 'react'
 
 import { RECENT_PAGE_SIZE } from '@/config/constants'
-import type { TaskFilterStatus, TaskQueryModel, TaskSortBy, TaskSummary } from '@/shared/types'
+import {
+  DEFAULT_TASK_FILTER_STATUS,
+  DEFAULT_TASK_ORDER,
+  DEFAULT_TASK_SORT_BY,
+} from '@/shared/lib/task-query-options'
+import type { SortOrder, TaskFilterStatus, TaskSortBy, TaskSummary } from '@/shared/types'
+
+export type RecentTaskSortBy = Exclude<TaskSortBy, 'duration'>
+
+export interface RecentTaskQueryModel {
+  q: string
+  status: TaskFilterStatus
+  sort_by: RecentTaskSortBy
+  order: SortOrder
+  page: number
+  page_size: number
+}
 
 export interface UseRecentTaskQueryResult {
-  query: TaskQueryModel
+  query: RecentTaskQueryModel
   tasks: TaskSummary[]
   total: number
   totalPages: number
   newTaskCount: number
   setSearch: (value: string) => void
   setStatus: (value: TaskFilterStatus) => void
-  setSortBy: (value: TaskSortBy) => void
-  setOrder: (value: TaskQueryModel['order']) => void
+  setSortBy: (value: RecentTaskSortBy) => void
+  setOrder: (value: RecentTaskQueryModel['order']) => void
   setPage: (value: number) => void
   goToFirstPageForNewTasks: () => void
+}
+
+export interface UseRecentTaskQueryOptions {
+  getFileLabel?: (task: TaskSummary) => string
 }
 
 function toTimestamp(value: string | null): number {
@@ -23,7 +43,22 @@ function toTimestamp(value: string | null): number {
   return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed
 }
 
-function compareBySortField(a: TaskSummary, b: TaskSummary, sortBy: TaskSortBy): number {
+function getDefaultFileLabel(task: TaskSummary): string {
+  return task.filename?.trim() || task.file_id
+}
+
+function compareBySortField(
+  a: TaskSummary,
+  b: TaskSummary,
+  sortBy: RecentTaskSortBy,
+  getFileLabel: (task: TaskSummary) => string,
+): number {
+  if (sortBy === 'task_id') {
+    return a.task_id.localeCompare(b.task_id)
+  }
+  if (sortBy === 'filename') {
+    return getFileLabel(a).localeCompare(getFileLabel(b))
+  }
   if (sortBy === 'created_at') {
     return toTimestamp(a.created_at) - toTimestamp(b.created_at)
   }
@@ -39,10 +74,11 @@ function compareBySortField(a: TaskSummary, b: TaskSummary, sortBy: TaskSortBy):
 function compareTasks(
   a: TaskSummary,
   b: TaskSummary,
-  sortBy: TaskSortBy,
-  order: TaskQueryModel['order'],
+  sortBy: RecentTaskSortBy,
+  order: RecentTaskQueryModel['order'],
+  getFileLabel: (task: TaskSummary) => string,
 ): number {
-  const primary = compareBySortField(a, b, sortBy)
+  const primary = compareBySortField(a, b, sortBy, getFileLabel)
   if (primary !== 0) {
     return order === 'asc' ? primary : -primary
   }
@@ -52,41 +88,47 @@ function compareTasks(
   return b.task_id.localeCompare(a.task_id)
 }
 
-function includeByKeyword(task: TaskSummary, keyword: string): boolean {
+function includeByKeyword(
+  task: TaskSummary,
+  keyword: string,
+  getFileLabel: (task: TaskSummary) => string,
+): boolean {
   if (!keyword) return true
   const normalized = keyword.toLowerCase()
   return (
     task.task_id.toLowerCase().includes(normalized) ||
     task.file_id.toLowerCase().includes(normalized) ||
-    (task.filename ?? '').toLowerCase().includes(normalized)
+    getFileLabel(task).toLowerCase().includes(normalized)
   )
 }
 
 export function useRecentTaskQuery(
   sourceTasks: TaskSummary[],
   pageSize: number = RECENT_PAGE_SIZE,
+  options: UseRecentTaskQueryOptions = {},
 ): UseRecentTaskQueryResult {
-  const [query, setQuery] = useState<TaskQueryModel>({
+  const [query, setQuery] = useState<RecentTaskQueryModel>({
     q: '',
-    status: 'all',
-    sort_by: 'created_at',
-    order: 'desc',
+    status: DEFAULT_TASK_FILTER_STATUS,
+    sort_by: DEFAULT_TASK_SORT_BY,
+    order: DEFAULT_TASK_ORDER,
     page: 1,
     page_size: pageSize,
   })
 
   const filteredTasks = useMemo(() => {
     const keyword = query.q.trim()
+    const getFileLabel = options.getFileLabel ?? getDefaultFileLabel
     return sourceTasks
       .filter((task) => {
-        if (query.status !== 'all' && task.status !== query.status) {
+        if (query.status !== DEFAULT_TASK_FILTER_STATUS && task.status !== query.status) {
           return false
         }
-        return includeByKeyword(task, keyword)
+        return includeByKeyword(task, keyword, getFileLabel)
       })
       .slice()
-      .sort((a, b) => compareTasks(a, b, query.sort_by, query.order))
-  }, [query.order, query.q, query.sort_by, query.status, sourceTasks])
+      .sort((a, b) => compareTasks(a, b, query.sort_by, query.order, getFileLabel))
+  }, [options.getFileLabel, query.order, query.q, query.sort_by, query.status, sourceTasks])
 
   const total = filteredTasks.length
   const totalPages = Math.max(1, Math.ceil(total / Math.max(query.page_size, 1)))
@@ -125,7 +167,7 @@ export function useRecentTaskQuery(
   )
 
   const setSortBy = useCallback(
-    (value: TaskSortBy) => {
+    (value: RecentTaskSortBy) => {
       setAcknowledgedTotal(total)
       setQuery((previous) => ({
         ...previous,
@@ -137,7 +179,7 @@ export function useRecentTaskQuery(
   )
 
   const setOrder = useCallback(
-    (value: TaskQueryModel['order']) => {
+    (value: RecentTaskQueryModel['order']) => {
       setAcknowledgedTotal(total)
       setQuery((previous) => ({
         ...previous,

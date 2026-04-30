@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { listModels } from '../../api'
+import { DEFAULT_MODEL_LIST_QUERY, type ModelListQuery } from '../../lib/model-query-options'
 import { requestModelRefresh } from '../../lib/model-refresh'
 import { useModels } from '../useModels'
 
@@ -48,7 +49,7 @@ describe('useModels', () => {
       expect(result.current.isLoading).toBe(false)
     })
 
-    expect(listModelsMock).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(listModelsMock).toHaveBeenCalledWith(DEFAULT_MODEL_LIST_QUERY, expect.any(AbortSignal))
     expect(result.current.models.map((model) => model.model_id)).toEqual(['small'])
     expect(result.current.configuredModelId).toBe('small')
     expect(result.current.lastLoadedModelId).toBe('small')
@@ -162,5 +163,51 @@ describe('useModels', () => {
     })
 
     expect(listModelsMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('reloads when API query controls change', async () => {
+    const initialQuery: ModelListQuery = {
+      q: '',
+      status: 'all',
+      sort_by: null,
+      order: 'asc',
+    }
+    const filteredQuery: ModelListQuery = {
+      q: 'small',
+      status: 'downloaded',
+      sort_by: 'size',
+      order: 'desc',
+    }
+
+    listModelsMock
+      .mockResolvedValueOnce({
+        models: [],
+        configured_model_id: null,
+        last_loaded_model_id: null,
+        effective_model_dir: 'D:/models-a',
+      })
+      .mockResolvedValueOnce({
+        models: [],
+        configured_model_id: null,
+        last_loaded_model_id: null,
+        effective_model_dir: 'D:/models-b',
+      })
+
+    const { result, rerender } = renderHook(({ query }) => useModels(query), {
+      initialProps: { query: initialQuery },
+    })
+
+    await waitFor(() => {
+      expect(result.current.effectiveModelDir).toBe('D:/models-a')
+    })
+
+    rerender({ query: filteredQuery })
+
+    await waitFor(() => {
+      expect(result.current.effectiveModelDir).toBe('D:/models-b')
+    })
+
+    expect(listModelsMock).toHaveBeenNthCalledWith(1, initialQuery, expect.any(AbortSignal))
+    expect(listModelsMock).toHaveBeenNthCalledWith(2, filteredQuery, expect.any(AbortSignal))
   })
 })

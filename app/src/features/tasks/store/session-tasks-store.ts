@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 import type { TaskSummary } from '@/shared/types'
-import { isTerminalTaskStatus } from '../lib/task-status-groups'
+import { isCompletedTaskStatus, isTerminalTaskStatus } from '../lib/task-status-groups'
 
 export type SessionTask = TaskSummary
 
@@ -21,7 +21,8 @@ function normalizeSessionTask(task: SessionTaskInput, previous?: SessionTask): S
   const status = task.status
   const createdAt = task.created_at ?? previous?.created_at ?? new Date().toISOString()
 
-  const progress = task.progress ?? (status === 'completed' ? 100 : (previous?.progress ?? 0))
+  const progress =
+    task.progress ?? (isCompletedTaskStatus(status) ? 100 : (previous?.progress ?? 0))
   const filename = task.filename !== undefined ? task.filename : (previous?.filename ?? null)
 
   const completedAt =

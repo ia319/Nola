@@ -75,7 +75,7 @@ vi.mock('@/config/logger', () => ({
   },
 }))
 
-vi.mock('@/features/upload/api', () => ({
+vi.mock('@/features/upload', () => ({
   checkIntegrity: systemInfoMocks.checkIntegrityMock,
   cleanupOrphans: systemInfoMocks.cleanupOrphansMock,
 }))

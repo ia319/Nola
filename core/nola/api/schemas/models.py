@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TypeAlias
 
 from pydantic import BaseModel, Field
 
+from nola.application.models import types as model_types
 from nola.engines.base import EngineComputeType, EngineDevice
+from nola.model_hub import contracts as model_contracts
 
-ModelStatusLiteral = Literal[
-    "not_downloaded",
-    "downloading",
-    "partial_download",
-    "downloaded",
-]
-ModelDirSourceLiteral = Literal["environment", "database", "default"]
-DownloadStatusLiteral = Literal["downloading", "completed", "failed", "cancelled"]
+ModelStatusLiteral: TypeAlias = model_types.ModelStatusValue
+ModelDirSourceLiteral: TypeAlias = model_contracts.ModelDirSource
+DownloadStatusLiteral: TypeAlias = model_contracts.DownloadStatus
+ModelListSortField: TypeAlias = model_types.ModelListSortField
+ModelListSortOrder: TypeAlias = model_types.ModelListSortOrder
 
 
 class DownloadProgressResponse(BaseModel):

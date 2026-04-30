@@ -1,6 +1,7 @@
-import type { components } from './openapi'
+import type { components, operations } from './openapi'
 
 type Schemas = components['schemas']
+type ListModelsOperation = operations['list_all_models_api_models_get']
 
 /** GET /api/models response item. */
 export type ModelResponse = Schemas['ModelResponse']
@@ -10,6 +11,18 @@ export type ModelDetailResponse = Schemas['ModelDetailResponse']
 
 /** GET /api/models response. */
 export type ModelListResponse = Schemas['ModelListResponse']
+
+/** GET /api/models query parameters. */
+export type ModelListApiQuery = NonNullable<ListModelsOperation['parameters']['query']>
+
+/** GET /api/models sort field. */
+export type ModelListSortBy = NonNullable<ModelListApiQuery['sort_by']>
+
+/** GET /api/models sort order. */
+export type ModelListSortOrder = NonNullable<ModelListApiQuery['order']>
+
+/** GET /api/models status filter. */
+export type ModelListFilterStatus = NonNullable<ModelListApiQuery['status']>
 
 /** POST /api/models/{model_id}/select response. */
 export type ModelSelectResponse = Schemas['ModelSelectResponse']

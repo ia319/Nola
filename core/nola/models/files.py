@@ -4,7 +4,21 @@ import sqlite3
 from contextlib import closing
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import Literal, TypedDict, cast
+
+from nola.models.query_helpers import build_contains_like_pattern
+
+FileSortField = Literal["filename", "size", "content_type", "created_at"]
+FileSortOrder = Literal["asc", "desc"]
+
+DEFAULT_FILE_SORT_BY: FileSortField = "created_at"
+DEFAULT_FILE_SORT_ORDER: FileSortOrder = "desc"
+FILE_SORT_COLUMNS: dict[FileSortField, str] = {
+    "filename": "LOWER(filename)",
+    "size": "size",
+    "content_type": "LOWER(COALESCE(content_type, ''))",
+    "created_at": "created_at",
+}
 
 
 class FileRow(TypedDict):
@@ -16,6 +30,27 @@ class FileRow(TypedDict):
     size: int
     content_type: str | None
     created_at: str
+
+
+class MissingFileRow(TypedDict):
+    """File row that points to a missing path."""
+
+    id: str
+    filename: str
+    path: str
+
+
+class FileIntegrityResult(TypedDict):
+    """Result from checking file metadata against the filesystem."""
+
+    missing_files: list[MissingFileRow]
+
+
+class FileCleanupResult(TypedDict):
+    """Result from deleting missing file metadata."""
+
+    deleted_count: int
+    deleted_files: list[MissingFileRow]
 
 
 class FileDatabase:
@@ -127,36 +162,94 @@ class FileDatabase:
 
                 return deleted
 
-    def list_files(self, limit: int = 50, offset: int = 0) -> list[FileRow]:
+    def _build_file_filter_sql(
+        self,
+        *,
+        q: str | None,
+        content_type: str | None,
+    ) -> tuple[str, list[str]]:
+        """Build safe file list filters."""
+        where_clauses: list[str] = []
+        params: list[str] = []
+
+        if q:
+            pattern = build_contains_like_pattern(q)
+            where_clauses.append(
+                "("
+                "LOWER(id) LIKE ? ESCAPE '\\' OR "
+                "LOWER(filename) LIKE ? ESCAPE '\\' OR "
+                "LOWER(COALESCE(content_type, '')) LIKE ? ESCAPE '\\'"
+                ")"
+            )
+            params.extend([pattern, pattern, pattern])
+
+        if content_type:
+            where_clauses.append("LOWER(content_type) = LOWER(?)")
+            params.append(content_type)
+
+        where_sql = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+        return where_sql, params
+
+    def list_files(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        q: str | None = None,
+        content_type: str | None = None,
+        sort_by: FileSortField = DEFAULT_FILE_SORT_BY,
+        order: FileSortOrder = DEFAULT_FILE_SORT_ORDER,
+    ) -> list[FileRow]:
         """List all files with pagination.
 
         Args:
             limit: Maximum number of results
             offset: Pagination offset
+            q: Optional file id, filename, or content-type keyword
+            content_type: Optional exact MIME type filter
+            sort_by: Sort field
+            order: Sort order
 
         Returns:
             List of file dictionaries
         """
+        sort_column = FILE_SORT_COLUMNS[sort_by]
+        sort_order = "ASC" if order == "asc" else "DESC"
+        where_sql, filter_params = self._build_file_filter_sql(
+            q=q,
+            content_type=content_type,
+        )
+        params: list[str | int] = [*filter_params, limit, offset]
         with closing(self._connect()) as conn:
             cursor = conn.execute(
-                "SELECT * FROM files ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                (limit, offset),
+                "SELECT * FROM files "
+                f"{where_sql} "
+                f"ORDER BY {sort_column} {sort_order}, id DESC "
+                "LIMIT ? OFFSET ?",
+                tuple(params),
             )
             return [cast(FileRow, dict(row)) for row in cursor]
 
-    def count_files(self) -> int:
+    def count_files(
+        self,
+        q: str | None = None,
+        content_type: str | None = None,
+    ) -> int:
         """Count total files."""
+        where_sql, params = self._build_file_filter_sql(
+            q=q,
+            content_type=content_type,
+        )
         with closing(self._connect()) as conn:
-            cursor = conn.execute("SELECT COUNT(*) FROM files")
+            cursor = conn.execute(f"SELECT COUNT(*) FROM files{where_sql}", params)
             return int(cursor.fetchone()[0])
 
-    def check_integrity(self) -> dict[str, list[dict[str, Any]]]:
+    def check_integrity(self) -> FileIntegrityResult:
         """Check file-database consistency.
 
         Returns:
             Dict with 'missing_files' (DB records with no file on disk)
         """
-        missing_files = []
+        missing_files: list[MissingFileRow] = []
 
         with closing(self._connect()) as conn:
             cursor = conn.execute("SELECT * FROM files")
@@ -175,7 +268,7 @@ class FileDatabase:
 
         return {"missing_files": missing_files}
 
-    def cleanup_orphans(self) -> dict[str, Any]:
+    def cleanup_orphans(self) -> FileCleanupResult:
         """Remove database records for files that no longer exist on disk.
 
         Returns:

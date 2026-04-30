@@ -61,6 +61,57 @@ class TestFileDatabase:
         assert deleted is True
         assert file_db.get_file("file-003") is None
 
+    def test_list_files_supports_search_filter_sort_and_count(self, test_db):
+        """File list query should search, filter, sort, and count consistently."""
+        file_db, _ = test_db
+
+        file_db.create_file(
+            "file-zeta",
+            "zeta.wav",
+            "/tmp/zeta.wav",
+            300,
+            "audio/wav",
+        )
+        file_db.create_file(
+            "needle-file",
+            "alpha.mp3",
+            "/tmp/alpha.mp3",
+            100,
+            "audio/mpeg",
+        )
+        file_db.create_file(
+            "file-beta",
+            "beta.flac",
+            "/tmp/beta.flac",
+            200,
+            "audio/flac",
+        )
+
+        id_rows = file_db.list_files(q="needle", limit=10, offset=0)
+        content_rows = file_db.list_files(q="audio/wav", limit=10, offset=0)
+        filtered_rows = file_db.list_files(
+            content_type="audio/mpeg",
+            limit=10,
+            offset=0,
+        )
+        sorted_rows = file_db.list_files(
+            sort_by="filename",
+            order="asc",
+            limit=10,
+            offset=0,
+        )
+
+        assert [row["id"] for row in id_rows] == ["needle-file"]
+        assert [row["id"] for row in content_rows] == ["file-zeta"]
+        assert [row["id"] for row in filtered_rows] == ["needle-file"]
+        assert [row["filename"] for row in sorted_rows] == [
+            "alpha.mp3",
+            "beta.flac",
+            "zeta.wav",
+        ]
+        assert file_db.count_files(q="needle") == 1
+        assert file_db.count_files(content_type="audio/mpeg") == 1
+
 
 class TestTaskDatabase:
     """Test task queue operations."""

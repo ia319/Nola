@@ -6,11 +6,9 @@ import type {
   CreateTaskPayload,
   CreateTaskResponse,
   DeleteTaskRecordResponse,
-  SortOrder,
   TaskDetail,
+  TaskListApiQuery,
   TaskListResponse,
-  TaskSortBy,
-  TaskStatus,
 } from '@/shared/types'
 
 const BASE = '/api/transcription-tasks'
@@ -26,14 +24,7 @@ export async function createTask(payload: CreateTaskPayload): Promise<CreateTask
 }
 
 export async function listTasks(
-  params: {
-    status?: TaskStatus
-    q?: string
-    sort_by?: TaskSortBy
-    order?: SortOrder
-    limit?: number
-    offset?: number
-  } = {},
+  params: TaskListApiQuery = {},
   signal?: AbortSignal,
 ): Promise<TaskListResponse> {
   const { data } = await apiClient.get<TaskListResponse>(BASE + '/', {
@@ -68,6 +59,15 @@ export async function batchRetryTasks(
   taskIds: BatchTaskActionRequest['task_ids'],
 ): Promise<BatchTaskActionResponse> {
   const { data } = await apiClient.post<BatchTaskActionResponse>(`${BASE}/batch/retry`, {
+    task_ids: taskIds,
+  })
+  return data
+}
+
+export async function batchDeleteTaskRecords(
+  taskIds: BatchTaskActionRequest['task_ids'],
+): Promise<BatchTaskActionResponse> {
+  const { data } = await apiClient.post<BatchTaskActionResponse>(`${BASE}/batch/delete-records`, {
     task_ids: taskIds,
   })
   return data

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { UploadProgress } from '../UploadProgress'
@@ -105,5 +105,31 @@ describe('UploadProgress', () => {
     rerender(<UploadProgress fileName="done.mp3" fileSize={1024} progress={0} status="cancelled" />)
 
     expect(screen.getAllByText('Cancelled')).toHaveLength(2)
+  })
+
+  it('leaves keyboard selection to the row checkbox instead of the row container', () => {
+    const onRowClick = vi.fn()
+
+    const { container } = render(
+      <UploadProgress
+        fileName="selectable.mp3"
+        fileSize={1024}
+        progress={0}
+        status="pending"
+        onRowClick={onRowClick}
+      />,
+    )
+
+    const row = container.querySelector('[data-slot="upload-progress-row"]')
+    if (!(row instanceof HTMLElement)) {
+      throw new Error('Expected upload row to exist')
+    }
+    fireEvent.click(row)
+    expect(onRowClick).toHaveBeenCalledTimes(1)
+
+    expect(row).not.toHaveAttribute('tabIndex')
+    expect(row).not.toHaveAttribute('aria-selected')
+    fireEvent.keyDown(row, { key: 'Enter' })
+    expect(onRowClick).toHaveBeenCalledTimes(1)
   })
 })

@@ -25,7 +25,6 @@
       "duplicateFiles_one": "{{count}} duplicate file skipped",
       "duplicateFiles_other": "{{count}} duplicate files skipped"
     },
-    "startUpload": "Start Upload",
     "reset": "Reset All"
   },
   "options": {
@@ -225,17 +224,15 @@
       "newTasksNotice_other": "{{count}} new tasks available",
       "selection": {
         "selectCurrentPage": "Select current page",
-        "clearCurrentPage": "Clear current page",
+        "clear": "Clear selection",
         "selectedCount_one": "{{count}} selected",
         "selectedCount_other": "{{count}} selected"
       },
-      "batchActions": {
-        "cancel_one": "Cancel selected ({{count}})",
-        "cancel_other": "Cancel selected ({{count}})",
-        "retry_one": "Retry selected ({{count}})",
-        "retry_other": "Retry selected ({{count}})",
-        "export_one": "Export selected ({{count}})",
-        "export_other": "Export selected ({{count}})"
+      "filters": {
+        "clearSearch": "Clear search"
+      },
+      "table": {
+        "rowActions": "Actions for task {{taskId}}"
       },
       "backToFirstPage": "Back to first page"
     },
@@ -341,10 +338,25 @@
         "fileName": "File Name",
         "status": "Status",
         "size": "Size",
+        "progress": "Progress",
         "action": "Action"
       },
       "actions": {
         "addMoreFiles": "Add More Files"
+      },
+      "selection": {
+        "selectAll": "Select all uploads",
+        "selectRow": "Select {{name}}"
+      },
+      "batchActions": {
+        "uploadSelected_one": "Upload selected ({{count}})",
+        "uploadSelected_other": "Upload selected ({{count}})",
+        "cancel_one": "Cancel ({{count}})",
+        "cancel_other": "Cancel ({{count}})",
+        "retry_one": "Retry ({{count}})",
+        "retry_other": "Retry ({{count}})",
+        "remove_one": "Remove ({{count}})",
+        "remove_other": "Remove ({{count}})"
       },
       "status": {
         "pending": "Pending",
@@ -352,25 +364,6 @@
         "ready": "Ready",
         "failed": "Failed",
         "cancelled": "Cancelled"
-      }
-    },
-    "history": {
-      "title": "Task History",
-      "description": "All transcription tasks",
-      "empty": "No history tasks",
-      "selection": {
-        "selectCurrentPage": "Select current page",
-        "clearCurrentPage": "Clear current page",
-        "selectedCount_one": "{{count}} selected",
-        "selectedCount_other": "{{count}} selected"
-      },
-      "batchActions": {
-        "cancel_one": "Cancel selected ({{count}})",
-        "cancel_other": "Cancel selected ({{count}})",
-        "retry_one": "Retry selected ({{count}})",
-        "retry_other": "Retry selected ({{count}})",
-        "export_one": "Export selected ({{count}})",
-        "export_other": "Export selected ({{count}})"
       }
     },
     "exportDialog": {
@@ -449,7 +442,9 @@
         "completed_at": "Completed Time",
         "status": "Status",
         "progress": "Progress",
-        "filename": "Filename"
+        "filename": "Filename",
+        "task_id": "Task ID",
+        "duration": "Duration"
       },
       "order": {
         "desc": "Desc",
@@ -481,6 +476,13 @@
           "partial": "Retried {{succeeded}} tasks, {{failed}} failed",
           "failed_one": "Retry failed for {{count}} task",
           "failed_other": "Retry failed for {{count}} tasks"
+        },
+        "deleteRecord": {
+          "success_one": "Deleted {{count}} task record",
+          "success_other": "Deleted {{count}} task records",
+          "partial": "Deleted {{succeeded}} task records, {{failed}} failed",
+          "failed_one": "Delete failed for {{count}} task record",
+          "failed_other": "Delete failed for {{count}} task records"
         },
         "export": {
           "success_one": "Exported {{count}} task",
@@ -569,10 +571,28 @@
         "profile": "Profile",
         "actions": "Actions"
       },
+      "rowActions": "More actions for {{name}}",
       "empty": {
         "title": "No models available",
         "description": "Download a model to start configuring local runs."
       }
+    },
+    "selection": {
+      "selectAll": "Select all models",
+      "selectRow": "Select {{name}}",
+      "selectedCount": "{{count}} selected",
+      "clear": "Clear selection"
+    },
+    "filters": {
+      "searchPlaceholder": "Search models",
+      "clearSearch": "Clear search",
+      "status": "Status filter",
+      "statusAll": "All Statuses"
+    },
+    "batchActions": {
+      "download": "Download selected",
+      "cancel": "Cancel selected",
+      "delete": "Delete selected"
     },
     "configured": "Default",
     "lastLoaded": "Running",
@@ -1097,10 +1117,8 @@
     "toolbar": {
       "searchLabel": "Search history records",
       "searchPlaceholder": "Search by task ID or filename",
-      "exportSelected": "Export Selected",
-      "status": "Status",
-      "sortBy": "Sort by",
-      "order": "Order"
+      "clearSearch": "Clear search",
+      "status": "Status"
     },
     "selection": {
       "clear": "Clear selection",
@@ -1141,7 +1159,8 @@
         "export": "Export record",
         "cancel": "Cancel task",
         "retry": "Retry task",
-        "deleteRecord": "Delete record"
+        "deleteRecord": "Delete record",
+        "more": "More actions for {{taskId}}"
       }
     },
     "pagination": {
@@ -1162,7 +1181,13 @@
         "selectedCount_other": "{{count}} selected"
       },
       "batch": {
+        "delete": "Delete selected",
         "deleteComingSoon": "Delete selected coming soon"
+      },
+      "filters": {
+        "searchPlaceholder": "Search by file ID, filename, or content type",
+        "contentType": "Content type",
+        "contentTypeAll": "All Types"
       },
       "table": {
         "caption": "History file records",
@@ -1182,7 +1207,8 @@
         },
         "actions": {
           "delete": "Delete file",
-          "openDetail": "Open details for {{filename}}"
+          "openDetail": "Open details for {{filename}}",
+          "more": "More actions for {{filename}}"
         }
       },
       "detail": {
@@ -1218,14 +1244,28 @@
       },
       "deleteDialog": {
         "title": "Delete file",
+        "batchTitle": "Delete files",
         "description": "Delete {{filename}} and its associated data?",
+        "batchDescription": "Delete {{count}} selected files and their associated data?",
+        "batchCount": "{{count}} files selected",
         "cancel": "Cancel",
         "confirm": "Delete file",
         "deleting": "Deleting..."
       },
       "toast": {
         "deleted": "File deleted: {{filename}}",
-        "deleteFailed": "File delete failed, please retry"
+        "deleteFailed": "File delete failed, please retry",
+        "batchDelete": {
+          "success_one": "Deleted {{count}} file",
+          "success_other": "Deleted {{count}} files",
+          "partial": "Deleted {{succeeded}} files, {{failed}} failed",
+          "partialLinkedTasks_one": "Deleted {{succeeded}} files, {{failed}} failed; {{count}} file still has linked tasks",
+          "partialLinkedTasks_other": "Deleted {{succeeded}} files, {{failed}} failed; {{count}} files still have linked tasks",
+          "failed_one": "Delete failed for {{count}} file",
+          "failed_other": "Delete failed for {{count}} files",
+          "linkedTasks_one": "{{count}} file still has linked tasks",
+          "linkedTasks_other": "{{count}} files still have linked tasks"
+        }
       }
     },
     "taskDetail": {

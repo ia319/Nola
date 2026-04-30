@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from nola.application.models import ModelOperationLocks
 from nola.common.event_bus import EventBus, event_bus
 from nola.config import settings
 from nola.model_hub import ModelDownloader, ModelStorage, resolve_model_dir
@@ -58,6 +59,12 @@ def get_model_downloader() -> ModelDownloader:
         _resolve_effective_model_dir(),
         event_bus=get_event_bus(),
     )
+
+
+@lru_cache
+def get_model_operation_locks() -> ModelOperationLocks:
+    """Get model operation locks (singleton)."""
+    return ModelOperationLocks()
 
 
 def invalidate_model_dir_caches() -> None:

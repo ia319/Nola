@@ -1,38 +1,39 @@
-import { lazy, Suspense, useCallback, useState } from 'react'
-import { Copy } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import logger from '@/config/logger'
-import { Button } from '@/components/ui/button'
-import { DetailSheet } from '@/components/ui/DetailSheet'
+import type { InteractiveSortState } from '@/components/common'
 import { useExportDefaults, type ExportRequestOptions } from '@/features/export'
 import type { SingleExportRequestOptions } from '@/features/export'
 import {
   deleteTaskRecordAction,
   requestTaskRefresh,
-  useHistoryTaskActions,
-  useHistoryTasks,
+  TaskDetailSheet,
+  type TaskDetailSheetAction,
   useSessionTasksStore,
+  useTaskDetailSheet,
 } from '@/features/tasks'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { HistoryTaskRecordsView } from './HistoryTaskRecordsView'
-import { useHistoryTaskDetail } from './useHistoryTaskDetail'
+import { useHistoryTaskActions } from './hooks/useHistoryTaskActions'
+import { useHistoryTaskDetail } from './hooks/useHistoryTaskDetail'
+import { useHistoryTasks } from './hooks/useHistoryTasks'
 import type { HistoryPageSize, HistoryRecordsMode, HistoryTaskQuery } from '@/routes/history-search'
-import type { SortOrder, TaskFilterStatus, TaskSortBy, TaskSummary } from '@/shared/types'
 import { useDetailOverlayCloseRequest } from '@/shared/lib/overlay-events'
+import {
+  isActiveTaskStatus,
+  isDeletableTaskRecordStatus,
+  isExportableTaskStatus,
+  isRetryableTaskStatus,
+} from '@/shared/lib/task-status'
+import type { TaskFilterStatus, TaskSortBy, TaskSummary } from '@/shared/types'
 
-const LazyTaskDetailContent = lazy(async () => {
-  const module = await import('@/features/tasks/components/TaskDetailContent')
-  return { default: module.TaskDetailContent }
-})
+type HistoryTaskDetailAction = 'cancel' | 'delete' | 'export' | 'retry'
 
 export interface HistoryTaskModeViewProps {
   query: HistoryTaskQuery
   onSearchChange: (value: string) => void
   onStatusChange: (value: TaskFilterStatus) => void
-  onSortByChange: (value: TaskSortBy) => void
-  onOrderChange: (value: SortOrder) => void
+  onSortChange: (value: InteractiveSortState<TaskSortBy>) => void
   onPageChange: (value: number) => void
   onPageSizeChange: (value: HistoryPageSize) => void
   onPageClamp?: (page: number) => void
@@ -44,8 +45,7 @@ export function HistoryTaskModeView({
   query,
   onSearchChange,
   onStatusChange,
-  onSortByChange,
-  onOrderChange,
+  onSortChange,
   onPageChange,
   onPageSizeChange,
   onPageClamp,
@@ -57,21 +57,19 @@ export function HistoryTaskModeView({
   const addCreatedTask = useSessionTasksStore((state) => state.addCreatedTask)
   const removeSessionTask = useSessionTasksStore((state) => state.removeSessionTask)
   const upsertSessionTask = useSessionTasksStore((state) => state.upsertSessionTask)
-  const [selectedDetailTask, setSelectedDetailTask] = useState<TaskSummary | null>(null)
-  const [runningDetailAction, setRunningDetailAction] = useState<
-    'cancel' | 'delete' | 'export' | 'retry' | null
-  >(null)
-  const closeTaskDetail = useCallback(() => {
-    setSelectedDetailTask(null)
-  }, [])
+  const taskDetailSheet = useTaskDetailSheet<HistoryTaskDetailAction>({
+    onActionError: (action, error) => {
+      logger.error('history.detailActionFailed', { action, error })
+    },
+  })
 
-  useDetailOverlayCloseRequest(closeTaskDetail)
+  useDetailOverlayCloseRequest(taskDetailSheet.closeTaskDetail)
 
   const historyTasks = useHistoryTasks({
     query,
     onPageClamp,
   })
-  const taskDetail = useHistoryTaskDetail(selectedDetailTask?.task_id ?? null)
+  const taskDetail = useHistoryTaskDetail(taskDetailSheet.selectedTask?.task_id ?? null)
   const historyTaskActions = useHistoryTaskActions({
     refresh: historyTasks.refresh,
     onRetryCreatedTask: (task) => {
@@ -93,6 +91,9 @@ export function HistoryTaskModeView({
         filename: task.filename,
         status: task.status,
       })
+    },
+    onDeletedTaskRecord: (taskId) => {
+      removeSessionTask(taskId)
     },
     onActionSettled: requestTaskRefresh,
   })
@@ -132,19 +133,6 @@ export function HistoryTaskModeView({
     await deleteHistoryTaskRecord(task)
   }
 
-  async function handleCopyTaskId(taskId: string): Promise<void> {
-    if (!navigator.clipboard?.writeText) {
-      return
-    }
-
-    try {
-      await navigator.clipboard.writeText(taskId)
-      toast.success(t('history.taskDetail.toast.taskIdCopied'))
-    } catch {
-      toast.error(t('tasks.toast.actionFailed'))
-    }
-  }
-
   async function resolveExportDefaults(): Promise<ExportRequestOptions | null> {
     if (!exportDefaults.isLoading) {
       return exportDefaults.defaults
@@ -158,34 +146,63 @@ export function HistoryTaskModeView({
     }
   }
 
-  async function runDetailAction(
-    action: 'cancel' | 'delete' | 'export' | 'retry',
-    handler: () => Promise<void>,
-  ): Promise<void> {
-    if (runningDetailAction !== null) {
-      return
-    }
+  const detailActionTask = taskDetail.task ?? taskDetailSheet.selectedTask
+  const canExportDetail = detailActionTask ? isExportableTaskStatus(detailActionTask.status) : false
+  const canRetryDetail = detailActionTask ? isRetryableTaskStatus(detailActionTask.status) : false
+  const canCancelDetail = detailActionTask ? isActiveTaskStatus(detailActionTask.status) : false
+  const canDeleteDetail = detailActionTask
+    ? isDeletableTaskRecordStatus(detailActionTask.status)
+    : false
+  const detailActions: readonly TaskDetailSheetAction<HistoryTaskDetailAction>[] = [
+    {
+      id: 'export',
+      label: t('tasks.actions.export'),
+      enabled: Boolean(canExportDetail),
+      variant: 'default',
+      run: async (task) => {
+        const defaults = await resolveExportDefaults()
+        if (!defaults) {
+          return
+        }
 
-    setRunningDetailAction(action)
-    try {
-      await handler()
-    } catch (error: unknown) {
-      logger.error('history.detailActionFailed', { action, error })
-    } finally {
-      setRunningDetailAction(null)
-    }
-  }
-
-  const detailActionTask = taskDetail.task ?? selectedDetailTask
-  const canExportDetail = detailActionTask?.status === 'completed'
-  const canRetryDetail =
-    detailActionTask?.status === 'failed' || detailActionTask?.status === 'cancelled'
-  const canCancelDetail =
-    detailActionTask?.status === 'pending' || detailActionTask?.status === 'processing'
-  const canDeleteDetail =
-    detailActionTask?.status === 'completed' ||
-    detailActionTask?.status === 'failed' ||
-    detailActionTask?.status === 'cancelled'
+        await historyTaskActions.exportTask(task, {
+          format: defaults.format,
+          include_timestamps: defaults.include_timestamps,
+          target: 'download',
+        })
+      },
+    },
+    {
+      id: 'retry',
+      label: t('tasks.actions.retry'),
+      enabled: Boolean(canRetryDetail),
+      run: async (task) => {
+        await handleRetryHistoryTask(task)
+        await taskDetail.refresh()
+      },
+    },
+    {
+      id: 'cancel',
+      label: t('tasks.actions.cancel'),
+      enabled: Boolean(canCancelDetail),
+      run: async (task) => {
+        await handleCancelHistoryTask(task)
+        await taskDetail.refresh()
+      },
+    },
+    {
+      id: 'delete',
+      label: t('tasks.actions.deleteRecord'),
+      enabled: Boolean(canDeleteDetail),
+      placement: 'danger',
+      run: async (task) => {
+        const deleted = await deleteHistoryTaskRecord(task)
+        if (deleted) {
+          taskDetailSheet.closeTaskDetail()
+        }
+      },
+    },
+  ]
 
   return (
     <>
@@ -199,14 +216,13 @@ export function HistoryTaskModeView({
         }
         onSearchChange={onSearchChange}
         onStatusChange={onStatusChange}
-        onSortByChange={onSortByChange}
-        onOrderChange={onOrderChange}
+        onSortChange={onSortChange}
         onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}
         onModeChange={onModeChange}
         onCreateTask={onCreateTask}
         onRetry={historyTasks.refresh}
-        onOpenTaskDetail={setSelectedDetailTask}
+        onOpenTaskDetail={taskDetailSheet.openTaskDetail}
         onCancelTask={handleCancelHistoryTask}
         onRetryTask={handleRetryHistoryTask}
         onDeleteTaskRecord={handleDeleteHistoryTask}
@@ -214,144 +230,21 @@ export function HistoryTaskModeView({
         onBatchCancelTasks={historyTaskActions.cancelTasks}
         onBatchRetryTasks={historyTaskActions.retryTasks}
         onBatchExportTasks={historyTaskActions.exportTasks}
+        onBatchDeleteTaskRecords={historyTaskActions.deleteTaskRecords}
       />
 
-      <DetailSheet
-        open={selectedDetailTask !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedDetailTask(null)
-          }
+      <TaskDetailSheet
+        open={taskDetailSheet.open}
+        summaryTask={taskDetailSheet.selectedTask}
+        detailTask={taskDetail.task}
+        error={taskDetail.error}
+        actions={detailActions}
+        runningAction={taskDetailSheet.runningAction}
+        onOpenChange={taskDetailSheet.onOpenChange}
+        onRunAction={(action, task) => {
+          void taskDetailSheet.runDetailAction(action.id, () => action.run(task))
         }}
-        mode="dialog"
-        size="wide"
-        eyebrow={t('history.taskDetail.eyebrow')}
-        title={
-          taskDetail.task?.filename?.trim() ||
-          selectedDetailTask?.filename?.trim() ||
-          t('history.table.filenameFallback')
-        }
-        description={
-          detailActionTask ? (
-            <span className="font-mono text-xs tracking-tight">
-              {t('tasks.fields.taskId')}: {detailActionTask.task_id}
-            </span>
-          ) : undefined
-        }
-        headerAdornment={
-          detailActionTask ? (
-            <div className="flex items-center gap-2">
-              <StatusBadge status={detailActionTask.status} />
-              <Button
-                type="button"
-                size="icon-xs"
-                variant="ghost"
-                aria-label={t('history.taskDetail.copyTaskId')}
-                onClick={() => {
-                  void handleCopyTaskId(detailActionTask.task_id)
-                }}
-              >
-                <Copy />
-              </Button>
-            </div>
-          ) : undefined
-        }
-        closeLabel={t('history.taskDetail.close')}
-        bodyClassName="px-0 py-0"
-        footer={
-          detailActionTask ? (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="default"
-                  disabled={!canExportDetail || runningDetailAction !== null}
-                  onClick={() => {
-                    void runDetailAction('export', async () => {
-                      const defaults = await resolveExportDefaults()
-                      if (!defaults) {
-                        return
-                      }
-
-                      await historyTaskActions.exportTask(detailActionTask, {
-                        format: defaults.format,
-                        include_timestamps: defaults.include_timestamps,
-                        target: 'download',
-                      })
-                    })
-                  }}
-                >
-                  {t('tasks.actions.export')}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!canRetryDetail || runningDetailAction !== null}
-                  onClick={() => {
-                    void runDetailAction('retry', async () => {
-                      await handleRetryHistoryTask(detailActionTask)
-                      await taskDetail.refresh()
-                    })
-                  }}
-                >
-                  {t('tasks.actions.retry')}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!canCancelDetail || runningDetailAction !== null}
-                  onClick={() => {
-                    void runDetailAction('cancel', async () => {
-                      await handleCancelHistoryTask(detailActionTask)
-                      await taskDetail.refresh()
-                    })
-                  }}
-                >
-                  {t('tasks.actions.cancel')}
-                </Button>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                className="text-destructive hover:text-destructive"
-                disabled={!canDeleteDetail || runningDetailAction !== null}
-                onClick={() => {
-                  void runDetailAction('delete', async () => {
-                    const deleted = await deleteHistoryTaskRecord(detailActionTask)
-                    if (deleted) {
-                      setSelectedDetailTask(null)
-                    }
-                  })
-                }}
-              >
-                {t('tasks.actions.deleteRecord')}
-              </Button>
-            </div>
-          ) : undefined
-        }
-      >
-        {taskDetail.error ? (
-          <div className="px-6 py-8">
-            <p className="text-destructive text-sm">
-              {t(taskDetail.error.i18nKey, taskDetail.error.params ?? {})}
-            </p>
-          </div>
-        ) : taskDetail.task ? (
-          <Suspense
-            fallback={
-              <div className="px-6 py-8">
-                <p className="text-muted-foreground text-sm">{t('history.taskDetail.loading')}</p>
-              </div>
-            }
-          >
-            <LazyTaskDetailContent task={taskDetail.task} />
-          </Suspense>
-        ) : (
-          <div className="px-6 py-8">
-            <p className="text-muted-foreground text-sm">{t('history.taskDetail.loading')}</p>
-          </div>
-        )}
-      </DetailSheet>
+      />
     </>
   )
 }

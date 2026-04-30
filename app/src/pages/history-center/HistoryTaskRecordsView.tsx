@@ -1,11 +1,19 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useMemo, useRef, useState } from 'react'
 import { Download, FileText, RotateCcw, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import logger from '@/config/logger'
+import {
+  InteractiveTable,
+  InteractiveTableRowActionsMenu,
+  type InteractiveBatchAction,
+  type InteractiveSortState,
+  type InteractiveTableColumn,
+  type InteractiveTableRowAction,
+  useInteractiveTableSelection,
+} from '@/components/common'
 import { Button } from '@/components/ui/button'
-import { DataTable, type DataTableColumn } from '@/components/ui/DataTable'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import {
@@ -15,10 +23,14 @@ import {
   type SingleExportRequestOptions,
   useExportDefaults,
 } from '@/features/export'
-import { useTaskSelection } from '@/features/tasks'
+import {
+  isActiveTaskStatus,
+  isDeletableTaskRecordStatus,
+  isExportableTaskStatus,
+  isRetryableTaskStatus,
+} from '@/shared/lib/task-status'
 import type {
   BatchTaskActionResponse,
-  SortOrder,
   TaskFilterStatus,
   TaskSortBy,
   TaskSummary,
@@ -26,6 +38,7 @@ import type {
 import type { HistoryPageSize, HistoryRecordsMode, HistoryTaskQuery } from '@/routes/history-search'
 import { HistoryPagination } from './HistoryPagination'
 import { HistoryToolbar } from './HistoryToolbar'
+import { useHistorySearchDraft } from './hooks/useHistorySearchDraft'
 
 type BatchTaskHandler = (taskIds: string[]) => Promise<void | BatchTaskActionResponse>
 type BatchExportHandler = (
@@ -33,6 +46,7 @@ type BatchExportHandler = (
   options: ExportRequestOptions & { zip_name?: string | null },
 ) => Promise<void>
 type RowAction = 'cancel' | 'delete' | 'retry'
+type BatchTaskAction = 'cancel' | 'delete' | 'retry'
 
 interface ExportDialogState {
   open: boolean
@@ -50,8 +64,7 @@ export interface HistoryTaskRecordsViewProps {
   mode?: HistoryRecordsMode
   onSearchChange: (value: string) => void
   onStatusChange: (value: TaskFilterStatus) => void
-  onSortByChange: (value: TaskSortBy) => void
-  onOrderChange: (value: SortOrder) => void
+  onSortChange: (value: InteractiveSortState<TaskSortBy>) => void
   onPageChange: (value: number) => void
   onPageSizeChange: (value: HistoryPageSize) => void
   onModeChange?: (mode: HistoryRecordsMode) => void
@@ -69,6 +82,7 @@ export interface HistoryTaskRecordsViewProps {
   onBatchCancelTasks?: BatchTaskHandler
   onBatchRetryTasks?: BatchTaskHandler
   onBatchExportTasks?: BatchExportHandler
+  onBatchDeleteTaskRecords?: BatchTaskHandler
 }
 
 const FALLBACK_EXPORT_OPTIONS: ExportRequestOptions = {
@@ -134,8 +148,7 @@ export function HistoryTaskRecordsView({
   mode = 'tasks',
   onSearchChange,
   onStatusChange,
-  onSortByChange,
-  onOrderChange,
+  onSortChange,
   onPageChange,
   onPageSizeChange,
   onModeChange,
@@ -150,14 +163,15 @@ export function HistoryTaskRecordsView({
   onBatchCancelTasks,
   onBatchRetryTasks,
   onBatchExportTasks,
+  onBatchDeleteTaskRecords,
 }: HistoryTaskRecordsViewProps) {
   const { t } = useTranslation()
   const exportDefaults = useExportDefaults()
   const rowActionsRef = useRef<Set<string>>(new Set())
   const runningBatchActionRef = useRef(false)
   const [runningRowActions, setRunningRowActions] = useState<Set<string>>(() => new Set())
-  const [runningBatchAction, setRunningBatchAction] = useState<'cancel' | 'retry' | null>(null)
-  const [searchDraft, setSearchDraft] = useState(query.q)
+  const [runningBatchAction, setRunningBatchAction] = useState<BatchTaskAction | null>(null)
+  const [searchDraft, setSearchDraft] = useHistorySearchDraft(query.q)
   const [exportDialog, setExportDialog] = useState<ExportDialogState>({
     open: false,
     mode: 'single',
@@ -171,39 +185,16 @@ export function HistoryTaskRecordsView({
   const [isUpdatingDefaults, setIsUpdatingDefaults] = useState(false)
   const [lastSavedPath, setLastSavedPath] = useState<string | null>(null)
 
-  useEffect(() => {
-    setSearchDraft(query.q)
-  }, [query.q])
-
   const selectionResetToken = `${mode}|${query.order}|${query.page}|${query.page_size}|${query.q}|${query.sort_by}|${query.status}`
-  const { clearSelection, selectedTaskIds, toggleCurrentPage, toggleTask } = useTaskSelection(
-    tasks,
-    {
-      resetToken: selectionResetToken,
-    },
-  )
-
-  const tasksById = useMemo(() => {
-    return Object.fromEntries(tasks.map((task) => [task.task_id, task]))
-  }, [tasks])
-
-  const cancellableTaskIds = selectedTaskIds.filter((taskId) => {
-    const task = tasksById[taskId]
-    return task?.status === 'pending' || task?.status === 'processing'
+  const tableSelection = useInteractiveTableSelection({
+    rows: tasks,
+    getRowId: (task) => task.task_id,
+    resetToken: selectionResetToken,
   })
-
-  const retryableTaskIds = selectedTaskIds.filter((taskId) => {
-    const task = tasksById[taskId]
-    return task?.status === 'failed' || task?.status === 'cancelled'
-  })
-
-  const exportableTaskIds = selectedTaskIds.filter((taskId) => {
-    const task = tasksById[taskId]
-    return task?.status === 'completed'
-  })
+  const { onClearSelection: clearSelection } = tableSelection
 
   async function runBatchAction(
-    action: 'cancel' | 'retry',
+    action: BatchTaskAction,
     taskIds: string[],
     handler?: BatchTaskHandler,
   ): Promise<void> {
@@ -465,10 +456,19 @@ export function HistoryTaskRecordsView({
         })
       : undefined
 
-  const columns: readonly DataTableColumn<TaskSummary>[] = [
+  const sort = useMemo<InteractiveSortState<TaskSortBy>>(
+    () => ({
+      key: query.sort_by,
+      direction: query.order,
+    }),
+    [query.order, query.sort_by],
+  )
+
+  const columns: readonly InteractiveTableColumn<TaskSummary, TaskSortBy>[] = [
     {
-      key: 'taskId',
+      id: 'taskId',
       header: t('history.table.columns.taskId'),
+      sortKey: 'task_id',
       className: 'min-w-[220px]',
       cell: (task) => {
         return (
@@ -477,8 +477,9 @@ export function HistoryTaskRecordsView({
       },
     },
     {
-      key: 'filename',
+      id: 'filename',
       header: t('history.table.columns.filename'),
+      sortKey: 'filename',
       className: 'min-w-[280px]',
       cell: (task) => {
         const fileLabel =
@@ -490,14 +491,17 @@ export function HistoryTaskRecordsView({
       },
     },
     {
-      key: 'status',
+      id: 'status',
       header: t('history.table.columns.status'),
+      sortKey: 'status',
       className: 'min-w-[140px]',
       cell: (task) => <StatusBadge status={task.status} />,
     },
     {
-      key: 'duration',
+      id: 'duration',
       header: t('history.table.columns.duration'),
+      sortKey: 'duration',
+      defaultSortDirection: 'desc',
       className: 'min-w-[140px]',
       cell: (task) => (
         <span className="text-sm">
@@ -506,187 +510,133 @@ export function HistoryTaskRecordsView({
       ),
     },
     {
-      key: 'actions',
+      id: 'actions',
       header: t('history.table.columns.actions'),
       className: 'w-[152px]',
       headerClassName: 'text-right',
       cell: (task) => {
-        const canCancel = task.status === 'pending' || task.status === 'processing'
-        const canRetry = task.status === 'failed' || task.status === 'cancelled'
-        const canDelete =
-          task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
-        const canExport = task.status === 'completed'
+        const canCancel = isActiveTaskStatus(task.status)
+        const canRetry = isRetryableTaskStatus(task.status)
+        const canDelete = isDeletableTaskRecordStatus(task.status)
+        const canExport = isExportableTaskStatus(task.status)
 
         const cancelBusy = runningRowActions.has(buildRowActionKey(task.task_id, 'cancel'))
         const retryBusy = runningRowActions.has(buildRowActionKey(task.task_id, 'retry'))
         const deleteBusy = runningRowActions.has(buildRowActionKey(task.task_id, 'delete'))
 
+        const rowActions: readonly InteractiveTableRowAction[] = [
+          {
+            id: 'export',
+            label: t('history.table.actions.export'),
+            ariaLabel: t('history.table.actions.export'),
+            icon: <Download />,
+            hidden: !canExport || !onExportTask,
+            run: () => openSingleExportDialog(task),
+          },
+          {
+            id: 'cancel',
+            label: t('history.table.actions.cancel'),
+            ariaLabel: t('history.table.actions.cancel'),
+            icon: <X />,
+            hidden: !canCancel || !onCancelTask,
+            disabled: cancelBusy,
+            run: () => runRowAction(task, 'cancel', onCancelTask),
+          },
+          {
+            id: 'retry',
+            label: t('history.table.actions.retry'),
+            ariaLabel: t('history.table.actions.retry'),
+            icon: <RotateCcw />,
+            hidden: !canRetry || !onRetryTask,
+            disabled: retryBusy,
+            run: () => runRowAction(task, 'retry', onRetryTask),
+          },
+          {
+            id: 'delete',
+            label: t('history.table.actions.deleteRecord'),
+            ariaLabel: t('history.table.actions.deleteRecord'),
+            icon: <Trash2 />,
+            hidden: !canDelete || !onDeleteTaskRecord,
+            disabled: deleteBusy,
+            variant: 'destructive',
+            run: () => runRowAction(task, 'delete', onDeleteTaskRecord),
+          },
+        ]
+
         return (
-          <div className="flex flex-wrap items-center justify-end gap-1">
-            {canExport && onExportTask ? (
-              <Button
-                type="button"
-                size="icon-xs"
-                variant="ghost"
-                aria-label={t('history.table.actions.export')}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  void openSingleExportDialog(task)
-                }}
-              >
-                <Download />
-              </Button>
-            ) : null}
-
-            {canCancel && onCancelTask ? (
-              <Button
-                type="button"
-                size="icon-xs"
-                variant="ghost"
-                aria-label={t('history.table.actions.cancel')}
-                disabled={cancelBusy}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  void runRowAction(task, 'cancel', onCancelTask)
-                }}
-              >
-                <X />
-              </Button>
-            ) : null}
-
-            {canRetry && onRetryTask ? (
-              <Button
-                type="button"
-                size="icon-xs"
-                variant="ghost"
-                aria-label={t('history.table.actions.retry')}
-                disabled={retryBusy}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  void runRowAction(task, 'retry', onRetryTask)
-                }}
-              >
-                <RotateCcw />
-              </Button>
-            ) : null}
-
-            {canDelete && onDeleteTaskRecord ? (
-              <Button
-                type="button"
-                size="icon-xs"
-                variant="ghost"
-                aria-label={t('history.table.actions.deleteRecord')}
-                disabled={deleteBusy}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  void runRowAction(task, 'delete', onDeleteTaskRecord)
-                }}
-              >
-                <Trash2 />
-              </Button>
-            ) : null}
+          <div className="flex justify-end">
+            <InteractiveTableRowActionsMenu
+              actions={rowActions}
+              triggerLabel={t('history.table.actions.more', { taskId: task.task_id })}
+            />
           </div>
         )
       },
     },
   ]
 
+  const batchActions: readonly InteractiveBatchAction<TaskSummary>[] = [
+    {
+      id: 'cancel',
+      label: t('tasks.actions.cancel'),
+      icon: <X />,
+      getEligibleRows: (selectedRows) =>
+        selectedRows.filter((task) => isActiveTaskStatus(task.status)),
+      run: (selectedRows) =>
+        runBatchAction(
+          'cancel',
+          selectedRows.map((task) => task.task_id),
+          onBatchCancelTasks,
+        ),
+      disabled: runningBatchAction !== null || !onBatchCancelTasks,
+      isRunning: runningBatchAction === 'cancel',
+    },
+    {
+      id: 'retry',
+      label: t('tasks.actions.retry'),
+      icon: <RotateCcw />,
+      getEligibleRows: (selectedRows) =>
+        selectedRows.filter((task) => isRetryableTaskStatus(task.status)),
+      run: (selectedRows) =>
+        runBatchAction(
+          'retry',
+          selectedRows.map((task) => task.task_id),
+          onBatchRetryTasks,
+        ),
+      disabled: runningBatchAction !== null || !onBatchRetryTasks,
+      isRunning: runningBatchAction === 'retry',
+    },
+    {
+      id: 'export',
+      label: t('tasks.actions.export'),
+      icon: <Download />,
+      getEligibleRows: (selectedRows) =>
+        selectedRows.filter((task) => isExportableTaskStatus(task.status)),
+      run: (selectedRows) => {
+        void openBatchExportDialog(selectedRows.map((task) => task.task_id))
+      },
+      disabled: runningBatchAction !== null || !onBatchExportTasks,
+    },
+    {
+      id: 'delete',
+      label: t('tasks.actions.deleteRecord'),
+      icon: <Trash2 />,
+      getEligibleRows: (selectedRows) =>
+        selectedRows.filter((task) => isDeletableTaskRecordStatus(task.status)),
+      run: (selectedRows) =>
+        runBatchAction(
+          'delete',
+          selectedRows.map((task) => task.task_id),
+          onBatchDeleteTaskRecords,
+        ),
+      disabled: runningBatchAction !== null || !onBatchDeleteTaskRecords,
+      isRunning: runningBatchAction === 'delete',
+      variant: 'destructive',
+    },
+  ]
+
   return (
-    <section
-      data-slot="history-records-view"
-      className="bg-card flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-sm"
-    >
-      <HistoryToolbar
-        mode={mode}
-        searchValue={searchDraft}
-        statusValue={query.status}
-        sortByValue={query.sort_by}
-        orderValue={query.order}
-        isLoading={isLoading}
-        canExportSelection={Boolean(onBatchExportTasks) && exportableTaskIds.length > 0}
-        onSearchChange={setSearchDraft}
-        onSearchSubmit={onSearchChange}
-        onStatusChange={onStatusChange}
-        onSortByChange={onSortByChange}
-        onOrderChange={onOrderChange}
-        onExportSelection={() => {
-          void openBatchExportDialog(exportableTaskIds)
-        }}
-        onModeChange={onModeChange}
-      />
-
-      {selectedTaskIds.length > 0 ? (
-        <div
-          data-slot="history-selection-bar"
-          className="bg-surface-container flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
-        >
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs font-semibold tracking-[0.18em] uppercase">
-              {t('history.selection.selectedCount', { count: selectedTaskIds.length })}
-            </span>
-            <div className="bg-border hidden h-4 w-px lg:block" />
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                size="xs"
-                variant="outline"
-                disabled={
-                  runningBatchAction !== null ||
-                  cancellableTaskIds.length === 0 ||
-                  !onBatchCancelTasks
-                }
-                onClick={() => {
-                  void runBatchAction('cancel', cancellableTaskIds, onBatchCancelTasks)
-                }}
-              >
-                <X />
-                {t('tasks.history.batchActions.cancel', { count: cancellableTaskIds.length })}
-              </Button>
-              <Button
-                type="button"
-                size="xs"
-                variant="outline"
-                disabled={
-                  runningBatchAction !== null || retryableTaskIds.length === 0 || !onBatchRetryTasks
-                }
-                onClick={() => {
-                  void runBatchAction('retry', retryableTaskIds, onBatchRetryTasks)
-                }}
-              >
-                <RotateCcw />
-                {t('tasks.history.batchActions.retry', { count: retryableTaskIds.length })}
-              </Button>
-              <Button
-                type="button"
-                size="xs"
-                variant="outline"
-                disabled={
-                  runningBatchAction !== null ||
-                  exportableTaskIds.length === 0 ||
-                  !onBatchExportTasks
-                }
-                onClick={() => {
-                  void openBatchExportDialog(exportableTaskIds)
-                }}
-              >
-                <Download />
-                {t('tasks.history.batchActions.export', { count: exportableTaskIds.length })}
-              </Button>
-            </div>
-          </div>
-
-          <Button
-            type="button"
-            size="icon-xs"
-            variant="ghost"
-            aria-label={t('history.selection.clear')}
-            onClick={clearSelection}
-          >
-            <X />
-          </Button>
-        </div>
-      ) : null}
-
+    <>
       {lastSavedPath ? (
         <div className="border-b px-4 py-3">
           <div className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
@@ -707,12 +657,34 @@ export function HistoryTaskRecordsView({
         </div>
       ) : null}
 
-      <DataTable
-        className="rounded-none border-0 shadow-none"
+      <InteractiveTable
+        data-slot="history-records-view"
         columns={columns}
         rows={tasks}
         getRowId={(task) => task.task_id}
         caption={t('history.table.caption')}
+        sort={sort}
+        onSortChange={onSortChange}
+        filters={
+          <HistoryToolbar
+            mode={mode}
+            searchValue={searchDraft}
+            statusValue={query.status}
+            isLoading={isLoading}
+            onSearchChange={setSearchDraft}
+            onSearchSubmit={onSearchChange}
+            onStatusChange={onStatusChange}
+            onModeChange={onModeChange}
+          />
+        }
+        selection={{
+          ...tableSelection.selection,
+          selectAllLabel: t('history.table.selectAll'),
+          getRowLabel: (task) => t('history.table.selectRow', { taskId: task.task_id }),
+          selectedRowsLabel: (count) => t('history.selection.selectedCount', { count }),
+          clearSelectionLabel: t('history.selection.clear'),
+        }}
+        batchActions={batchActions}
         isLoading={isLoading}
         errorState={
           errorMessage
@@ -736,17 +708,16 @@ export function HistoryTaskRecordsView({
         onRowClick={onOpenTaskDetail}
         scrollAreaClassName="max-h-[56vh] overflow-auto"
         stickyHeader
-        selection={{
-          selectedRowIds: selectedTaskIds,
-          selectAllLabel: t('history.table.selectAll'),
-          getRowLabel: (task) => t('history.table.selectRow', { taskId: task.task_id }),
-          onToggleRow: (rowId, checked) => {
-            toggleTask(rowId, checked)
-          },
-          onToggleAllRows: () => {
-            toggleCurrentPage()
-          },
-        }}
+        pagination={
+          <HistoryPagination
+            page={query.page}
+            pageSize={query.page_size}
+            total={total}
+            isLoading={isLoading}
+            onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
+          />
+        }
         emptyState={
           <EmptyState
             icon={<FileText className="size-6" />}
@@ -761,15 +732,6 @@ export function HistoryTaskRecordsView({
             }
           />
         }
-      />
-
-      <HistoryPagination
-        page={query.page}
-        pageSize={query.page_size}
-        total={total}
-        isLoading={isLoading}
-        onPageChange={onPageChange}
-        onPageSizeChange={onPageSizeChange}
       />
 
       {exportDialog.open ? (
@@ -794,6 +756,6 @@ export function HistoryTaskRecordsView({
           />
         </Suspense>
       ) : null}
-    </section>
+    </>
   )
 }

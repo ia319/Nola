@@ -107,8 +107,8 @@ class BatchTaskActionSummaryResponse(BaseModel):
 
 
 class BatchTaskActionResponse(BaseModel):
-    """Response for batch cancel/retry actions."""
+    """Response for batch task actions."""
 
-    action: Literal["cancel", "retry"]
+    action: Literal["cancel", "retry", "delete_record"]
     summary: BatchTaskActionSummaryResponse
     results: list[BatchTaskActionResultResponse]

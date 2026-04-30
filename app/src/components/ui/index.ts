@@ -22,6 +22,23 @@ export {
   type DetailSheetSize,
 } from './DetailSheet'
 export { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './dialog'
+export {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from './dropdown-menu'
 export { EmptyState, type EmptyStateProps } from './EmptyState'
 export { Input } from './input'
 export { Label } from './label'

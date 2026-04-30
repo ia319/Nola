@@ -24,7 +24,6 @@
       "uploadFailed": "上传失败，请重试",
       "duplicateFiles": "已跳过 {{count}} 个重复文件"
     },
-    "startUpload": "开始上传",
     "reset": "全部重置"
   },
   "options": {
@@ -224,17 +223,15 @@
       "newTasksNotice_other": "有 {{count}} 个新任务",
       "selection": {
         "selectCurrentPage": "选择当前页",
-        "clearCurrentPage": "清空当前页",
+        "clear": "清除选择",
         "selectedCount_one": "已选择 {{count}} 项",
         "selectedCount_other": "已选择 {{count}} 项"
       },
-      "batchActions": {
-        "cancel_one": "取消所选 ({{count}})",
-        "cancel_other": "取消所选 ({{count}})",
-        "retry_one": "重试所选 ({{count}})",
-        "retry_other": "重试所选 ({{count}})",
-        "export_one": "导出所选 ({{count}})",
-        "export_other": "导出所选 ({{count}})"
+      "filters": {
+        "clearSearch": "清除搜索"
+      },
+      "table": {
+        "rowActions": "任务 {{taskId}} 的操作"
       },
       "backToFirstPage": "返回第一页"
     },
@@ -340,10 +337,25 @@
         "fileName": "文件名",
         "status": "状态",
         "size": "大小",
+        "progress": "进度",
         "action": "操作"
       },
       "actions": {
         "addMoreFiles": "继续添加文件"
+      },
+      "selection": {
+        "selectAll": "选择所有上传项",
+        "selectRow": "选择 {{name}}"
+      },
+      "batchActions": {
+        "uploadSelected_one": "上传选择的 ({{count}})",
+        "uploadSelected_other": "上传选择的 ({{count}})",
+        "cancel_one": "取消 ({{count}})",
+        "cancel_other": "取消 ({{count}})",
+        "retry_one": "重试 ({{count}})",
+        "retry_other": "重试 ({{count}})",
+        "remove_one": "移除 ({{count}})",
+        "remove_other": "移除 ({{count}})"
       },
       "status": {
         "pending": "等待上传",
@@ -351,25 +363,6 @@
         "ready": "就绪",
         "failed": "失败",
         "cancelled": "已取消"
-      }
-    },
-    "history": {
-      "title": "任务历史",
-      "description": "所有转写任务",
-      "empty": "暂无历史任务",
-      "selection": {
-        "selectCurrentPage": "选择当前页",
-        "clearCurrentPage": "清空当前页",
-        "selectedCount_one": "已选择 {{count}} 项",
-        "selectedCount_other": "已选择 {{count}} 项"
-      },
-      "batchActions": {
-        "cancel_one": "取消所选 ({{count}})",
-        "cancel_other": "取消所选 ({{count}})",
-        "retry_one": "重试所选 ({{count}})",
-        "retry_other": "重试所选 ({{count}})",
-        "export_one": "导出所选 ({{count}})",
-        "export_other": "导出所选 ({{count}})"
       }
     },
     "exportDialog": {
@@ -448,7 +441,9 @@
         "completed_at": "完成时间",
         "status": "状态",
         "progress": "进度",
-        "filename": "文件名"
+        "filename": "文件名",
+        "task_id": "任务 ID",
+        "duration": "时长"
       },
       "order": {
         "desc": "降序",
@@ -480,6 +475,13 @@
           "partial": "已重试 {{succeeded}} 个任务，{{failed}} 个失败",
           "failed_one": "{{count}} 个任务重试失败",
           "failed_other": "{{count}} 个任务重试失败"
+        },
+        "deleteRecord": {
+          "success_one": "已删除 {{count}} 条任务记录",
+          "success_other": "已删除 {{count}} 条任务记录",
+          "partial": "已删除 {{succeeded}} 条任务记录，{{failed}} 条失败",
+          "failed_one": "{{count}} 条任务记录删除失败",
+          "failed_other": "{{count}} 条任务记录删除失败"
         },
         "export": {
           "success_one": "已导出 {{count}} 个任务",
@@ -568,10 +570,28 @@
         "profile": "特征",
         "actions": "操作"
       },
+      "rowActions": "{{name}} 的更多操作",
       "empty": {
         "title": "暂无可用模型",
         "description": "先下载模型，再开始配置本地转写。"
       }
+    },
+    "selection": {
+      "selectAll": "选择所有模型",
+      "selectRow": "选择 {{name}}",
+      "selectedCount": "已选择 {{count}} 个",
+      "clear": "清除选择"
+    },
+    "filters": {
+      "searchPlaceholder": "搜索模型",
+      "clearSearch": "清除搜索",
+      "status": "状态筛选",
+      "statusAll": "全部状态"
+    },
+    "batchActions": {
+      "download": "下载所选",
+      "cancel": "取消所选",
+      "delete": "删除所选"
     },
     "configured": "默认",
     "lastLoaded": "运行中",
@@ -1096,10 +1116,8 @@
     "toolbar": {
       "searchLabel": "搜索历史记录",
       "searchPlaceholder": "按任务 ID 或文件名搜索",
-      "exportSelected": "导出所选",
-      "status": "状态",
-      "sortBy": "排序字段",
-      "order": "排序方向"
+      "clearSearch": "清除搜索",
+      "status": "状态"
     },
     "selection": {
       "clear": "清除选择",
@@ -1140,7 +1158,8 @@
         "export": "导出记录",
         "cancel": "取消任务",
         "retry": "重试任务",
-        "deleteRecord": "删除记录"
+        "deleteRecord": "删除记录",
+        "more": "{{taskId}} 的更多操作"
       }
     },
     "pagination": {
@@ -1161,7 +1180,13 @@
         "selectedCount_other": "已选择 {{count}} 项"
       },
       "batch": {
+        "delete": "删除所选",
         "deleteComingSoon": "批量删除即将支持"
+      },
+      "filters": {
+        "searchPlaceholder": "按文件 ID、文件名或内容类型搜索",
+        "contentType": "内容类型",
+        "contentTypeAll": "全部类型"
       },
       "table": {
         "caption": "历史文件记录",
@@ -1181,7 +1206,8 @@
         },
         "actions": {
           "delete": "删除文件",
-          "openDetail": "打开 {{filename}} 的详情"
+          "openDetail": "打开 {{filename}} 的详情",
+          "more": "{{filename}} 的更多操作"
         }
       },
       "detail": {
@@ -1217,14 +1243,28 @@
       },
       "deleteDialog": {
         "title": "删除文件",
+        "batchTitle": "批量删除文件",
         "description": "删除 {{filename}} 及其关联数据？",
+        "batchDescription": "删除选中的 {{count}} 个文件及其关联数据？",
+        "batchCount": "已选择 {{count}} 个文件",
         "cancel": "取消",
         "confirm": "删除文件",
         "deleting": "删除中..."
       },
       "toast": {
         "deleted": "文件已删除: {{filename}}",
-        "deleteFailed": "文件删除失败，请重试"
+        "deleteFailed": "文件删除失败，请重试",
+        "batchDelete": {
+          "success_one": "已删除 {{count}} 个文件",
+          "success_other": "已删除 {{count}} 个文件",
+          "partial": "已删除 {{succeeded}} 个文件，{{failed}} 个失败",
+          "partialLinkedTasks_one": "已删除 {{succeeded}} 个文件，{{failed}} 个失败；其中 {{count}} 个仍有关联任务",
+          "partialLinkedTasks_other": "已删除 {{succeeded}} 个文件，{{failed}} 个失败；其中 {{count}} 个仍有关联任务",
+          "failed_one": "{{count}} 个文件删除失败",
+          "failed_other": "{{count}} 个文件删除失败",
+          "linkedTasks_one": "{{count}} 个文件仍有关联任务",
+          "linkedTasks_other": "{{count}} 个文件仍有关联任务"
+        }
       }
     },
     "taskDetail": {

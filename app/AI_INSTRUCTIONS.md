@@ -94,11 +94,29 @@ app/                          # Frontend workspace root
 │   │   │   └── theme-provider.test.tsx # Verify theme hydration and persistence behavior
 │   │   ├── common/           # Cross-feature common components barrel
 │   │   │   ├── __tests__/
-│   │   │   │   ├── ErrorBoundary.test.tsx # Fallback and retry tests
-│   │   │   │   └── TaskListPanel.test.tsx # Task list panel behavior tests
+│   │   │   │   └── ErrorBoundary.test.tsx # Fallback and retry tests
 │   │   │   ├── ErrorBoundary.tsx # Render-error catch + i18n fallback + retry
-│   │   │   ├── ListToolbar.tsx # Shared search/filter/sort toolbar
-│   │   │   ├── TaskListPanel.tsx # Shared task list panel with actions
+│   │   │   ├── interactive-table/ # Feature-agnostic interactive table composition
+│   │   │   │   ├── __tests__/ # Interactive table component and hook tests
+│   │   │   │   │   ├── InteractiveTable.test.tsx # Table rendering and selection tests
+│   │   │   │   │   ├── InteractiveTableBatchActionBar.test.tsx # Batch action bar tests
+│   │   │   │   │   ├── InteractiveTablePagination.test.tsx # Pagination tests
+│   │   │   │   │   ├── InteractiveTableRowActionsMenu.test.tsx # Row action menu tests
+│   │   │   │   │   ├── useInteractiveTableSelection.test.ts # Selection hook tests
+│   │   │   │   │   └── useLocalInteractiveTableQuery.test.ts # Local query hook tests
+│   │   │   │   ├── hooks/      # Selection and local-query hooks
+│   │   │   │   │   ├── useInteractiveTableSelection.ts # Feature-agnostic selection state
+│   │   │   │   │   ├── useLocalInteractiveTableQuery.ts # Full local dataset query helper
+│   │   │   │   │   └── index.ts # Hook exports
+│   │   │   │   ├── InteractiveTable.stories.tsx # Storybook table scenarios
+│   │   │   │   ├── InteractiveTable.tsx # Compose DataTable, sorting, selection, and actions
+│   │   │   │   ├── InteractiveTableBatchActionBar.tsx # Selection action bar
+│   │   │   │   ├── InteractiveTableFilterBar.tsx # Search/filter shell
+│   │   │   │   ├── InteractiveTablePagination.tsx # Shared pagination controls
+│   │   │   │   ├── InteractiveTableRowActionsMenu.tsx # Row action trigger/menu
+│   │   │   │   ├── InteractiveTableSortableHeader.tsx # Sortable header control
+│   │   │   │   ├── types.ts    # Interactive table contracts
+│   │   │   │   └── index.ts    # Interactive table public exports
 │   │   │   ├── types.ts      # Shared common-component callback contracts
 │   │   │   └── index.ts      # Common export entry (feature-agnostic)
 │   │   └── ui/               # Radix + Tailwind primitives plus Nola design components
@@ -171,32 +189,35 @@ app/                          # Frontend workspace root
 │   │   │   │       └── useModelDownload.test.ts # Verify download hook behavior
 │   │   │   ├── lib/          # Model-private display helpers
 │   │   │   │   ├── model-helpers.ts # Format, sort, and resolve model display data
+│   │   │   │   ├── model-query-options.ts # Model filter/sort query options
 │   │   │   │   ├── model-refresh.ts # Broadcast model refresh requests
 │   │   │   │   └── __tests__/    # Model helper tests
 │   │   │   │       └── model-helpers.test.ts # Verify helper edge cases
 │   │   │   ├── index.ts      # Feature public exports
 │   │   │   └── types.ts      # Model domain contracts
-│   │   ├── tasks/            # Keep task lifecycle, polling, and history subdomain
+│   │   ├── tasks/            # Keep reusable task lifecycle, polling, and detail logic
 │   │   │   ├── api.ts        # Use create/list/get/cancel/delete and batch endpoints
 │   │   │   ├── actions.ts    # Wrap write actions and guarantee refresh signals
 │   │   │   ├── __tests__/    # Keep task API/action tests
 │   │   │   │   ├── actions.test.ts # Verify action wrapper behavior
 │   │   │   │   └── api.test.ts # Verify API request wiring
-│   │   │   ├── components/   # Keep current-batch task panel, action bar, and detail content
+│   │   │   ├── components/   # Keep current-batch task panel and shared detail content
 │   │   │   │   ├── CurrentBatchTasksPanel.tsx # Compose session task list with batch actions
-│   │   │   │   ├── TaskBatchActionBar.tsx # Reuse batch-action controls
 │   │   │   │   ├── TaskDetailContent.tsx # Task detail dialog content
+│   │   │   │   ├── TaskDetailSheet.tsx # Shared task detail sheet wrapper
 │   │   │   │   └── __tests__/
-│   │   │   │       ├── TaskBatchActionBar.test.tsx # Verify batch-action controls
+│   │   │   │       ├── CurrentBatchTasksPanel.test.tsx # Verify current-batch table behavior
 │   │   │   │       └── TaskDetailContent.test.tsx # Verify task detail rendering edge cases
-│   │   │   ├── hooks/        # Keep task query/polling/selection hooks
+│   │   │   ├── hooks/        # Keep reusable task query, detail, and polling hooks
 │   │   │   │   ├── useRecentTaskQuery.ts # Normalize recent-task query and paging
+│   │   │   │   ├── useTaskDetail.ts # Query one task by id
+│   │   │   │   ├── useTaskDetailSheet.ts # Manage selected task detail state and action locks
 │   │   │   │   ├── useTaskPolling.ts # Poll with foreground/background intervals
-│   │   │   │   ├── useTaskSelection.ts # Manage reusable selection state
 │   │   │   │   └── __tests__/
 │   │   │   │       ├── useRecentTaskQuery.test.ts # Verify recent query hook
-│   │   │   │       ├── useTaskPolling.test.ts # Verify polling hook
-│   │   │   │       └── useTaskSelection.test.ts # Verify selection hook
+│   │   │   │       ├── useTaskDetail.test.ts # Verify task detail hook
+│   │   │   │       ├── useTaskDetailSheet.test.ts # Verify detail sheet state
+│   │   │   │       └── useTaskPolling.test.ts # Verify polling hook
 │   │   │   ├── lib/          # Keep task-private pure helpers
 │   │   │   │   ├── task-refresh.ts # Broadcast task refresh events
 │   │   │   │   ├── task-selectors.ts # Select active/recent terminal tasks
@@ -211,21 +232,6 @@ app/                          # Frontend workspace root
 │   │   │   │   └── __tests__/
 │   │   │   │       ├── session-tasks-store.test.ts # Verify session store
 │   │   │   │       └── task-board-store.test.ts # Verify board store
-│   │   │   ├── history/      # Keep history subdomain on top of tasks APIs
-│   │   │   │   ├── api.ts    # Wrap listHistoryTasks and batch actions
-│   │   │   │   ├── index.ts  # Expose history subdomain exports
-│   │   │   │   ├── __tests__/
-│   │   │   │   │   └── api.test.ts # Verify history API wrappers
-│   │   │   │   ├── hooks/
-│   │   │   │   │   ├── useHistoryTasks.ts # Query history with backend paging
-│   │   │   │   │   ├── useHistoryTaskActions.ts # Orchestrate history actions and export
-│   │   │   │   │   └── __tests__/
-│   │   │   │   │       ├── useHistoryTasks.test.ts # Verify history query hook
-│   │   │   │   │       └── useHistoryTaskActions.test.ts # Verify history action hook
-│   │   │   │   └── components/
-│   │   │   │       ├── TaskHistoryPanel.tsx # Compose history list with batch actions/export
-│   │   │   │       └── __tests__/
-│   │   │   │           └── TaskHistoryPanel.test.tsx # Verify history panel behavior
 │   │   │   └── index.ts      # Expose feature public exports
 │   │   │
 │   │   ├── settings/         # Settings feature helpers
@@ -272,6 +278,7 @@ app/                          # Frontend workspace root
 │   │       │   ├── UploadProgress.tsx # Single upload row UI
 │   │       │   └── __tests__/      # Component tests
 │   │       │       ├── FileUploader.test.tsx # Dropzone input behavior tests
+│   │       │       ├── UploadList.test.tsx # Upload queue selection/action tests
 │   │       │       └── UploadProgress.test.tsx # Upload row status UI tests
 │   │       ├── hooks/        # Upload orchestration hooks
 │   │       │   ├── useFileUpload.ts # Multi-file upload orchestration hook
@@ -297,6 +304,7 @@ app/                          # Frontend workspace root
 │   │   │   ├── api-client.ts       # Axios instance + structured error interceptors
 │   │   │   ├── error-factory.ts    # AppError factory helpers (408/429 retriable)
 │   │   │   ├── error-utils.ts      # API error normalization helpers
+│   │   │   ├── file-query-options.ts # File list content-type/sort query options
 │   │   │   ├── file-validation.ts  # Pure file validation (ext/MIME/size)
 │   │   │   ├── format.ts           # formatFileSize() human-readable sizes
 │   │   │   ├── icons.ts            # Shared Lucide icon mapping
@@ -305,6 +313,8 @@ app/                          # Frontend workspace root
 │   │   │   ├── query-fetcher.ts    # Shared query fetcher wrapper
 │   │   │   ├── query-keys.ts       # Query key factory
 │   │   │   ├── sse-client.ts       # Shared EventSource wrapper for typed SSE streams
+│   │   │   ├── task-query-options.ts # Task query option constants and guards
+│   │   │   ├── task-status.ts      # Task status groups derived from OpenAPI types
 │   │   │   ├── utils.ts            # downloadBlob helper
 │   │   │   └── __tests__/          # Unit tests (Vitest)
 │   │   │       ├── api-client.test.ts # Interceptor error mapping tests
@@ -355,17 +365,25 @@ app/                          # Frontend workspace root
 │   │   │   ├── HistoryTaskModeView.tsx # Compose task-mode history page
 │   │   │   ├── HistoryTaskRecordsView.tsx # Render task history records
 │   │   │   ├── HistoryToolbar.tsx # Render history filters and actions
-│   │   │   ├── useHistoryFileActions.ts # Orchestrate file history mutations
-│   │   │   ├── useHistoryFileAssociatedTasks.ts # Resolve tasks linked to selected files
-│   │   │   ├── useHistoryFiles.ts # Query paged file history
-│   │   │   ├── useHistoryFileTaskCounts.ts # Resolve file-to-task counts
-│   │   │   ├── useHistoryTaskDetail.ts # Query task detail for history dialogs
-│   │   │   └── __tests__/    # History page and hook tests
+│   │   │   ├── hooks/        # History-page query/action hooks
+│   │   │   │   ├── useHistoryFileActions.ts # Orchestrate file history mutations
+│   │   │   │   ├── useHistoryFileAssociatedTasks.ts # Resolve tasks linked to selected files
+│   │   │   │   ├── useHistoryFiles.ts # Query paged file history
+│   │   │   │   ├── useHistoryFileTaskCounts.ts # Resolve file-to-task counts
+│   │   │   │   ├── useHistorySearchDraft.ts # Keep URL search and input draft aligned
+│   │   │   │   ├── useHistoryTaskActions.ts # Orchestrate task history actions
+│   │   │   │   ├── useHistoryTaskDetail.ts # Query task detail for history dialogs
+│   │   │   │   ├── useHistoryTasks.ts # Query paged task history
+│   │   │   │   └── __tests__/ # History hook tests
+│   │   │   │       ├── useHistoryFileActions.test.tsx # Verify file action orchestration
+│   │   │   │       ├── useHistoryFileAssociatedTasks.test.ts # Verify associated task resolution
+│   │   │   │       ├── useHistoryFileTaskCounts.test.ts # Verify file task-count resolution
+│   │   │   │       ├── useHistorySearchDraft.test.ts # Verify search draft synchronization
+│   │   │   │       ├── useHistoryTaskActions.test.ts # Verify task action orchestration
+│   │   │   │       └── useHistoryTasks.test.ts # Verify task history queries
+│   │   │   └── __tests__/    # History page tests
 │   │   │       ├── HistoryPage.test.tsx # Verify history center behavior
-│   │   │       ├── HistoryPagination.test.tsx # Verify pagination controls
-│   │   │       ├── useHistoryFileActions.test.tsx # Verify file action orchestration
-│   │   │       ├── useHistoryFileAssociatedTasks.test.ts # Verify associated task resolution
-│   │   │       └── useHistoryFileTaskCounts.test.ts # Verify file task-count resolution
+│   │   │       └── HistoryPagination.test.tsx # Verify pagination controls
 │   │   ├── models-management/ # Models table, detail sheet, and actions
 │   │   │   ├── ModelsPage.tsx # Compose model management page
 │   │   │   └── __tests__/    # Model management page tests
@@ -386,15 +404,13 @@ app/                          # Frontend workspace root
 │   │   │       ├── ModelStorageTab.test.tsx # Verify model storage settings
 │   │   │       ├── SystemInfoTab.test.tsx # Verify maintenance actions
 │   │   │       └── TranscriptionTab.test.tsx # Verify transcription defaults flows
-│   │   └── task-workbench/   # Upload queue, session config, and activity monitor
+│   │   └── task-workbench/   # Upload queue, session config, and current-batch tasks
 │   │       ├── task-workbench-summary.ts # Build workbench summary copy
-│   │       ├── TaskWorkbenchActivityMonitor.tsx # Track active task outcomes
 │   │       ├── TaskWorkbenchPage.tsx # Compose upload and task creation workspace
 │   │       ├── TaskWorkbenchSessionConfig.tsx # Render task options and defaults controls
 │   │       ├── TaskWorkbenchUploadQueue.tsx # Render upload queue and actions
 │   │       └── __tests__/    # Task Workbench page tests
 │   │           ├── task-workbench-summary.test.ts # Verify summary copy builder
-│   │           ├── TaskWorkbenchActivityMonitor.test.tsx # Verify activity monitor behavior
 │   │           ├── TaskWorkbenchPage.test.tsx # Verify workbench composition
 │   │           ├── TaskWorkbenchSessionConfig.test.tsx # Verify session config behavior
 │   │           └── TaskWorkbenchUploadQueue.test.tsx # Verify upload queue behavior
@@ -437,6 +453,8 @@ Keep future Storybook stories colocated under `src` beside the component or page
 - `src/features/activity/`: Aggregate task and model-download activity into `needsAttention`, `inProgress`, and `recent`.
 - `src/shared/lib/query-*`: Centralize TanStack Query keys, fetcher, and client defaults.
 - `src/shared/lib/overlay-events.ts`: Coordinate mutually exclusive detail sheets and Activity Center.
+- `src/shared/lib/task-status.ts`, `task-query-options.ts`, `file-query-options.ts`: Centralize runtime query option arrays and guards.
+- `src/components/common/interactive-table/`: Compose cross-feature sorting, selection, row actions, pagination, and local table query behavior.
 - `src/components/theme-provider.tsx`: Apply app-owned light/dark/system theme without `next-themes`.
 - `.storybook/`: Configure Storybook React Vite, public static assets, and app global CSS.
 
@@ -459,6 +477,11 @@ Keep future Storybook stories colocated under `src` beside the component or page
 - Keep Activity Center recent events for model download `completed`, `failed`, and `cancelled` terminal states.
 - Do not generate or render `model_restart_required` Activity Center attention.
 - Keep upload completion as toast/upload-queue feedback, not Activity Center history.
+- Keep `InteractiveTable` feature-agnostic and import it through `@/components/common`; pass business actions, labels, and eligibility through props.
+- Keep `InteractiveTable` visual behavior aligned with `DataTable`; do not move it into `components/ui`.
+- Drive sorting through API for remote queries, server pagination, or incomplete client datasets. Use local full-set sorting only for temporary client-held lists such as Upload Queue.
+- Keep History-only query/action hooks in `src/pages/history-center/hooks`; do not restore `src/features/tasks/history`.
+- Keep Upload Queue row clicks as selection toggles. Start transcription only from selected successful uploads.
 
 ---
 
@@ -470,53 +493,58 @@ Keep future Storybook stories colocated under `src` beside the component or page
 > 1. **Feature Cohesion**: Keep feature logic colocated; add `components/`, `hooks/`, `lib/`, and `store/` only when that feature needs them.
 > 2. **Barrel Exports**: Every feature with a public surface must expose it via an `index.ts`. External files should import from a feature index; keep internal helper-only feature folders private.
 > 3. **Shared UI**: Put Nola design-system primitives in `src/components/ui/` or `src/layouts/`; do not add new design-system components under `src/components/common/`.
-> 4. **Routing**: Keep route trees and route adapters in `router.tsx` / `src/routes/*`; keep page implementations in `src/pages/*`; keep product shell code in `src/shell/*`.
-> 5. **API Types**: `shared/types/openapi.d.ts` is AUTO-GENERATED from the backend OpenAPI spec (`pnpm gen:types`). Do NOT manually edit it. Hand-maintained aliases/contracts (`config.ts`, `file.ts`, `task.ts`, `api-error.ts`, `app-error.ts`) provide stable, readable types for business code.
-> 6. **Lib Layer Boundaries**:
+> 4. **Interactive Tables**: Keep cross-feature interactive table composition in `src/components/common/interactive-table`; keep `DataTable` as the lower-level UI primitive.
+> 5. **Routing**: Keep route trees and route adapters in `router.tsx` / `src/routes/*`; keep page implementations in `src/pages/*`; keep product shell code in `src/shell/*`.
+> 6. **API Types**: `shared/types/openapi.d.ts` is AUTO-GENERATED from the backend OpenAPI spec (`pnpm gen:types`). Do NOT manually edit it. Hand-maintained aliases/contracts (`config.ts`, `file.ts`, `task.ts`, `api-error.ts`, `app-error.ts`) provide stable, readable types for business code.
+> 7. **Lib Layer Boundaries**:
 >    - `src/lib/*`: app/platform-level helpers (e.g., shadcn `cn`)
 >    - `src/shared/lib/*`: cross-feature reusable runtime helpers
 >    - `src/features/*/lib/*`: feature-private helpers; promote to `shared/lib` only when reused by another feature
-> 7. **Schema-Driven Controls**: Drive language/task/initial prompt, advanced controls, and engine execution selects from backend schema metadata; do not reintroduce hardcoded option groups.
-> 8. **Transcription Defaults Priority**: Apply `engine defaults < persisted defaults < task overrides` when composing transcription request payloads and defaults patches.
-> 9. **Defaults Patch Semantics**: Use `undefined` for unchanged fields, use `null` to clear persisted overrides, and send concrete values for explicit overrides.
-> 10. **Execution Config Boundary**: Keep `model_id`, `device`, and `compute_type` out of `transcription-options`; compose them as `model_id` and `engine` in Workbench.
-> 11. **Session Defaults Boundary**: Use Session defaults for Workbench task defaults. Use transcription defaults for Settings transcription defaults.
-> 12. **Language Ordering**: Consume `effective_languages` in backend return order; do not assume alphabetical ordering.
-> 13. **Vitest Environment Split**: Keep `node` as default test environment. Add `// @vitest-environment jsdom` only for DOM-driven tests.
-> 14. **Import Boundaries (ESLint-Enforced)**:
+> 8. **Schema-Driven Controls**: Drive language/task/initial prompt, advanced controls, and engine execution selects from backend schema metadata; do not reintroduce hardcoded option groups.
+> 9. **Transcription Defaults Priority**: Apply `engine defaults < persisted defaults < task overrides` when composing transcription request payloads and defaults patches.
+> 10. **Defaults Patch Semantics**: Use `undefined` for unchanged fields, use `null` to clear persisted overrides, and send concrete values for explicit overrides.
+> 11. **Execution Config Boundary**: Keep `model_id`, `device`, and `compute_type` out of `transcription-options`; compose them as `model_id` and `engine` in Workbench.
+> 12. **Session Defaults Boundary**: Use Session defaults for Workbench task defaults. Use transcription defaults for Settings transcription defaults.
+> 13. **Language Ordering**: Consume `effective_languages` in backend return order; do not assume alphabetical ordering.
+> 14. **Vitest Environment Split**: Keep `node` as default test environment. Add `// @vitest-environment jsdom` only for DOM-driven tests.
+> 15. **Import Boundaries (ESLint-Enforced)**:
 >     - Outside `src/features/*`, import public feature surfaces from `@/features/<name>`; do not deep import `@/features/<name>/**` unless the folder is explicitly helper-only and has no public barrel.
 >     - Keep `@/features/settings/lib/ui-preferences` as a settings-page helper exception until it gains a public barrel or moves to `src/app/locale`.
 >     - `src/components/common/*` must not import from `@/features/*`.
 >     - Inside `src/features/<name>/*`, do not deep import from other features; import only via feature public entry.
-> 15. **Feature Naming Boundary**:
->     - Use `src/features/tasks` for task lifecycle and history flows.
+> 16. **Feature Naming Boundary**:
+>     - Use `src/features/tasks` for reusable task lifecycle, polling, detail, and action APIs.
+>     - Keep History page-specific hooks under `src/pages/history-center/hooks`.
 >     - Use `src/features/transcription-options` for option composition and defaults-patch logic.
 >     - Do not create or restore `src/features/history` or `src/features/transcription`.
-> 16. **Subdomain Composition Boundary**:
+> 17. **Subdomain Composition Boundary**:
 >     - Keep `transcription-options` independent from `tasks`.
 >     - Compose `transcription-options` with `tasks` only in page or shell containers under `src/pages/*` and `src/shell/*`.
 >     - Do not reintroduce compatibility re-export modules for removed legacy feature roots.
-> 17. **Task API Path Boundary**:
+> 18. **Task API Path Boundary**:
 >     - Use `/api/transcription-tasks/*` as runtime task endpoints.
 >     - Do not add new frontend runtime clients for `/api/transcriptions/*` aliases.
-> 18. **Locale Routing Boundary**:
+> 19. **Locale Routing Boundary**:
 >     - Use `src/app/locale/*` for locale-prefix parsing, route localization, and UI preference persistence.
 >     - Let explicit Settings language changes rewrite the current route with a locale prefix.
 >     - Keep the default locale path unprefixed until the user explicitly chooses a language.
-> 19. **Theme Boundary**:
+> 20. **Theme Boundary**:
 >     - Use the app-owned `ThemeProvider`, `useTheme`, and UI preferences store.
 >     - Do not introduce new `next-themes` usage.
 >     - Apply document theme before paint and serialize UI preference writes.
-> 20. **Activity Boundary**:
+> 21. **Activity Boundary**:
 >     - Keep Activity Center as a client aggregation layer over task polling, active downloads, and model SSE.
 >     - Store structured route targets and data only; render labels in shell/i18n.
 >     - Do not represent Default/Running model mismatch as attention.
 >     - Do not use `restart_required` to create restart attention while task-boundary reload remains the backend contract.
 >     - Keep upload completion as toast/queue feedback, not Activity Center history.
-> 21. **DataTable Boundary**:
+> 22. **DataTable Boundary**:
 >     - Disable select-all while loading, error, or empty states render.
 >     - Ignore nested interactive controls when handling row clicks.
 >     - Use keyboard activation only on the row element.
+> 23. **Query Semantics Boundary**:
+>     - Sort remote or paged datasets through API query params, not current-page arrays.
+>     - Keep task/file/model runtime option arrays in shared or feature query-option helpers; do not duplicate status arrays in pages.
 >
 > [!IMPORTANT]
 > Use `GET /api/config`, `GET /api/config/transcription/engine-defaults`, and `GET /api/config/session-defaults` as the config/default sources.
@@ -591,14 +619,14 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `store.ts`: Keep `needsAttention`, `inProgress`, `recent`, stable dismissal ids, sorted recent events, and route targets.
   - `index.ts`: Expose activity feature public exports.
 - **upload**:
-  - `api.ts`: Use `uploadFile` (FormData + progress + AbortSignal), `listFiles`, `getFile`, `deleteFile`, and `checkIntegrity`.
+  - `api.ts`: Use `uploadFile` (FormData + progress + AbortSignal), `listFiles`, `getFile`, `deleteFile`, `batchDeleteFiles`, and `checkIntegrity`.
   - `components/FileDetailContent.tsx`: Render file metadata, associated tasks, safe missing-path display, and file actions.
   - `components/FileUploader.tsx`: Accept drag/drop and click file selection, then pass raw `File[]` upward.
-  - `components/UploadProgress.tsx`: Render each upload row status, progress, and action entry.
-  - `components/UploadList.tsx`: Render upload rows from `UploadItem[]`.
+  - `components/UploadProgress.tsx`: Render each selectable upload row status, progress, and action entry.
+  - `components/UploadList.tsx`: Render upload rows from `UploadItem[]` while preserving Upload Queue visual structure.
   - `components/__tests__/FileUploader.test.tsx`: Verify drag/drop, keyboard trigger, and disabled blocking.
-  - `components/__tests__/UploadProgress.test.tsx`: Verify uploading/error/success/cancelled row states.
-  - `hooks/useFileUpload.ts`: Orchestrate validate/add/start/cancel/retry/remove/reset and expose `batchError` + `clearBatchError`.
+  - `components/__tests__/UploadList.test.tsx`, `components/__tests__/UploadProgress.test.tsx`: Verify queue selection, actions, and row states.
+  - `hooks/useFileUpload.ts`: Orchestrate validate/add/start/cancel/retry/remove/reset; preserve queued retry/start ids when another upload drain is active.
   - `hooks/__tests__/useFileUpload.test.ts`: Verify queue flow, dedup, error lifecycle, concurrency, and cleanup.
   - `lib/admission.ts`: Deduplicate by file fingerprint and return admitted uploads plus optional batch-level error.
   - `lib/state.ts`: Keep upload list update/select helpers pure.
@@ -608,18 +636,19 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `types.ts`: Keep upload contracts (`UploadItem`, `UseFileUploadReturn`) stable.
   - `index.ts`: Expose upload feature public exports.
 - **tasks**:
-  - `api.ts`: Use `createTask`, `listTasks`, `getTask`, `cancelTask`, `deleteTaskRecord`, `batchCancelTasks`, and `batchRetryTasks`.
+  - `api.ts`: Use `createTask`, `listTasks`, `getTask`, `cancelTask`, `deleteTaskRecord`, `batchCancelTasks`, `batchRetryTasks`, and `batchDeleteTaskRecords`.
   - `__tests__/api.test.ts`: Verify task endpoint path and request body wiring.
   - `actions.ts`: Use refresh-safe wrappers (`cancelTaskAndRefresh`, `retryTaskAndRefresh`, `deleteTaskRecordAction`); call `requestTaskRefresh()` in `finally` for cancel/retry attempts.
   - `__tests__/actions.test.ts`: Verify wrapper refresh behavior and failure handling.
-  - `components/CurrentBatchTasksPanel.tsx`: Compose current-batch list, per-task actions, and batch action flow; guard batch actions with real handlers and prevent unhandled rejections from `void` click chains.
-  - `components/TaskBatchActionBar.tsx`: Reuse batch cancel/retry selection controls.
+  - `components/CurrentBatchTasksPanel.tsx`: Compose current-batch table, per-task actions, and batch action flow; lock row actions by task id while a task action is in flight.
   - `components/TaskDetailContent.tsx`: Render task detail dialog content; clamp progress display and normalize duration rounding before splitting time units.
-  - `components/__tests__/TaskBatchActionBar.test.tsx`: Verify batch action bar interaction and disabled states.
+  - `components/TaskDetailSheet.tsx`: Wrap task detail content with shared sheet behavior.
+  - `components/__tests__/CurrentBatchTasksPanel.test.tsx`: Verify current-batch table, selection, actions, filters, and sorting.
   - `hooks/useRecentTaskQuery.ts`: Normalize query/filter/sort/pagination state for recent tasks.
+  - `hooks/useTaskDetail.ts`: Query task detail and make `refresh()` safe when no task is selected.
+  - `hooks/useTaskDetailSheet.ts`: Manage selected task detail state and scope action locks to the selected task.
   - `hooks/useTaskPolling.ts`: Poll board data with visibility-aware cadence.
-  - `hooks/useTaskSelection.ts`: Isolate current-page selection toggle logic.
-  - `hooks/__tests__/useRecentTaskQuery.test.ts`, `hooks/__tests__/useTaskPolling.test.ts`, `hooks/__tests__/useTaskSelection.test.ts`: Verify hook behavior.
+  - `hooks/__tests__/useRecentTaskQuery.test.ts`, `hooks/__tests__/useTaskDetail.test.ts`, `hooks/__tests__/useTaskDetailSheet.test.ts`, `hooks/__tests__/useTaskPolling.test.ts`: Verify hook behavior.
   - `lib/task-refresh.ts`: Broadcast refresh events without hook coupling.
   - `lib/task-selectors.ts`: Select active and recent terminal tasks.
   - `lib/task-status-groups.ts`: Keep status-group constants centralized.
@@ -627,14 +656,6 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `store/session-tasks-store.ts`: Keep session-scoped task map and mutations.
   - `store/task-board-store.ts`: Keep board-scope polled task list and hydration.
   - `store/__tests__/session-tasks-store.test.ts`, `store/__tests__/task-board-store.test.ts`: Verify store contracts.
-  - `history/api.ts`: Wrap `listTasks` as `listHistoryTasks` and expose history batch wrappers.
-  - `history/__tests__/api.test.ts`: Verify history API wrappers.
-  - `history/hooks/useHistoryTasks.ts`: Query backend history with page clamp behavior.
-  - `history/hooks/useHistoryTaskActions.ts`: Orchestrate history cancel/retry/export and refresh sequencing.
-  - `history/hooks/__tests__/useHistoryTasks.test.ts`, `history/hooks/__tests__/useHistoryTaskActions.test.ts`: Verify history hooks.
-  - `history/components/TaskHistoryPanel.tsx`: Compose history list panel, selection, and export entry.
-  - `history/components/__tests__/TaskHistoryPanel.test.tsx`: Verify history panel interactions.
-  - `history/index.ts`: Expose history subdomain public exports.
   - `index.ts`: Expose tasks feature public exports.
 - **transcription-options**:
   - `components/OptionsBar.tsx`: Compose file selector, language/task selector, prompt input, defaults actions, and task creation trigger.
@@ -674,6 +695,7 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `hooks/useModelDownload.ts`: Merge REST baseline download state with SSE progress events.
   - `hooks/__tests__/useModels.test.ts`, `hooks/__tests__/useModelDownload.test.ts`: Verify model hook behavior.
   - `lib/model-helpers.ts`: Keep pure display helpers for sorting, byte formatting, action states, description resolution, and language splitting.
+  - `lib/model-query-options.ts`: Keep model filter/sort/order runtime options derived from generated API types.
   - `lib/model-refresh.ts`: Broadcast model refresh events after downloads, deletes, and selection changes.
   - `lib/__tests__/model-helpers.test.ts`: Verify helper edge cases.
   - `types.ts`: Keep model feature contracts stable over generated OpenAPI types.
@@ -686,11 +708,10 @@ Separate business domain logic by feature. Expose every feature public surface t
 Cross-feature composite components with feature-agnostic behavior.
 
 - **ErrorBoundary.tsx**: Class-based error boundary wrapping child components. Catch render-time exceptions and display i18n-powered fallback UI with retry button. Use `withTranslation` HOC for i18n access in class components.
-- **ListToolbar.tsx**: Share task list search/status/sort/order controls across recent/history panels.
-- **TaskListPanel.tsx**: Share task row rendering, row actions, and pagination shell across recent/history panels.
+- **interactive-table/**: Compose feature-agnostic sortable headers, selection, batch action bar, row actions, pagination, and local full-set query behavior over `DataTable`.
 - **types.ts**: Keep shared task action callback contracts.
 - **__tests__/ErrorBoundary.test.tsx**: Component tests covering fallback rendering and retry recovery.
-- **__tests__/TaskListPanel.test.tsx**: Component tests covering task row actions and pagination behavior.
+- **interactive-table/__tests__/**: Cover table rendering, selection reset semantics, pagination, local query, row actions, and batch action behavior.
 - **index.ts**: Barrel entry for common components. Prefer importing via `@/components/common`.
 
 ### src/components/ui/
@@ -716,8 +737,8 @@ Page-level layout primitives.
 
 Route page implementations.
 
-- **task-workbench/**: Compose upload queue, session config, Advanced side sheet, and session activity monitor. Let session config create task-level execution payloads with `model_id` and schema-derived `engine` values.
-- **history-center/**: Compose Task ID and Filename modes, URL search state, pagination, detail dialogs, export dialog loading, and file/task associated actions.
+- **task-workbench/**: Compose upload queue, session config, Advanced side sheet, and current-batch task table. Let session config create task-level execution payloads with `model_id` and schema-derived `engine` values.
+- **history-center/**: Compose Task ID and Filename modes, URL search state, pagination, detail dialogs, export dialog loading, and page-local history hooks.
 - **models-management/**: Compose model overview, model table, detail sheet, mutation de-duplication, canonical `configured_model_id` handling, Default/Running display, model refresh, and restart-free model selection feedback.
 - **settings/**: Compose General, Transcription, Export, Model Storage, and System Info tabs. Keep subpage titles removed; show settings content directly. Keep engine resources read-only and use task-boundary reload language instead of restart-required language.
 
@@ -748,6 +769,7 @@ Cross-feature shared code, split into `lib/` and `types/`.
 - **lib/__tests__/error-factory.test.ts**: Factory contract tests for retry semantics and `isAppError`.
 - **lib/error-utils.ts**: `formatApiError()` converts FastAPI error payloads into readable messages.
 - **lib/__tests__/error-utils.test.ts**: Formatting tests for string and validation-array payloads.
+- **lib/file-query-options.ts**: Centralize file list sort/order/filter option constants and guards.
 - **lib/file-validation.ts**: Pure function `validateFile(file, config)` with config injection. Checks extension, MIME, size, empty file, no extension. Returns `AppError` on failure.
 - **lib/format.ts**: `formatFileSize(bytes)` — base-1024 human-readable string (B/KB/MB/GB/TB). Guards against negative/NaN/Infinity.
 - **lib/icons.ts**: Keep shared Lucide icon mappings.
@@ -757,6 +779,8 @@ Cross-feature shared code, split into `lib/` and `types/`.
 - **lib/query-keys.ts**: Centralize query key factories for tasks, files, models, and config.
 - **lib/sse-client.ts**: Shared EventSource wrapper with typed payloads and normalized API-base URL joining.
 - **lib/__tests__/sse-client.test.ts**: Verify SSE connection wiring, event parsing, and cleanup.
+- **lib/task-query-options.ts**: Centralize task filter/sort/order option constants and guards.
+- **lib/task-status.ts**: Centralize task status groups derived from OpenAPI `TaskStatus`.
 - **lib/utils.ts**: `downloadBlob()` triggers browser file download from Blob (appends `<a>` to DOM, defers `URL.revokeObjectURL`).
 - **lib/__tests__/**: Vitest unit tests for API-client mapping plus pure helpers (`error-factory`, `error-utils`, `file-validation`, `format`).
 - **types/openapi.d.ts**: Auto-generated by `pnpm gen:types`. Never edit manually.

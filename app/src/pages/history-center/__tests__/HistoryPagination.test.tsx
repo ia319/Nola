@@ -1,11 +1,16 @@
 // @vitest-environment jsdom
 
+import type { ComponentType } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { HistoryPagination } from '../HistoryPagination'
 
 vi.mock('react-i18next', () => ({
+  withTranslation: () => (Component: ComponentType<Record<string, unknown>>) =>
+    function WithTranslationMock(props: Record<string, unknown>) {
+      return <Component {...props} t={(key: string) => key} />
+    },
   useTranslation: () => ({
     t: (key: string, params?: Record<string, unknown>) => {
       if (key === 'history.pagination.summary') {

@@ -1,5 +1,11 @@
 import apiClient from '@/shared/lib/api-client'
 
+import {
+  DEFAULT_MODEL_LIST_QUERY,
+  toModelListApiQuery,
+  type ModelListApiQuery,
+  type ModelListQuery,
+} from './lib/model-query-options'
 import type {
   ActiveModelDownloadsResponse,
   ModelCancelResponse,
@@ -14,8 +20,37 @@ import type {
 
 const BASE = '/api/models'
 
-export async function listModels(signal?: AbortSignal): Promise<ModelListResponse> {
-  const { data } = await apiClient.get<ModelListResponse>(BASE, { signal })
+function isAbortSignal(value: ModelListQuery | AbortSignal | undefined): value is AbortSignal {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'aborted' in value &&
+    typeof value.aborted === 'boolean'
+  )
+}
+
+function buildListModelsRequestConfig(
+  query: ModelListQuery,
+  signal?: AbortSignal,
+): { signal?: AbortSignal; params?: ModelListApiQuery } {
+  const params = toModelListApiQuery(query)
+  if (Object.keys(params).length === 0) {
+    return { signal }
+  }
+
+  return { signal, params }
+}
+
+export async function listModels(
+  queryOrSignal: ModelListQuery | AbortSignal = DEFAULT_MODEL_LIST_QUERY,
+  signal?: AbortSignal,
+): Promise<ModelListResponse> {
+  const query = isAbortSignal(queryOrSignal) ? DEFAULT_MODEL_LIST_QUERY : queryOrSignal
+  const requestSignal = isAbortSignal(queryOrSignal) ? queryOrSignal : signal
+  const { data } = await apiClient.get<ModelListResponse>(
+    BASE,
+    buildListModelsRequestConfig(query, requestSignal),
+  )
   return data
 }
 
