@@ -94,7 +94,8 @@ async def upload_uploaded_file(
             content_type=resolved_content_type,
         )
     except Exception:
-        file_path.unlink(missing_ok=True)
+        with suppress(OSError):
+            file_path.unlink(missing_ok=True)
         raise
 
     return {
