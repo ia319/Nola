@@ -1,10 +1,13 @@
 """Unit tests for model application use-cases."""
 
 from pathlib import Path
+from threading import Event, Thread
 
 import pytest
 
 from nola.application.models import (
+    ModelOperationLocks,
+    delete_model_cache,
     list_models,
     select_configured_model,
     start_model_download,
@@ -177,6 +180,7 @@ def test_start_model_download_rejects_cached_model() -> None:
         start_model_download(
             storage=storage,
             get_downloader=get_downloader,
+            operation_locks=ModelOperationLocks(),
             model_id="small",
         )
 
@@ -184,6 +188,72 @@ def test_start_model_download_rejects_cached_model() -> None:
     assert error.value.detail == "Model already downloaded: small"
     assert downloader_requested is False
     assert downloader.started_models == []
+
+
+def test_model_delete_waits_for_download_start_registration() -> None:
+    """Serialize delete with download start before checking active state."""
+    small = require_model("small")
+    config_store = FakeConfigStore()
+    storage = FakeModelStorage({small.repo_id: "partial_download"})
+    operation_locks = ModelOperationLocks()
+    entered_start = Event()
+    release_start = Event()
+
+    class SlowDownloader(FakeModelDownloader):
+        def start_download(
+            self,
+            model_info: ModelInfo,
+            on_progress: object | None = None,
+        ) -> DownloadProgress:
+            entered_start.set()
+            release_start.wait(timeout=1)
+            return super().start_download(model_info, on_progress)
+
+    downloader = SlowDownloader()
+    start_errors: list[Exception] = []
+    delete_errors: list[ModelUseCaseError] = []
+
+    def run_start() -> None:
+        try:
+            start_model_download(
+                storage=storage,
+                get_downloader=lambda: downloader,
+                operation_locks=operation_locks,
+                model_id="small",
+            )
+        except Exception as exc:
+            start_errors.append(exc)
+
+    def run_delete() -> None:
+        try:
+            delete_model_cache(
+                config_store=config_store,
+                storage=storage,
+                downloader=downloader,
+                operation_locks=operation_locks,
+                model_id="small",
+            )
+        except ModelUseCaseError as exc:
+            delete_errors.append(exc)
+
+    start_thread = Thread(target=run_start)
+    start_thread.start()
+    assert entered_start.wait(timeout=1)
+
+    delete_thread = Thread(target=run_delete)
+    delete_thread.start()
+    assert storage.deleted_repo_ids == []
+
+    release_start.set()
+    start_thread.join(timeout=1)
+    delete_thread.join(timeout=1)
+
+    assert not start_thread.is_alive()
+    assert not delete_thread.is_alive()
+    assert start_errors == []
+    assert len(delete_errors) == 1
+    assert delete_errors[0].status_code == 409
+    assert storage.deleted_repo_ids == []
 
 
 def test_select_configured_model_writes_canonical_id() -> None:

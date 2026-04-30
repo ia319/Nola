@@ -16,6 +16,7 @@ from nola.api.deps import (
     get_app_config_db,
     get_event_bus,
     get_model_downloader,
+    get_model_operation_locks,
     get_model_storage,
     invalidate_model_dir_caches,
 )
@@ -231,6 +232,7 @@ def start_download(model_id: str) -> ModelDownloadStartedPayload:
         return start_model_download(
             storage=get_model_storage(),
             get_downloader=get_model_downloader,
+            operation_locks=get_model_operation_locks(),
             model_id=model_id,
         )
     except ModelUseCaseError as error:
@@ -274,6 +276,7 @@ def delete_model(model_id: str) -> ModelDeletePayload:
             config_store=get_app_config_db(),
             storage=get_model_storage(),
             downloader=get_model_downloader(),
+            operation_locks=get_model_operation_locks(),
             model_id=model_id,
         )
     except ModelUseCaseError as error:

@@ -7,6 +7,7 @@ from nola.application.models.actions import (
     start_model_download,
     update_model_settings,
 )
+from nola.application.models.operation_locks import ModelOperationLocks
 from nola.application.models.queries import (
     get_model_detail,
     get_model_settings,
@@ -15,6 +16,7 @@ from nola.application.models.queries import (
 )
 
 __all__ = [
+    "ModelOperationLocks",
     "cancel_model_download",
     "delete_model_cache",
     "get_model_detail",
