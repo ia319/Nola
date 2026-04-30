@@ -81,10 +81,12 @@ async def upload_uploaded_file(
             file_path.unlink(missing_ok=True)
         raise
     finally:
-        await stream.close()
+        with suppress(Exception):
+            await stream.close()
 
     try:
-        file_store.create_file(
+        await asyncio.to_thread(
+            file_store.create_file,
             file_id=file_id,
             filename=filename,
             path=str(file_path),

@@ -121,6 +121,20 @@ class FailingUploadStream(FakeUploadStream):
         raise RuntimeError("stream failed")
 
 
+class CloseFailingUploadStream(FakeUploadStream):
+    """Upload stream that raises during cleanup."""
+
+    async def close(self) -> None:
+        raise RuntimeError("close failed")
+
+
+class ReadAndCloseFailingUploadStream(FailingUploadStream):
+    """Upload stream that raises during read and cleanup."""
+
+    async def close(self) -> None:
+        raise RuntimeError("close failed")
+
+
 def _file_row(file_id: str, filename: str, path: Path) -> dict[str, object]:
     return {
         "id": file_id,
@@ -258,6 +272,32 @@ def test_upload_uploaded_file_stores_file_and_metadata(tmp_path: Path) -> None:
     assert file_store.get_file("upload-1") is not None
 
 
+def test_upload_uploaded_file_ignores_close_failure_after_success(
+    tmp_path: Path,
+) -> None:
+    file_store = FakeFileStore(files={})
+    stream = CloseFailingUploadStream([b"audio"])
+
+    payload = asyncio.run(
+        upload_uploaded_file(
+            file_store=file_store,
+            stream=stream,
+            filename="meeting.mp3",
+            content_type=None,
+            upload_dir=tmp_path,
+            max_file_size=1024,
+            allowed_extensions={".mp3"},
+            allowed_content_types={"audio/mpeg"},
+            infer_content_type=lambda filename: "audio/mpeg",
+            file_id_factory=lambda: "upload-close-failure",
+        )
+    )
+
+    assert payload["file_id"] == "upload-close-failure"
+    assert (tmp_path / "upload-close-failure.mp3").read_bytes() == b"audio"
+    assert file_store.get_file("upload-close-failure") is not None
+
+
 def test_upload_uploaded_file_rejects_unsupported_inferred_content_type(
     tmp_path: Path,
 ) -> None:
@@ -311,3 +351,29 @@ def test_upload_uploaded_file_cleans_partial_file_on_stream_failure(
     assert stream.closed is True
     assert file_store.get_file("upload-partial") is None
     assert not (tmp_path / "upload-partial.mp3").exists()
+
+
+def test_upload_uploaded_file_preserves_stream_failure_when_close_fails(
+    tmp_path: Path,
+) -> None:
+    file_store = FakeFileStore(files={})
+    stream = ReadAndCloseFailingUploadStream([b"partial"])
+
+    with pytest.raises(RuntimeError, match="stream failed"):
+        asyncio.run(
+            upload_uploaded_file(
+                file_store=file_store,
+                stream=stream,
+                filename="meeting.mp3",
+                content_type=None,
+                upload_dir=tmp_path,
+                max_file_size=1024,
+                allowed_extensions={".mp3"},
+                allowed_content_types={"audio/mpeg"},
+                infer_content_type=lambda filename: "audio/mpeg",
+                file_id_factory=lambda: "upload-close-mask",
+            )
+        )
+
+    assert file_store.get_file("upload-close-mask") is None
+    assert not (tmp_path / "upload-close-mask.mp3").exists()
