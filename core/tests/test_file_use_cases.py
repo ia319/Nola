@@ -112,6 +112,15 @@ class FakeUploadStream:
         self.closed = True
 
 
+class FailingUploadStream(FakeUploadStream):
+    """Upload stream that fails after its queued chunks are consumed."""
+
+    async def read(self, size: int = -1) -> bytes:
+        if self.chunks:
+            return self.chunks.pop(0)
+        raise RuntimeError("stream failed")
+
+
 def _file_row(file_id: str, filename: str, path: Path) -> dict[str, object]:
     return {
         "id": file_id,
@@ -247,3 +256,58 @@ def test_upload_uploaded_file_stores_file_and_metadata(tmp_path: Path) -> None:
     assert stream.closed is True
     assert (tmp_path / "upload-1.mp3").read_bytes() == b"audio"
     assert file_store.get_file("upload-1") is not None
+
+
+def test_upload_uploaded_file_rejects_unsupported_inferred_content_type(
+    tmp_path: Path,
+) -> None:
+    file_store = FakeFileStore(files={})
+    stream = FakeUploadStream([b"audio"])
+
+    with pytest.raises(FileUseCaseError) as error:
+        asyncio.run(
+            upload_uploaded_file(
+                file_store=file_store,
+                stream=stream,
+                filename="meeting.mp3",
+                content_type=None,
+                upload_dir=tmp_path,
+                max_file_size=1024,
+                allowed_extensions={".mp3"},
+                allowed_content_types={"audio/mpeg"},
+                infer_content_type=lambda filename: "application/octet-stream",
+                file_id_factory=lambda: "upload-unsupported",
+            )
+        )
+
+    assert error.value.status_code == 400
+    assert error.value.error_code == "unsupported_content_type"
+    assert file_store.get_file("upload-unsupported") is None
+    assert not (tmp_path / "upload-unsupported.mp3").exists()
+
+
+def test_upload_uploaded_file_cleans_partial_file_on_stream_failure(
+    tmp_path: Path,
+) -> None:
+    file_store = FakeFileStore(files={})
+    stream = FailingUploadStream([b"partial"])
+
+    with pytest.raises(RuntimeError, match="stream failed"):
+        asyncio.run(
+            upload_uploaded_file(
+                file_store=file_store,
+                stream=stream,
+                filename="meeting.mp3",
+                content_type=None,
+                upload_dir=tmp_path,
+                max_file_size=1024,
+                allowed_extensions={".mp3"},
+                allowed_content_types={"audio/mpeg"},
+                infer_content_type=lambda filename: "audio/mpeg",
+                file_id_factory=lambda: "upload-partial",
+            )
+        )
+
+    assert stream.closed is True
+    assert file_store.get_file("upload-partial") is None
+    assert not (tmp_path / "upload-partial.mp3").exists()

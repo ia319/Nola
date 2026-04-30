@@ -3,6 +3,7 @@
 import asyncio
 import uuid
 from collections.abc import Callable, Set
+from contextlib import suppress
 from pathlib import Path
 
 from nola.application.files.contracts import (
@@ -45,10 +46,11 @@ async def upload_uploaded_file(
             error_code="unsupported_file_format",
         )
 
-    if content_type and content_type not in allowed_content_types:
+    resolved_content_type = content_type or infer_content_type(filename)
+    if resolved_content_type not in allowed_content_types:
         raise FileUseCaseError(
             status_code=400,
-            detail=f"Unsupported content type: {content_type}",
+            detail=f"Unsupported content type: {resolved_content_type}",
             error_code="unsupported_content_type",
         )
 
@@ -74,13 +76,13 @@ async def upload_uploaded_file(
                         error_code="file_too_large",
                     )
                 await asyncio.to_thread(target.write, chunk)
-    except FileUseCaseError:
-        file_path.unlink(missing_ok=True)
+    except (Exception, asyncio.CancelledError):
+        with suppress(OSError):
+            file_path.unlink(missing_ok=True)
         raise
     finally:
         await stream.close()
 
-    resolved_content_type = content_type or infer_content_type(filename)
     try:
         file_store.create_file(
             file_id=file_id,
