@@ -34,10 +34,48 @@ core/
 │   ├── main.py                # FastAPI entry point
 │   ├── application/           # Application-layer use-cases
 │   │   ├── __init__.py        # Application package exports
+│   │   ├── files/             # File upload/list/delete use-cases
+│   │   │   ├── __init__.py    # File use-case exports
+│   │   │   ├── contracts.py   # File store and upload stream protocols
+│   │   │   ├── errors.py      # File use-case error model
+│   │   │   ├── payloads.py    # File response payload builders
+│   │   │   ├── types.py       # File TypedDict payload contracts
+│   │   │   ├── actions/       # File write-side use-cases
+│   │   │   │   ├── __init__.py # File action exports
+│   │   │   │   ├── batch_delete_uploaded_files.py # Batch file delete use-case
+│   │   │   │   ├── cleanup_orphan_files.py # Orphan cleanup use-case
+│   │   │   │   ├── delete_uploaded_file.py # Single file delete use-case
+│   │   │   │   └── upload_uploaded_file.py # Upload validation/storage use-case
+│   │   │   └── queries/       # File read-side use-cases
+│   │   │       ├── __init__.py # File query exports
+│   │   │       ├── check_file_integrity.py # File integrity query
+│   │   │       ├── get_uploaded_file.py # File detail query
+│   │   │       └── list_uploaded_files.py # File list query
+│   │   ├── models/            # Model registry/cache/download use-cases
+│   │   │   ├── __init__.py    # Model use-case exports
+│   │   │   ├── contracts.py   # Model storage/downloader/config protocols
+│   │   │   ├── errors.py      # Model use-case error model
+│   │   │   ├── operation_locks.py # Per-model mutation locks
+│   │   │   ├── payloads.py    # Model response payload builders
+│   │   │   ├── types.py       # Model TypedDict payload contracts
+│   │   │   ├── values.py      # Model query value helpers
+│   │   │   ├── actions/       # Model write-side use-cases
+│   │   │   │   ├── __init__.py # Model action exports
+│   │   │   │   ├── cancel_model_download.py # Cancel download use-case
+│   │   │   │   ├── delete_model_cache.py # Delete cached model use-case
+│   │   │   │   ├── select_configured_model.py # Select default model use-case
+│   │   │   │   ├── start_model_download.py # Start download use-case
+│   │   │   │   └── update_model_settings.py # Update model settings use-case
+│   │   │   └── queries/       # Model read-side use-cases
+│   │   │       ├── __init__.py # Model query exports
+│   │   │       ├── get_model_detail.py # Model detail query
+│   │   │       ├── get_model_settings.py # Model settings query
+│   │   │       ├── list_active_downloads.py # Active download query
+│   │   │       └── list_models.py # Model list query
 │   │   └── tasks/             # Task use-cases and shared payload contracts
 │   │       ├── __init__.py    # Task use-case exports
 │   │       ├── contracts.py   # Task/file gateway protocols
-│   │       ├── errors.py      # Application-layer error model
+│   │       ├── errors.py      # Task use-case error model
 │   │       ├── execution_config.py # Resolve task-level engine execution config
 │   │       ├── payloads.py    # Shared task response payload builders
 │   │       ├── types.py       # TypedDict payload contracts
@@ -45,6 +83,7 @@ core/
 │   │       │   ├── __init__.py # Action use-case exports
 │   │       │   ├── _batch_action.py # Shared batch action executor
 │   │       │   ├── batch_cancel_tasks.py # Batch cancel use-case
+│   │       │   ├── batch_delete_task_records.py # Batch terminal-record delete use-case
 │   │       │   ├── batch_retry_tasks.py # Batch retry use-case
 │   │       │   ├── cancel_task.py # Single task cancel use-case
 │   │       │   ├── create_task.py # Task creation use-case
@@ -74,7 +113,8 @@ core/
 │   │   │   └── types.py       # Shared export format enum/contracts
 │   │   ├── session/           # Workbench session defaults aggregation
 │   │   │   ├── __init__.py    # Session config exports
-│   │   │   └── defaults.py    # Execution and transcription defaults helpers
+│   │   │   ├── defaults.py    # Execution and transcription defaults helpers
+│   │   │   └── schema.py      # Execution option schema metadata
 │   │   └── transcription/     # Transcription contracts/defaults/languages/schema
 │   │       ├── __init__.py    # Transcription config package exports
 │   │       ├── contracts.py   # Shared transcription option contracts
@@ -112,7 +152,7 @@ core/
 │   │   └── schemas/           # Pydantic request/response models
 │   │       ├── __init__.py    # Schema package exports
 │   │       ├── config.py      # Session defaults and export defaults schemas
-│   │       ├── files.py       # FileResponse, FileListResponse, etc.
+│   │       ├── files.py       # File schemas, batch delete, integrity, cleanup responses
 │   │       ├── models.py      # Model request/response schema set
 │   │       ├── responses.py   # TaskDetailResponse, CreateTaskResponse, etc.
 │   │       ├── transcriptions.py  # TranscriptionRequest, BatchExportRequest, defaults update
@@ -126,6 +166,7 @@ core/
 │   │   ├── app_config.py      # AppConfigDatabase for persisted defaults
 │   │   ├── database.py        # Schema & init
 │   │   ├── files.py           # FileDatabase class
+│   │   ├── query_helpers.py   # Shared SQLite contains-search helpers
 │   │   ├── tasks.py           # TaskDatabase facade over taskdb repositories
 │   │   ├── taskdb/            # Split repositories and task row contracts
 │   │   │   ├── __init__.py    # taskdb package exports
@@ -168,19 +209,22 @@ core/
     ├── test_engines.py        # Engine tests
     ├── test_event_bus.py      # Event-bus publish/subscribe tests
     ├── test_export_filenames.py # Export filename helper tests
+    ├── test_file_use_cases.py # File application use-case tests
+    ├── test_formatters.py     # Formatter tests
+    ├── test_model_use_cases.py # Model application use-case tests
     ├── test_models.py         # Database tests
     ├── test_model_downloader.py # Model downloader tests
     ├── test_model_registry.py # Model registry tests
     ├── test_model_storage.py  # Model storage tests
+    ├── test_session_defaults.py # Session defaults tests
+    ├── test_task_execution_config.py # Task execution config resolution tests
     ├── test_task_repositories.py # taskdb repository tests
+    ├── test_task_use_cases.py # Application-layer task use-case tests
     ├── test_transcription_config.py # Transcription schema/defaults tests
     ├── test_transcription_contracts.py # Transcription contract consistency tests
     ├── test_transcription_schemas.py # Request schema validation tests
-    ├── test_task_execution_config.py # Task execution config resolution tests
-    ├── test_task_use_cases.py # Application-layer task use-case tests
     ├── test_worker.py         # Worker tests
-    ├── test_worker_engine.py  # Worker engine reload tests
-    └── test_formatters.py     # Formatter tests
+    └── test_worker_engine.py  # Worker engine reload tests
 ```
 
 Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, and `.ruff_cache/` out of this tree.
@@ -194,6 +238,8 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - `nola/config/export/`: Export defaults, export format contracts, and filename helpers.
 - `nola/config/session/`: Workbench session defaults for execution and transcription.
 - `nola/config/session/schema.py`: Execution option schema metadata for frontend device and compute-type controls.
+- `nola/application/files/`: File upload, list, integrity, cleanup, single-delete, and batch-delete use-cases.
+- `nola/application/models/`: Model list/detail/settings/download/cancel/delete/select use-cases and per-model operation locks.
 - `nola/application/tasks/`: Task use-cases, payload builders, and export orchestration.
 - `nola/application/tasks/execution_config.py`: Resolve task-level `model_id`, `engine_device`, and `engine_compute_type` before persistence.
 - `nola/services/worker_engine.py`: Reuse or reload `FasterWhisperEngine` at task boundaries from a model/model-dir/device/compute-type fingerprint.
@@ -202,7 +248,12 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 
 - Reject file deletion with `409` when any transcription task references the file.
 - Return `404` when a file row disappears between lookup and delete; do not unlink and report success.
+- Keep file upload validation on the resolved content type, not only the raw request header.
+- Clean up partial upload files on stream read, write, size-limit, or cancellation failures.
+- Do not let upload stream close failures mask the original upload outcome.
+- Offload blocking upload file writes and metadata writes from async upload use-cases.
 - Return `409` when a model download starts for an already-downloaded model.
+- Serialize model download start and cache deletion per canonical model id through application-layer locks.
 - Treat Hugging Face repos with revisions as `downloaded` without scanning incomplete files.
 - Remove metadata-only partial cache directories during stale artifact cleanup.
 - Keep model registry descriptions keyed by `description_key`; let the frontend localize and fall back to backend `description`.
@@ -258,6 +309,7 @@ Data persistence layer (SQLite):
 - `database.py`: Schema initialization, connection management, foreign key enforcement, and task execution config column migrations.
 - `app_config.py`: `AppConfigDatabase` for persisted application defaults under `app_config`.
 - `files.py`: `FileDatabase` for managing audio file metadata. Uses `FileRow` TypedDict.
+- `query_helpers.py`: Share SQLite `LIKE` escape and contains-pattern helpers across file and task repositories.
 - `tasks.py`: Keep `TaskDatabase` as facade and delegate to split repositories.
 - `taskdb/task_queue.py`: Handle enqueue/dequeue/heartbeat/complete/fail/requeue flows; persist task `model_id`, `engine_device`, and `engine_compute_type`; clear stale `error` on successful completion; reset `progress` when requeueing failed/timeout/dead-worker tasks.
 - `taskdb/task_store.py`: Handle get/list/count/cancel/delete persistence queries.
@@ -297,15 +349,15 @@ Transcription engine layer:
 REST API layer:
 - `deps.py`: Dependency injection for database singletons plus shared model storage, downloader, and event-bus singletons.
 - `routes/config.py`: Aggregated config endpoints, session defaults management, transcription defaults management, and export defaults management.
-- `routes/files.py`: File upload/list/delete with validation. Reject file deletion with `409` when tasks still reference the file; return `404` when a concurrent delete wins after the initial lookup. All endpoints use `response_model`.
-- `routes/models.py`: Model list/detail/download/cancel/delete/select/settings endpoints, SSE event stream, active-download runtime summary, and `409` responses for both active downloads and already-downloaded models.
+- `routes/files.py`: File upload/list/delete HTTP adapter. Delegate list, upload, integrity, cleanup, single delete, and batch delete orchestration to `application/files`; keep explicit `response_model`.
+- `routes/models.py`: Model HTTP adapter for list/detail/download/cancel/delete/select/settings, SSE event stream, active-download runtime summary, and `409` responses for both active downloads and already-downloaded models.
 - `routes/transcriptions.py`: Canonical task router composition entry. Mount read/actions/export task route modules under `/api/transcription-tasks`.
 - `routes/tasks/read.py`: Read endpoints for task list/detail; keep sync handlers for sync DB dependencies.
-- `routes/tasks/actions.py`: Mutation endpoints for create/cancel/batch/retry/delete-record; resolve task execution config before task creation.
+- `routes/tasks/actions.py`: Mutation endpoints for create, cancel, batch cancel/retry/delete-records, and single delete-record; resolve task execution config before task creation.
 - `routes/tasks/export.py`: Single/batch export endpoints and OpenAPI response metadata; map use-case output to FastAPI `Response`/`StreamingResponse`.
 - `routes/tasks/_errors.py`: Convert task use-case errors into HTTP exceptions.
 - `schemas/config.py`: Config request/response schemas for session defaults and export defaults.
-- `schemas/files.py`: 8 Pydantic response models (`FileResponse`, `FileListResponse`, etc.)
+- `schemas/files.py`: Pydantic file request/response models (`FileResponse`, `FileListResponse`, batch delete, integrity, cleanup, etc.)
 - `schemas/models.py`: Model management request/response models for list/detail/settings/download runtime. Include download conflict metadata in route OpenAPI responses.
 - `schemas/responses.py`: 7 Pydantic response models (`TaskDetailResponse`, `CreateTaskResponse`, etc.); task read responses now expose persisted `model_id` context
 - `schemas/transcriptions.py`: Request models (`TranscriptionRequest`, `TaskEngineRequest`, `BatchTaskActionRequest`, `BatchExportRequest`, `TranscriptionDefaultsUpdateRequest`) with typed `VadParametersRequest` and `extra=forbid`
@@ -313,11 +365,20 @@ REST API layer:
 
 ### nola/application/
 Application-layer orchestration:
+- `files/contracts.py`: Protocol contracts for file stores and upload streams used by file use-cases.
+- `files/types.py`: TypedDict payload contracts for file list/detail/upload/integrity/delete results.
+- `files/payloads.py`: File payload builders; avoid serializing missing values as string `"None"`.
+- `files/actions/`: File write-side use-cases (`upload_uploaded_file`, `delete_uploaded_file`, `batch_delete_uploaded_files`, `cleanup_orphan_files`).
+- `files/queries/`: File read-side use-cases (`list_uploaded_files`, `get_uploaded_file`, `check_file_integrity`).
+- `models/contracts.py`: Protocol contracts for model registry, storage, downloader, config store, and operation locks.
+- `models/operation_locks.py`: Provide per-model locks shared by download start and cache deletion.
+- `models/actions/`: Model write-side use-cases (`start_model_download`, `cancel_model_download`, `delete_model_cache`, `select_configured_model`, `update_model_settings`).
+- `models/queries/`: Model read-side use-cases (`list_models`, `get_model_detail`, `get_model_settings`, `list_active_downloads`).
 - `tasks/contracts.py`: Protocol contracts for task/file gateways used by use-cases.
 - `tasks/types.py`: TypedDict payload contracts for task use-case outputs and resolved task execution config.
 - `tasks/execution_config.py`: Resolve task execution config from request values, Session defaults, settings, and model aliases before enqueue.
 - `tasks/payloads.py`: Shared task payload builders (`to_task_summary_payload`, batch summary builder); preserve task `model_id` across list/detail/cancel responses.
-- `tasks/actions/`: Write-side use-cases (`create_task`, `cancel_task`, `batch_cancel_tasks`, `batch_retry_tasks`, `delete_task_record`); create/retry paths preserve persisted execution config.
+- `tasks/actions/`: Write-side use-cases (`create_task`, `cancel_task`, `batch_cancel_tasks`, `batch_retry_tasks`, `batch_delete_task_records`, `delete_task_record`); create/retry paths preserve persisted execution config.
 - `tasks/actions/_batch_action.py`: Reuse batch execution skeleton; keep per-task result semantics; return item-level failures instead of aborting whole batch.
 - `tasks/queries/`: Read-side use-cases (`list_tasks`, `get_task`).
 - `tasks/exports/`: Keep export use-cases (`export_task`, `batch_export_tasks`) and export option resolver; return framework-agnostic `BatchExportArchive` from batch use-case; map `save=true` write-path I/O failures to stable `TaskUseCaseError` details.
@@ -360,7 +421,7 @@ FastAPI entry point with lifespan management:
 - `GET /api/config/export` - Get effective export defaults
 - `PATCH /api/config/export/defaults` - Persist export default overrides
 - `DELETE /api/config/export/defaults` - Reset persisted export defaults
-- `GET /api/models` - List registered models with local and download state
+- `GET /api/models` - List registered models with search/filter/sort query support and local/download state
 - `GET /api/models/downloads` - List active downloads with real current speed
 - `GET /api/models/settings` - Read model directory and configured-model settings
 - `PATCH /api/models/settings` - Update model directory settings
@@ -371,7 +432,8 @@ FastAPI entry point with lifespan management:
 - `DELETE /api/models/{model_id}` - Delete local model cache
 - `POST /api/models/{model_id}/select` - Select the configured default model for future tasks without forcing worker restart
 - `POST /api/files/` - Upload audio file
-- `GET /api/files/` - List all files
+- `GET /api/files/` - List files with search/filter/sort/pagination query support
+- `POST /api/files/batch/delete` - Batch delete uploaded files with per-file results
 - `GET /api/files/{file_id}` - Get file metadata
 - `DELETE /api/files/{file_id}` - Delete file only when no transcription task still references it
 - `GET /api/files/check-integrity` - Check database-file consistency
@@ -382,6 +444,7 @@ FastAPI entry point with lifespan management:
 - `DELETE /api/transcription-tasks/{task_id}` - Cancel task
 - `POST /api/transcription-tasks/batch/cancel` - Batch cancel tasks
 - `POST /api/transcription-tasks/batch/retry` - Batch retry tasks
+- `POST /api/transcription-tasks/batch/delete-records` - Batch delete terminal task records
 - `DELETE /api/transcription-tasks/{task_id}/record` - Delete terminal task record
 - `GET /api/transcription-tasks/{task_id}/export` - Export as subtitle (SRT/VTT/TXT/ASS)
 - `POST /api/transcription-tasks/export/batch` - Batch export as ZIP
@@ -432,6 +495,17 @@ Apply export defaults precedence as `built-in export defaults < persisted export
 Map export write-path `OSError` and `UnicodeError` failures to stable API error details; do not widen this mapping to catch-all exceptions.
 Keep batch export error output sanitized; write stable task-level reasons to `_errors.txt` and do not write raw exception text into archives.
 Record `no_segments` as task-level batch export failure; return `400` only when every selected task fails.
+
+### File and Model Rules
+Keep FastAPI routes as adapters for query/path/body parsing, dependency injection, `response_model`, and error mapping.
+Put file upload/list/integrity/cleanup/delete orchestration in `nola/application/files`.
+Put model list/detail/settings/download/cancel/delete/select orchestration in `nola/application/models`.
+Validate upload files against the resolved content type after filename inference.
+Clean up partial upload files on stream read, write, size-limit, and cancellation failures.
+Suppress upload stream close failures so they do not replace the original upload outcome.
+Use best-effort unlink after successful database file deletion; do not turn a deleted row into an API failure because filesystem cleanup failed.
+Use shared SQLite contains-search helpers for file and task repository search; keep model registry in-memory search inside `application/models` until another in-memory search domain needs it.
+Serialize model download start and cache deletion with `ModelOperationLocks` by canonical model id.
 
 ### nola/utils/
 Utility functions:
@@ -522,19 +596,20 @@ Client ──▶ FastAPI routes ──▶ application use-cases ──▶ SQLite
 | Endpoint | Method | Body/Query | Response Model |
 |----------|--------|------------|----------------|
 | `/api/files/` | POST | `file: UploadFile` | `FileUploadResponse` |
-| `/api/files/` | GET | `?limit=&offset=` | `FileListResponse` |
+| `/api/files/` | GET | `?q=&content_type=&sort_by=&order=&limit=&offset=` | `FileListResponse` |
+| `/api/files/batch/delete` | POST | `BatchFileDeleteRequest` | `BatchFileDeleteResponse` |
 | `/api/files/{file_id}` | GET | - | `FileResponse` |
 | `/api/files/{file_id}` | DELETE | - | `DeleteResponse` |
 | `/api/files/check-integrity` | GET | - | `IntegrityCheckResponse` |
 | `/api/files/cleanup` | POST | - | `CleanupResponse` |
 
-File deletion contract: return `409` when transcription tasks still reference the file; return `404` when the row disappears before delete finishes.
+File deletion contract: return `409` when transcription tasks still reference the file; return `404` when the row disappears before delete finishes; treat post-database unlink failures as best-effort cleanup.
 
 ### Models API
 
 | Endpoint | Method | Body/Query | Response Model |
 |----------|--------|------------|----------------|
-| `/api/models` | GET | - | `ModelListResponse` |
+| `/api/models` | GET | `?q=&status=&sort_by=&order=` | `ModelListResponse` |
 | `/api/models/downloads` | GET | - | `ActiveModelDownloadsResponse` |
 | `/api/models/settings` | GET | - | `ModelSettingsResponse` |
 | `/api/models/settings` | PATCH | `ModelSettingsUpdateRequest` | `ModelSettingsResponse` |
@@ -545,7 +620,7 @@ File deletion contract: return `409` when transcription tasks still reference th
 | `/api/models/{model_id}` | DELETE | - | `ModelDeleteResponse` |
 | `/api/models/{model_id}/select` | POST | - | `ModelSelectResponse` |
 
-Model download contract: return `409` for both duplicate active downloads and already-cached models; expose both cases in OpenAPI route metadata.
+Model download contract: return `409` for both duplicate active downloads and already-cached models; expose both cases in OpenAPI route metadata; share the same per-model operation lock with cache deletion.
 
 ### Transcription Tasks API
 
@@ -557,6 +632,7 @@ Model download contract: return `409` for both duplicate active downloads and al
 | `/api/transcription-tasks/{task_id}` | DELETE | - | `CancelTaskResponse` |
 | `/api/transcription-tasks/batch/cancel` | POST | `BatchTaskActionRequest` | `BatchTaskActionResponse` |
 | `/api/transcription-tasks/batch/retry` | POST | `BatchTaskActionRequest` | `BatchTaskActionResponse` |
+| `/api/transcription-tasks/batch/delete-records` | POST | `BatchTaskActionRequest` | `BatchTaskActionResponse` |
 | `/api/transcription-tasks/{task_id}/record` | DELETE | - | `DeleteTaskRecordResponse` |
 | `/api/transcription-tasks/{task_id}/export` | GET | `?format=&include_timestamps=&filename=&save=` | Binary or `SavedExportResponse` |
 | `/api/transcription-tasks/export/batch` | POST | `BatchExportRequest` | ZIP binary |
