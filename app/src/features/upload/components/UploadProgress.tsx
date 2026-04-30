@@ -76,6 +76,7 @@ export function UploadProgress({
 
   return (
     <div
+      data-slot="upload-progress-row"
       className={cn(
         'grid items-center gap-4 px-5 py-4 transition-colors',
         UPLOAD_PROGRESS_GRID_COLUMNS,

@@ -110,7 +110,7 @@ describe('UploadProgress', () => {
   it('leaves keyboard selection to the row checkbox instead of the row container', () => {
     const onRowClick = vi.fn()
 
-    render(
+    const { container } = render(
       <UploadProgress
         fileName="selectable.mp3"
         fileSize={1024}
@@ -120,8 +120,7 @@ describe('UploadProgress', () => {
       />,
     )
 
-    const fileName = screen.getByText('selectable.mp3')
-    const row = fileName.closest('div')?.parentElement
+    const row = container.querySelector('[data-slot="upload-progress-row"]')
     if (!(row instanceof HTMLElement)) {
       throw new Error('Expected upload row to exist')
     }
