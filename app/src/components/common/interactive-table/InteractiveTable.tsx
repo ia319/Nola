@@ -1,4 +1,5 @@
 import { type ComponentPropsWithoutRef, type ReactNode, useEffect, useMemo, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { DataTable, type DataTableColumn, type DataTableProps } from '@/components/ui/DataTable'
 import { cn } from '@/lib/utils'
@@ -130,6 +131,7 @@ export function InteractiveTable<Row, SortKey extends string = string>({
   className,
   ...props
 }: InteractiveTableProps<Row, SortKey>) {
+  const { t } = useTranslation()
   const selectedRowIdSet = useMemo(
     () => new Set(selection?.selectedRowIds ?? []),
     [selection?.selectedRowIds],
@@ -188,7 +190,7 @@ export function InteractiveTable<Row, SortKey extends string = string>({
         key: SELECTION_COLUMN_ID,
         header: (
           <SelectAllCheckbox
-            label={selection.selectAllLabel ?? 'Select all rows'}
+            label={selection.selectAllLabel ?? t('components.dataTable.selectAll')}
             rows={selectableRows}
             checked={allRowsSelected}
             indeterminate={partiallySelected}
@@ -206,7 +208,9 @@ export function InteractiveTable<Row, SortKey extends string = string>({
                 row={row}
                 checked={selectedRowIdSet.has(rowId)}
                 disabled={!selectable}
-                label={selection.getRowLabel?.(row) ?? `Select row ${rowId}`}
+                label={
+                  selection.getRowLabel?.(row) ?? t('components.dataTable.selectRow', { rowId })
+                }
                 onToggle={selection.onToggleRow}
               />
             </div>
@@ -228,6 +232,7 @@ export function InteractiveTable<Row, SortKey extends string = string>({
     selectedRowIdSet,
     selection,
     sort,
+    t,
   ])
 
   return (
