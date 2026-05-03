@@ -189,6 +189,58 @@ def test_create_tracks_and_segments(live_database):
     assert tracks[0]["device_label"] == "Built-in microphone"
     assert [segment["id"] for segment in segments] == ["segment-001", "segment-002"]
     assert segments[0]["is_final"] is True
+    assert live_db.count_segments("live-001") == 2
+
+
+def test_create_segment_allows_untracked_segment(live_database):
+    """Live segments may be stored before a source track is known."""
+    live_db = live_database
+    _create_session(live_db)
+
+    segment = live_db.create_segment(
+        segment_id="segment-001",
+        session_id="live-001",
+        track_id=None,
+        sequence=1,
+        start_ms=0,
+        end_ms=1000,
+        text="interim text",
+        language=None,
+        confidence=None,
+        is_final=False,
+        created_at="2026-01-01T00:00:01",
+    )
+    segments = live_db.list_segments("live-001")
+
+    assert segment["track_id"] is None
+    assert segment["is_final"] is False
+    assert segments == [segment]
+
+
+def test_list_segments_returns_paged_results(live_database):
+    """Live segments should be paged in sequence order."""
+    live_db = live_database
+    _create_session(live_db)
+
+    for sequence in range(1, 4):
+        live_db.create_segment(
+            segment_id=f"segment-00{sequence}",
+            session_id="live-001",
+            track_id=None,
+            sequence=sequence,
+            start_ms=(sequence - 1) * 1000,
+            end_ms=sequence * 1000,
+            text=f"text {sequence}",
+            language="en",
+            confidence=None,
+            is_final=True,
+            created_at=f"2026-01-01T00:00:0{sequence}",
+        )
+
+    segments = live_db.list_segments("live-001", limit=1, offset=1)
+
+    assert [segment["id"] for segment in segments] == ["segment-002"]
+    assert live_db.count_segments("live-001") == 3
 
 
 def test_create_segment_rejects_cross_session_track(live_database):
