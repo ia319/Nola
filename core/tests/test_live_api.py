@@ -66,6 +66,19 @@ def _create_live_session(client: TestClient) -> dict[str, object]:
     return response.json()
 
 
+def test_list_live_sessions_empty(client: TestClient) -> None:
+    """Live session list should return an empty page before any session exists."""
+    response = client.get("/api/live/sessions")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "sessions": [],
+        "total": 0,
+        "limit": 50,
+        "offset": 0,
+    }
+
+
 def test_create_list_get_and_finish_live_session(client: TestClient) -> None:
     """Live session endpoints should expose the stage-one lifecycle."""
     created = _create_live_session(client)
