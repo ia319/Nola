@@ -6,7 +6,7 @@ from nola.application.models import ModelOperationLocks
 from nola.common.event_bus import EventBus, event_bus
 from nola.config import settings
 from nola.model_hub import ModelDownloader, ModelStorage, resolve_model_dir
-from nola.models import AppConfigDatabase, FileDatabase, TaskDatabase
+from nola.models import AppConfigDatabase, FileDatabase, LiveDatabase, TaskDatabase
 
 
 @lru_cache
@@ -19,6 +19,12 @@ def get_file_db() -> FileDatabase:
 def get_task_db() -> TaskDatabase:
     """Get task database instance (singleton)."""
     return TaskDatabase(settings.db_path)
+
+
+@lru_cache
+def get_live_db() -> LiveDatabase:
+    """Get live database instance (singleton)."""
+    return LiveDatabase(settings.db_path)
 
 
 @lru_cache

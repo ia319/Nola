@@ -58,7 +58,7 @@ class SupportsLiveSessionMutations(Protocol):
         ended_at: str,
         updated_at: str,
     ) -> LiveSessionRecord | None:
-        """Mark one live session finished and return its stored snapshot."""
+        """Mark an active live session finished and return the updated snapshot."""
         ...
 
     def fail_session(
@@ -69,7 +69,7 @@ class SupportsLiveSessionMutations(Protocol):
         ended_at: str,
         updated_at: str,
     ) -> LiveSessionRecord | None:
-        """Mark one live session failed and return its stored snapshot."""
+        """Mark an active live session failed and return the updated snapshot."""
         ...
 
 
