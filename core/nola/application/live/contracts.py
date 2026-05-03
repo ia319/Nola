@@ -3,6 +3,7 @@
 from typing import Protocol
 
 from nola.application.live.types import (
+    DEFAULT_LIVE_SEGMENT_LIMIT,
     LiveSegmentRecord,
     LiveSessionMode,
     LiveSessionRecord,
@@ -105,8 +106,17 @@ class SupportsLiveTrackMutations(Protocol):
 class SupportsLiveSegmentQueries(Protocol):
     """Expose live segment reads required by live use-cases."""
 
-    def list_segments(self, session_id: str) -> list[LiveSegmentRecord]:
-        """Return final transcript segments attached to one live session."""
+    def list_segments(
+        self,
+        session_id: str,
+        limit: int = DEFAULT_LIVE_SEGMENT_LIMIT,
+        offset: int = 0,
+    ) -> list[LiveSegmentRecord]:
+        """Return paged transcript segments attached to one live session."""
+        ...
+
+    def count_segments(self, session_id: str) -> int:
+        """Return total transcript segment count for one live session."""
         ...
 
 
