@@ -12,6 +12,8 @@ from nola.application.live import (
 )
 from nola.application.live.errors import LiveUseCaseError
 from nola.application.live.types import (
+    DEFAULT_LIVE_SEGMENT_LIMIT,
+    MAX_LIVE_SEGMENT_LIMIT,
     LiveSegmentRecord,
     LiveSessionMode,
     LiveSessionRecord,
@@ -178,8 +180,20 @@ class FakeLiveStore:
         self.segments.setdefault(session_id, []).append(segment)
         return dict(segment)  # type: ignore[return-value]
 
-    def list_segments(self, session_id: str) -> list[LiveSegmentRecord]:
-        return [dict(segment) for segment in self.segments.get(session_id, [])]  # type: ignore[list-item]
+    def list_segments(
+        self,
+        session_id: str,
+        limit: int = DEFAULT_LIVE_SEGMENT_LIMIT,
+        offset: int = 0,
+    ) -> list[LiveSegmentRecord]:
+        segments = sorted(
+            self.segments.get(session_id, []),
+            key=lambda segment: (segment["sequence"], segment["id"]),
+        )
+        return [dict(segment) for segment in segments[offset : offset + limit]]  # type: ignore[list-item]
+
+    def count_segments(self, session_id: str) -> int:
+        return len(self.segments.get(session_id, []))
 
 
 def _session(
@@ -226,6 +240,9 @@ def test_create_live_session_returns_active_payload() -> None:
     assert payload["model_id"] == "small"
     assert payload["tracks"] == []
     assert payload["segments"] == []
+    assert payload["segment_total"] == 0
+    assert payload["segment_limit"] == DEFAULT_LIVE_SEGMENT_LIMIT
+    assert payload["segment_offset"] == 0
     assert live_store.created_sessions[0]["started_at"] == "2026-01-01T00:00:00"
 
 
@@ -294,6 +311,60 @@ def test_get_live_session_returns_tracks_and_segments() -> None:
     assert payload["session_id"] == "live-001"
     assert payload["tracks"][0]["track_id"] == "track-001"
     assert payload["segments"][0]["segment_id"] == "segment-001"
+    assert payload["segment_total"] == 1
+    assert payload["segment_limit"] == DEFAULT_LIVE_SEGMENT_LIMIT
+    assert payload["segment_offset"] == 0
+
+
+def test_get_live_session_returns_paged_segments() -> None:
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+    for sequence in range(1, 4):
+        live_store.create_segment(
+            segment_id=f"segment-00{sequence}",
+            session_id="live-001",
+            track_id=None,
+            sequence=sequence,
+            start_ms=(sequence - 1) * 1000,
+            end_ms=sequence * 1000,
+            text=f"text {sequence}",
+            language="en",
+            confidence=None,
+            is_final=True,
+            created_at=f"2026-01-01T00:00:0{sequence}",
+        )
+
+    payload = get_live_session(
+        live_store=live_store,
+        session_id="live-001",
+        segment_limit=1,
+        segment_offset=1,
+    )
+
+    assert [segment["segment_id"] for segment in payload["segments"]] == ["segment-002"]
+    assert payload["segment_total"] == 3
+    assert payload["segment_limit"] == 1
+    assert payload["segment_offset"] == 1
+
+
+def test_get_live_session_rejects_invalid_segment_pagination() -> None:
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+
+    with pytest.raises(LiveUseCaseError) as limit_error:
+        get_live_session(
+            live_store=live_store,
+            session_id="live-001",
+            segment_limit=MAX_LIVE_SEGMENT_LIMIT + 1,
+        )
+
+    with pytest.raises(LiveUseCaseError) as offset_error:
+        get_live_session(
+            live_store=live_store,
+            session_id="live-001",
+            segment_offset=-1,
+        )
+
+    assert limit_error.value.status_code == 422
+    assert offset_error.value.status_code == 422
 
 
 def test_get_live_session_raises_when_missing() -> None:
@@ -363,6 +434,7 @@ def test_finish_live_session_finishes_active_session() -> None:
 
     assert payload["status"] == "finished"
     assert payload["ended_at"] == "2026-01-01T00:05:00"
+    assert payload["segment_total"] == 0
     assert live_store.finish_calls == 1
 
 

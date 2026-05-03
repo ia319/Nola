@@ -4,9 +4,11 @@ from typing import cast
 
 from nola.application.live.errors import LiveUseCaseError
 from nola.application.live.types import (
+    DEFAULT_LIVE_SEGMENT_LIMIT,
     LIVE_SESSION_MODES,
     LIVE_SESSION_STATUSES,
     LIVE_TRACK_SOURCES,
+    MAX_LIVE_SEGMENT_LIMIT,
     LiveSessionMode,
     LiveSessionStatus,
     LiveTrackSource,
@@ -48,3 +50,24 @@ def ensure_live_track_source(source: object) -> LiveTrackSource:
             detail=f"Invalid live track source: {raw_source}",
         )
     return cast(LiveTrackSource, raw_source)
+
+
+def ensure_live_segment_page(
+    *,
+    limit: int = DEFAULT_LIVE_SEGMENT_LIMIT,
+    offset: int = 0,
+) -> tuple[int, int]:
+    """Return bounded live segment pagination values."""
+    if limit < 1 or limit > MAX_LIVE_SEGMENT_LIMIT:
+        raise LiveUseCaseError(
+            status_code=422,
+            detail=(
+                f"Live segment limit must be between 1 and {MAX_LIVE_SEGMENT_LIMIT}"
+            ),
+        )
+    if offset < 0:
+        raise LiveUseCaseError(
+            status_code=422,
+            detail="Live segment offset must be greater than or equal to 0",
+        )
+    return limit, offset

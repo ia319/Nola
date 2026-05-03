@@ -79,12 +79,18 @@ def build_live_session_payload(
     session: LiveSessionRecord,
     tracks: list[LiveTrackRecord],
     segments: list[LiveSegmentRecord],
+    segment_total: int,
+    segment_limit: int,
+    segment_offset: int,
 ) -> LiveSessionPayload:
     """Build a live session detail payload."""
     return {
         **to_live_session_summary_payload(session),
         "tracks": [to_live_track_payload(track) for track in tracks],
         "segments": [to_live_segment_payload(segment) for segment in segments],
+        "segment_total": segment_total,
+        "segment_limit": segment_limit,
+        "segment_offset": segment_offset,
     }
 
 

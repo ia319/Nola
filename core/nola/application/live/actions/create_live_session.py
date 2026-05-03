@@ -7,6 +7,7 @@ from datetime import datetime
 from nola.application.live.contracts import SupportsLiveSessionMutations
 from nola.application.live.payloads import build_live_session_payload
 from nola.application.live.types import (
+    DEFAULT_LIVE_SEGMENT_LIMIT,
     LiveSessionMode,
     LiveSessionPayload,
 )
@@ -46,4 +47,11 @@ def create_live_session(
         updated_at=now,
     )
 
-    return build_live_session_payload(session=session, tracks=[], segments=[])
+    return build_live_session_payload(
+        session=session,
+        tracks=[],
+        segments=[],
+        segment_total=0,
+        segment_limit=DEFAULT_LIVE_SEGMENT_LIMIT,
+        segment_offset=0,
+    )

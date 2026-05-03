@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import cast
 
 from nola.application.live.types import (
+    DEFAULT_LIVE_SEGMENT_LIMIT,
     LiveSegmentRecord,
     LiveSessionMode,
     LiveSessionRecord,
@@ -276,15 +277,30 @@ class LiveDatabase:
                 )
                 return self._to_segment_record(cursor.fetchone())
 
-    def list_segments(self, session_id: str) -> list[LiveSegmentRecord]:
-        """Return transcript segments attached to one live session."""
+    def list_segments(
+        self,
+        session_id: str,
+        limit: int = DEFAULT_LIVE_SEGMENT_LIMIT,
+        offset: int = 0,
+    ) -> list[LiveSegmentRecord]:
+        """Return paged transcript segments attached to one live session."""
         with closing(self._connect()) as conn:
             cursor = conn.execute(
                 """
                 SELECT * FROM live_segments
                 WHERE session_id = ?
                 ORDER BY sequence ASC, id ASC
+                LIMIT ? OFFSET ?
                 """,
-                (session_id,),
+                (session_id, limit, offset),
             )
             return [self._to_segment_record(row) for row in cursor.fetchall()]
+
+    def count_segments(self, session_id: str) -> int:
+        """Return total transcript segment count for one live session."""
+        with closing(self._connect()) as conn:
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM live_segments WHERE session_id = ?",
+                (session_id,),
+            )
+            return int(cursor.fetchone()[0])

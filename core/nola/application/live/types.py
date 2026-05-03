@@ -13,6 +13,8 @@ LIVE_SESSION_STATUSES: tuple[LiveSessionStatus, ...] = (
 )
 LIVE_SESSION_MODES: tuple[LiveSessionMode, ...] = ("streaming", "background")
 LIVE_TRACK_SOURCES: tuple[LiveTrackSource, ...] = ("microphone", "system")
+DEFAULT_LIVE_SEGMENT_LIMIT = 100
+MAX_LIVE_SEGMENT_LIMIT = 500
 
 
 class LiveSessionRecord(TypedDict):
@@ -118,6 +120,9 @@ class LiveSessionPayload(LiveSessionSummaryPayload):
 
     tracks: list[LiveTrackPayload]
     segments: list[LiveSegmentPayload]
+    segment_total: int
+    segment_limit: int
+    segment_offset: int
 
 
 class LiveSessionListPayload(TypedDict):
