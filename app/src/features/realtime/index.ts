@@ -32,3 +32,11 @@ export type {
   LiveOutputDeviceTestResult,
   LiveOutputDeviceTestStatus,
 } from './playback/types'
+export type {
+  RealtimeRuntimeAdapterFactory,
+  RealtimeRuntimeEnvironment,
+} from './platform/runtime-environment'
+export {
+  createRealtimeRuntimeAdapter,
+  getRealtimeRuntimeEnvironment,
+} from './platform/runtime-environment'
