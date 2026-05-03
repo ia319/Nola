@@ -1,5 +1,6 @@
 """Live transcription application-layer exports."""
 
+from nola.application.live.actions import create_live_session, finish_live_session
 from nola.application.live.contracts import (
     SupportsLiveRepository,
     SupportsLiveSegmentMutations,
@@ -20,6 +21,7 @@ from nola.application.live.payloads import (
     to_live_session_summary_payload,
     to_live_track_payload,
 )
+from nola.application.live.queries import get_live_session, list_live_sessions
 from nola.application.live.types import (
     LIVE_SESSION_MODES,
     LIVE_SESSION_STATUSES,
@@ -65,6 +67,10 @@ __all__ = [
     "SupportsLiveTrackStore",
     "build_live_session_list_payload",
     "build_live_session_payload",
+    "create_live_session",
+    "finish_live_session",
+    "get_live_session",
+    "list_live_sessions",
     "to_live_segment_payload",
     "to_live_session_summary_payload",
     "to_live_track_payload",

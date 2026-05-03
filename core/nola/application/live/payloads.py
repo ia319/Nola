@@ -10,17 +10,24 @@ from nola.application.live.types import (
     LiveTrackPayload,
     LiveTrackRecord,
 )
+from nola.application.live.values import (
+    ensure_live_session_mode,
+    ensure_live_session_status,
+    ensure_live_track_source,
+)
 
 
 def to_live_session_summary_payload(
     session: LiveSessionRecord,
 ) -> LiveSessionSummaryPayload:
     """Build a live session summary payload from one stored record."""
+    mode = ensure_live_session_mode(session["mode"], status_code=409)
+    status = ensure_live_session_status(session["status"])
     return {
         "session_id": session["id"],
         "title": session["title"],
-        "mode": session["mode"],
-        "status": session["status"],
+        "mode": mode,
+        "status": status,
         "language_hint": session["language_hint"],
         "model_id": session["model_id"],
         "runtime": session["runtime"],
@@ -35,10 +42,11 @@ def to_live_session_summary_payload(
 
 def to_live_track_payload(track: LiveTrackRecord) -> LiveTrackPayload:
     """Build a live track payload from one stored record."""
+    source = ensure_live_track_source(track["source"])
     return {
         "track_id": track["id"],
         "session_id": track["session_id"],
-        "source": track["source"],
+        "source": source,
         "label": track["label"],
         "device_label": track["device_label"],
         "sample_rate": track["sample_rate"],
