@@ -99,6 +99,83 @@ def init_db(db_path: str | Path | None = None) -> None:
                 )
             """)
 
+            # Live transcription sessions and history
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS live_sessions (
+                    id TEXT PRIMARY KEY,
+                    title TEXT,
+                    mode TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    language_hint TEXT,
+                    model_id TEXT,
+                    runtime TEXT,
+                    audio_format TEXT,
+                    started_at TEXT NOT NULL,
+                    ended_at TEXT,
+                    error TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS live_tracks (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    label TEXT,
+                    device_label TEXT,
+                    sample_rate INTEGER,
+                    channel_count INTEGER,
+                    started_at TEXT,
+                    ended_at TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (session_id)
+                        REFERENCES live_sessions(id)
+                        ON DELETE CASCADE
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS live_segments (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    track_id TEXT,
+                    sequence INTEGER NOT NULL,
+                    start_ms INTEGER NOT NULL,
+                    end_ms INTEGER NOT NULL,
+                    text TEXT NOT NULL,
+                    language TEXT,
+                    confidence REAL,
+                    is_final INTEGER NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (session_id)
+                        REFERENCES live_sessions(id)
+                        ON DELETE CASCADE,
+                    FOREIGN KEY (track_id)
+                        REFERENCES live_tracks(id)
+                        ON DELETE SET NULL
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_live_sessions_started "
+                "ON live_sessions(started_at DESC)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_live_sessions_status "
+                "ON live_sessions(status)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_live_tracks_session "
+                "ON live_tracks(session_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_live_segments_session_sequence "
+                "ON live_segments(session_id, sequence)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_live_segments_track_sequence "
+                "ON live_segments(track_id, sequence)"
+            )
+
             # Schema migrations for task execution config columns
             cursor = conn.execute("PRAGMA table_info(transcription_tasks)")
             existing_columns = {row[1] for row in cursor.fetchall()}

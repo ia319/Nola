@@ -643,6 +643,70 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/live/sessions': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List live sessions
+     * @description Return paged live session summaries.
+     */
+    get: operations['list_live_sessions_endpoint_api_live_sessions_get']
+    put?: never
+    /**
+     * Create live session
+     * @description Create an active live transcription session.
+     */
+    post: operations['create_live_session_endpoint_api_live_sessions_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/live/sessions/{session_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get live session
+     * @description Return one live session with tracks and a paged segment window.
+     */
+    get: operations['get_live_session_endpoint_api_live_sessions__session_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/live/sessions/{session_id}/finish': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Finish live session
+     * @description Finish an active live session and return its current snapshot.
+     */
+    post: operations['finish_live_session_endpoint_api_live_sessions__session_id__finish_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/health': {
     parameters: {
       query?: never
@@ -911,6 +975,23 @@ export interface components {
       deleted_files: components['schemas']['MissingFileInfo'][]
     }
     /**
+     * CreateLiveSessionRequest
+     * @description Accept live session creation metadata.
+     */
+    CreateLiveSessionRequest: {
+      /** Title */
+      title?: string | null
+      /**
+       * Mode
+       * @enum {string}
+       */
+      mode: 'streaming' | 'background'
+      /** Language Hint */
+      language_hint?: string | null
+      /** Model Id */
+      model_id?: string | null
+    }
+    /**
      * CreateTaskResponse
      * @description Task creation response.
      */
@@ -1135,6 +1216,163 @@ export interface components {
       code: string
       /** Label Key */
       label_key: string
+    }
+    /**
+     * LiveSegmentResponse
+     * @description Expose one live transcript segment.
+     */
+    LiveSegmentResponse: {
+      /** Segment Id */
+      segment_id: string
+      /** Session Id */
+      session_id: string
+      /** Track Id */
+      track_id?: string | null
+      /** Sequence */
+      sequence: number
+      /** Start Ms */
+      start_ms: number
+      /** End Ms */
+      end_ms: number
+      /** Text */
+      text: string
+      /** Language */
+      language?: string | null
+      /** Confidence */
+      confidence?: number | null
+      /** Is Final */
+      is_final: boolean
+      /** Created At */
+      created_at: string
+    }
+    /**
+     * LiveSessionDetailResponse
+     * @description Expose one live session with tracks and a paged segment window.
+     */
+    LiveSessionDetailResponse: {
+      /** Session Id */
+      session_id: string
+      /** Title */
+      title?: string | null
+      /**
+       * Mode
+       * @enum {string}
+       */
+      mode: 'streaming' | 'background'
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'active' | 'finished' | 'failed'
+      /** Language Hint */
+      language_hint?: string | null
+      /** Model Id */
+      model_id?: string | null
+      /** Runtime */
+      runtime?: string | null
+      /** Audio Format */
+      audio_format?: string | null
+      /** Started At */
+      started_at: string
+      /** Ended At */
+      ended_at?: string | null
+      /** Error */
+      error?: string | null
+      /** Created At */
+      created_at: string
+      /** Updated At */
+      updated_at: string
+      /** Tracks */
+      tracks: components['schemas']['LiveTrackResponse'][]
+      /** Segments */
+      segments: components['schemas']['LiveSegmentResponse'][]
+      /** Segment Total */
+      segment_total: number
+      /** Segment Limit */
+      segment_limit: number
+      /** Segment Offset */
+      segment_offset: number
+    }
+    /**
+     * LiveSessionListResponse
+     * @description Expose paged live session summaries.
+     */
+    LiveSessionListResponse: {
+      /** Sessions */
+      sessions: components['schemas']['LiveSessionSummaryResponse'][]
+      /** Total */
+      total: number
+      /** Limit */
+      limit: number
+      /** Offset */
+      offset: number
+    }
+    /**
+     * LiveSessionSummaryResponse
+     * @description Expose one live session summary.
+     */
+    LiveSessionSummaryResponse: {
+      /** Session Id */
+      session_id: string
+      /** Title */
+      title?: string | null
+      /**
+       * Mode
+       * @enum {string}
+       */
+      mode: 'streaming' | 'background'
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'active' | 'finished' | 'failed'
+      /** Language Hint */
+      language_hint?: string | null
+      /** Model Id */
+      model_id?: string | null
+      /** Runtime */
+      runtime?: string | null
+      /** Audio Format */
+      audio_format?: string | null
+      /** Started At */
+      started_at: string
+      /** Ended At */
+      ended_at?: string | null
+      /** Error */
+      error?: string | null
+      /** Created At */
+      created_at: string
+      /** Updated At */
+      updated_at: string
+    }
+    /**
+     * LiveTrackResponse
+     * @description Expose one live audio track.
+     */
+    LiveTrackResponse: {
+      /** Track Id */
+      track_id: string
+      /** Session Id */
+      session_id: string
+      /**
+       * Source
+       * @enum {string}
+       */
+      source: 'microphone' | 'system'
+      /** Label */
+      label?: string | null
+      /** Device Label */
+      device_label?: string | null
+      /** Sample Rate */
+      sample_rate?: number | null
+      /** Channel Count */
+      channel_count?: number | null
+      /** Started At */
+      started_at?: string | null
+      /** Ended At */
+      ended_at?: string | null
+      /** Created At */
+      created_at: string
     }
     /**
      * MissingFileInfo
@@ -3435,6 +3673,145 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['DeleteResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_live_sessions_endpoint_api_live_sessions_get: {
+    parameters: {
+      query?: {
+        /** @description Max results */
+        limit?: number
+        /** @description Offset for pagination */
+        offset?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['LiveSessionListResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_live_session_endpoint_api_live_sessions_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateLiveSessionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['LiveSessionDetailResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_live_session_endpoint_api_live_sessions__session_id__get: {
+    parameters: {
+      query?: {
+        /** @description Max transcript segments in the detail payload */
+        segment_limit?: number
+        /** @description Transcript segment pagination offset */
+        segment_offset?: number
+      }
+      header?: never
+      path: {
+        session_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['LiveSessionDetailResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  finish_live_session_endpoint_api_live_sessions__session_id__finish_post: {
+    parameters: {
+      query?: {
+        /** @description Max transcript segments in the detail payload */
+        segment_limit?: number
+        /** @description Transcript segment pagination offset */
+        segment_offset?: number
+      }
+      header?: never
+      path: {
+        session_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['LiveSessionDetailResponse']
         }
       }
       /** @description Validation Error */

@@ -1,6 +1,5 @@
 import {
   DEFAULT_UI_PREFERENCES,
-  isTauriRuntime,
   isUiTheme,
   isUiUnits,
   normalizeUiLanguage,
@@ -8,6 +7,7 @@ import {
   type UiPreferences,
   UI_PREFERENCES_STORAGE_KEY,
 } from './ui-preferences'
+import { isTauriRuntime } from '@/lib/runtime-environment'
 
 const LEGACY_LANGUAGE_STORAGE_KEY = 'nola-language'
 const LEGACY_THEME_STORAGE_KEY = 'nola-theme'

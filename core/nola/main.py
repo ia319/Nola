@@ -9,6 +9,7 @@ from nola import __version__
 from nola.api.routes import (
     config_router,
     files_router,
+    live_router,
     models_router,
     transcriptions_router,
 )
@@ -36,6 +37,7 @@ app.include_router(config_router)
 app.include_router(models_router)
 app.include_router(transcriptions_router)
 app.include_router(files_router)
+app.include_router(live_router)
 
 
 @app.get("/health")
