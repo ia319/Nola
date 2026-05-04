@@ -7,6 +7,7 @@ import { getLocaleFromPath } from '@/app/locale/locale-routing'
 import { hydrateUiPreferences } from '@/app/locale/ui-preferences-store'
 import { BootstrapErrorFallback } from '@/components/bootstrap-error-fallback'
 import { ThemeProvider } from '@/components/theme-provider'
+import { installLiveDeviceDiagnostics } from '@/features/realtime'
 import { initializeI18n } from '@/i18n'
 import './index.css'
 import { router } from './router'
@@ -47,6 +48,8 @@ if (!rootElement) {
 }
 
 const root = createRoot(rootElement)
+
+installLiveDeviceDiagnostics()
 
 void bootstrapApplication(root).catch((error: unknown) => {
   console.error('bootstrap.failed', error)
