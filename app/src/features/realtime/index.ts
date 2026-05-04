@@ -39,6 +39,21 @@ export { createAudioCaptureRepository } from './capture/audio-capture-repository
 export { LiveCaptureError } from './capture/errors'
 
 export type {
+  LiveCaptureSessionSnapshot,
+  LiveCaptureSlotState,
+  LiveDeviceInventoryErrorCode,
+  LiveDeviceInventoryStatus,
+  LiveDeviceStoreState,
+} from './store/live-device-store'
+export { getLiveDeviceSelectionState, useLiveDeviceStore } from './store/live-device-store'
+
+export type {
+  UseLiveDeviceInventoryOptions,
+  UseLiveDeviceInventoryReturn,
+} from './hooks/useLiveDeviceInventory'
+export { useLiveDeviceInventory } from './hooks/useLiveDeviceInventory'
+
+export type {
   RealtimeRuntimeAdapterFactory,
   RealtimeRuntimeEnvironment,
 } from './platform/runtime-environment'
