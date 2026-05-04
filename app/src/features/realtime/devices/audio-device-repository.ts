@@ -3,6 +3,7 @@ import type { LiveDeviceInventory, LiveDevicePermissionState, LiveDeviceWarningC
 import type { RealtimeRuntimeEnvironment } from '../platform/runtime-environment'
 import { getRealtimeRuntimeEnvironment } from '../platform/runtime-environment'
 
+/** Use null device IDs when Nola follows the browser or system default device. */
 export interface LiveDeviceSelectionState {
   selectedMicrophoneId?: string | null
   activeMicrophoneId?: string | null
