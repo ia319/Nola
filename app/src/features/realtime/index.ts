@@ -32,15 +32,12 @@ export type {
   LiveCaptureState,
   LiveCaptureStateChange,
   LiveMicrophoneCaptureOptions,
+  LiveSystemAudioCaptureOptions,
 } from './capture/types'
+export type { LiveAudioCaptureRepository } from './capture/audio-capture-repository'
+export { createAudioCaptureRepository } from './capture/audio-capture-repository'
+export { LiveCaptureError } from './capture/errors'
 
-export type {
-  LiveOutputDeviceTester,
-  LiveOutputDeviceTestErrorCode,
-  LiveOutputDeviceTestOptions,
-  LiveOutputDeviceTestResult,
-  LiveOutputDeviceTestStatus,
-} from './playback/types'
 export type {
   RealtimeRuntimeAdapterFactory,
   RealtimeRuntimeEnvironment,

@@ -19,6 +19,9 @@ export type LiveCaptureErrorCode =
   | 'microphone_capture_failed'
   | 'capture_interrupted'
   | 'system_audio_capture_unsupported'
+  | 'system_audio_permission_denied'
+  | 'system_audio_track_missing'
+  | 'system_audio_capture_failed'
   | 'tauri_capture_not_implemented'
 
 export interface LiveAudioLevel {
@@ -49,5 +52,9 @@ export interface LiveCaptureSession {
 
 export interface LiveMicrophoneCaptureOptions {
   deviceId?: string | null
+  levelSampleIntervalMs?: LiveDurationMs
+}
+
+export interface LiveSystemAudioCaptureOptions {
   levelSampleIntervalMs?: LiveDurationMs
 }
