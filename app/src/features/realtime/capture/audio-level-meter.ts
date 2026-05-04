@@ -41,6 +41,7 @@ export class AudioLevelMeter {
   private readonly samples: Uint8Array<ArrayBuffer> | null
   private intervalId: ReturnType<typeof setInterval> | null = null
   private mutedSince: number | null = null
+  private stopped = false
 
   constructor(stream: MediaStream, options: AudioLevelMeterOptions = {}) {
     this.sampleIntervalMs = options.levelSampleIntervalMs ?? DEFAULT_SAMPLE_INTERVAL_MS
@@ -65,7 +66,7 @@ export class AudioLevelMeter {
   }
 
   start(): void {
-    if (!this.analyser || !this.samples || this.intervalId !== null) {
+    if (this.stopped || !this.analyser || !this.samples || this.intervalId !== null) {
       return
     }
 
@@ -75,6 +76,11 @@ export class AudioLevelMeter {
   }
 
   async stop(): Promise<void> {
+    if (this.stopped) {
+      return
+    }
+
+    this.stopped = true
     if (this.intervalId !== null) {
       clearInterval(this.intervalId)
       this.intervalId = null
@@ -94,7 +100,7 @@ export class AudioLevelMeter {
   }
 
   private emitSample(): void {
-    if (!this.analyser || !this.samples || this.callbacks.size === 0) {
+    if (this.stopped || !this.analyser || !this.samples || this.callbacks.size === 0) {
       return
     }
 
