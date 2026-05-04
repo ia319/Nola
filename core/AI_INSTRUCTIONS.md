@@ -72,6 +72,22 @@ core/
 │   │   │       ├── get_model_settings.py # Model settings query
 │   │   │       ├── list_active_downloads.py # Active download query
 │   │   │       └── list_models.py # Model list query
+│   │   ├── live/              # Live transcription session use-cases
+│   │   │   ├── __init__.py    # Live use-case exports
+│   │   │   ├── _clock.py      # UTC timestamp helper
+│   │   │   ├── contracts.py   # Live repository protocols
+│   │   │   ├── errors.py      # Live use-case error model
+│   │   │   ├── payloads.py    # Live response payload builders
+│   │   │   ├── types.py       # Live TypedDict payloads, literals, and pagination limits
+│   │   │   ├── values.py      # Live value and pagination validators
+│   │   │   ├── actions/       # Live write-side use-cases
+│   │   │   │   ├── __init__.py # Live action exports
+│   │   │   │   ├── create_live_session.py # Create active live session use-case
+│   │   │   │   └── finish_live_session.py # Finish active live session use-case
+│   │   │   └── queries/       # Live read-side use-cases
+│   │   │       ├── __init__.py # Live query exports
+│   │   │       ├── get_live_session.py # Live detail query with segment pagination
+│   │   │       └── list_live_sessions.py # Live session list query
 │   │   └── tasks/             # Task use-cases and shared payload contracts
 │   │       ├── __init__.py    # Task use-case exports
 │   │       ├── contracts.py   # Task/file gateway protocols
@@ -141,6 +157,7 @@ core/
 │   │   │   ├── _model_helpers.py # Shared model-route helper functions
 │   │   │   ├── config.py      # Config aggregation and defaults endpoints
 │   │   │   ├── files.py       # File upload/management
+│   │   │   ├── live.py        # Live session REST endpoints
 │   │   │   ├── models.py      # Model management and download runtime endpoints
 │   │   │   ├── transcriptions.py  # Canonical task route composition entry
 │   │   │   └── tasks/         # Task route modules grouped by responsibility
@@ -153,6 +170,7 @@ core/
 │   │       ├── __init__.py    # Schema package exports
 │   │       ├── config.py      # Session defaults and export defaults schemas
 │   │       ├── files.py       # File schemas, batch delete, integrity, cleanup responses
+│   │       ├── live.py        # Live request/response schemas
 │   │       ├── models.py      # Model request/response schema set
 │   │       ├── responses.py   # TaskDetailResponse, CreateTaskResponse, etc.
 │   │       ├── transcriptions.py  # TranscriptionRequest, BatchExportRequest, defaults update
@@ -166,6 +184,7 @@ core/
 │   │   ├── app_config.py      # AppConfigDatabase for persisted defaults
 │   │   ├── database.py        # Schema & init
 │   │   ├── files.py           # FileDatabase class
+│   │   ├── live.py            # LiveDatabase for sessions, tracks, and segments
 │   │   ├── query_helpers.py   # Shared SQLite contains-search helpers
 │   │   ├── tasks.py           # TaskDatabase facade over taskdb repositories
 │   │   ├── taskdb/            # Split repositories and task row contracts
@@ -211,6 +230,9 @@ core/
     ├── test_export_filenames.py # Export filename helper tests
     ├── test_file_use_cases.py # File application use-case tests
     ├── test_formatters.py     # Formatter tests
+    ├── test_live_api.py      # Live REST API tests
+    ├── test_live_database.py # Live database tests
+    ├── test_live_use_cases.py # Live application use-case tests
     ├── test_model_use_cases.py # Model application use-case tests
     ├── test_models.py         # Database tests
     ├── test_model_downloader.py # Model downloader tests
@@ -239,9 +261,12 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - `nola/config/session/`: Workbench session defaults for execution and transcription.
 - `nola/config/session/schema.py`: Execution option schema metadata for frontend device and compute-type controls.
 - `nola/application/files/`: File upload, list, integrity, cleanup, single-delete, and batch-delete use-cases.
+- `nola/application/live/`: Live session, track, segment contracts, payload builders, value guards, and create/list/get/finish use-cases.
 - `nola/application/models/`: Model list/detail/settings/download/cancel/delete/select use-cases and per-model operation locks.
 - `nola/application/tasks/`: Task use-cases, payload builders, and export orchestration.
 - `nola/application/tasks/execution_config.py`: Resolve task-level `model_id`, `engine_device`, and `engine_compute_type` before persistence.
+- `nola/models/live.py`: SQLite repository for independent Live sessions, tracks, and transcript segments.
+- `nola/api/routes/live.py` + `nola/api/schemas/live.py`: Live REST API endpoints and response schemas for session create/list/detail/finish.
 - `nola/services/worker_engine.py`: Reuse or reload `FasterWhisperEngine` at task boundaries from a model/model-dir/device/compute-type fingerprint.
 
 ### Current Backend Guardrails
@@ -267,6 +292,13 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - Keep VAD fields gated by the installed `faster-whisper` `VadOptions`; do not expose fields only present in local source unless the installed package supports them.
 - Treat transcription progress as segment output coverage, not faster-whisper internal progress.
 - Keep the Windows `CT2_CUDA_ALLOCATOR=cub_caching` compatibility default in `nola/__init__.py` until CTranslate2 fixes CUDA model cleanup crashes and `base -> release -> small -> release` passes without it.
+- Keep Live as an independent backend subsystem. Do not write Live session, track, or segment data into `transcription_tasks`.
+- Keep `/api/live/*` as the Live REST resource namespace. Do not overload `/api/transcription-tasks/*` for realtime session lifecycle.
+- Keep Live routes as adapters for parsing, dependency injection, response models, and `LiveUseCaseError` mapping; put lifecycle and payload behavior in `nola/application/live`.
+- Keep Live timestamps timezone-aware UTC ISO strings.
+- Keep Live session list and detail segment reads paginated; reject invalid `limit`/`offset` values before repository calls.
+- Return a stable current snapshot for repeated Live finish requests. Do not turn an already-terminal session into an error when the session exists.
+- Do not add backend device enumeration APIs for browser or desktop user devices. Device inventory belongs to the client runtime adapters.
 
 ---
 
@@ -278,6 +310,7 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 > 2.  **Atomic Updates**: Use `UPDATE ... WHERE ... RETURNING` for queue operations to avoid race conditions.
 > 3.  **Poison Pill Protection**: Increment `retry_count` even when requeuing timeout/dead tasks.
 > 4.  **Environment Check**: Verify `sqlite3` version >= 3.35.0 on startup.
+> 5.  **Live Integrity**: Keep Live foreign keys enabled, ensure a segment `track_id` belongs to the same `session_id`, and do not return unbounded segment lists.
 
 ---
 
@@ -306,9 +339,10 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 
 ### nola/models/
 Data persistence layer (SQLite):
-- `database.py`: Schema initialization, connection management, foreign key enforcement, and task execution config column migrations.
+- `database.py`: Schema initialization, connection management, foreign key enforcement, Live table/index creation, and task execution config column migrations.
 - `app_config.py`: `AppConfigDatabase` for persisted application defaults under `app_config`.
 - `files.py`: `FileDatabase` for managing audio file metadata. Uses `FileRow` TypedDict.
+- `live.py`: `LiveDatabase` for Live session, track, and segment persistence. Keep sessions newest-first, tracks creation-ordered, segments sequence-ordered and paginated.
 - `query_helpers.py`: Share SQLite `LIKE` escape and contains-pattern helpers across file and task repositories.
 - `tasks.py`: Keep `TaskDatabase` as facade and delegate to split repositories.
 - `taskdb/task_queue.py`: Handle enqueue/dequeue/heartbeat/complete/fail/requeue flows; persist task `model_id`, `engine_device`, and `engine_compute_type`; clear stale `error` on successful completion; reset `progress` when requeueing failed/timeout/dead-worker tasks.
@@ -347,9 +381,10 @@ Transcription engine layer:
 
 ### nola/api/
 REST API layer:
-- `deps.py`: Dependency injection for database singletons plus shared model storage, downloader, and event-bus singletons.
+- `deps.py`: Dependency injection for database singletons, including Live DB, plus shared model storage, downloader, and event-bus singletons.
 - `routes/config.py`: Aggregated config endpoints, session defaults management, transcription defaults management, and export defaults management.
 - `routes/files.py`: File upload/list/delete HTTP adapter. Delegate list, upload, integrity, cleanup, single delete, and batch delete orchestration to `application/files`; keep explicit `response_model`.
+- `routes/live.py`: Live REST adapter for create/list/detail/finish session endpoints. Resolve `get_live_db` through FastAPI dependency injection and keep business behavior in `application/live`.
 - `routes/models.py`: Model HTTP adapter for list/detail/download/cancel/delete/select/settings, SSE event stream, active-download runtime summary, and `409` responses for both active downloads and already-downloaded models.
 - `routes/transcriptions.py`: Canonical task router composition entry. Mount read/actions/export task route modules under `/api/transcription-tasks`.
 - `routes/tasks/read.py`: Read endpoints for task list/detail; keep sync handlers for sync DB dependencies.
@@ -358,6 +393,7 @@ REST API layer:
 - `routes/tasks/_errors.py`: Convert task use-case errors into HTTP exceptions.
 - `schemas/config.py`: Config request/response schemas for session defaults and export defaults.
 - `schemas/files.py`: Pydantic file request/response models (`FileResponse`, `FileListResponse`, batch delete, integrity, cleanup, etc.)
+- `schemas/live.py`: Pydantic Live request/response models for session summaries, detail payloads, tracks, segments, and list pagination.
 - `schemas/models.py`: Model management request/response models for list/detail/settings/download runtime. Include download conflict metadata in route OpenAPI responses.
 - `schemas/responses.py`: 7 Pydantic response models (`TaskDetailResponse`, `CreateTaskResponse`, etc.); task read responses now expose persisted `model_id` context
 - `schemas/transcriptions.py`: Request models (`TranscriptionRequest`, `TaskEngineRequest`, `BatchTaskActionRequest`, `BatchExportRequest`, `TranscriptionDefaultsUpdateRequest`) with typed `VadParametersRequest` and `extra=forbid`
@@ -370,6 +406,13 @@ Application-layer orchestration:
 - `files/payloads.py`: File payload builders; avoid serializing missing values as string `"None"`.
 - `files/actions/`: File write-side use-cases (`upload_uploaded_file`, `delete_uploaded_file`, `batch_delete_uploaded_files`, `cleanup_orphan_files`).
 - `files/queries/`: File read-side use-cases (`list_uploaded_files`, `get_uploaded_file`, `check_file_integrity`).
+- `live/contracts.py`: Protocol contracts for Live session, track, segment, and aggregate repository stores.
+- `live/types.py`: TypedDict payload contracts, Live literals, and session/segment pagination limits.
+- `live/values.py`: Validate Live modes, statuses, and pagination windows before payload or repository output.
+- `live/payloads.py`: Build Live session summary/detail/list payloads and validate stored enum values on read paths.
+- `live/_clock.py`: Generate timezone-aware UTC timestamps for Live lifecycle changes.
+- `live/actions/`: Live write-side use-cases (`create_live_session`, `finish_live_session`); repeated finish returns the existing terminal snapshot when present.
+- `live/queries/`: Live read-side use-cases (`get_live_session`, `list_live_sessions`) with bounded session and segment pagination.
 - `models/contracts.py`: Protocol contracts for model registry, storage, downloader, config store, and operation locks.
 - `models/operation_locks.py`: Provide per-model locks shared by download start and cache deletion.
 - `models/actions/`: Model write-side use-cases (`start_model_download`, `cancel_model_download`, `delete_model_cache`, `select_configured_model`, `update_model_settings`).
@@ -438,6 +481,10 @@ FastAPI entry point with lifespan management:
 - `DELETE /api/files/{file_id}` - Delete file only when no transcription task still references it
 - `GET /api/files/check-integrity` - Check database-file consistency
 - `POST /api/files/cleanup` - Remove orphan database records
+- `POST /api/live/sessions` - Create a Live session
+- `GET /api/live/sessions` - List Live sessions with pagination
+- `GET /api/live/sessions/{session_id}` - Get one Live session with tracks and paged segments
+- `POST /api/live/sessions/{session_id}/finish` - Finish one Live session and return its snapshot
 - `POST /api/transcription-tasks/` - Create transcription task
 - `GET /api/transcription-tasks/` - List tasks with status/search/sort/pagination
 - `GET /api/transcription-tasks/{task_id}` - Get task status/result
@@ -496,9 +543,20 @@ Map export write-path `OSError` and `UnicodeError` failures to stable API error 
 Keep batch export error output sanitized; write stable task-level reasons to `_errors.txt` and do not write raw exception text into archives.
 Record `no_segments` as task-level batch export failure; return `400` only when every selected task fails.
 
+### Live Rules
+Use `/api/live/*` for Live session REST APIs; do not add Live lifecycle aliases under `/api/transcription-tasks/*`.
+Keep Live session, track, and segment data in independent `live_*` tables.
+Treat Live tracks as source metadata for microphone/system audio. Do not persist browser device inventory in the backend.
+Validate stored Live `mode`, `status`, and track/segment source values before emitting response payloads.
+Keep Live session list pagination bounded by `DEFAULT_LIVE_SESSION_LIMIT` and `MAX_LIVE_SESSION_LIMIT`.
+Keep Live detail and finish segment pagination bounded by `DEFAULT_LIVE_SEGMENT_LIMIT` and `MAX_LIVE_SEGMENT_LIMIT`.
+Keep `track_id` optional on segments, but require same-session ownership when a segment references a track.
+Store Live lifecycle timestamps with timezone-aware UTC ISO strings.
+
 ### File and Model Rules
 Keep FastAPI routes as adapters for query/path/body parsing, dependency injection, `response_model`, and error mapping.
 Put file upload/list/integrity/cleanup/delete orchestration in `nola/application/files`.
+Put Live session lifecycle, payload validation, and pagination orchestration in `nola/application/live`.
 Put model list/detail/settings/download/cancel/delete/select orchestration in `nola/application/models`.
 Validate upload files against the resolved content type after filename inference.
 Clean up partial upload files on stream read, write, size-limit, and cancellation failures.
@@ -621,6 +679,17 @@ File deletion contract: return `409` when transcription tasks still reference th
 | `/api/models/{model_id}/select` | POST | - | `ModelSelectResponse` |
 
 Model download contract: return `409` for both duplicate active downloads and already-cached models; expose both cases in OpenAPI route metadata; share the same per-model operation lock with cache deletion.
+
+### Live API
+
+| Endpoint | Method | Body/Query | Response Model |
+|----------|--------|------------|----------------|
+| `/api/live/sessions` | POST | `CreateLiveSessionRequest` | `LiveSessionDetailResponse` |
+| `/api/live/sessions` | GET | `?limit=&offset=` | `LiveSessionListResponse` |
+| `/api/live/sessions/{session_id}` | GET | `?segment_limit=&segment_offset=` | `LiveSessionDetailResponse` |
+| `/api/live/sessions/{session_id}/finish` | POST | `?segment_limit=&segment_offset=` | `LiveSessionDetailResponse` |
+
+Live REST contract: keep session data independent from transcription tasks; return paged segments in detail/finish responses; keep repeated finish idempotent for existing terminal sessions.
 
 ### Transcription Tasks API
 
