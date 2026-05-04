@@ -5,10 +5,12 @@ from typing import cast
 from nola.application.live.errors import LiveUseCaseError
 from nola.application.live.types import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
+    DEFAULT_LIVE_SESSION_LIMIT,
     LIVE_SESSION_MODES,
     LIVE_SESSION_STATUSES,
     LIVE_TRACK_SOURCES,
     MAX_LIVE_SEGMENT_LIMIT,
+    MAX_LIVE_SESSION_LIMIT,
     LiveSessionMode,
     LiveSessionStatus,
     LiveTrackSource,
@@ -69,5 +71,26 @@ def ensure_live_segment_page(
         raise LiveUseCaseError(
             status_code=422,
             detail="Live segment offset must be greater than or equal to 0",
+        )
+    return limit, offset
+
+
+def ensure_live_session_page(
+    *,
+    limit: int = DEFAULT_LIVE_SESSION_LIMIT,
+    offset: int = 0,
+) -> tuple[int, int]:
+    """Return bounded live session pagination values."""
+    if limit < 1 or limit > MAX_LIVE_SESSION_LIMIT:
+        raise LiveUseCaseError(
+            status_code=422,
+            detail=(
+                f"Live session limit must be between 1 and {MAX_LIVE_SESSION_LIMIT}"
+            ),
+        )
+    if offset < 0:
+        raise LiveUseCaseError(
+            status_code=422,
+            detail="Live session offset must be greater than or equal to 0",
         )
     return limit, offset

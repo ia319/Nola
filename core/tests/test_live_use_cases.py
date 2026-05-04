@@ -1,5 +1,6 @@
 """Unit tests for live transcription application use-cases."""
 
+from datetime import datetime, timedelta
 from typing import cast
 
 import pytest
@@ -13,7 +14,9 @@ from nola.application.live import (
 from nola.application.live.errors import LiveUseCaseError
 from nola.application.live.types import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
+    DEFAULT_LIVE_SESSION_LIMIT,
     MAX_LIVE_SEGMENT_LIMIT,
+    MAX_LIVE_SESSION_LIMIT,
     LiveSegmentRecord,
     LiveSessionMode,
     LiveSessionRecord,
@@ -30,7 +33,7 @@ class FakeLiveStore:
         self.sessions = sessions or {}
         self.tracks: dict[str, list[LiveTrackRecord]] = {}
         self.segments: dict[str, list[LiveSegmentRecord]] = {}
-        self.created_sessions: list[dict[str, object]] = []
+        self.created_sessions: list[LiveSessionRecord] = []
         self.finish_calls = 0
 
     def create_session(
@@ -64,22 +67,22 @@ class FakeLiveStore:
             "updated_at": updated_at,
         }
         self.sessions[session_id] = session
-        self.created_sessions.append(dict(session))
-        return dict(session)  # type: ignore[return-value]
+        self.created_sessions.append(session.copy())
+        return session.copy()
 
     def get_session(self, session_id: str) -> LiveSessionRecord | None:
         session = self.sessions.get(session_id)
-        return dict(session) if session else None  # type: ignore[return-value]
+        return session.copy() if session else None
 
     def list_sessions(
-        self, limit: int = 50, offset: int = 0
+        self, limit: int = DEFAULT_LIVE_SESSION_LIMIT, offset: int = 0
     ) -> list[LiveSessionRecord]:
         sessions = sorted(
             self.sessions.values(),
             key=lambda session: (session["started_at"], session["id"]),
             reverse=True,
         )
-        return [dict(session) for session in sessions[offset : offset + limit]]  # type: ignore[list-item]
+        return [session.copy() for session in sessions[offset : offset + limit]]
 
     def count_sessions(self) -> int:
         return len(self.sessions)
@@ -144,10 +147,14 @@ class FakeLiveStore:
             "created_at": created_at,
         }
         self.tracks.setdefault(session_id, []).append(track)
-        return dict(track)  # type: ignore[return-value]
+        return track.copy()
 
     def list_tracks(self, session_id: str) -> list[LiveTrackRecord]:
-        return [dict(track) for track in self.tracks.get(session_id, [])]  # type: ignore[list-item]
+        tracks = sorted(
+            self.tracks.get(session_id, []),
+            key=lambda track: (track["created_at"], track["id"]),
+        )
+        return [track.copy() for track in tracks]
 
     def create_segment(
         self,
@@ -178,7 +185,7 @@ class FakeLiveStore:
             "created_at": created_at,
         }
         self.segments.setdefault(session_id, []).append(segment)
-        return dict(segment)  # type: ignore[return-value]
+        return segment.copy()
 
     def list_segments(
         self,
@@ -190,7 +197,7 @@ class FakeLiveStore:
             self.segments.get(session_id, []),
             key=lambda segment: (segment["sequence"], segment["id"]),
         )
-        return [dict(segment) for segment in segments[offset : offset + limit]]  # type: ignore[list-item]
+        return [segment.copy() for segment in segments[offset : offset + limit]]
 
     def count_segments(self, session_id: str) -> int:
         return len(self.segments.get(session_id, []))
@@ -262,6 +269,26 @@ def test_create_live_session_rejects_invalid_mode() -> None:
     assert live_store.created_sessions == []
 
 
+def test_create_live_session_uses_utc_timestamp_by_default() -> None:
+    live_store = FakeLiveStore()
+
+    create_live_session(
+        live_store=live_store,
+        title=None,
+        mode="streaming",
+        language_hint=None,
+        model_id=None,
+        session_id_factory=lambda: "live-utc",
+    )
+
+    started_at = live_store.created_sessions[0]["started_at"]
+    timestamp = datetime.fromisoformat(started_at)
+
+    assert timestamp.utcoffset() == timedelta(0)
+    assert live_store.created_sessions[0]["created_at"] == started_at
+    assert live_store.created_sessions[0]["updated_at"] == started_at
+
+
 def test_list_live_sessions_returns_paged_payload() -> None:
     live_store = FakeLiveStore(
         sessions={
@@ -276,6 +303,27 @@ def test_list_live_sessions_returns_paged_payload() -> None:
     assert payload["limit"] == 1
     assert payload["offset"] == 0
     assert [session["session_id"] for session in payload["sessions"]] == ["new"]
+
+
+def test_list_live_sessions_rejects_invalid_pagination() -> None:
+    live_store = FakeLiveStore()
+
+    with pytest.raises(LiveUseCaseError) as limit_error:
+        list_live_sessions(live_store=live_store, limit=0, offset=0)
+
+    with pytest.raises(LiveUseCaseError) as max_limit_error:
+        list_live_sessions(
+            live_store=live_store,
+            limit=MAX_LIVE_SESSION_LIMIT + 1,
+            offset=0,
+        )
+
+    with pytest.raises(LiveUseCaseError) as offset_error:
+        list_live_sessions(live_store=live_store, limit=10, offset=-1)
+
+    assert limit_error.value.status_code == 422
+    assert max_limit_error.value.status_code == 422
+    assert offset_error.value.status_code == 422
 
 
 def test_get_live_session_returns_tracks_and_segments() -> None:
@@ -314,6 +362,41 @@ def test_get_live_session_returns_tracks_and_segments() -> None:
     assert payload["segment_total"] == 1
     assert payload["segment_limit"] == DEFAULT_LIVE_SEGMENT_LIMIT
     assert payload["segment_offset"] == 0
+
+
+def test_get_live_session_returns_tracks_in_created_order() -> None:
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+    live_store.create_track(
+        track_id="track-new",
+        session_id="live-001",
+        source="system",
+        label="System",
+        device_label="System audio",
+        sample_rate=48000,
+        channel_count=2,
+        started_at="2026-01-01T00:00:02",
+        ended_at=None,
+        created_at="2026-01-01T00:00:02",
+    )
+    live_store.create_track(
+        track_id="track-old",
+        session_id="live-001",
+        source="microphone",
+        label="Mic",
+        device_label="Built-in microphone",
+        sample_rate=16000,
+        channel_count=1,
+        started_at="2026-01-01T00:00:01",
+        ended_at=None,
+        created_at="2026-01-01T00:00:01",
+    )
+
+    payload = get_live_session(live_store=live_store, session_id="live-001")
+
+    assert [track["track_id"] for track in payload["tracks"]] == [
+        "track-old",
+        "track-new",
+    ]
 
 
 def test_get_live_session_returns_paged_segments() -> None:

@@ -24,10 +24,12 @@ from nola.application.live.payloads import (
 from nola.application.live.queries import get_live_session, list_live_sessions
 from nola.application.live.types import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
+    DEFAULT_LIVE_SESSION_LIMIT,
     LIVE_SESSION_MODES,
     LIVE_SESSION_STATUSES,
     LIVE_TRACK_SOURCES,
     MAX_LIVE_SEGMENT_LIMIT,
+    MAX_LIVE_SESSION_LIMIT,
     LiveSegmentPayload,
     LiveSegmentRecord,
     LiveSessionListPayload,
@@ -43,6 +45,7 @@ from nola.application.live.types import (
 
 __all__ = [
     "DEFAULT_LIVE_SEGMENT_LIMIT",
+    "DEFAULT_LIVE_SESSION_LIMIT",
     "LIVE_SESSION_MODES",
     "LIVE_SESSION_STATUSES",
     "LIVE_TRACK_SOURCES",
@@ -59,6 +62,7 @@ __all__ = [
     "LiveTrackSource",
     "LiveUseCaseError",
     "MAX_LIVE_SEGMENT_LIMIT",
+    "MAX_LIVE_SESSION_LIMIT",
     "SupportsLiveRepository",
     "SupportsLiveSegmentMutations",
     "SupportsLiveSegmentQueries",

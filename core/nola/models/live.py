@@ -7,6 +7,7 @@ from typing import cast
 
 from nola.application.live.types import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
+    DEFAULT_LIVE_SESSION_LIMIT,
     LiveSegmentRecord,
     LiveSessionMode,
     LiveSessionRecord,
@@ -99,7 +100,7 @@ class LiveDatabase:
 
     def list_sessions(
         self,
-        limit: int = 50,
+        limit: int = DEFAULT_LIVE_SESSION_LIMIT,
         offset: int = 0,
     ) -> list[LiveSessionRecord]:
         """Return paged live sessions in newest-first order."""

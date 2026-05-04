@@ -1,8 +1,8 @@
 """Finish-live-session use-case."""
 
 from collections.abc import Callable
-from datetime import datetime
 
+from nola.application.live._clock import now_iso
 from nola.application.live.contracts import SupportsLiveRepository
 from nola.application.live.errors import LiveUseCaseError
 from nola.application.live.payloads import build_live_session_payload
@@ -11,11 +11,6 @@ from nola.application.live.values import (
     ensure_live_segment_page,
     ensure_live_session_status,
 )
-
-
-def _now_iso() -> str:
-    """Return the current local timestamp."""
-    return datetime.now().isoformat()
 
 
 def finish_live_session(
@@ -37,7 +32,7 @@ def finish_live_session(
 
     status = ensure_live_session_status(session["status"])
     if status == "active":
-        now = timestamp_factory() if timestamp_factory else _now_iso()
+        now = timestamp_factory() if timestamp_factory else now_iso()
         updated_session = live_store.finish_session(
             session_id,
             ended_at=now,
