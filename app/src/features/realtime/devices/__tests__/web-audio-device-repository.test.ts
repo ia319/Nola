@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { LiveDeviceWarningCode } from '../types'
 import { WebAudioDeviceRepository } from '../web-audio-device-repository'
 
 const originalSetSinkIdDescriptor = Object.getOwnPropertyDescriptor(
@@ -48,6 +49,13 @@ function restoreSpeakerSelectionSupport(): void {
     Object.defineProperty(HTMLMediaElement.prototype, 'setSinkId', originalSetSinkIdDescriptor)
   }
 }
+
+const microphonePermissionFailureCases = [
+  ['NotFoundError', 'microphone_device_unavailable'],
+  ['OverconstrainedError', 'microphone_device_unavailable'],
+  ['NotReadableError', 'microphone_hardware_unavailable'],
+  ['AbortError', 'microphone_hardware_unavailable'],
+] satisfies ReadonlyArray<readonly [errorName: string, warning: LiveDeviceWarningCode]>
 
 describe('WebAudioDeviceRepository', () => {
   afterEach(() => {
@@ -351,6 +359,28 @@ describe('WebAudioDeviceRepository', () => {
       warning: 'microphone_permission_denied',
     })
   })
+
+  it.each(microphonePermissionFailureCases)(
+    'maps %s into a non-permission warning',
+    async (errorName, warning) => {
+      vi.stubGlobal('navigator', {
+        mediaDevices: {
+          enumerateDevices: vi.fn(),
+          getUserMedia: vi.fn().mockRejectedValue(new DOMException('Capture failed', errorName)),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        },
+      })
+
+      const repository = new WebAudioDeviceRepository()
+
+      await expect(repository.requestMicrophonePermission()).resolves.toEqual({
+        state: 'unknown',
+        granted: false,
+        warning,
+      })
+    },
+  )
 
   it('subscribes to devicechange and cleans up the listener', () => {
     const addEventListener = vi.fn()

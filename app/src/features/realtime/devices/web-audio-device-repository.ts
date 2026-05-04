@@ -202,13 +202,29 @@ function stopStreamTracks(stream: MediaStream): void {
   }
 }
 
-function permissionFailureFromError(error: unknown): LiveDevicePermissionResult {
+function microphonePermissionResultFromError(error: unknown): LiveDevicePermissionResult {
   if (error instanceof DOMException) {
     if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
       return {
         state: 'denied',
         granted: false,
         warning: 'microphone_permission_denied',
+      }
+    }
+
+    if (error.name === 'NotFoundError' || error.name === 'OverconstrainedError') {
+      return {
+        state: 'unknown',
+        granted: false,
+        warning: 'microphone_device_unavailable',
+      }
+    }
+
+    if (error.name === 'NotReadableError' || error.name === 'AbortError') {
+      return {
+        state: 'unknown',
+        granted: false,
+        warning: 'microphone_hardware_unavailable',
       }
     }
   }
@@ -310,7 +326,7 @@ export class WebAudioDeviceRepository implements LiveAudioDeviceRepository {
         warning: null,
       }
     } catch (error) {
-      return permissionFailureFromError(error)
+      return microphonePermissionResultFromError(error)
     }
   }
 

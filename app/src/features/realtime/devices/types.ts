@@ -20,6 +20,8 @@ export interface LiveDeviceUseState {
 export type LiveDeviceWarningCode =
   | 'microphone_permission_required'
   | 'microphone_permission_denied'
+  | 'microphone_device_unavailable'
+  | 'microphone_hardware_unavailable'
   | 'speaker_enumeration_unsupported'
   | 'speaker_labels_hidden'
   | 'speaker_selection_unsupported'
