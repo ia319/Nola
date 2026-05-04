@@ -14,6 +14,14 @@ export type {
   LiveDeviceUseState,
   LiveDeviceWarningCode,
 } from './devices/types'
+export type {
+  LiveAudioDeviceRepository,
+  LiveDeviceChangeCallback,
+  LiveDevicePermissionResult,
+  LiveDeviceSelectionState,
+} from './devices/audio-device-repository'
+export { createAudioDeviceRepository } from './devices/audio-device-repository'
+export { installLiveDeviceDiagnostics, logLiveDeviceInventory } from './devices/diagnostics'
 
 export type {
   LiveAudioLevel,
