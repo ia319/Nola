@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { installLiveDeviceDiagnostics, logLiveDeviceInventory } from '../diagnostics'
 import type { LiveAudioDeviceRepository } from '../audio-device-repository'
@@ -36,6 +36,10 @@ const inventory: LiveDeviceInventory = {
 }
 
 describe('live device diagnostics', () => {
+  afterEach(() => {
+    delete (window as DiagnosticWindow).__NOLA_LIVE_DEVICES__
+  })
+
   it('logs and returns inventory through an injected repository', async () => {
     const repository: LiveAudioDeviceRepository = {
       listDevices: vi.fn().mockResolvedValue(inventory),

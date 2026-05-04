@@ -14,6 +14,7 @@ export type {
   LiveDeviceUseState,
   LiveDeviceWarningCode,
 } from './devices/types'
+export { TEMPORARY_LIVE_DEVICE_ID_PREFIX, isTemporaryLiveDeviceId } from './devices/types'
 export type {
   LiveAudioDeviceRepository,
   LiveDeviceChangeCallback,

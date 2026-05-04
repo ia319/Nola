@@ -6,6 +6,12 @@ export type LiveDevicePermissionState = 'granted' | 'prompt' | 'denied' | 'unsup
 
 export type LiveDeviceCapabilityState = LiveRuntimeCapabilityState
 
+export const TEMPORARY_LIVE_DEVICE_ID_PREFIX = 'temp-'
+
+export function isTemporaryLiveDeviceId(deviceId: string | null | undefined): boolean {
+  return typeof deviceId === 'string' && deviceId.startsWith(TEMPORARY_LIVE_DEVICE_ID_PREFIX)
+}
+
 export interface LiveDeviceUseState {
   selectedDeviceId: string | null
   activeDeviceId: string | null
@@ -28,6 +34,7 @@ export interface LiveAudioDevice {
   kind: LiveDeviceKind
   label: string | null
   groupId: string | null
+  isTemporary: boolean
   isDefault: boolean
   isSelected: boolean
   isActive: boolean

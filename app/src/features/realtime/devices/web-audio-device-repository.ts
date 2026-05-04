@@ -4,6 +4,7 @@ import type {
   LiveDevicePermissionResult,
   LiveDeviceSelectionState,
 } from './audio-device-repository'
+import { TEMPORARY_LIVE_DEVICE_ID_PREFIX, isTemporaryLiveDeviceId } from './types'
 import type {
   LiveAudioDevice,
   LiveDeviceCapabilityState,
@@ -32,15 +33,23 @@ function getBrowserMediaDevices(): BrowserMediaDevices | null {
   return (navigator.mediaDevices as BrowserMediaDevices | undefined) ?? null
 }
 
+function getPersistableDeviceId(deviceId: string | null | undefined): string | null {
+  if (!deviceId || isTemporaryLiveDeviceId(deviceId)) {
+    return null
+  }
+
+  return deviceId
+}
+
 function getCurrentState(state: LiveDeviceSelectionState = {}): LiveDeviceInventory['current'] {
   return {
     microphone: {
-      selectedDeviceId: state.selectedMicrophoneId ?? null,
-      activeDeviceId: state.activeMicrophoneId ?? null,
+      selectedDeviceId: getPersistableDeviceId(state.selectedMicrophoneId),
+      activeDeviceId: getPersistableDeviceId(state.activeMicrophoneId),
     },
     speaker: {
-      selectedDeviceId: state.selectedSpeakerId ?? null,
-      activeDeviceId: state.activeSpeakerId ?? null,
+      selectedDeviceId: getPersistableDeviceId(state.selectedSpeakerId),
+      activeDeviceId: getPersistableDeviceId(state.activeSpeakerId),
     },
   }
 }
@@ -85,8 +94,24 @@ function resolveMicrophonePermissionState(): Promise<LiveDevicePermissionState> 
     .catch(() => 'unknown')
 }
 
+function getTemporaryIdPart(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 function getDeviceId(device: MediaDeviceInfo, kind: LiveDeviceKind, index: number): string {
-  return device.deviceId || `${kind}-${index + 1}`
+  if (device.deviceId) {
+    return device.deviceId
+  }
+
+  const stableParts = [device.groupId, device.label].map(getTemporaryIdPart).filter(Boolean)
+  const suffix = stableParts.length > 0 ? stableParts.join('-') : String(index + 1)
+
+  // Keep temporary IDs display-only; they are not browser deviceId values and must not be persisted.
+  return `${TEMPORARY_LIVE_DEVICE_ID_PREFIX}${kind}-${suffix}-${index + 1}`
 }
 
 function getDeviceLabel(device: MediaDeviceInfo, kind: LiveDeviceKind, index: number): string {
@@ -111,6 +136,7 @@ function toLiveAudioDevice(
     kind,
     label: getDeviceLabel(device, kind, index),
     groupId: device.groupId || null,
+    isTemporary: isTemporaryLiveDeviceId(id),
     isDefault: device.deviceId === 'default',
     isSelected: useState.selectedDeviceId === id,
     isActive: useState.activeDeviceId === id,
@@ -163,8 +189,10 @@ function buildUnsupportedInventory(
 }
 
 function buildMicrophoneConstraints(deviceId?: string): MediaStreamConstraints {
+  const persistableDeviceId = getPersistableDeviceId(deviceId)
+
   return {
-    audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+    audio: persistableDeviceId ? { deviceId: { exact: persistableDeviceId } } : true,
   }
 }
 

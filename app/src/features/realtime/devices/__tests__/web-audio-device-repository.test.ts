@@ -90,6 +90,7 @@ describe('WebAudioDeviceRepository', () => {
         kind: 'microphone',
         label: 'System microphone',
         groupId: 'group-1',
+        isTemporary: false,
         isDefault: true,
         isSelected: false,
         isActive: true,
@@ -99,6 +100,7 @@ describe('WebAudioDeviceRepository', () => {
         kind: 'microphone',
         label: 'USB microphone',
         groupId: 'group-2',
+        isTemporary: false,
         isDefault: false,
         isSelected: true,
         isActive: false,
@@ -110,6 +112,7 @@ describe('WebAudioDeviceRepository', () => {
         kind: 'speaker',
         label: 'USB speaker',
         groupId: 'group-3',
+        isTemporary: false,
         isDefault: false,
         isSelected: true,
         isActive: true,
@@ -189,6 +192,55 @@ describe('WebAudioDeviceRepository', () => {
     ])
   })
 
+  it('marks browser fallback device IDs as temporary and ignores temporary selection state', async () => {
+    setSpeakerSelectionSupport(true)
+    vi.stubGlobal('navigator', {
+      mediaDevices: {
+        enumerateDevices: vi
+          .fn()
+          .mockResolvedValue([
+            buildDevice('audioinput', '', 'USB microphone', 'group-1'),
+            buildDevice('audiooutput', '', 'USB speaker', 'group-2'),
+          ]),
+        getUserMedia: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+      permissions: {
+        query: vi.fn().mockResolvedValue({ state: 'granted' }),
+      },
+    })
+
+    const repository = new WebAudioDeviceRepository()
+    const inventory = await repository.listDevices({
+      selectedMicrophoneId: 'temp-microphone-group-1-usb-microphone-1',
+      activeMicrophoneId: 'temp-microphone-group-1-usb-microphone-1',
+      selectedSpeakerId: 'temp-speaker-group-2-usb-speaker-1',
+    })
+
+    expect(inventory.current).toEqual({
+      microphone: {
+        selectedDeviceId: null,
+        activeDeviceId: null,
+      },
+      speaker: {
+        selectedDeviceId: null,
+        activeDeviceId: null,
+      },
+    })
+    expect(inventory.microphones[0]).toMatchObject({
+      id: 'temp-microphone-group-1-usb-microphone-1',
+      isTemporary: true,
+      isSelected: false,
+      isActive: false,
+    })
+    expect(inventory.speakers[0]).toMatchObject({
+      id: 'temp-speaker-group-2-usb-speaker-1',
+      isTemporary: true,
+      isSelected: false,
+    })
+  })
+
   it('warns when speaker enumeration returns no output devices', async () => {
     setSpeakerSelectionSupport(true)
     vi.stubGlobal('navigator', {
@@ -257,6 +309,26 @@ describe('WebAudioDeviceRepository', () => {
       granted: true,
       warning: null,
     })
+  })
+
+  it('does not pass temporary fallback IDs as exact microphone constraints', async () => {
+    const stop = vi.fn()
+    const getUserMedia = vi.fn().mockResolvedValue(buildStream(stop))
+    vi.stubGlobal('navigator', {
+      mediaDevices: {
+        enumerateDevices: vi.fn(),
+        getUserMedia,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    })
+
+    const repository = new WebAudioDeviceRepository()
+    const result = await repository.requestMicrophonePermission('temp-microphone-1')
+
+    expect(getUserMedia).toHaveBeenCalledWith({ audio: true })
+    expect(stop).toHaveBeenCalledTimes(1)
+    expect(result.granted).toBe(true)
   })
 
   it('maps microphone permission denial into a stable result', async () => {
