@@ -150,6 +150,7 @@ export function useLiveDeviceInventory(
   const systemAudioSessionRef = useRef<LiveCaptureSession | null>(null)
   const microphoneUnsubscribersRef = useRef<LiveUnsubscribe[]>([])
   const systemAudioUnsubscribersRef = useRef<LiveUnsubscribe[]>([])
+  const releaseActiveCaptureSessionsRef = useRef<() => void>(() => undefined)
 
   const getDeviceRepository = useCallback(() => {
     if (!deviceRepositoryRef.current) {
@@ -373,13 +374,18 @@ export function useLiveDeviceInventory(
     const result = await stopSystemAudioSession(true)
     if (result === 'missing') {
       clearSystemAudioCapture()
+      void refreshDevices()
     }
-  }, [clearSystemAudioCapture, stopSystemAudioSession])
+  }, [clearSystemAudioCapture, refreshDevices, stopSystemAudioSession])
 
   const releaseActiveCaptureSessions = useCallback((): void => {
     void stopMicrophoneSession(false)
     void stopSystemAudioSession(false)
   }, [stopMicrophoneSession, stopSystemAudioSession])
+
+  useEffect(() => {
+    releaseActiveCaptureSessionsRef.current = releaseActiveCaptureSessions
+  }, [releaseActiveCaptureSessions])
 
   const startMicrophoneCapture = useCallback(
     async (captureOptions: LiveMicrophoneCaptureOptions = {}): Promise<void> => {
@@ -488,9 +494,9 @@ export function useLiveDeviceInventory(
 
   useEffect(() => {
     return () => {
-      releaseActiveCaptureSessions()
+      releaseActiveCaptureSessionsRef.current()
     }
-  }, [releaseActiveCaptureSessions])
+  }, [])
 
   return {
     inventory,

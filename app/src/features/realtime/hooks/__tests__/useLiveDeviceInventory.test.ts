@@ -354,6 +354,28 @@ describe('useLiveDeviceInventory', () => {
     expect(result.current.systemAudioCapture.state).toBe('stopped')
   })
 
+  it('refreshes devices when system audio stop has no active session', async () => {
+    const deviceRepository = createDeviceRepository(buildInventory())
+    const captureRepository = createCaptureRepository()
+
+    const { result } = renderHook(() =>
+      useLiveDeviceInventory({
+        autoRefresh: false,
+        deviceRepositoryFactory: async () => deviceRepository.repository,
+        captureRepositoryFactory: async () => captureRepository.repository,
+      }),
+    )
+
+    await act(async () => {
+      await result.current.stopSystemAudioCapture()
+    })
+
+    expect(result.current.systemAudioCapture.state).toBe('idle')
+    await waitFor(() => {
+      expect(deviceRepository.listDevices).toHaveBeenCalledTimes(1)
+    })
+  })
+
   it('requests microphone permission through the current selected microphone', async () => {
     const deviceRepository = createDeviceRepository(buildInventory())
     const captureRepository = createCaptureRepository()
