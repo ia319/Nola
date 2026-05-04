@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from nola.api.deps import get_app_config_db, get_file_db, get_live_db, get_task_db
+from nola.application.live import DEFAULT_LIVE_SESSION_LIMIT, LiveSessionRecord
 from nola.config.settings import Settings
 from nola.main import app
 from nola.models import init_db
@@ -74,9 +75,48 @@ def test_list_live_sessions_empty(client: TestClient) -> None:
     assert response.json() == {
         "sessions": [],
         "total": 0,
-        "limit": 50,
+        "limit": DEFAULT_LIVE_SESSION_LIMIT,
         "offset": 0,
     }
+
+
+def test_list_live_sessions_uses_dependency_override(client: TestClient) -> None:
+    """Live session list should accept a FastAPI store dependency override."""
+
+    class OverrideLiveStore:
+        def list_sessions(
+            self,
+            limit: int = DEFAULT_LIVE_SESSION_LIMIT,
+            offset: int = 0,
+        ) -> list[LiveSessionRecord]:
+            session: LiveSessionRecord = {
+                "id": "override-session",
+                "title": "Override",
+                "mode": "streaming",
+                "status": "active",
+                "language_hint": None,
+                "model_id": None,
+                "runtime": None,
+                "audio_format": None,
+                "started_at": "2026-01-01T00:00:00+00:00",
+                "ended_at": None,
+                "error": None,
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "updated_at": "2026-01-01T00:00:00+00:00",
+            }
+            return [session][offset : offset + limit]
+
+        def count_sessions(self) -> int:
+            return 1
+
+    app.dependency_overrides[get_live_db] = OverrideLiveStore
+    try:
+        response = client.get("/api/live/sessions")
+    finally:
+        app.dependency_overrides.pop(get_live_db, None)
+
+    assert response.status_code == 200
+    assert response.json()["sessions"][0]["session_id"] == "override-session"
 
 
 def test_create_list_get_and_finish_live_session(client: TestClient) -> None:

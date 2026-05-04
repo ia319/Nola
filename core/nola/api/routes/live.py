@@ -1,8 +1,8 @@
 """Live transcription REST endpoints."""
 
-from typing import NoReturn
+from typing import Annotated, NoReturn, TypeAlias
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from nola.api.deps import get_live_db
 from nola.api.schemas import (
@@ -12,10 +12,13 @@ from nola.api.schemas import (
 )
 from nola.application.live import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
+    DEFAULT_LIVE_SESSION_LIMIT,
     MAX_LIVE_SEGMENT_LIMIT,
+    MAX_LIVE_SESSION_LIMIT,
     LiveSessionListPayload,
     LiveSessionPayload,
     LiveUseCaseError,
+    SupportsLiveRepository,
     create_live_session,
     finish_live_session,
     get_live_session,
@@ -23,6 +26,7 @@ from nola.application.live import (
 )
 
 router = APIRouter(prefix="/api/live", tags=["live"])
+LiveStoreDependency: TypeAlias = Annotated[SupportsLiveRepository, Depends(get_live_db)]
 
 
 def _raise_live_http_error(error: LiveUseCaseError) -> NoReturn:
@@ -37,11 +41,12 @@ def _raise_live_http_error(error: LiveUseCaseError) -> NoReturn:
 )
 def create_live_session_endpoint(
     request: CreateLiveSessionRequest,
+    live_store: LiveStoreDependency,
 ) -> LiveSessionPayload:
     """Create an active live transcription session."""
     try:
         return create_live_session(
-            live_store=get_live_db(),
+            live_store=live_store,
             title=request.title,
             mode=request.mode,
             language_hint=request.language_hint,
@@ -57,13 +62,19 @@ def create_live_session_endpoint(
     response_model=LiveSessionListResponse,
 )
 def list_live_sessions_endpoint(
-    limit: int = Query(50, ge=1, le=100, description="Max results"),
+    live_store: LiveStoreDependency,
+    limit: int = Query(
+        DEFAULT_LIVE_SESSION_LIMIT,
+        ge=1,
+        le=MAX_LIVE_SESSION_LIMIT,
+        description="Max results",
+    ),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
 ) -> LiveSessionListPayload:
     """Return paged live session summaries."""
     try:
         return list_live_sessions(
-            live_store=get_live_db(),
+            live_store=live_store,
             limit=limit,
             offset=offset,
         )
@@ -78,6 +89,7 @@ def list_live_sessions_endpoint(
 )
 def get_live_session_endpoint(
     session_id: str,
+    live_store: LiveStoreDependency,
     segment_limit: int = Query(
         DEFAULT_LIVE_SEGMENT_LIMIT,
         ge=1,
@@ -93,7 +105,7 @@ def get_live_session_endpoint(
     """Return one live session with tracks and a paged segment window."""
     try:
         return get_live_session(
-            live_store=get_live_db(),
+            live_store=live_store,
             session_id=session_id,
             segment_limit=segment_limit,
             segment_offset=segment_offset,
@@ -109,6 +121,7 @@ def get_live_session_endpoint(
 )
 def finish_live_session_endpoint(
     session_id: str,
+    live_store: LiveStoreDependency,
     segment_limit: int = Query(
         DEFAULT_LIVE_SEGMENT_LIMIT,
         ge=1,
@@ -124,7 +137,7 @@ def finish_live_session_endpoint(
     """Finish an active live session and return its current snapshot."""
     try:
         return finish_live_session(
-            live_store=get_live_db(),
+            live_store=live_store,
             session_id=session_id,
             segment_limit=segment_limit,
             segment_offset=segment_offset,
