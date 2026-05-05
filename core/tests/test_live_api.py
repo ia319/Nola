@@ -436,6 +436,50 @@ def test_live_realtime_stream_rejects_second_writer(client: TestClient) -> None:
         assert first.receive_json()["type"] == "session.finished"
 
 
+def test_live_realtime_stream_rechecks_session_after_acquire(
+    client: TestClient,
+) -> None:
+    """Live realtime stream should reject sessions finished during acquire."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+    live_db = get_live_db()
+
+    class FinishDuringAcquireRegistry:
+        def __init__(self) -> None:
+            self.released = False
+
+        async def acquire(self, acquired_session_id: str) -> bool:
+            assert acquired_session_id == session_id
+            live_db.finish_session(
+                session_id,
+                ended_at="2026-01-01T00:01:00+00:00",
+                updated_at="2026-01-01T00:01:00+00:00",
+            )
+            return True
+
+        async def release(self, released_session_id: str) -> None:
+            assert released_session_id == session_id
+            self.released = True
+
+    registry = FinishDuringAcquireRegistry()
+    app.dependency_overrides[get_live_stream_connection_registry] = lambda: registry
+    try:
+        with client.websocket_connect(
+            f"/api/live/sessions/{session_id}/stream"
+        ) as websocket:
+            error = websocket.receive_json()
+
+            assert error["type"] == "server.error"
+            assert error["error"]["code"] == "session_not_active"
+            with pytest.raises(WebSocketDisconnect) as close_error:
+                websocket.receive_json()
+            assert close_error.value.code == 4409
+    finally:
+        app.dependency_overrides.pop(get_live_stream_connection_registry, None)
+
+    assert registry.released is True
+
+
 def test_live_realtime_stream_rejects_unsupported_protocol(
     client: TestClient,
 ) -> None:

@@ -265,12 +265,35 @@ async def stream_live_session_endpoint(
         await websocket.close(code=LIVE_REALTIME_CLOSE_CONFLICT)
         return
 
-    runtime = LiveRealtimeSessionRuntime(
-        live_store=live_store,
-        session_id=session_id,
-    )
+    runtime: LiveRealtimeSessionRuntime | None = None
 
     try:
+        session = live_store.get_session(session_id)
+        if session is None:
+            await _send_realtime_error(
+                websocket,
+                session_id=session_id,
+                code="session_not_found",
+                message="Live session not found",
+            )
+            await websocket.close(code=LIVE_REALTIME_CLOSE_NOT_FOUND)
+            return
+
+        if ensure_live_session_status(session["status"]) != "active":
+            await _send_realtime_error(
+                websocket,
+                session_id=session_id,
+                code="session_not_active",
+                message="Live session is not active",
+            )
+            await websocket.close(code=LIVE_REALTIME_CLOSE_CONFLICT)
+            return
+
+        runtime = LiveRealtimeSessionRuntime(
+            live_store=live_store,
+            session_id=session_id,
+        )
+
         raw_hello = await websocket.receive_json()
         base_hello = LiveRealtimeEventEnvelope.model_validate(raw_hello)
         if base_hello.session_id != session_id:
@@ -415,7 +438,9 @@ async def stream_live_session_endpoint(
         )
         await websocket.close(code=LIVE_REALTIME_CLOSE_POLICY)
     except WebSocketDisconnect:
-        runtime.fail_after_disconnect()
+        if runtime is not None:
+            runtime.fail_after_disconnect()
     finally:
-        runtime.release()
+        if runtime is not None:
+            runtime.release()
         await stream_registry.release(session_id)
