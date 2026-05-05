@@ -13,6 +13,7 @@ from nola.application.live.realtime.audio import (
     LiveRealtimeAudioFrameMetadata,
     LiveRealtimePcm16Frame,
     build_pcm16le_frame,
+    pcm16le_to_float32_waveform,
     validate_pcm16le_frame_metadata,
 )
 from nola.application.live.realtime.diagnostics import (
@@ -23,8 +24,17 @@ from nola.application.live.realtime.diagnostics import (
     LiveRealtimeWavDiagnosticsSession,
 )
 from nola.application.live.realtime.errors import LiveRealtimeSessionError
+from nola.application.live.realtime.mock_transcriber import MockLiveRealtimeTranscriber
 from nola.application.live.realtime.protocol import (
     LIVE_REALTIME_SUPPORTED_PROTOCOL_VERSIONS,
+)
+from nola.application.live.realtime.transcriber import (
+    LiveRealtimeTranscriber,
+    LiveRealtimeTranscriberFrame,
+    LiveRealtimeTranscriptEvent,
+    LiveRealtimeTranscriptFinal,
+    LiveRealtimeTranscriptFinalCandidate,
+    LiveRealtimeTranscriptPartial,
 )
 from nola.application.live.types import (
     LiveSessionPayload,
@@ -75,20 +85,25 @@ class LiveRealtimeSessionRuntime:
         live_store: SupportsLiveRepository,
         session_id: str,
         track_id_factory: Callable[[], str] | None = None,
+        segment_id_factory: Callable[[], str] | None = None,
         timestamp_factory: Callable[[], str] | None = None,
         diagnostics_output_dir: Path | None = None,
         repository_root: Path | None = None,
+        transcriber: LiveRealtimeTranscriber | None = None,
     ) -> None:
         self._live_store = live_store
         self._session_id = session_id
         self._track_id_factory = track_id_factory or self._default_track_id
+        self._segment_id_factory = segment_id_factory or self._default_segment_id
         self._timestamp_factory = timestamp_factory or now_iso
         self._diagnostics_output_dir = diagnostics_output_dir
         self._repository_root = repository_root
+        self._transcriber = transcriber or MockLiveRealtimeTranscriber()
         self._handshake_complete = False
         self._finished_normally = False
         self._tracks: dict[str, _LiveRealtimeTrackState] = {}
         self._diagnostics_wav: LiveRealtimeWavDiagnosticsSession | None = None
+        self._next_segment_sequence = 1
 
     @property
     def handshake_complete(self) -> bool:
@@ -172,16 +187,84 @@ class LiveRealtimeSessionRuntime:
         self,
         event: LiveRealtimeAudioFrameMetadata,
         payload: bytes,
-    ) -> LiveRealtimePcm16Frame:
-        """Validate one audio frame payload and update track state."""
+    ) -> tuple[LiveRealtimeTranscriptEvent, ...]:
+        """Validate one audio frame payload and return transcript events."""
         state = self._get_expected_audio_track(event)
         frame = build_pcm16le_frame(metadata=event, payload=payload)
 
         if self._diagnostics_wav is not None:
             self._diagnostics_wav.record_frame(frame)
 
+        transcript_events = self._accept_frame_for_transcription(frame)
         self._commit_audio_frame_metadata(state, event)
-        return frame
+        return transcript_events
+
+    def _accept_frame_for_transcription(
+        self,
+        frame: LiveRealtimePcm16Frame,
+    ) -> tuple[LiveRealtimeTranscriptEvent, ...]:
+        waveform = pcm16le_to_float32_waveform(frame.payload)
+        transcriber_frame = LiveRealtimeTranscriberFrame(
+            track_id=frame.track_id,
+            source=frame.source,
+            sequence=frame.sequence,
+            start_ms=frame.captured_at_ms,
+            end_ms=frame.captured_at_ms + frame.duration_ms,
+            duration_ms=frame.duration_ms,
+            waveform=waveform,
+        )
+        try:
+            results = self._transcriber.accept_frame(transcriber_frame)
+        except Exception as error:
+            raise LiveRealtimeSessionError(
+                code="mock_transcriber_failed",
+                message="Mock transcriber could not process the audio frame",
+            ) from error
+
+        return tuple(self._persist_transcript_result(result) for result in results)
+
+    def _persist_transcript_result(
+        self,
+        result: LiveRealtimeTranscriptPartial | LiveRealtimeTranscriptFinalCandidate,
+    ) -> LiveRealtimeTranscriptEvent:
+        if isinstance(result, LiveRealtimeTranscriptPartial):
+            return result
+
+        now = self._timestamp_factory()
+        try:
+            segment = self._live_store.create_segment(
+                segment_id=self._segment_id_factory(),
+                session_id=self._session_id,
+                track_id=result.track_id,
+                sequence=self._next_segment_sequence,
+                start_ms=result.start_ms,
+                end_ms=result.end_ms,
+                text=result.text,
+                language=result.language,
+                confidence=result.confidence,
+                is_final=True,
+                created_at=now,
+            )
+        except Exception as error:
+            raise LiveRealtimeSessionError(
+                code="repository_write_failed",
+                message="Live transcript segment could not be created",
+            ) from error
+
+        self._next_segment_sequence += 1
+        return LiveRealtimeTranscriptFinal(
+            segment_id=segment["id"],
+            session_id=segment["session_id"],
+            track_id=result.track_id,
+            source=result.source,
+            sequence=segment["sequence"],
+            start_ms=segment["start_ms"],
+            end_ms=segment["end_ms"],
+            text=segment["text"],
+            language=segment["language"],
+            confidence=segment["confidence"],
+            created_at=segment["created_at"],
+        )
 
     def _commit_audio_frame_metadata(
         self,
@@ -316,6 +399,7 @@ class LiveRealtimeSessionRuntime:
             self._diagnostics_wav.close_silently(reason="connection_closed")
             self._diagnostics_wav = None
         self._tracks.clear()
+        self._transcriber.release()
 
     def _ensure_ready(self) -> None:
         if not self._handshake_complete:
@@ -360,4 +444,8 @@ class LiveRealtimeSessionRuntime:
 
     @staticmethod
     def _default_track_id() -> str:
+        return str(uuid4())
+
+    @staticmethod
+    def _default_segment_id() -> str:
         return str(uuid4())

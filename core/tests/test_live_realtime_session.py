@@ -12,6 +12,8 @@ from nola.application.live.realtime import (
     LiveRealtimeSessionRuntime,
     LiveRealtimeTrackStart,
     LiveRealtimeTrackStop,
+    LiveRealtimeTranscriptFinal,
+    LiveRealtimeTranscriptPartial,
 )
 from nola.application.live.types import LiveTrackSource
 from tests.test_live_use_cases import FakeLiveStore, _session
@@ -227,3 +229,55 @@ def test_realtime_session_writes_explicit_wav_diagnostics(tmp_path: Path) -> Non
     assert len(stopped.files) == 1
     assert stopped.files[0].track_id == "track-001"
     assert stopped.files[0].duration_ms == 20
+
+
+def test_realtime_session_emits_mock_transcripts_and_persists_final() -> None:
+    """Realtime runtime should send partials and persist final transcript segments."""
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+    runtime = LiveRealtimeSessionRuntime(
+        live_store=live_store,
+        session_id="live-001",
+        track_id_factory=lambda: "track-001",
+        segment_id_factory=lambda: "segment-001",
+        timestamp_factory=lambda: "2026-01-01T00:00:00+00:00",
+    )
+    runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
+    runtime.start_track(_start_event())
+
+    partial_events = tuple(
+        event
+        for sequence in range(25)
+        for event in runtime.accept_audio_frame(
+            _audio_metadata(
+                sequence=sequence,
+                captured_at_ms=sequence * 20,
+            ),
+            b"\x00" * 640,
+        )
+    )
+    assert live_store.count_segments("live-001") == 0
+
+    final_events = tuple(
+        event
+        for sequence in range(25, 50)
+        for event in runtime.accept_audio_frame(
+            _audio_metadata(
+                sequence=sequence,
+                captured_at_ms=sequence * 20,
+            ),
+            b"\x00" * 640,
+        )
+    )
+
+    assert len(partial_events) == 1
+    assert isinstance(partial_events[0], LiveRealtimeTranscriptPartial)
+    assert partial_events[0].text == "Mock microphone partial 1"
+
+    assert len(final_events) == 1
+    assert isinstance(final_events[0], LiveRealtimeTranscriptFinal)
+    assert final_events[0].segment_id == "segment-001"
+    assert final_events[0].sequence == 1
+    assert final_events[0].start_ms == 0
+    assert final_events[0].end_ms == 1000
+    assert final_events[0].text == "Mock microphone segment 1"
+    assert live_store.count_segments("live-001") == 1
