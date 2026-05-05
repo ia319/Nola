@@ -46,6 +46,7 @@ from nola.api.schemas.live_realtime import (
     LiveRealtimeServerReadyEvent,
     LiveRealtimeSessionFinishedEvent,
     LiveRealtimeSessionFinishEvent,
+    LiveRealtimeTrackReadyEvent,
     LiveRealtimeTrackStartEvent,
     LiveRealtimeTrackStopEvent,
 )
@@ -109,6 +110,7 @@ __all__ = [
     "LiveRealtimeServerReadyEvent",
     "LiveRealtimeSessionFinishEvent",
     "LiveRealtimeSessionFinishedEvent",
+    "LiveRealtimeTrackReadyEvent",
     "LiveRealtimeTrackStartEvent",
     "LiveRealtimeTrackStopEvent",
     "LiveSessionDetailResponse",

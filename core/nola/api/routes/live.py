@@ -11,6 +11,7 @@ from nola.api.deps import get_live_db, get_live_stream_connection_registry
 from nola.api.schemas import (
     CreateLiveSessionRequest,
     LiveRealtimeAudioContract,
+    LiveRealtimeAudioFrameMetadataEvent,
     LiveRealtimeClientHelloEvent,
     LiveRealtimeClientPingEvent,
     LiveRealtimeErrorPayload,
@@ -20,8 +21,12 @@ from nola.api.schemas import (
     LiveRealtimeServerReadyEvent,
     LiveRealtimeSessionFinishedEvent,
     LiveRealtimeSessionFinishEvent,
+    LiveRealtimeTrackReadyEvent,
+    LiveRealtimeTrackStartEvent,
+    LiveRealtimeTrackStopEvent,
     LiveSessionDetailResponse,
     LiveSessionListResponse,
+    LiveTrackResponse,
 )
 from nola.application.live import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
@@ -33,7 +38,6 @@ from nola.application.live import (
     LiveUseCaseError,
     SupportsLiveRepository,
     create_live_session,
-    fail_live_session,
     finish_live_session,
     get_live_session,
     list_live_sessions,
@@ -41,8 +45,12 @@ from nola.application.live import (
 from nola.application.live._clock import now_iso
 from nola.application.live.realtime import (
     LIVE_REALTIME_PROTOCOL_VERSION,
-    LIVE_REALTIME_SUPPORTED_PROTOCOL_VERSIONS,
+    LiveRealtimeAudioFrameMetadata,
     LiveRealtimeErrorCode,
+    LiveRealtimeSessionError,
+    LiveRealtimeSessionRuntime,
+    LiveRealtimeTrackStart,
+    LiveRealtimeTrackStop,
     LiveStreamConnectionRegistry,
 )
 from nola.application.live.values import ensure_live_session_status
@@ -87,6 +95,20 @@ async def _send_realtime_error(
         error=LiveRealtimeErrorPayload(code=code, message=message),
     )
     await websocket.send_json(event.model_dump(mode="json"))
+
+
+async def _ensure_audio_payload(websocket: WebSocket) -> None:
+    """Require the binary payload that follows audio.frame metadata."""
+    message = await websocket.receive()
+    if message["type"] == "websocket.disconnect":
+        raise WebSocketDisconnect(code=message.get("code", 1000))
+
+    payload = message.get("bytes")
+    if not isinstance(payload, bytes):
+        raise LiveRealtimeSessionError(
+            code="audio_frame_invalid",
+            message="Audio frame metadata must be followed by a binary payload",
+        )
 
 
 @router.post(
@@ -243,32 +265,27 @@ async def stream_live_session_endpoint(
         await websocket.close(code=LIVE_REALTIME_CLOSE_CONFLICT)
         return
 
-    handshake_complete = False
-    finished_normally = False
+    runtime = LiveRealtimeSessionRuntime(
+        live_store=live_store,
+        session_id=session_id,
+    )
 
     try:
         raw_hello = await websocket.receive_json()
         base_hello = LiveRealtimeEventEnvelope.model_validate(raw_hello)
+        if base_hello.session_id != session_id:
+            raise LiveRealtimeSessionError(
+                code="invalid_event",
+                message="Realtime event session does not match the stream",
+            )
         if base_hello.type != "client.hello":
-            await _send_realtime_error(
-                websocket,
-                session_id=session_id,
+            raise LiveRealtimeSessionError(
                 code="invalid_event_order",
                 message="First realtime event must be client.hello",
             )
-            await websocket.close(code=LIVE_REALTIME_CLOSE_POLICY)
-            return
 
         hello = LiveRealtimeClientHelloEvent.model_validate(raw_hello)
-        if hello.protocol_version not in LIVE_REALTIME_SUPPORTED_PROTOCOL_VERSIONS:
-            await _send_realtime_error(
-                websocket,
-                session_id=session_id,
-                code="protocol_version_unsupported",
-                message="Realtime protocol version is not supported",
-            )
-            await websocket.close(code=LIVE_REALTIME_CLOSE_POLICY)
-            return
+        runtime.accept_hello(protocol_version=hello.protocol_version)
 
         session_payload = get_live_session(
             live_store=live_store,
@@ -285,24 +302,19 @@ async def stream_live_session_endpoint(
             session=session_response,
         )
         await websocket.send_json(ready.model_dump(mode="json"))
-        handshake_complete = True
 
         while True:
             raw_event = await websocket.receive_json()
             base_event = LiveRealtimeEventEnvelope.model_validate(raw_event)
-
-            protocol_supported = (
-                base_event.protocol_version in LIVE_REALTIME_SUPPORTED_PROTOCOL_VERSIONS
-            )
-            if not protocol_supported:
-                await _send_realtime_error(
-                    websocket,
-                    session_id=session_id,
-                    code="protocol_version_unsupported",
-                    message="Realtime protocol version is not supported",
+            if base_event.session_id != session_id:
+                raise LiveRealtimeSessionError(
+                    code="invalid_event",
+                    message="Realtime event session does not match the stream",
                 )
-                await websocket.close(code=LIVE_REALTIME_CLOSE_POLICY)
-                return
+
+            runtime.ensure_protocol_version(
+                protocol_version=base_event.protocol_version
+            )
 
             if base_event.type == "client.ping":
                 LiveRealtimeClientPingEvent.model_validate(raw_event)
@@ -316,12 +328,59 @@ async def stream_live_session_endpoint(
                 await websocket.send_json(pong.model_dump(mode="json"))
                 continue
 
+            if base_event.type == "track.start":
+                track_start = LiveRealtimeTrackStartEvent.model_validate(raw_event)
+                track_payload = runtime.start_track(
+                    LiveRealtimeTrackStart(
+                        source=track_start.source,
+                        sequence=track_start.sequence,
+                        label=track_start.label,
+                        device_label=track_start.device_label,
+                        sample_rate=track_start.sample_rate,
+                        channel_count=track_start.channel_count,
+                    )
+                )
+                track_ready = LiveRealtimeTrackReadyEvent(
+                    type="track.ready",
+                    protocol_version=LIVE_REALTIME_PROTOCOL_VERSION,
+                    session_id=session_id,
+                    event_id=_event_id(),
+                    sent_at=now_iso(),
+                    track=LiveTrackResponse.model_validate(track_payload),
+                )
+                await websocket.send_json(track_ready.model_dump(mode="json"))
+                continue
+
+            if base_event.type == "audio.frame":
+                frame_metadata = LiveRealtimeAudioFrameMetadataEvent.model_validate(
+                    raw_event
+                )
+                audio_frame = LiveRealtimeAudioFrameMetadata(
+                    track_id=frame_metadata.track_id,
+                    source=frame_metadata.source,
+                    sequence=frame_metadata.sequence,
+                    captured_at_ms=frame_metadata.captured_at_ms,
+                    duration_ms=frame_metadata.duration_ms,
+                )
+                runtime.validate_audio_frame_metadata(audio_frame)
+                await _ensure_audio_payload(websocket)
+                runtime.accept_audio_frame_metadata(audio_frame)
+                continue
+
+            if base_event.type == "track.stop":
+                track_stop = LiveRealtimeTrackStopEvent.model_validate(raw_event)
+                runtime.stop_track(
+                    LiveRealtimeTrackStop(
+                        track_id=track_stop.track_id,
+                        source=track_stop.source,
+                        sequence=track_stop.sequence,
+                    )
+                )
+                continue
+
             if base_event.type == "session.finish":
                 LiveRealtimeSessionFinishEvent.model_validate(raw_event)
-                payload = finish_live_session(
-                    live_store=live_store,
-                    session_id=session_id,
-                )
+                payload = runtime.finish()
                 session_response = LiveSessionDetailResponse.model_validate(payload)
                 finished = LiveRealtimeSessionFinishedEvent(
                     type="session.finished",
@@ -332,18 +391,13 @@ async def stream_live_session_endpoint(
                     session=session_response,
                 )
                 await websocket.send_json(finished.model_dump(mode="json"))
-                finished_normally = True
                 await websocket.close(code=LIVE_REALTIME_CLOSE_NORMAL)
                 return
 
-            await _send_realtime_error(
-                websocket,
-                session_id=session_id,
+            raise LiveRealtimeSessionError(
                 code="invalid_event",
                 message="Realtime event is not implemented in this phase",
             )
-            await websocket.close(code=LIVE_REALTIME_CLOSE_POLICY)
-            return
     except ValidationError:
         await _send_realtime_error(
             websocket,
@@ -352,12 +406,16 @@ async def stream_live_session_endpoint(
             message="Realtime event payload is invalid",
         )
         await websocket.close(code=LIVE_REALTIME_CLOSE_POLICY)
+    except LiveRealtimeSessionError as error:
+        await _send_realtime_error(
+            websocket,
+            session_id=session_id,
+            code=error.code,
+            message=error.message,
+        )
+        await websocket.close(code=LIVE_REALTIME_CLOSE_POLICY)
     except WebSocketDisconnect:
-        if handshake_complete and not finished_normally:
-            fail_live_session(
-                live_store=live_store,
-                session_id=session_id,
-                error="connection_closed",
-            )
+        runtime.fail_after_disconnect()
     finally:
+        runtime.release()
         await stream_registry.release(session_id)

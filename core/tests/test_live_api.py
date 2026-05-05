@@ -93,6 +93,62 @@ def _realtime_event(
     }
 
 
+def _track_start_event(
+    session_id: str,
+    *,
+    source: str,
+    sequence: int = 0,
+) -> dict[str, object]:
+    """Build one realtime track start event."""
+    return {
+        **_realtime_event("track.start", session_id),
+        "source": source,
+        "sequence": sequence,
+        "label": source,
+        "device_label": None,
+        "sample_rate": 16000,
+        "channel_count": 1,
+    }
+
+
+def _audio_frame_event(
+    session_id: str,
+    *,
+    track_id: str,
+    source: str,
+    sequence: int,
+) -> dict[str, object]:
+    """Build one realtime audio frame metadata event."""
+    return {
+        **_realtime_event("audio.frame", session_id),
+        "track_id": track_id,
+        "source": source,
+        "sequence": sequence,
+        "captured_at_ms": sequence * 20,
+        "duration_ms": 20,
+        "byte_length": 640,
+        "encoding": "pcm_s16le",
+        "sample_rate": 16000,
+        "channel_count": 1,
+    }
+
+
+def _track_stop_event(
+    session_id: str,
+    *,
+    track_id: str,
+    source: str,
+    sequence: int,
+) -> dict[str, object]:
+    """Build one realtime track stop event."""
+    return {
+        **_realtime_event("track.stop", session_id),
+        "track_id": track_id,
+        "source": source,
+        "sequence": sequence,
+    }
+
+
 def test_list_live_sessions_empty(client: TestClient) -> None:
     """Live session list should return an empty page before any session exists."""
     response = client.get("/api/live/sessions")
@@ -202,6 +258,126 @@ def test_live_realtime_stream_returns_server_ready(client: TestClient) -> None:
         with pytest.raises(WebSocketDisconnect) as close_error:
             websocket.receive_json()
         assert close_error.value.code == 1000
+
+
+def test_live_realtime_stream_handles_track_lifecycle(client: TestClient) -> None:
+    """Live realtime stream should create and stop source tracks."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+
+    with client.websocket_connect(
+        f"/api/live/sessions/{session_id}/stream"
+    ) as websocket:
+        websocket.send_json(_realtime_event("client.hello", session_id))
+        assert websocket.receive_json()["type"] == "server.ready"
+
+        websocket.send_json(_track_start_event(session_id, source="microphone"))
+        microphone_ready = websocket.receive_json()
+        microphone_track_id = str(microphone_ready["track"]["track_id"])
+
+        websocket.send_json(_track_start_event(session_id, source="system"))
+        system_ready = websocket.receive_json()
+        system_track_id = str(system_ready["track"]["track_id"])
+
+        websocket.send_json(
+            _audio_frame_event(
+                session_id,
+                track_id=microphone_track_id,
+                source="microphone",
+                sequence=0,
+            )
+        )
+        websocket.send_bytes(b"\x00" * 640)
+        websocket.send_json(
+            _track_stop_event(
+                session_id,
+                track_id=microphone_track_id,
+                source="microphone",
+                sequence=1,
+            )
+        )
+        websocket.send_json(
+            _track_stop_event(
+                session_id,
+                track_id=system_track_id,
+                source="system",
+                sequence=0,
+            )
+        )
+        websocket.send_json(_realtime_event("session.finish", session_id))
+        finished = websocket.receive_json()
+
+        tracks = sorted(
+            finished["session"]["tracks"],
+            key=lambda track: track["source"],
+        )
+        assert microphone_ready["type"] == "track.ready"
+        assert microphone_ready["track"]["source"] == "microphone"
+        assert system_ready["track"]["source"] == "system"
+        assert finished["type"] == "session.finished"
+        assert [track["source"] for track in tracks] == ["microphone", "system"]
+        assert all(track["ended_at"] is not None for track in tracks)
+
+
+def test_live_realtime_stream_rejects_unknown_track_audio(
+    client: TestClient,
+) -> None:
+    """Live realtime stream should reject audio for unknown tracks."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+
+    with client.websocket_connect(
+        f"/api/live/sessions/{session_id}/stream"
+    ) as websocket:
+        websocket.send_json(_realtime_event("client.hello", session_id))
+        assert websocket.receive_json()["type"] == "server.ready"
+        websocket.send_json(
+            _audio_frame_event(
+                session_id,
+                track_id="missing-track",
+                source="microphone",
+                sequence=0,
+            )
+        )
+        error = websocket.receive_json()
+
+        assert error["type"] == "server.error"
+        assert error["error"]["code"] == "invalid_track"
+        with pytest.raises(WebSocketDisconnect) as close_error:
+            websocket.receive_json()
+        assert close_error.value.code == 1008
+
+
+def test_live_realtime_stream_rejects_audio_sequence_gap(
+    client: TestClient,
+) -> None:
+    """Live realtime stream should reject skipped track frame sequences."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+
+    with client.websocket_connect(
+        f"/api/live/sessions/{session_id}/stream"
+    ) as websocket:
+        websocket.send_json(_realtime_event("client.hello", session_id))
+        assert websocket.receive_json()["type"] == "server.ready"
+        websocket.send_json(_track_start_event(session_id, source="microphone"))
+        track_ready = websocket.receive_json()
+        track_id = str(track_ready["track"]["track_id"])
+        websocket.send_json(
+            _audio_frame_event(
+                session_id,
+                track_id=track_id,
+                source="microphone",
+                sequence=1,
+            )
+        )
+        error = websocket.receive_json()
+
+        assert error["type"] == "server.error"
+        assert error["error"]["code"] == "audio_sequence_invalid"
+        with pytest.raises(WebSocketDisconnect) as close_error:
+            websocket.receive_json()
+        assert close_error.value.code == 1008
 
 
 def test_live_realtime_stream_rejects_missing_session(client: TestClient) -> None:

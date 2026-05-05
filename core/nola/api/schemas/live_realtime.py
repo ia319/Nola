@@ -4,7 +4,7 @@ from typing import Annotated, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from nola.api.schemas.live import LiveSessionDetailResponse
+from nola.api.schemas.live import LiveSessionDetailResponse, LiveTrackResponse
 from nola.application.live.realtime import (
     LIVE_REALTIME_AUDIO_BYTE_ORDER,
     LIVE_REALTIME_AUDIO_CHANNEL_COUNT,
@@ -48,9 +48,9 @@ LiveRealtimeServerEventType: TypeAlias = Literal[
 class LiveRealtimeEventEnvelope(BaseModel):
     """Accept a minimal event envelope for dispatch."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
-    type: str
+    type: LiveRealtimeClientEventType
     protocol_version: int
     session_id: LiveRealtimeSessionId
     event_id: LiveRealtimeEventId
@@ -188,6 +188,13 @@ class LiveRealtimeServerReadyEvent(LiveRealtimeServerBaseEvent):
     type: Literal["server.ready"] = "server.ready"
     audio_contract: LiveRealtimeAudioContract
     session: LiveSessionDetailResponse
+
+
+class LiveRealtimeTrackReadyEvent(LiveRealtimeServerBaseEvent):
+    """Expose one created live track."""
+
+    type: Literal["track.ready"] = "track.ready"
+    track: LiveTrackResponse
 
 
 class LiveRealtimeSessionFinishedEvent(LiveRealtimeServerBaseEvent):
