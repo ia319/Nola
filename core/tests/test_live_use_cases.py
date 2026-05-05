@@ -7,6 +7,7 @@ import pytest
 
 from nola.application.live import (
     create_live_session,
+    fail_live_session,
     finish_live_session,
     get_live_session,
     list_live_sessions,
@@ -593,3 +594,47 @@ def test_finish_live_session_rejects_invalid_status() -> None:
         finish_live_session(live_store=live_store, session_id="live-001")
 
     assert error.value.status_code == 409
+
+
+def test_fail_live_session_fails_active_session() -> None:
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+
+    payload = fail_live_session(
+        live_store=live_store,
+        session_id="live-001",
+        error="connection_closed",
+        timestamp_factory=lambda: "2026-01-01T00:05:00",
+    )
+
+    assert payload["status"] == "failed"
+    assert payload["error"] == "connection_closed"
+    assert payload["ended_at"] == "2026-01-01T00:05:00"
+
+
+def test_fail_live_session_returns_existing_terminal_session() -> None:
+    live_store = FakeLiveStore(
+        sessions={"live-001": _session(session_id="live-001", status="finished")}
+    )
+
+    payload = fail_live_session(
+        live_store=live_store,
+        session_id="live-001",
+        error="connection_closed",
+        timestamp_factory=lambda: "2026-01-01T00:20:00",
+    )
+
+    assert payload["status"] == "finished"
+    assert payload["ended_at"] == "2026-01-01T00:10:00"
+
+
+def test_fail_live_session_raises_when_missing() -> None:
+    live_store = FakeLiveStore()
+
+    with pytest.raises(LiveUseCaseError) as error:
+        fail_live_session(
+            live_store=live_store,
+            session_id="missing",
+            error="connection_closed",
+        )
+
+    assert error.value.status_code == 404
