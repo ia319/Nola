@@ -1,10 +1,13 @@
 """Unit tests for live realtime session runtime state."""
 
+from pathlib import Path
+
 import pytest
 
 from nola.application.live.realtime import (
     LIVE_REALTIME_PROTOCOL_VERSION,
     LiveRealtimeAudioFrameMetadata,
+    LiveRealtimeDiagnosticsWavStart,
     LiveRealtimeSessionError,
     LiveRealtimeSessionRuntime,
     LiveRealtimeTrackStart,
@@ -36,6 +39,25 @@ def _start_event(source: LiveTrackSource = "microphone") -> LiveRealtimeTrackSta
         device_label=None,
         sample_rate=16000,
         channel_count=1,
+    )
+
+
+def _audio_metadata(
+    *,
+    track_id: str = "track-001",
+    source: LiveTrackSource = "microphone",
+    sequence: int = 0,
+    captured_at_ms: int = 0,
+    duration_ms: int = 20,
+    byte_length: int = 640,
+) -> LiveRealtimeAudioFrameMetadata:
+    return LiveRealtimeAudioFrameMetadata(
+        track_id=track_id,
+        source=source,
+        sequence=sequence,
+        captured_at_ms=captured_at_ms,
+        duration_ms=duration_ms,
+        byte_length=byte_length,
     )
 
 
@@ -73,35 +95,17 @@ def test_realtime_session_validates_audio_sequence_and_stop_state() -> None:
     runtime = _runtime(live_store=live_store)
     runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
     runtime.start_track(_start_event())
-    runtime.accept_audio_frame_metadata(
-        LiveRealtimeAudioFrameMetadata(
-            track_id="track-001",
-            source="microphone",
-            sequence=0,
-            captured_at_ms=0,
-            duration_ms=20,
-        )
-    )
+    runtime.accept_audio_frame(_audio_metadata(), b"\x00" * 640)
 
     with pytest.raises(LiveRealtimeSessionError) as repeated_error:
-        runtime.accept_audio_frame_metadata(
-            LiveRealtimeAudioFrameMetadata(
-                track_id="track-001",
-                source="microphone",
-                sequence=0,
-                captured_at_ms=20,
-                duration_ms=20,
-            )
+        runtime.accept_audio_frame(
+            _audio_metadata(sequence=0, captured_at_ms=20),
+            b"\x00" * 640,
         )
     with pytest.raises(LiveRealtimeSessionError) as skipped_error:
-        runtime.accept_audio_frame_metadata(
-            LiveRealtimeAudioFrameMetadata(
-                track_id="track-001",
-                source="microphone",
-                sequence=2,
-                captured_at_ms=20,
-                duration_ms=20,
-            )
+        runtime.accept_audio_frame(
+            _audio_metadata(sequence=2, captured_at_ms=20),
+            b"\x00" * 640,
         )
 
     stopped = runtime.stop_track(
@@ -113,14 +117,9 @@ def test_realtime_session_validates_audio_sequence_and_stop_state() -> None:
     )
 
     with pytest.raises(LiveRealtimeSessionError) as stopped_error:
-        runtime.accept_audio_frame_metadata(
-            LiveRealtimeAudioFrameMetadata(
-                track_id="track-001",
-                source="microphone",
-                sequence=1,
-                captured_at_ms=20,
-                duration_ms=20,
-            )
+        runtime.accept_audio_frame(
+            _audio_metadata(sequence=1, captured_at_ms=20),
+            b"\x00" * 640,
         )
 
     assert repeated_error.value.code == "audio_sequence_invalid"
@@ -137,14 +136,9 @@ def test_realtime_session_rejects_unknown_track() -> None:
     runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
 
     with pytest.raises(LiveRealtimeSessionError) as error:
-        runtime.accept_audio_frame_metadata(
-            LiveRealtimeAudioFrameMetadata(
-                track_id="missing-track",
-                source="microphone",
-                sequence=0,
-                captured_at_ms=0,
-                duration_ms=20,
-            )
+        runtime.accept_audio_frame(
+            _audio_metadata(track_id="missing-track"),
+            b"\x00" * 640,
         )
 
     assert error.value.code == "invalid_track"
@@ -162,3 +156,74 @@ def test_realtime_session_finish_releases_track_state() -> None:
     assert payload["status"] == "finished"
     assert runtime.finished_normally is True
     assert runtime.active_track_count == 0
+
+
+def test_realtime_session_rejects_invalid_pcm_frame_before_state_update() -> None:
+    """Realtime runtime should not advance sequence after invalid PCM data."""
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+    runtime = _runtime(live_store=live_store)
+    runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
+    runtime.start_track(_start_event())
+
+    with pytest.raises(LiveRealtimeSessionError) as error:
+        runtime.accept_audio_frame(_audio_metadata(byte_length=640), b"\x00" * 638)
+
+    runtime.accept_audio_frame(_audio_metadata(byte_length=640), b"\x00" * 640)
+
+    assert error.value.code == "audio_frame_invalid"
+
+
+def test_realtime_session_keeps_wav_diagnostics_off_by_default(
+    tmp_path: Path,
+) -> None:
+    """Realtime runtime should not write WAV diagnostics unless explicitly started."""
+    output_dir = tmp_path / "diagnostics"
+    repository_root = tmp_path / "repo"
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+    runtime = LiveRealtimeSessionRuntime(
+        live_store=live_store,
+        session_id="live-001",
+        track_id_factory=lambda: "track-001",
+        timestamp_factory=lambda: "2026-01-01T00:00:00+00:00",
+        diagnostics_output_dir=output_dir,
+        repository_root=repository_root,
+    )
+    runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
+    runtime.start_track(_start_event())
+
+    runtime.accept_audio_frame(_audio_metadata(), b"\x00" * 640)
+
+    assert not output_dir.exists()
+
+
+def test_realtime_session_writes_explicit_wav_diagnostics(tmp_path: Path) -> None:
+    """Realtime runtime should write track-scoped WAV diagnostics when enabled."""
+    output_dir = tmp_path / "diagnostics"
+    repository_root = tmp_path / "repo"
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+    runtime = LiveRealtimeSessionRuntime(
+        live_store=live_store,
+        session_id="live-001",
+        track_id_factory=lambda: "track-001",
+        timestamp_factory=lambda: "2026-01-01T00:00:00+00:00",
+        diagnostics_output_dir=output_dir,
+        repository_root=repository_root,
+    )
+    runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
+    runtime.start_track(_start_event())
+
+    started = runtime.start_diagnostics_wav(
+        LiveRealtimeDiagnosticsWavStart(
+            max_duration_ms=1000,
+            max_bytes=4096,
+            track_ids=None,
+        )
+    )
+    runtime.accept_audio_frame(_audio_metadata(), b"\x00" * 640)
+    stopped = runtime.stop_diagnostics_wav(reason="client_stop")
+
+    assert started.manifest_path.endswith("manifest.json")
+    assert stopped.reason == "client_stop"
+    assert len(stopped.files) == 1
+    assert stopped.files[0].track_id == "track-001"
+    assert stopped.files[0].duration_ms == 20

@@ -2,15 +2,29 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from uuid import uuid4
 
 from nola.application.live._clock import now_iso
 from nola.application.live.actions import fail_live_session, finish_live_session
 from nola.application.live.contracts import SupportsLiveRepository
 from nola.application.live.payloads import to_live_track_payload
+from nola.application.live.realtime.audio import (
+    LiveRealtimeAudioFrameMetadata,
+    LiveRealtimePcm16Frame,
+    build_pcm16le_frame,
+    validate_pcm16le_frame_metadata,
+)
+from nola.application.live.realtime.diagnostics import (
+    LiveRealtimeDiagnosticsWavStart,
+    LiveRealtimeDiagnosticsWavStarted,
+    LiveRealtimeDiagnosticsWavStopped,
+    LiveRealtimeDiagnosticsWavStopReason,
+    LiveRealtimeWavDiagnosticsSession,
+)
+from nola.application.live.realtime.errors import LiveRealtimeSessionError
 from nola.application.live.realtime.protocol import (
     LIVE_REALTIME_SUPPORTED_PROTOCOL_VERSIONS,
-    LiveRealtimeErrorCode,
 )
 from nola.application.live.types import (
     LiveSessionPayload,
@@ -29,17 +43,6 @@ class LiveRealtimeTrackStart:
     device_label: str | None
     sample_rate: int | None
     channel_count: int | None
-
-
-@dataclass(frozen=True)
-class LiveRealtimeAudioFrameMetadata:
-    """Carry metadata for one track-scoped audio frame."""
-
-    track_id: str
-    source: LiveTrackSource
-    sequence: int
-    captured_at_ms: int
-    duration_ms: int
 
 
 @dataclass(frozen=True)
@@ -63,15 +66,6 @@ class _LiveRealtimeTrackState:
     total_duration_ms: int = 0
 
 
-class LiveRealtimeSessionError(Exception):
-    """Report one stable realtime session error."""
-
-    def __init__(self, *, code: LiveRealtimeErrorCode, message: str) -> None:
-        super().__init__(message)
-        self.code = code
-        self.message = message
-
-
 class LiveRealtimeSessionRuntime:
     """Coordinate one live realtime connection state machine."""
 
@@ -82,14 +76,19 @@ class LiveRealtimeSessionRuntime:
         session_id: str,
         track_id_factory: Callable[[], str] | None = None,
         timestamp_factory: Callable[[], str] | None = None,
+        diagnostics_output_dir: Path | None = None,
+        repository_root: Path | None = None,
     ) -> None:
         self._live_store = live_store
         self._session_id = session_id
         self._track_id_factory = track_id_factory or self._default_track_id
         self._timestamp_factory = timestamp_factory or now_iso
+        self._diagnostics_output_dir = diagnostics_output_dir
+        self._repository_root = repository_root
         self._handshake_complete = False
         self._finished_normally = False
         self._tracks: dict[str, _LiveRealtimeTrackState] = {}
+        self._diagnostics_wav: LiveRealtimeWavDiagnosticsSession | None = None
 
     @property
     def handshake_complete(self) -> bool:
@@ -105,6 +104,11 @@ class LiveRealtimeSessionRuntime:
     def active_track_count(self) -> int:
         """Return the number of open track buffers."""
         return len(self._tracks)
+
+    @property
+    def diagnostics_wav_active(self) -> bool:
+        """Return whether explicit WAV diagnostics capture is active."""
+        return self._diagnostics_wav is not None and self._diagnostics_wav.active
 
     def accept_hello(self, *, protocol_version: int) -> None:
         """Accept the initial client handshake."""
@@ -164,13 +168,26 @@ class LiveRealtimeSessionRuntime:
         )
         return to_live_track_payload(track)
 
-    def accept_audio_frame_metadata(
+    def accept_audio_frame(
         self,
         event: LiveRealtimeAudioFrameMetadata,
-    ) -> None:
-        """Validate one audio frame metadata event and update track state."""
+        payload: bytes,
+    ) -> LiveRealtimePcm16Frame:
+        """Validate one audio frame payload and update track state."""
         state = self._get_expected_audio_track(event)
+        frame = build_pcm16le_frame(metadata=event, payload=payload)
 
+        if self._diagnostics_wav is not None:
+            self._diagnostics_wav.record_frame(frame)
+
+        self._commit_audio_frame_metadata(state, event)
+        return frame
+
+    def _commit_audio_frame_metadata(
+        self,
+        state: _LiveRealtimeTrackState,
+        event: LiveRealtimeAudioFrameMetadata,
+    ) -> None:
         if state.first_frame_start_ms is None:
             state.first_frame_start_ms = event.captured_at_ms
         state.last_frame_end_ms = event.captured_at_ms + event.duration_ms
@@ -183,6 +200,53 @@ class LiveRealtimeSessionRuntime:
     ) -> None:
         """Validate one audio frame metadata event without mutating state."""
         self._get_expected_audio_track(event)
+        validate_pcm16le_frame_metadata(event)
+
+    def start_diagnostics_wav(
+        self,
+        event: LiveRealtimeDiagnosticsWavStart,
+    ) -> LiveRealtimeDiagnosticsWavStarted:
+        """Start explicit real-capture WAV diagnostics."""
+        self._ensure_ready()
+        if self._diagnostics_wav is not None and self._diagnostics_wav.active:
+            raise LiveRealtimeSessionError(
+                code="diagnostics_wav_already_started",
+                message="Diagnostics WAV capture is already active",
+            )
+        if event.track_ids is not None:
+            missing_track_ids = [
+                track_id for track_id in event.track_ids if track_id not in self._tracks
+            ]
+            if missing_track_ids:
+                raise LiveRealtimeSessionError(
+                    code="invalid_track",
+                    message="Diagnostics WAV track is not active",
+                )
+
+        self._diagnostics_wav = LiveRealtimeWavDiagnosticsSession.start(
+            session_id=self._session_id,
+            output_base_dir=self._diagnostics_output_dir,
+            repository_root=self._repository_root,
+            command=event,
+        )
+        return self._diagnostics_wav.started_event()
+
+    def stop_diagnostics_wav(
+        self,
+        *,
+        reason: LiveRealtimeDiagnosticsWavStopReason,
+    ) -> LiveRealtimeDiagnosticsWavStopped:
+        """Stop explicit real-capture WAV diagnostics."""
+        self._ensure_ready()
+        if self._diagnostics_wav is None or not self._diagnostics_wav.active:
+            raise LiveRealtimeSessionError(
+                code="diagnostics_wav_not_started",
+                message="Diagnostics WAV capture is not active",
+            )
+
+        stopped = self._diagnostics_wav.stop(reason=reason)
+        self._diagnostics_wav = None
+        return stopped
 
     def _get_expected_audio_track(
         self,
@@ -225,6 +289,9 @@ class LiveRealtimeSessionRuntime:
     def finish(self) -> LiveSessionPayload:
         """Finish the live session and release connection-local buffers."""
         self._ensure_ready()
+        if self._diagnostics_wav is not None and self._diagnostics_wav.active:
+            self._diagnostics_wav.close_silently(reason="session_finish")
+            self._diagnostics_wav = None
         payload = finish_live_session(
             live_store=self._live_store,
             session_id=self._session_id,
@@ -245,6 +312,9 @@ class LiveRealtimeSessionRuntime:
 
     def release(self) -> None:
         """Clear connection-local track buffers."""
+        if self._diagnostics_wav is not None and self._diagnostics_wav.active:
+            self._diagnostics_wav.close_silently(reason="connection_closed")
+            self._diagnostics_wav = None
         self._tracks.clear()
 
     def _ensure_ready(self) -> None:
