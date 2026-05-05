@@ -262,6 +262,51 @@ def test_live_realtime_stream_returns_server_ready(client: TestClient) -> None:
         assert close_error.value.code == 1000
 
 
+def test_live_realtime_stream_rejects_malformed_hello_json(
+    client: TestClient,
+) -> None:
+    """Live realtime stream should reject malformed hello JSON predictably."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+
+    with client.websocket_connect(
+        f"/api/live/sessions/{session_id}/stream"
+    ) as websocket:
+        websocket.send_text("{")
+        error = websocket.receive_json()
+
+        assert error["type"] == "server.error"
+        assert error["error"]["code"] == "invalid_event"
+        assert error["error"]["message"] == "Realtime event payload is invalid JSON"
+        with pytest.raises(WebSocketDisconnect) as close_error:
+            websocket.receive_json()
+        assert close_error.value.code == 1008
+
+
+def test_live_realtime_stream_rejects_malformed_event_json(
+    client: TestClient,
+) -> None:
+    """Live realtime stream should reject malformed event JSON predictably."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+
+    with client.websocket_connect(
+        f"/api/live/sessions/{session_id}/stream"
+    ) as websocket:
+        websocket.send_json(_realtime_event("client.hello", session_id))
+        assert websocket.receive_json()["type"] == "server.ready"
+
+        websocket.send_text("{")
+        error = websocket.receive_json()
+
+        assert error["type"] == "server.error"
+        assert error["error"]["code"] == "invalid_event"
+        assert error["error"]["message"] == "Realtime event payload is invalid JSON"
+        with pytest.raises(WebSocketDisconnect) as close_error:
+            websocket.receive_json()
+        assert close_error.value.code == 1008
+
+
 def test_live_realtime_stream_handles_track_lifecycle(client: TestClient) -> None:
     """Live realtime stream should create and stop source tracks."""
     created = _create_live_session(client)

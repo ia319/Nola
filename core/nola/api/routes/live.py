@@ -1,5 +1,6 @@
 """Live transcription REST and realtime endpoints."""
 
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Annotated, NoReturn, TypeAlias
 
@@ -65,6 +66,7 @@ from nola.application.live.realtime import (
     ensure_pcm16le_contract,
 )
 from nola.application.live.values import ensure_live_session_status
+from nola.common.types import JsonValue
 
 router = APIRouter(prefix="/api/live", tags=["live"])
 LiveStoreDependency: TypeAlias = Annotated[SupportsLiveRepository, Depends(get_live_db)]
@@ -102,6 +104,18 @@ async def _send_realtime_error(
         message=message,
     )
     await websocket.send_json(event.model_dump(mode="json"))
+
+
+async def _receive_realtime_json(websocket: WebSocket) -> JsonValue:
+    """Receive one client JSON event and normalize malformed JSON."""
+    try:
+        event: JsonValue = await websocket.receive_json()
+        return event
+    except JSONDecodeError as error:
+        raise LiveRealtimeSessionError(
+            code="invalid_event",
+            message="Realtime event payload is invalid JSON",
+        ) from error
 
 
 async def _receive_audio_payload(websocket: WebSocket) -> bytes:
@@ -304,7 +318,7 @@ async def stream_live_session_endpoint(
             diagnostics_output_dir=diagnostics_output_dir,
         )
 
-        raw_hello = await websocket.receive_json()
+        raw_hello = await _receive_realtime_json(websocket)
         base_hello = LiveRealtimeEventEnvelope.model_validate(raw_hello)
         if base_hello.session_id != session_id:
             raise LiveRealtimeSessionError(
@@ -332,7 +346,7 @@ async def stream_live_session_endpoint(
         await websocket.send_json(ready.model_dump(mode="json"))
 
         while True:
-            raw_event = await websocket.receive_json()
+            raw_event = await _receive_realtime_json(websocket)
             base_event = LiveRealtimeEventEnvelope.model_validate(raw_event)
             if base_event.session_id != session_id:
                 raise LiveRealtimeSessionError(
