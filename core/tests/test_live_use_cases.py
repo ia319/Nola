@@ -150,6 +150,19 @@ class FakeLiveStore:
         self.tracks.setdefault(session_id, []).append(track)
         return track.copy()
 
+    def finish_track(
+        self,
+        track_id: str,
+        session_id: str,
+        *,
+        ended_at: str,
+    ) -> LiveTrackRecord | None:
+        for track in self.tracks.get(session_id, []):
+            if track["id"] == track_id and track["ended_at"] is None:
+                track["ended_at"] = ended_at
+                return track.copy()
+        return None
+
     def list_tracks(self, session_id: str) -> list[LiveTrackRecord]:
         tracks = sorted(
             self.tracks.get(session_id, []),

@@ -103,6 +103,16 @@ class SupportsLiveTrackMutations(Protocol):
         """Create one live audio track and return its stored snapshot."""
         ...
 
+    def finish_track(
+        self,
+        track_id: str,
+        session_id: str,
+        *,
+        ended_at: str,
+    ) -> LiveTrackRecord | None:
+        """Mark one active live track finished and return the updated snapshot."""
+        ...
+
 
 class SupportsLiveSegmentQueries(Protocol):
     """Expose live segment reads required by live use-cases."""
