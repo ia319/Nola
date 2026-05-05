@@ -49,6 +49,10 @@ from nola.api.schemas.live_realtime import (
     LiveRealtimeTrackReadyEvent,
     LiveRealtimeTrackStartEvent,
     LiveRealtimeTrackStopEvent,
+    LiveRealtimeTranscriptFinalEvent,
+    LiveRealtimeTranscriptFinalPayload,
+    LiveRealtimeTranscriptPartialEvent,
+    LiveRealtimeTranscriptPartialPayload,
 )
 from nola.api.schemas.responses import (
     BatchTaskActionResponse,
@@ -110,6 +114,10 @@ __all__ = [
     "LiveRealtimeServerReadyEvent",
     "LiveRealtimeSessionFinishEvent",
     "LiveRealtimeSessionFinishedEvent",
+    "LiveRealtimeTranscriptFinalEvent",
+    "LiveRealtimeTranscriptFinalPayload",
+    "LiveRealtimeTranscriptPartialEvent",
+    "LiveRealtimeTranscriptPartialPayload",
     "LiveRealtimeTrackReadyEvent",
     "LiveRealtimeTrackStartEvent",
     "LiveRealtimeTrackStopEvent",

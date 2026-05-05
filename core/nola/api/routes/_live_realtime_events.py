@@ -14,6 +14,10 @@ from nola.api.schemas.live_realtime import (
     LiveRealtimeServerReadyEvent,
     LiveRealtimeSessionFinishedEvent,
     LiveRealtimeTrackReadyEvent,
+    LiveRealtimeTranscriptFinalEvent,
+    LiveRealtimeTranscriptFinalPayload,
+    LiveRealtimeTranscriptPartialEvent,
+    LiveRealtimeTranscriptPartialPayload,
 )
 from nola.application.live._clock import now_iso
 from nola.application.live.realtime import (
@@ -21,6 +25,8 @@ from nola.application.live.realtime import (
     LiveRealtimeDiagnosticsWavStarted,
     LiveRealtimeDiagnosticsWavStopped,
     LiveRealtimeErrorCode,
+    LiveRealtimeTranscriptFinal,
+    LiveRealtimeTranscriptPartial,
 )
 
 
@@ -132,6 +138,61 @@ def build_realtime_pong_event(*, session_id: str) -> LiveRealtimeServerPongEvent
         session_id=session_id,
         event_id=_server_event_id(),
         sent_at=now_iso(),
+    )
+
+
+def build_transcript_partial_event(
+    *,
+    session_id: str,
+    partial: LiveRealtimeTranscriptPartial,
+) -> LiveRealtimeTranscriptPartialEvent:
+    """Build a realtime partial transcript event."""
+    return LiveRealtimeTranscriptPartialEvent(
+        type="transcript.partial",
+        protocol_version=LIVE_REALTIME_PROTOCOL_VERSION,
+        session_id=session_id,
+        event_id=_server_event_id(),
+        sent_at=now_iso(),
+        transcript=LiveRealtimeTranscriptPartialPayload(
+            track_id=partial.track_id,
+            source=partial.source,
+            partial_index=partial.partial_index,
+            start_ms=partial.start_ms,
+            end_ms=partial.end_ms,
+            text=partial.text,
+            language=partial.language,
+            confidence=partial.confidence,
+            is_final=False,
+        ),
+    )
+
+
+def build_transcript_final_event(
+    *,
+    session_id: str,
+    final: LiveRealtimeTranscriptFinal,
+) -> LiveRealtimeTranscriptFinalEvent:
+    """Build a realtime final transcript event."""
+    return LiveRealtimeTranscriptFinalEvent(
+        type="transcript.final",
+        protocol_version=LIVE_REALTIME_PROTOCOL_VERSION,
+        session_id=session_id,
+        event_id=_server_event_id(),
+        sent_at=now_iso(),
+        transcript=LiveRealtimeTranscriptFinalPayload(
+            segment_id=final.segment_id,
+            session_id=final.session_id,
+            track_id=final.track_id,
+            source=final.source,
+            sequence=final.sequence,
+            start_ms=final.start_ms,
+            end_ms=final.end_ms,
+            text=final.text,
+            language=final.language,
+            confidence=final.confidence,
+            is_final=True,
+            created_at=final.created_at,
+        ),
     )
 
 

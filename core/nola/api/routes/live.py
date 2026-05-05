@@ -20,6 +20,8 @@ from nola.api.routes._live_realtime_events import (
     build_server_ready_event,
     build_session_finished_event,
     build_track_ready_event,
+    build_transcript_final_event,
+    build_transcript_partial_event,
 )
 from nola.api.schemas import (
     CreateLiveSessionRequest,
@@ -58,6 +60,7 @@ from nola.application.live.realtime import (
     LiveRealtimeSessionRuntime,
     LiveRealtimeTrackStart,
     LiveRealtimeTrackStop,
+    LiveRealtimeTranscriptPartial,
     LiveStreamConnectionRegistry,
     ensure_pcm16le_contract,
 )
@@ -385,7 +388,25 @@ async def stream_live_session_endpoint(
                 )
                 runtime.validate_audio_frame_metadata(audio_frame)
                 audio_payload = await _receive_audio_payload(websocket)
-                runtime.accept_audio_frame(audio_frame, audio_payload)
+                transcript_events = runtime.accept_audio_frame(
+                    audio_frame,
+                    audio_payload,
+                )
+                for transcript_event in transcript_events:
+                    if isinstance(transcript_event, LiveRealtimeTranscriptPartial):
+                        await websocket.send_json(
+                            build_transcript_partial_event(
+                                session_id=session_id,
+                                partial=transcript_event,
+                            ).model_dump(mode="json")
+                        )
+                    else:
+                        await websocket.send_json(
+                            build_transcript_final_event(
+                                session_id=session_id,
+                                final=transcript_event,
+                            ).model_dump(mode="json")
+                        )
                 continue
 
             if base_event.type == "diagnostics.wav.start":

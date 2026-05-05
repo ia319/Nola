@@ -241,6 +241,51 @@ class LiveRealtimeDiagnosticsWavStoppedEvent(LiveRealtimeServerBaseEvent):
     reason: LiveRealtimeDiagnosticsWavStopReason
 
 
+class LiveRealtimeTranscriptPartialPayload(BaseModel):
+    """Expose one non-persisted realtime partial transcript."""
+
+    track_id: LiveRealtimeTrackId
+    source: LiveTrackSource
+    partial_index: int = Field(ge=1)
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(ge=0)
+    text: str
+    language: str | None = None
+    confidence: float | None = None
+    is_final: Literal[False] = False
+
+
+class LiveRealtimeTranscriptFinalPayload(BaseModel):
+    """Expose one persisted realtime final transcript."""
+
+    segment_id: str
+    session_id: LiveRealtimeSessionId
+    track_id: LiveRealtimeTrackId
+    source: LiveTrackSource
+    sequence: int = Field(ge=1)
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(ge=0)
+    text: str
+    language: str | None = None
+    confidence: float | None = None
+    is_final: Literal[True] = True
+    created_at: str
+
+
+class LiveRealtimeTranscriptPartialEvent(LiveRealtimeServerBaseEvent):
+    """Expose one realtime partial transcript event."""
+
+    type: Literal["transcript.partial"] = "transcript.partial"
+    transcript: LiveRealtimeTranscriptPartialPayload
+
+
+class LiveRealtimeTranscriptFinalEvent(LiveRealtimeServerBaseEvent):
+    """Expose one realtime final transcript event."""
+
+    type: Literal["transcript.final"] = "transcript.final"
+    transcript: LiveRealtimeTranscriptFinalPayload
+
+
 class LiveRealtimeSessionFinishedEvent(LiveRealtimeServerBaseEvent):
     """Expose a realtime session finish response."""
 

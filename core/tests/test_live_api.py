@@ -321,6 +321,75 @@ def test_live_realtime_stream_handles_track_lifecycle(client: TestClient) -> Non
         assert all(track["ended_at"] is not None for track in tracks)
 
 
+def test_live_realtime_stream_emits_mock_transcripts(
+    client: TestClient,
+) -> None:
+    """Live realtime stream should emit partials and persist final segments."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+
+    with client.websocket_connect(
+        f"/api/live/sessions/{session_id}/stream"
+    ) as websocket:
+        websocket.send_json(_realtime_event("client.hello", session_id))
+        assert websocket.receive_json()["type"] == "server.ready"
+        websocket.send_json(_track_start_event(session_id, source="microphone"))
+        track_ready = websocket.receive_json()
+        track_id = str(track_ready["track"]["track_id"])
+
+        for sequence in range(25):
+            websocket.send_json(
+                _audio_frame_event(
+                    session_id,
+                    track_id=track_id,
+                    source="microphone",
+                    sequence=sequence,
+                )
+            )
+            websocket.send_bytes(b"\x00" * 640)
+
+        partial = websocket.receive_json()
+        interim_detail = client.get(f"/api/live/sessions/{session_id}").json()
+
+        for sequence in range(25, 50):
+            websocket.send_json(
+                _audio_frame_event(
+                    session_id,
+                    track_id=track_id,
+                    source="microphone",
+                    sequence=sequence,
+                )
+            )
+            websocket.send_bytes(b"\x00" * 640)
+
+        final = websocket.receive_json()
+        websocket.send_json(_realtime_event("session.finish", session_id))
+        finished = websocket.receive_json()
+
+    assert partial["type"] == "transcript.partial"
+    assert partial["transcript"]["track_id"] == track_id
+    assert partial["transcript"]["source"] == "microphone"
+    assert partial["transcript"]["partial_index"] == 1
+    assert partial["transcript"]["start_ms"] == 0
+    assert partial["transcript"]["end_ms"] == 500
+    assert partial["transcript"]["text"] == "Mock microphone partial 1"
+    assert partial["transcript"]["is_final"] is False
+    assert interim_detail["segment_total"] == 0
+    assert interim_detail["segments"] == []
+
+    assert final["type"] == "transcript.final"
+    assert final["transcript"]["track_id"] == track_id
+    assert final["transcript"]["source"] == "microphone"
+    assert final["transcript"]["sequence"] == 1
+    assert final["transcript"]["start_ms"] == 0
+    assert final["transcript"]["end_ms"] == 1000
+    assert final["transcript"]["text"] == "Mock microphone segment 1"
+    assert final["transcript"]["is_final"] is True
+    assert finished["type"] == "session.finished"
+    assert finished["session"]["segment_total"] == 1
+    assert finished["session"]["segments"][0]["text"] == "Mock microphone segment 1"
+
+
 def test_live_realtime_stream_rejects_unknown_track_audio(
     client: TestClient,
 ) -> None:
