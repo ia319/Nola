@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from nola.application.live.realtime import LiveStreamConnectionRegistry
 from nola.application.models import ModelOperationLocks
 from nola.common.event_bus import EventBus, event_bus
 from nola.config import settings
@@ -25,6 +26,12 @@ def get_task_db() -> TaskDatabase:
 def get_live_db() -> LiveDatabase:
     """Get live database instance (singleton)."""
     return LiveDatabase(settings.db_path)
+
+
+@lru_cache
+def get_live_stream_connection_registry() -> LiveStreamConnectionRegistry:
+    """Get live stream connection registry instance."""
+    return LiveStreamConnectionRegistry()
 
 
 @lru_cache
