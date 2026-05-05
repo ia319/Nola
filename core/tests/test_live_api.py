@@ -6,9 +6,17 @@ from unittest.mock import PropertyMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
-from nola.api.deps import get_app_config_db, get_file_db, get_live_db, get_task_db
+from nola.api.deps import (
+    get_app_config_db,
+    get_file_db,
+    get_live_db,
+    get_live_stream_connection_registry,
+    get_task_db,
+)
 from nola.application.live import DEFAULT_LIVE_SESSION_LIMIT, LiveSessionRecord
+from nola.application.live.realtime import LIVE_REALTIME_PROTOCOL_VERSION
 from nola.config.settings import Settings
 from nola.main import app
 from nola.models import init_db
@@ -21,6 +29,7 @@ def client() -> TestClient:
     get_app_config_db.cache_clear()
     get_file_db.cache_clear()
     get_live_db.cache_clear()
+    get_live_stream_connection_registry.cache_clear()
     get_task_db.cache_clear()
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -50,6 +59,7 @@ def client() -> TestClient:
     get_app_config_db.cache_clear()
     get_file_db.cache_clear()
     get_live_db.cache_clear()
+    get_live_stream_connection_registry.cache_clear()
     get_task_db.cache_clear()
 
 
@@ -65,6 +75,22 @@ def _create_live_session(client: TestClient) -> dict[str, object]:
     )
     assert response.status_code == 200
     return response.json()
+
+
+def _realtime_event(
+    event_type: str,
+    session_id: str,
+    *,
+    protocol_version: int = LIVE_REALTIME_PROTOCOL_VERSION,
+) -> dict[str, object]:
+    """Build one realtime client event envelope."""
+    return {
+        "type": event_type,
+        "protocol_version": protocol_version,
+        "session_id": session_id,
+        "event_id": f"{event_type}-event",
+        "sent_at": "2026-01-01T00:00:00+00:00",
+    }
 
 
 def test_list_live_sessions_empty(client: TestClient) -> None:
@@ -143,6 +169,141 @@ def test_create_list_get_and_finish_live_session(client: TestClient) -> None:
     assert finish_response.json()["ended_at"] is not None
     assert repeated_finish_response.status_code == 200
     assert repeated_finish_response.json()["status"] == "finished"
+
+
+def test_live_realtime_stream_returns_server_ready(client: TestClient) -> None:
+    """Live realtime stream should expose protocol and session metadata."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+
+    with client.websocket_connect(
+        f"/api/live/sessions/{session_id}/stream"
+    ) as websocket:
+        websocket.send_json(_realtime_event("client.hello", session_id))
+        ready = websocket.receive_json()
+        websocket.send_json(_realtime_event("session.finish", session_id))
+        finished = websocket.receive_json()
+
+        assert ready["type"] == "server.ready"
+        assert ready["protocol_version"] == LIVE_REALTIME_PROTOCOL_VERSION
+        assert ready["session_id"] == session_id
+        assert ready["audio_contract"] == {
+            "encoding": "pcm_s16le",
+            "byte_order": "little_endian",
+            "sample_rate": 16000,
+            "channel_count": 1,
+            "frame_duration_ms_min": 20,
+            "frame_duration_ms_max": 100,
+        }
+        assert ready["session"]["session_id"] == session_id
+        assert finished["type"] == "session.finished"
+        assert finished["session"]["status"] == "finished"
+
+        with pytest.raises(WebSocketDisconnect) as close_error:
+            websocket.receive_json()
+        assert close_error.value.code == 1000
+
+
+def test_live_realtime_stream_rejects_missing_session(client: TestClient) -> None:
+    """Live realtime stream should reject unknown sessions."""
+    with client.websocket_connect(
+        "/api/live/sessions/missing-session/stream"
+    ) as websocket:
+        error = websocket.receive_json()
+
+        assert error["type"] == "server.error"
+        assert error["error"]["code"] == "session_not_found"
+        with pytest.raises(WebSocketDisconnect) as close_error:
+            websocket.receive_json()
+        assert close_error.value.code == 4404
+
+
+def test_live_realtime_stream_rejects_non_active_session(client: TestClient) -> None:
+    """Live realtime stream should reject terminal sessions."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+    finish_response = client.post(f"/api/live/sessions/{session_id}/finish")
+    assert finish_response.status_code == 200
+
+    with client.websocket_connect(
+        f"/api/live/sessions/{session_id}/stream"
+    ) as websocket:
+        error = websocket.receive_json()
+
+        assert error["type"] == "server.error"
+        assert error["error"]["code"] == "session_not_active"
+        with pytest.raises(WebSocketDisconnect) as close_error:
+            websocket.receive_json()
+        assert close_error.value.code == 4409
+
+
+def test_live_realtime_stream_rejects_second_writer(client: TestClient) -> None:
+    """Live realtime stream should reject a second writer for one session."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+
+    with client.websocket_connect(f"/api/live/sessions/{session_id}/stream") as first:
+        first.send_json(_realtime_event("client.hello", session_id))
+        assert first.receive_json()["type"] == "server.ready"
+
+        with client.websocket_connect(
+            f"/api/live/sessions/{session_id}/stream"
+        ) as second:
+            error = second.receive_json()
+            assert error["type"] == "server.error"
+            assert error["error"]["code"] == "session_already_streaming"
+            with pytest.raises(WebSocketDisconnect) as close_error:
+                second.receive_json()
+            assert close_error.value.code == 4409
+
+        first.send_json(_realtime_event("session.finish", session_id))
+        assert first.receive_json()["type"] == "session.finished"
+
+
+def test_live_realtime_stream_rejects_unsupported_protocol(
+    client: TestClient,
+) -> None:
+    """Live realtime stream should reject unsupported protocol versions."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+
+    with client.websocket_connect(
+        f"/api/live/sessions/{session_id}/stream"
+    ) as websocket:
+        websocket.send_json(
+            _realtime_event("client.hello", session_id, protocol_version=999)
+        )
+        error = websocket.receive_json()
+
+        assert error["type"] == "server.error"
+        assert error["error"]["code"] == "protocol_version_unsupported"
+        with pytest.raises(WebSocketDisconnect) as close_error:
+            websocket.receive_json()
+        assert close_error.value.code == 1008
+
+    detail_response = client.get(f"/api/live/sessions/{session_id}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["status"] == "active"
+
+
+def test_live_realtime_stream_marks_session_failed_after_disconnect(
+    client: TestClient,
+) -> None:
+    """Live realtime stream should fail active sessions after unexpected close."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+
+    with client.websocket_connect(
+        f"/api/live/sessions/{session_id}/stream"
+    ) as websocket:
+        websocket.send_json(_realtime_event("client.hello", session_id))
+        assert websocket.receive_json()["type"] == "server.ready"
+
+    detail_response = client.get(f"/api/live/sessions/{session_id}")
+
+    assert detail_response.status_code == 200
+    assert detail_response.json()["status"] == "failed"
+    assert detail_response.json()["error"] == "connection_closed"
 
 
 def test_get_live_session_returns_paged_segments(client: TestClient) -> None:
