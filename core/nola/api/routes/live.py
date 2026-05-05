@@ -1,33 +1,41 @@
 """Live transcription REST and realtime endpoints."""
 
+from pathlib import Path
 from typing import Annotated, NoReturn, TypeAlias
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket
 from pydantic import ValidationError
 from starlette.websockets import WebSocketDisconnect
 
-from nola.api.deps import get_live_db, get_live_stream_connection_registry
+from nola.api.deps import (
+    get_live_db,
+    get_live_diagnostics_output_dir,
+    get_live_stream_connection_registry,
+)
+from nola.api.routes._live_realtime_events import (
+    build_diagnostics_wav_started_event,
+    build_diagnostics_wav_stopped_event,
+    build_realtime_error_event,
+    build_realtime_pong_event,
+    build_server_ready_event,
+    build_session_finished_event,
+    build_track_ready_event,
+)
 from nola.api.schemas import (
     CreateLiveSessionRequest,
-    LiveRealtimeAudioContract,
     LiveRealtimeAudioFrameMetadataEvent,
     LiveRealtimeClientHelloEvent,
     LiveRealtimeClientPingEvent,
-    LiveRealtimeErrorPayload,
+    LiveRealtimeDiagnosticsWavStopEvent,
     LiveRealtimeEventEnvelope,
-    LiveRealtimeServerErrorEvent,
-    LiveRealtimeServerPongEvent,
-    LiveRealtimeServerReadyEvent,
-    LiveRealtimeSessionFinishedEvent,
     LiveRealtimeSessionFinishEvent,
-    LiveRealtimeTrackReadyEvent,
     LiveRealtimeTrackStartEvent,
     LiveRealtimeTrackStopEvent,
     LiveSessionDetailResponse,
     LiveSessionListResponse,
     LiveTrackResponse,
 )
+from nola.api.schemas.live_realtime import LiveRealtimeDiagnosticsWavStartEvent
 from nola.application.live import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
     DEFAULT_LIVE_SESSION_LIMIT,
@@ -42,16 +50,16 @@ from nola.application.live import (
     get_live_session,
     list_live_sessions,
 )
-from nola.application.live._clock import now_iso
 from nola.application.live.realtime import (
-    LIVE_REALTIME_PROTOCOL_VERSION,
     LiveRealtimeAudioFrameMetadata,
+    LiveRealtimeDiagnosticsWavStart,
     LiveRealtimeErrorCode,
     LiveRealtimeSessionError,
     LiveRealtimeSessionRuntime,
     LiveRealtimeTrackStart,
     LiveRealtimeTrackStop,
     LiveStreamConnectionRegistry,
+    ensure_pcm16le_contract,
 )
 from nola.application.live.values import ensure_live_session_status
 
@@ -60,6 +68,10 @@ LiveStoreDependency: TypeAlias = Annotated[SupportsLiveRepository, Depends(get_l
 LiveStreamRegistryDependency: TypeAlias = Annotated[
     LiveStreamConnectionRegistry,
     Depends(get_live_stream_connection_registry),
+]
+LiveDiagnosticsOutputDependency: TypeAlias = Annotated[
+    Path,
+    Depends(get_live_diagnostics_output_dir),
 ]
 
 LIVE_REALTIME_CLOSE_NORMAL = 1000
@@ -73,11 +85,6 @@ def _raise_live_http_error(error: LiveUseCaseError) -> NoReturn:
     raise HTTPException(status_code=error.status_code, detail=error.detail) from error
 
 
-def _event_id() -> str:
-    """Create one server event id."""
-    return f"server-{uuid4()}"
-
-
 async def _send_realtime_error(
     websocket: WebSocket,
     *,
@@ -86,18 +93,15 @@ async def _send_realtime_error(
     message: str,
 ) -> None:
     """Send one realtime protocol error event."""
-    event = LiveRealtimeServerErrorEvent(
-        type="server.error",
-        protocol_version=LIVE_REALTIME_PROTOCOL_VERSION,
+    event = build_realtime_error_event(
         session_id=session_id,
-        event_id=_event_id(),
-        sent_at=now_iso(),
-        error=LiveRealtimeErrorPayload(code=code, message=message),
+        code=code,
+        message=message,
     )
     await websocket.send_json(event.model_dump(mode="json"))
 
 
-async def _ensure_audio_payload(websocket: WebSocket) -> None:
+async def _receive_audio_payload(websocket: WebSocket) -> bytes:
     """Require the binary payload that follows audio.frame metadata."""
     message = await websocket.receive()
     if message["type"] == "websocket.disconnect":
@@ -109,6 +113,7 @@ async def _ensure_audio_payload(websocket: WebSocket) -> None:
             code="audio_frame_invalid",
             message="Audio frame metadata must be followed by a binary payload",
         )
+    return payload
 
 
 @router.post(
@@ -229,6 +234,7 @@ async def stream_live_session_endpoint(
     session_id: str,
     live_store: LiveStoreDependency,
     stream_registry: LiveStreamRegistryDependency,
+    diagnostics_output_dir: LiveDiagnosticsOutputDependency,
 ) -> None:
     """Handle one live realtime WebSocket stream."""
     await websocket.accept()
@@ -292,6 +298,7 @@ async def stream_live_session_endpoint(
         runtime = LiveRealtimeSessionRuntime(
             live_store=live_store,
             session_id=session_id,
+            diagnostics_output_dir=diagnostics_output_dir,
         )
 
         raw_hello = await websocket.receive_json()
@@ -315,13 +322,8 @@ async def stream_live_session_endpoint(
             session_id=session_id,
         )
         session_response = LiveSessionDetailResponse.model_validate(session_payload)
-        ready = LiveRealtimeServerReadyEvent(
-            type="server.ready",
-            protocol_version=LIVE_REALTIME_PROTOCOL_VERSION,
+        ready = build_server_ready_event(
             session_id=session_id,
-            event_id=_event_id(),
-            sent_at=now_iso(),
-            audio_contract=LiveRealtimeAudioContract(),
             session=session_response,
         )
         await websocket.send_json(ready.model_dump(mode="json"))
@@ -341,13 +343,7 @@ async def stream_live_session_endpoint(
 
             if base_event.type == "client.ping":
                 LiveRealtimeClientPingEvent.model_validate(raw_event)
-                pong = LiveRealtimeServerPongEvent(
-                    type="server.pong",
-                    protocol_version=LIVE_REALTIME_PROTOCOL_VERSION,
-                    session_id=session_id,
-                    event_id=_event_id(),
-                    sent_at=now_iso(),
-                )
+                pong = build_realtime_pong_event(session_id=session_id)
                 await websocket.send_json(pong.model_dump(mode="json"))
                 continue
 
@@ -363,12 +359,8 @@ async def stream_live_session_endpoint(
                         channel_count=track_start.channel_count,
                     )
                 )
-                track_ready = LiveRealtimeTrackReadyEvent(
-                    type="track.ready",
-                    protocol_version=LIVE_REALTIME_PROTOCOL_VERSION,
+                track_ready = build_track_ready_event(
                     session_id=session_id,
-                    event_id=_event_id(),
-                    sent_at=now_iso(),
                     track=LiveTrackResponse.model_validate(track_payload),
                 )
                 await websocket.send_json(track_ready.model_dump(mode="json"))
@@ -378,16 +370,54 @@ async def stream_live_session_endpoint(
                 frame_metadata = LiveRealtimeAudioFrameMetadataEvent.model_validate(
                     raw_event
                 )
+                ensure_pcm16le_contract(
+                    encoding=frame_metadata.encoding,
+                    sample_rate=frame_metadata.sample_rate,
+                    channel_count=frame_metadata.channel_count,
+                )
                 audio_frame = LiveRealtimeAudioFrameMetadata(
                     track_id=frame_metadata.track_id,
                     source=frame_metadata.source,
                     sequence=frame_metadata.sequence,
                     captured_at_ms=frame_metadata.captured_at_ms,
                     duration_ms=frame_metadata.duration_ms,
+                    byte_length=frame_metadata.byte_length,
                 )
                 runtime.validate_audio_frame_metadata(audio_frame)
-                await _ensure_audio_payload(websocket)
-                runtime.accept_audio_frame_metadata(audio_frame)
+                audio_payload = await _receive_audio_payload(websocket)
+                runtime.accept_audio_frame(audio_frame, audio_payload)
+                continue
+
+            if base_event.type == "diagnostics.wav.start":
+                diagnostics_start = LiveRealtimeDiagnosticsWavStartEvent.model_validate(
+                    raw_event
+                )
+                started = runtime.start_diagnostics_wav(
+                    LiveRealtimeDiagnosticsWavStart(
+                        max_duration_ms=diagnostics_start.max_duration_ms,
+                        max_bytes=diagnostics_start.max_bytes,
+                        track_ids=(
+                            tuple(diagnostics_start.tracks)
+                            if diagnostics_start.tracks is not None
+                            else None
+                        ),
+                    )
+                )
+                started_event = build_diagnostics_wav_started_event(
+                    session_id=session_id,
+                    started=started,
+                )
+                await websocket.send_json(started_event.model_dump(mode="json"))
+                continue
+
+            if base_event.type == "diagnostics.wav.stop":
+                LiveRealtimeDiagnosticsWavStopEvent.model_validate(raw_event)
+                stopped = runtime.stop_diagnostics_wav(reason="client_stop")
+                stopped_event = build_diagnostics_wav_stopped_event(
+                    session_id=session_id,
+                    stopped=stopped,
+                )
+                await websocket.send_json(stopped_event.model_dump(mode="json"))
                 continue
 
             if base_event.type == "track.stop":
@@ -403,14 +433,21 @@ async def stream_live_session_endpoint(
 
             if base_event.type == "session.finish":
                 LiveRealtimeSessionFinishEvent.model_validate(raw_event)
-                payload = runtime.finish()
-                session_response = LiveSessionDetailResponse.model_validate(payload)
-                finished = LiveRealtimeSessionFinishedEvent(
-                    type="session.finished",
-                    protocol_version=LIVE_REALTIME_PROTOCOL_VERSION,
+                if runtime.diagnostics_wav_active:
+                    stopped = runtime.stop_diagnostics_wav(reason="session_finish")
+                    await websocket.send_json(
+                        build_diagnostics_wav_stopped_event(
+                            session_id=session_id,
+                            stopped=stopped,
+                        ).model_dump(mode="json")
+                    )
+
+                finish_payload = runtime.finish()
+                session_response = LiveSessionDetailResponse.model_validate(
+                    finish_payload
+                )
+                finished = build_session_finished_event(
                     session_id=session_id,
-                    event_id=_event_id(),
-                    sent_at=now_iso(),
                     session=session_response,
                 )
                 await websocket.send_json(finished.model_dump(mode="json"))

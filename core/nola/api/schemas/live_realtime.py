@@ -9,9 +9,12 @@ from nola.application.live.realtime import (
     LIVE_REALTIME_AUDIO_BYTE_ORDER,
     LIVE_REALTIME_AUDIO_CHANNEL_COUNT,
     LIVE_REALTIME_AUDIO_ENCODING,
+    LIVE_REALTIME_AUDIO_FRAME_MAX_BYTES,
     LIVE_REALTIME_AUDIO_FRAME_MAX_MS,
     LIVE_REALTIME_AUDIO_FRAME_MIN_MS,
     LIVE_REALTIME_AUDIO_SAMPLE_RATE,
+    LIVE_REALTIME_DIAGNOSTICS_WAV_DEFAULT_MAX_BYTES,
+    LIVE_REALTIME_DIAGNOSTICS_WAV_DEFAULT_MAX_DURATION_MS,
     LiveRealtimeErrorCode,
 )
 from nola.application.live.types import LiveTrackSource
@@ -42,6 +45,13 @@ LiveRealtimeServerEventType: TypeAlias = Literal[
     "session.finished",
     "server.error",
     "server.pong",
+]
+LiveRealtimeDiagnosticsWavStopReason: TypeAlias = Literal[
+    "client_stop",
+    "session_finish",
+    "connection_closed",
+    "limit_exceeded",
+    "write_failed",
 ]
 
 
@@ -131,9 +141,9 @@ class LiveRealtimeAudioFrameMetadataEvent(LiveRealtimeClientBaseEvent):
     captured_at_ms: int = Field(ge=0)
     duration_ms: int = Field(ge=1)
     byte_length: int = Field(ge=1)
-    encoding: Literal["pcm_s16le"] = LIVE_REALTIME_AUDIO_ENCODING
-    sample_rate: Literal[16000] = LIVE_REALTIME_AUDIO_SAMPLE_RATE
-    channel_count: Literal[1] = LIVE_REALTIME_AUDIO_CHANNEL_COUNT
+    encoding: str = Field(LIVE_REALTIME_AUDIO_ENCODING, min_length=1, max_length=32)
+    sample_rate: int = Field(LIVE_REALTIME_AUDIO_SAMPLE_RATE, ge=1)
+    channel_count: int = Field(LIVE_REALTIME_AUDIO_CHANNEL_COUNT, ge=1)
 
 
 class LiveRealtimeDiagnosticsWavStartEvent(LiveRealtimeClientBaseEvent):
@@ -143,7 +153,7 @@ class LiveRealtimeDiagnosticsWavStartEvent(LiveRealtimeClientBaseEvent):
     output_target: LiveRealtimeDiagnosticsOutputTarget | None = None
     max_duration_ms: int | None = Field(None, ge=1)
     max_bytes: int | None = Field(None, ge=1)
-    tracks: list[LiveRealtimeTrackId] | None = None
+    tracks: list[LiveRealtimeTrackId] | None = Field(None, min_length=1)
 
 
 class LiveRealtimeDiagnosticsWavStopEvent(LiveRealtimeClientBaseEvent):
@@ -173,6 +183,18 @@ class LiveRealtimeAudioContract(BaseModel):
     channel_count: Literal[1] = LIVE_REALTIME_AUDIO_CHANNEL_COUNT
     frame_duration_ms_min: int = LIVE_REALTIME_AUDIO_FRAME_MIN_MS
     frame_duration_ms_max: int = LIVE_REALTIME_AUDIO_FRAME_MAX_MS
+    frame_payload_bytes_max: int = LIVE_REALTIME_AUDIO_FRAME_MAX_BYTES
+
+
+class LiveRealtimeDiagnosticsWavFileResponse(BaseModel):
+    """Expose one diagnostics WAV file."""
+
+    track_id: LiveRealtimeTrackId
+    source: LiveTrackSource
+    path: str
+    duration_ms: int
+    audio_byte_length: int
+    file_byte_length: int
 
 
 class LiveRealtimeErrorPayload(BaseModel):
@@ -195,6 +217,28 @@ class LiveRealtimeTrackReadyEvent(LiveRealtimeServerBaseEvent):
 
     type: Literal["track.ready"] = "track.ready"
     track: LiveTrackResponse
+
+
+class LiveRealtimeDiagnosticsWavStartedEvent(LiveRealtimeServerBaseEvent):
+    """Expose a started diagnostics WAV capture."""
+
+    type: Literal["diagnostics.wav.started"] = "diagnostics.wav.started"
+    output_dir: str
+    manifest_path: str
+    max_duration_ms: int = LIVE_REALTIME_DIAGNOSTICS_WAV_DEFAULT_MAX_DURATION_MS
+    max_bytes: int = LIVE_REALTIME_DIAGNOSTICS_WAV_DEFAULT_MAX_BYTES
+    tracks: list[LiveRealtimeTrackId] | None = None
+
+
+class LiveRealtimeDiagnosticsWavStoppedEvent(LiveRealtimeServerBaseEvent):
+    """Expose a stopped diagnostics WAV capture."""
+
+    type: Literal["diagnostics.wav.stopped"] = "diagnostics.wav.stopped"
+    output_dir: str
+    manifest_path: str
+    files: list[LiveRealtimeDiagnosticsWavFileResponse]
+    total_file_byte_length: int
+    reason: LiveRealtimeDiagnosticsWavStopReason
 
 
 class LiveRealtimeSessionFinishedEvent(LiveRealtimeServerBaseEvent):
