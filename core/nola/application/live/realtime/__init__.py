@@ -15,6 +15,13 @@ from nola.application.live.realtime.protocol import (
     LIVE_REALTIME_SUPPORTED_PROTOCOL_VERSIONS,
     LiveRealtimeErrorCode,
 )
+from nola.application.live.realtime.session import (
+    LiveRealtimeAudioFrameMetadata,
+    LiveRealtimeSessionError,
+    LiveRealtimeSessionRuntime,
+    LiveRealtimeTrackStart,
+    LiveRealtimeTrackStop,
+)
 
 __all__ = [
     "LIVE_REALTIME_AUDIO_BYTE_ORDER",
@@ -26,6 +33,11 @@ __all__ = [
     "LIVE_REALTIME_ERROR_CODES",
     "LIVE_REALTIME_PROTOCOL_VERSION",
     "LIVE_REALTIME_SUPPORTED_PROTOCOL_VERSIONS",
+    "LiveRealtimeAudioFrameMetadata",
     "LiveRealtimeErrorCode",
+    "LiveRealtimeSessionError",
+    "LiveRealtimeSessionRuntime",
     "LiveStreamConnectionRegistry",
+    "LiveRealtimeTrackStart",
+    "LiveRealtimeTrackStop",
 ]
