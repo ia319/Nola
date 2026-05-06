@@ -479,7 +479,7 @@ export function createWebRealtimeTransport(
 }
 
 function getAudioPayloadByteLength(payload: LiveRealtimeAudioPayload): number {
-  return ArrayBuffer.isView(payload) ? payload.byteLength : payload.byteLength
+  return payload.byteLength
 }
 
 function stripUndefinedFields(value: LiveRealtimeClientEvent): Record<string, unknown> {
