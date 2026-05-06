@@ -4,7 +4,7 @@ import asyncio
 
 
 class LiveStreamConnectionRegistry:
-    """Prevent multiple concurrent writers for one live session."""
+    """Use only when one API worker process serves Live WebSockets."""
 
     def __init__(self) -> None:
         self._active_session_ids: set[str] = set()
