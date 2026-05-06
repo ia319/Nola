@@ -37,6 +37,19 @@ export interface LiveCaptureStateChange {
   errorCode: LiveCaptureErrorCode | null
 }
 
+export type RealtimeAudioFrameFormat = 'pcm_s16le'
+
+export interface RealtimeAudioFrame {
+  source: LiveAudioSourceKind
+  sequence: number
+  sampleRate: 16000
+  channelCount: 1
+  format: RealtimeAudioFrameFormat
+  durationMs: LiveDurationMs
+  capturedAtMs: LiveTimestampMs
+  payload: ArrayBuffer
+}
+
 export interface LiveCaptureSession {
   id: string
   sourceKind: LiveAudioSourceKind
@@ -47,14 +60,17 @@ export interface LiveCaptureSession {
   pause(): Promise<void>
   resume(): Promise<void>
   onLevel(callback: (level: LiveAudioLevel) => void): LiveUnsubscribe
+  onAudioFrame(callback: (frame: RealtimeAudioFrame) => void): LiveUnsubscribe
   onStateChange(callback: (change: LiveCaptureStateChange) => void): LiveUnsubscribe
 }
 
 export interface LiveMicrophoneCaptureOptions {
   deviceId?: string | null
   levelSampleIntervalMs?: LiveDurationMs
+  audioFrameDurationMs?: LiveDurationMs
 }
 
 export interface LiveSystemAudioCaptureOptions {
   levelSampleIntervalMs?: LiveDurationMs
+  audioFrameDurationMs?: LiveDurationMs
 }
