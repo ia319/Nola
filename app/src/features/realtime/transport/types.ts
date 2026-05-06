@@ -166,7 +166,7 @@ export interface LiveRealtimeAudioContract {
 export interface LiveRealtimeDiagnosticsWavFile {
   track_id: string
   source: LiveTrackSource
-  path: string
+  file_name: string
   duration_ms: LiveDurationMs
   audio_byte_length: number
   file_byte_length: number
@@ -187,16 +187,16 @@ export interface LiveRealtimeTrackReadyEvent extends LiveRealtimeEventEnvelope<'
 }
 
 export interface LiveRealtimeDiagnosticsWavStartedEvent extends LiveRealtimeEventEnvelope<'diagnostics.wav.started'> {
-  output_dir: string
-  manifest_path: string
+  capture_id: string
+  manifest_name: string
   max_duration_ms: LiveDurationMs
   max_bytes: number
   tracks: string[] | null
 }
 
 export interface LiveRealtimeDiagnosticsWavStoppedEvent extends LiveRealtimeEventEnvelope<'diagnostics.wav.stopped'> {
-  output_dir: string
-  manifest_path: string
+  capture_id: string
+  manifest_name: string
   files: LiveRealtimeDiagnosticsWavFile[]
   total_file_byte_length: number
   reason: LiveRealtimeDiagnosticsWavStopReason

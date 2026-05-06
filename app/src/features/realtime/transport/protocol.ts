@@ -110,16 +110,16 @@ export function isLiveRealtimeServerEvent(value: unknown): value is LiveRealtime
       return isLiveTrack(value.track)
     case 'diagnostics.wav.started':
       return (
-        isString(value.output_dir) &&
-        isString(value.manifest_path) &&
+        isString(value.capture_id) &&
+        isString(value.manifest_name) &&
         isNumber(value.max_duration_ms) &&
         isNumber(value.max_bytes) &&
         isStringArrayOrNull(value.tracks)
       )
     case 'diagnostics.wav.stopped':
       return (
-        isString(value.output_dir) &&
-        isString(value.manifest_path) &&
+        isString(value.capture_id) &&
+        isString(value.manifest_name) &&
         Array.isArray(value.files) &&
         value.files.every(isDiagnosticsWavFile) &&
         isNumber(value.total_file_byte_length) &&
@@ -259,7 +259,7 @@ function isDiagnosticsWavFile(value: unknown): boolean {
   return (
     isString(value.track_id) &&
     isLiveTrackSource(value.source) &&
-    isString(value.path) &&
+    isString(value.file_name) &&
     isNumber(value.duration_ms) &&
     isNumber(value.audio_byte_length) &&
     isNumber(value.file_byte_length)

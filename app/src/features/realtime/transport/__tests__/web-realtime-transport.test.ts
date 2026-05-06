@@ -156,7 +156,8 @@ describe('WebLiveRealtimeTransport', () => {
       sample_rate: 16000,
       channel_count: 1,
     })
-    expect(socket.sent[3]).toBe(payload)
+    expect(socket.sent[3]).toBeInstanceOf(Int16Array)
+    expect(Array.from(socket.sent[3] as Int16Array)).toEqual(Array.from(payload))
     expect(transport.state).toBe('streaming')
 
     transport.stopTrack('track-1')
@@ -308,8 +309,8 @@ function trackReadyEvent(
 function diagnosticsStartedEvent(sessionId: string): LiveRealtimeDiagnosticsWavStartedEvent {
   return {
     ...serverEnvelope('diagnostics.wav.started', sessionId),
-    output_dir: 'C:/Temp/nola-live-diagnostics',
-    manifest_path: 'C:/Temp/nola-live-diagnostics/manifest.json',
+    capture_id: 'capture-1',
+    manifest_name: 'manifest.json',
     max_duration_ms: 10000,
     max_bytes: 1024,
     tracks: ['track-1'],
@@ -319,13 +320,13 @@ function diagnosticsStartedEvent(sessionId: string): LiveRealtimeDiagnosticsWavS
 function diagnosticsStoppedEvent(sessionId: string): LiveRealtimeDiagnosticsWavStoppedEvent {
   return {
     ...serverEnvelope('diagnostics.wav.stopped', sessionId),
-    output_dir: 'C:/Temp/nola-live-diagnostics',
-    manifest_path: 'C:/Temp/nola-live-diagnostics/manifest.json',
+    capture_id: 'capture-1',
+    manifest_name: 'manifest.json',
     files: [
       {
         track_id: 'track-1',
         source: 'microphone',
-        path: 'C:/Temp/nola-live-diagnostics/track.wav',
+        file_name: 'track.wav',
         duration_ms: 20,
         audio_byte_length: 640,
         file_byte_length: 684,
