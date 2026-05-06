@@ -44,4 +44,11 @@ describe('createRealtimeTransport', () => {
       TauriRealtimeTransport,
     )
   })
+
+  it('allows tauri placeholder teardown before implementation exists', async () => {
+    const transport = await createRealtimeTransport({ environment: 'tauri' })
+
+    expect(() => transport.disconnect()).not.toThrow()
+    expect(() => transport.close()).not.toThrow()
+  })
 })

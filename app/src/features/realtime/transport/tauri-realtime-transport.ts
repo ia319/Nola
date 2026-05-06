@@ -25,11 +25,11 @@ export class TauriRealtimeTransport implements LiveRealtimeTransport {
   }
 
   disconnect(_code?: number, _reason?: string): void {
-    throw createNotImplementedError()
+    return
   }
 
   close(_code?: number, _reason?: string): void {
-    throw createNotImplementedError()
+    return
   }
 
   sendControlEvent(_event: LiveRealtimeClientControlEventInput): void {
