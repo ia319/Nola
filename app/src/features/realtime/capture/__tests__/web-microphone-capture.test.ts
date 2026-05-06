@@ -171,6 +171,7 @@ describe('startMicrophoneCapture', () => {
 
     const samples = new Float32Array(960)
     samples.fill(0.5)
+    expect(processor.onaudioprocess).toBeDefined()
     processor.onaudioprocess?.(buildAudioProcessEvent(samples))
 
     expect(frames).toHaveLength(1)
@@ -184,6 +185,8 @@ describe('startMicrophoneCapture', () => {
       capturedAtMs: 0,
     })
     expect(frames[0].payload.byteLength).toBe(640)
+    expect(new DataView(frames[0].payload).getInt16(0, true)).toBe(16384)
+    expect(new DataView(frames[0].payload).getInt16(638, true)).toBe(16384)
 
     await session.stop()
   })

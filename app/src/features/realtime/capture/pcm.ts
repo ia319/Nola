@@ -18,7 +18,11 @@ export interface BuildRealtimeAudioFrameOptions {
 export function getSamplesPerFrame(
   frameDurationMs: LiveDurationMs = REALTIME_AUDIO_DEFAULT_FRAME_DURATION_MS,
 ): number {
-  return Math.round((REALTIME_AUDIO_TARGET_SAMPLE_RATE * frameDurationMs) / 1000)
+  if (!Number.isFinite(frameDurationMs) || frameDurationMs <= 0) {
+    throw new RangeError('Audio frame duration must be positive')
+  }
+
+  return Math.max(1, Math.round((REALTIME_AUDIO_TARGET_SAMPLE_RATE * frameDurationMs) / 1000))
 }
 
 export function downmixToMono(channels: readonly Float32Array[]): Float32Array {

@@ -6,6 +6,7 @@ import {
   getSamplesPerFrame,
   resampleLinear,
 } from './pcm'
+import logger from '@/config/logger'
 import type { LiveAudioSourceKind, RealtimeAudioFrame } from './types'
 import type { LiveDurationMs, LiveUnsubscribe } from '../types'
 
@@ -147,8 +148,16 @@ export class AudioFrameEmitter {
       this.sequence += 1
       this.emittedSamples += this.samplesPerFrame
 
-      for (const callback of this.callbacks) {
+      this.emitFrame(frame)
+    }
+  }
+
+  private emitFrame(frame: RealtimeAudioFrame): void {
+    for (const callback of this.callbacks) {
+      try {
         callback(frame)
+      } catch (error) {
+        logger.error('Live audio frame listener failed', error)
       }
     }
   }

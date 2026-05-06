@@ -62,4 +62,12 @@ describe('realtime PCM helpers', () => {
     })
     expect(frame.payload.byteLength).toBe(640)
   })
+
+  it('rejects frame durations that cannot produce a valid PCM frame', () => {
+    expect(() => getSamplesPerFrame(0)).toThrow(RangeError)
+    expect(() => getSamplesPerFrame(-20)).toThrow(RangeError)
+    expect(() => getSamplesPerFrame(Number.NaN)).toThrow(RangeError)
+    expect(() => getSamplesPerFrame(Number.POSITIVE_INFINITY)).toThrow(RangeError)
+    expect(getSamplesPerFrame(0.01)).toBe(1)
+  })
 })

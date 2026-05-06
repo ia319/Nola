@@ -187,6 +187,7 @@ describe('startSystemAudioCapture', () => {
     const right = new Float32Array(960)
     left.fill(1)
     right.fill(-1)
+    expect(processor.onaudioprocess).toBeDefined()
     processor.onaudioprocess?.(buildAudioProcessEvent(left, right))
 
     expect(frames).toHaveLength(1)
@@ -200,6 +201,8 @@ describe('startSystemAudioCapture', () => {
       capturedAtMs: 0,
     })
     expect(new DataView(frames[0].payload).getInt16(0, true)).toBe(0)
+    expect(new DataView(frames[0].payload).getInt16(320, true)).toBe(0)
+    expect(new DataView(frames[0].payload).getInt16(638, true)).toBe(0)
 
     await session.stop()
   })
