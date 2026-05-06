@@ -241,20 +241,27 @@ app/                          # Frontend workspace root
 │   │   │           ├── locale-routing.test.ts # Verify legacy locale-route helper behavior
 │   │   │           └── ui-preferences.test.ts # Verify settings preference option models
 │   │   ├── realtime/         # Live transcription runtime foundation
-│   │   │   ├── index.ts      # Expose realtime public types, stores, repositories, and hooks
+│   │   │   ├── index.ts      # Expose realtime public API, stores, repositories, transport, service, and hooks
+│   │   │   ├── api.ts        # Live REST session API client
 │   │   │   ├── types.ts      # Shared realtime primitive types
+│   │   │   ├── __tests__/
+│   │   │   │   └── api.test.ts # Verify Live REST API request wiring
 │   │   │   ├── capture/      # Audio capture adapters and session lifecycle
 │   │   │   │   ├── audio-capture-repository.ts # Runtime factory for Web/Tauri capture adapters
+│   │   │   │   ├── audio-frame-emitter.ts # Web Audio PCM frame emitter
 │   │   │   │   ├── audio-level-meter.ts # Web Audio level/peak meter
 │   │   │   │   ├── capture-session.ts # Capture session state, cleanup, and subscriptions
 │   │   │   │   ├── errors.ts # Structured capture errors
+│   │   │   │   ├── pcm.ts # PCM16LE/downmix/resample pure helpers
 │   │   │   │   ├── tauri-audio-capture-repository.ts # Tauri capture placeholder adapter
-│   │   │   │   ├── types.ts # Capture source, state, level, and option contracts
+│   │   │   │   ├── types.ts # Capture source, state, level, frame, and option contracts
 │   │   │   │   ├── web-audio-capture-repository.ts # Web capture adapter composition
 │   │   │   │   ├── web-microphone-capture.ts # Web microphone capture entry
 │   │   │   │   ├── web-system-audio-capture.ts # Web display/system audio capture entry
 │   │   │   │   └── __tests__/ # Capture adapter and cleanup tests
 │   │   │   │       ├── audio-capture-repository.test.ts # Verify runtime capture factory
+│   │   │   │       ├── audio-frame-emitter.test.ts # Verify frame listener isolation
+│   │   │   │       ├── pcm.test.ts # Verify PCM conversion helpers
 │   │   │   │       ├── web-microphone-capture.test.ts # Verify microphone capture behavior
 │   │   │   │       └── web-system-audio-capture.test.ts # Verify system audio capture behavior
 │   │   │   ├── devices/      # Device inventory repositories and diagnostics
@@ -276,10 +283,27 @@ app/                          # Frontend workspace root
 │   │   │   │   ├── runtime-environment.ts # Wrap app runtime environment for realtime adapters
 │   │   │   │   └── __tests__/
 │   │   │   │       └── runtime-environment.test.ts # Verify Web/Tauri adapter selection
-│   │   │   └── store/        # Device inventory and capture state store
-│   │   │       ├── live-device-store.ts # Store selected/active devices, inventory, levels, and capture states
+│   │   │   ├── session/      # UI-less realtime session orchestration
+│   │   │   │   ├── live-realtime-session-service.ts # Compose REST session, transport, and capture sessions
+│   │   │   │   └── __tests__/
+│   │   │   │       └── live-realtime-session-service.test.ts # Verify session lifecycle and cleanup
+│   │   │   ├── store/        # Device inventory and live runtime stores
+│   │   │   │   ├── live-device-store.ts # Store selected/active devices, inventory, levels, and capture states
+│   │   │   │   ├── live-realtime-store.ts # Store connection, tracks, partials, finals, diagnostics, and errors
+│   │   │   │   └── __tests__/
+│   │   │   │       ├── live-device-store.test.ts # Verify store state transitions
+│   │   │   │       └── live-realtime-store.test.ts # Verify realtime runtime state transitions
+│   │   │   └── transport/    # Live WebSocket transport contract and implementations
+│   │   │       ├── errors.ts # Structured realtime transport errors
+│   │   │       ├── protocol.ts # Protocol constants, URL builder, and event guards
+│   │   │       ├── realtime-transport.ts # Runtime transport factory
+│   │   │       ├── tauri-realtime-transport.ts # Tauri transport placeholder adapter
+│   │   │       ├── types.ts # WebSocket event, audio frame, diagnostics, and state contracts
+│   │   │       ├── web-realtime-transport.ts # Browser WebSocket implementation
 │   │   │       └── __tests__/
-│   │   │           └── live-device-store.test.ts # Verify store state transitions
+│   │   │           ├── protocol.test.ts # Verify protocol guards and URL builder
+│   │   │           ├── realtime-transport.test.ts # Verify runtime transport factory
+│   │   │           └── web-realtime-transport.test.ts # Verify WebSocket lifecycle and frame sending
 │   │   ├── transcription-options/ # Keep task option composition and defaults patch logic
 │   │   │   ├── index.ts      # Expose feature public exports
 │   │   │   ├── types.ts      # Keep option domain types and contracts
@@ -381,6 +405,7 @@ app/                          # Frontend workspace root
 │   │       ├── app-error.ts   # Frontend standardized error model
 │   │       ├── config.ts      # Config response aliases (schema/defaults)
 │   │       ├── file.ts        # FileInfo, FileUploadResponse, etc.
+│   │       ├── live.ts        # Live REST response aliases derived from OpenAPI
 │   │       ├── model.ts       # Model response aliases and download-state contracts
 │   │       ├── task.ts        # TaskSummary, TaskStatus, ExportFormat, etc.
 │   │       ├── task-query.ts  # Shared task query model contracts
@@ -492,7 +517,7 @@ Keep future Storybook stories colocated under `src` beside the component or page
 - `src/layouts/`: Keep page workspace wrappers and Settings row/section primitives.
 - `src/pages/`: Keep route page implementations outside `features/*`.
 - `src/features/activity/`: Aggregate task and model-download activity into `needsAttention`, `inProgress`, and `recent`.
-- `src/features/realtime/`: Provide UI-less Live device inventory, Web/Tauri adapter factories, capture sessions, audio level state, diagnostics, and store/hook orchestration.
+- `src/features/realtime/`: Provide UI-less Live device inventory, Web/Tauri adapter factories, capture sessions, PCM frame output, WebSocket transport, diagnostics, runtime store, and session-service orchestration.
 - `src/lib/runtime-environment.ts`: Centralize Web/Tauri runtime detection for app-level and realtime platform selection.
 - `src/shared/lib/query-*`: Centralize TanStack Query keys, fetcher, and client defaults.
 - `src/shared/lib/overlay-events.ts`: Coordinate mutually exclusive detail sheets and Activity Center.
@@ -531,6 +556,13 @@ Keep future Storybook stories colocated under `src` beside the component or page
 - Treat system audio as a capture source. In Web runtime, use explicit user-triggered capture and return structured unsupported/limited states when the browser cannot provide audio.
 - Keep browser permission prompts behind explicit permission or capture calls. Do not trigger microphone or display-capture prompts from ordinary inventory refresh.
 - Use `temp-*` device IDs only as display-only fallbacks. Do not persist them or pass them to `getUserMedia`/`setSinkId`.
+- Keep Web realtime capture output at PCM16LE, 16 kHz, mono. Do not add default denoise, gain, compression, loudness normalization, EQ, or content trimming.
+- Keep realtime audio transport as JSON metadata plus binary PCM payload. Do not make base64 audio the production protocol.
+- Keep realtime diagnostics events opaque: consume `capture_id`, `manifest_name`, and `file_name`; do not expect or display server absolute paths.
+- Keep final realtime transcripts bounded in memory. Do not reintroduce unbounded current-session transcript arrays.
+- Treat ended realtime tracks as inactive. Do not keep sending audio frames after a `track.ready` event carries `ended_at`.
+- Treat realtime transport `failed` states as fatal even when they do not carry an error payload.
+- Reject pending realtime waits when the transport closes before `track.ready` or `session.finished`.
 - Keep `features/realtime` platform-neutral files free of static imports from `web-*`, `tauri-*`, browser-only, or desktop-native implementation modules.
 - Keep Tauri realtime adapters behind runtime factories or dynamic imports. Do not let browser builds statically import Tauri/native code.
 
@@ -619,14 +651,15 @@ Backend (Pydantic) ──► openapi.json ──► openapi.d.ts ──► domai
 | Layer                    | Path                                                                           | Maintained by           | Edit?                                                               |
 | ------------------------ | ------------------------------------------------------------------------------ | ----------------------- | ------------------------------------------------------------------- |
 | Raw types                | `shared/types/openapi.d.ts`                                                    | `pnpm gen:types` (auto) | Never                                                               |
-| Domain aliases/contracts | `shared/types/config.ts`, `task.ts`, `file.ts`, `api-error.ts`, `app-error.ts`, future `live.ts` | Developer               | Rarely (only if backend adds new schemas or error contract changes) |
+| Domain aliases/contracts | `shared/types/config.ts`, `task.ts`, `file.ts`, `live.ts`, `api-error.ts`, `app-error.ts` | Developer               | Rarely (only if backend adds new schemas or error contract changes) |
 | Feature API              | `features/*/api.ts`                                                            | Developer               | Frequently                                                          |
 
 **Key rules:**
 
 - `TaskStatus` and `ExportFormat` are **derived from OpenAPI enum**, not hardcoded. This ensures Single Source of Truth — backend adds a new status/format, frontend auto-inherits after `pnpm gen:types`.
 - Domain aliases/contracts avoid verbose `components['schemas']['TaskSummaryResponse']` paths in business code.
-- Live REST DTOs must follow the same thin-alias path when the frontend starts consuming `/api/live/*`: derive aliases from generated OpenAPI types in `shared/types/live.ts`, then import those aliases from `@/shared/types`.
+- Live REST DTOs must follow the same thin-alias path: derive aliases from generated OpenAPI types in `shared/types/live.ts`, then import those aliases from `@/shared/types`.
+- Live WebSocket DTOs are not generated from OpenAPI. Keep them in `features/realtime/transport/types.ts` and validate inbound events with `features/realtime/transport/protocol.ts`.
 - Runtime helpers such as `formatApiError` and AppError factories live in `shared/lib/*`, not in `shared/types/*`.
 - Feature `api.ts` functions return unwrapped `data` (not `AxiosResponse`), keeping callers free from Axios internals.
 
@@ -753,7 +786,8 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `types.ts`: Keep model feature contracts stable over generated OpenAPI types.
   - `index.ts`: Expose model feature public exports.
 - **realtime**:
-  - `index.ts`: Expose the public realtime foundation surface: primitive types, device repository factory, capture repository factory, diagnostics, store, hook, and runtime adapter helpers.
+  - `index.ts`: Expose the public realtime foundation surface: REST API helpers, primitive types, device repository factory, capture repository factory, transport factory, session service, diagnostics, stores, hook, and runtime adapter helpers.
+  - `api.ts`: Create and fetch Live sessions through `/api/live/*` REST endpoints using shared Live DTO aliases.
   - `types.ts`: Keep shared realtime primitive aliases (`LiveTimestampMs`, `LiveDurationMs`, `LiveUnsubscribe`) and runtime capability states.
   - `platform/runtime-environment.ts`: Wrap app-level runtime detection and choose Web/Tauri realtime adapters through explicit factories.
   - `devices/types.ts`: Keep microphone/speaker inventory, permission, capability, temporary-device, and warning code contracts.
@@ -761,18 +795,26 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `devices/web-audio-device-repository.ts`: Enumerate browser microphones/speakers, classify permissions/capabilities, emit stable warnings, and avoid implicit permission prompts during inventory refresh.
   - `devices/tauri-audio-device-repository.ts`: Return structured placeholder output for Tauri until native device enumeration is implemented.
   - `devices/diagnostics.ts`: Provide dev-only console helpers for manual inventory validation.
-  - `capture/types.ts`: Keep capture source, session, level, state, and error contracts.
+  - `capture/types.ts`: Keep capture source, session, level, frame, state, and error contracts.
   - `capture/audio-capture-repository.ts`: Define the capture repository contract and dynamically load Web or Tauri implementations.
   - `capture/web-audio-capture-repository.ts`: Compose Web microphone and system-audio capture implementations behind the repository contract.
-  - `capture/web-microphone-capture.ts`: Start explicit Web microphone capture and expose audio level events.
-  - `capture/web-system-audio-capture.ts`: Start explicit Web display/system-audio capture and expose system-source level events when an audio track exists.
-  - `capture/capture-session.ts`: Own capture state transitions, listener cleanup, track stopping, and level-meter cleanup.
-  - `capture/audio-level-meter.ts`: Measure Web Audio level and peak values without producing model input frames.
+  - `capture/web-microphone-capture.ts`: Start explicit Web microphone capture and expose audio level plus PCM frame events.
+  - `capture/web-system-audio-capture.ts`: Start explicit Web display/system-audio capture and expose system-source level plus PCM frame events when an audio track exists.
+  - `capture/capture-session.ts`: Own capture state transitions, listener cleanup, frame subscriptions, track stopping, and level/frame emitter cleanup.
+  - `capture/audio-frame-emitter.ts`: Emit PCM16LE, 16 kHz, mono frames and isolate listener failures.
+  - `capture/audio-level-meter.ts`: Measure Web Audio level and peak values.
+  - `capture/pcm.ts`: Keep downmix, resample, PCM sizing, and float-to-PCM conversion pure and tested.
   - `capture/errors.ts`: Expose structured capture errors with stable codes.
   - `capture/tauri-audio-capture-repository.ts`: Return structured placeholder errors for desktop capture until native adapters exist.
   - `store/live-device-store.ts`: Store serializable inventory, selected/active devices, capture states, and latest level snapshots; normalize `temp-*` device IDs to `null`.
+  - `store/live-realtime-store.ts`: Store current Live session, connection state, active tracks, partials, capped final transcripts, diagnostics state, and last runtime error.
   - `hooks/useLiveDeviceInventory.ts`: Own repository creation, `devicechange` subscriptions, capture session lifecycle, cleanup on teardown, and store updates.
-  - `**/__tests__/*`: Cover runtime selection, inventory behavior, warnings, permission failures, capture cleanup, diagnostics, store transitions, and hook lifecycle.
+  - `session/live-realtime-session-service.ts`: Compose Live REST creation, WebSocket transport, capture sessions, diagnostics controls, track routing, stop/failure cleanup, closed-transport wait rejection, and server-finished cleanup without adding UI.
+  - `transport/types.ts`: Keep hand-maintained Live WebSocket event, audio frame, diagnostics, and state contracts.
+  - `transport/protocol.ts`: Validate server events, build WebSocket URLs from origins, and keep protocol constants.
+  - `transport/web-realtime-transport.ts`: Implement browser WebSocket handshake, control event sending, JSON metadata plus binary payload audio frames, and state changes.
+  - `transport/tauri-realtime-transport.ts`: Return structured not-implemented errors for unsupported operations and keep teardown methods idempotent.
+  - `**/__tests__/*`: Cover runtime selection, inventory behavior, warnings, permission failures, capture cleanup, PCM conversion, transport protocol, diagnostics, store transitions, session service lifecycle, and hook lifecycle.
 
 ### src/components/common/
 
@@ -859,6 +901,7 @@ Cross-feature shared code, split into `lib/` and `types/`.
 - **types/app-error.ts**: Frontend error contract (`AppError`: `code`, `i18nKey`, `params`, `retriable`).
 - **types/config.ts**: Thin aliases for config contracts (`AppConfig`, `EngineDefaults`, `SessionDefaults`, `EngineDevice`, `EngineComputeType`, defaults update requests).
 - **types/file.ts**: Thin aliases over OpenAPI file schemas (`FileInfo`, `FileUploadResponse`, etc.).
+- **types/live.ts**: Thin aliases over OpenAPI Live REST schemas (`CreateLiveSessionRequest`, `LiveSessionDetail`, `LiveTrack`, `LiveSegment`, etc.).
 - **types/model.ts**: Thin aliases over OpenAPI model schemas and active download contracts.
 - **types/task.ts**: Thin aliases over OpenAPI task schemas + derived types (`TaskStatus`, `ExportFormat` from schema enums); task read responses expose persisted `model_id` context.
 - **types/task-query.ts**: Shared query model for list toolbar and pagination contracts.
@@ -996,3 +1039,5 @@ Frontend (Vite/React) ───[ HTTP Proxy /api/* ]───▶ Backend (FastAP
 | Polling Interval | 2000 ms foreground, 6000 ms background (hidden document)     |
 | Theme            | App-owned `ThemeProvider` drives light/dark/system and persists via UI preferences |
 | Live Devices     | Client-runtime only; Web inventory cannot report system-global device use and may expose temporary `temp-*` IDs before permission |
+| Live Audio Frames | PCM16LE, 16 kHz, mono; default capture path does not denoise, gain-normalize, compress, EQ, or trim content |
+| Live Diagnostics | Explicit WebSocket control only; frontend receives `capture_id`, `manifest_name`, and `file_name`, not server absolute paths |
