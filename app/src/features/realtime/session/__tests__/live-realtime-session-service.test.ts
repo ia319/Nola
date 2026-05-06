@@ -146,6 +146,58 @@ describe('LiveRealtimeSessionService', () => {
     expect(state.runState).toBe('failed')
     expect(state.lastError?.code).toBe('websocket_closed')
   })
+
+  it('marks the service failed when stopping capture fails', async () => {
+    const setup = createServiceSetup()
+
+    await setup.service.start({ sources: ['microphone'] })
+    const microphoneSession = setup.captureRepository.microphoneSessions[0]!
+    expect(microphoneSession).toBeDefined()
+    microphoneSession.stopError = new Error('stop failed')
+
+    await expect(setup.service.stop()).rejects.toMatchObject({
+      code: 'live_session_stop_failed',
+      message: 'stop failed',
+      retryable: false,
+    })
+
+    expect(setup.service.state).toBe('failed')
+    expect(setup.transport.closeCalls).toBe(1)
+    expect(useLiveRealtimeStore.getState().runState).toBe('failed')
+  })
+
+  it('removes ended tracks and stops sending frames to them', async () => {
+    const setup = createServiceSetup()
+
+    await setup.service.start({ sources: ['microphone'] })
+    setup.captureRepository.microphoneSessions[0]?.emitFrame(audioFrame('microphone', 0))
+    expect(setup.transport.audioFrames).toHaveLength(1)
+
+    setup.transport.emitEvent(
+      trackReadyEvent('session-1', 'track-microphone-1', 'microphone', '2026-05-06T00:00:01Z'),
+    )
+    expect(useLiveRealtimeStore.getState().tracksBySource.microphone).toBeUndefined()
+
+    setup.captureRepository.microphoneSessions[0]?.emitFrame(audioFrame('microphone', 1))
+    expect(setup.transport.audioFrames).toHaveLength(1)
+  })
+
+  it('cleans up active capture when the server finishes the session', async () => {
+    const setup = createServiceSetup()
+
+    await setup.service.start({ sources: ['microphone'] })
+    setup.transport.emitEvent(sessionFinishedEvent('session-1'))
+    await flushAsyncWork()
+
+    expect(setup.captureRepository.microphoneSessions[0]?.stop).toHaveBeenCalledTimes(1)
+    expect(setup.transport.closeCalls).toBe(1)
+    expect(setup.service.state).toBe('finished')
+
+    const state = useLiveRealtimeStore.getState()
+    expect(state.runState).toBe('finished')
+    expect(state.connectionState).toBe('closed')
+    expect(state.tracksBySource).toEqual({})
+  })
 })
 
 interface ServiceSetup {
@@ -313,6 +365,7 @@ class MockCaptureSession implements LiveCaptureSession {
   readonly deviceId: string | null = null
   readonly startedAt = 1
   state: LiveCaptureState = 'capturing'
+  stopError: Error | null = null
   private readonly frameCallbacks = new Set<(frame: RealtimeAudioFrame) => void>()
   private readonly stateCallbacks = new Set<(change: LiveCaptureStateChange) => void>()
 
@@ -322,6 +375,10 @@ class MockCaptureSession implements LiveCaptureSession {
   }
 
   stop = vi.fn(async (): Promise<void> => {
+    if (this.stopError) {
+      throw this.stopError
+    }
+
     this.state = 'stopped'
     this.emitState('stopped', null)
   })
@@ -432,10 +489,11 @@ function trackReadyEvent(
   sessionId: string,
   trackId: string,
   source: LiveAudioSourceKind,
+  endedAt: string | null = null,
 ): LiveRealtimeServerEvent {
   return {
     ...serverEnvelope('track.ready', sessionId),
-    track: liveTrack(sessionId, trackId, source),
+    track: liveTrack(sessionId, trackId, source, endedAt),
   }
 }
 
@@ -503,7 +561,12 @@ function liveSession(
   }
 }
 
-function liveTrack(sessionId: string, trackId: string, source: LiveAudioSourceKind): LiveTrack {
+function liveTrack(
+  sessionId: string,
+  trackId: string,
+  source: LiveAudioSourceKind,
+  endedAt: string | null = null,
+): LiveTrack {
   return {
     track_id: trackId,
     session_id: sessionId,
@@ -513,7 +576,7 @@ function liveTrack(sessionId: string, trackId: string, source: LiveAudioSourceKi
     sample_rate: 16000,
     channel_count: 1,
     started_at: '2026-05-06T00:00:00Z',
-    ended_at: null,
+    ended_at: endedAt,
     created_at: '2026-05-06T00:00:00Z',
   }
 }

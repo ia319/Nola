@@ -91,6 +91,7 @@ export class LiveRealtimeSessionService {
   private session: LiveSessionDetail | null = null
   private runState: LiveRealtimeRunState = 'idle'
   private failureCleanupPromise: Promise<void> | null = null
+  private remoteFinishCleanupPromise: Promise<void> | null = null
 
   constructor(dependencies: LiveRealtimeSessionServiceDependencies = {}) {
     this.createLiveSession = dependencies.createLiveSession ?? defaultCreateLiveSession
@@ -165,6 +166,11 @@ export class LiveRealtimeSessionService {
       return
     }
 
+    if (this.remoteFinishCleanupPromise) {
+      await this.remoteFinishCleanupPromise
+      return
+    }
+
     if (this.runState === 'idle' || this.runState === 'finished') {
       return
     }
@@ -194,6 +200,7 @@ export class LiveRealtimeSessionService {
         message: 'Live realtime session failed to stop',
         retryable: false,
       })
+      this.runState = 'failed'
       useLiveRealtimeStore.getState().setLiveRealtimeFailure(normalized)
       throw new LiveRealtimeSessionError(normalized)
     } finally {
@@ -305,8 +312,13 @@ export class LiveRealtimeSessionService {
 
   private handleTransportEvent(event: LiveRealtimeServerEvent): void {
     if (event.type === 'track.ready') {
-      this.tracksBySource.set(event.track.source, event.track)
-      useLiveRealtimeStore.getState().setLiveRealtimeTrack(event.track)
+      if (event.track.ended_at) {
+        this.tracksBySource.delete(event.track.source)
+        useLiveRealtimeStore.getState().removeLiveRealtimeTrack(event.track.source)
+      } else {
+        this.tracksBySource.set(event.track.source, event.track)
+        useLiveRealtimeStore.getState().setLiveRealtimeTrack(event.track)
+      }
     } else if (event.type === 'transcript.partial') {
       useLiveRealtimeStore.getState().setLiveRealtimePartial(event.transcript)
     } else if (event.type === 'transcript.final') {
@@ -319,6 +331,11 @@ export class LiveRealtimeSessionService {
       this.session = event.session
       if (this.runState === 'finishing') {
         useLiveRealtimeStore.getState().setLiveRealtimeFinished(event.session)
+      } else if (
+        (this.runState === 'starting' || this.runState === 'active') &&
+        !this.remoteFinishCleanupPromise
+      ) {
+        this.remoteFinishCleanupPromise = this.cleanupAfterRemoteFinish(event.session)
       }
     } else if (event.type === 'server.error') {
       useLiveRealtimeStore.getState().setLiveRealtimeFailure(
@@ -349,7 +366,11 @@ export class LiveRealtimeSessionService {
 
       const cleanup = createWaitCleanup([
         transport.onEvent((event) => {
-          if (event.type === 'track.ready' && event.track.source === source) {
+          if (
+            event.type === 'track.ready' &&
+            event.track.source === source &&
+            !event.track.ended_at
+          ) {
             cleanup()
             resolve(event.track)
           } else if (event.type === 'server.error') {
@@ -439,7 +460,11 @@ export class LiveRealtimeSessionService {
   }
 
   private handleRuntimeFailure(error: unknown): void {
-    if (this.failureCleanupPromise || this.runState === 'finished') {
+    if (
+      this.failureCleanupPromise ||
+      this.remoteFinishCleanupPromise ||
+      this.runState === 'finished'
+    ) {
       return
     }
 
@@ -470,6 +495,22 @@ export class LiveRealtimeSessionService {
     }
 
     this.resetRuntimeReferences()
+  }
+
+  private async cleanupAfterRemoteFinish(session: LiveSessionDetail): Promise<void> {
+    this.runState = 'finishing'
+    useLiveRealtimeStore.getState().setLiveRealtimeFinishing()
+
+    try {
+      await this.stopCaptureSessionsBestEffort()
+    } finally {
+      this.session = session
+      this.runState = 'finished'
+      useLiveRealtimeStore.getState().setLiveRealtimeFinished(session)
+      this.closeTransport()
+      this.resetRuntimeReferences()
+      this.remoteFinishCleanupPromise = null
+    }
   }
 
   private async stopCaptureSessions(): Promise<void> {
