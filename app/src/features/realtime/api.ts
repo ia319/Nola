@@ -68,12 +68,14 @@ export async function getLiveSession(
 export async function finishLiveSession(
   sessionId: string,
   query: LiveSessionDetailQuery = {},
+  signal?: AbortSignal,
 ): Promise<LiveSessionDetail> {
   const { data } = await apiClient.post<LiveSessionDetail>(
     `${BASE}/${sessionId}/finish`,
     undefined,
     {
       params: buildLiveSessionDetailParams(query),
+      signal,
     },
   )
   return data
