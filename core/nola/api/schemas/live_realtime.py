@@ -191,7 +191,7 @@ class LiveRealtimeDiagnosticsWavFileResponse(BaseModel):
 
     track_id: LiveRealtimeTrackId
     source: LiveTrackSource
-    path: str
+    file_name: str
     duration_ms: int
     audio_byte_length: int
     file_byte_length: int
@@ -223,8 +223,8 @@ class LiveRealtimeDiagnosticsWavStartedEvent(LiveRealtimeServerBaseEvent):
     """Expose a started diagnostics WAV capture."""
 
     type: Literal["diagnostics.wav.started"] = "diagnostics.wav.started"
-    output_dir: str
-    manifest_path: str
+    capture_id: str
+    manifest_name: str
     max_duration_ms: int = LIVE_REALTIME_DIAGNOSTICS_WAV_DEFAULT_MAX_DURATION_MS
     max_bytes: int = LIVE_REALTIME_DIAGNOSTICS_WAV_DEFAULT_MAX_BYTES
     tracks: list[LiveRealtimeTrackId] | None = None
@@ -234,8 +234,8 @@ class LiveRealtimeDiagnosticsWavStoppedEvent(LiveRealtimeServerBaseEvent):
     """Expose a stopped diagnostics WAV capture."""
 
     type: Literal["diagnostics.wav.stopped"] = "diagnostics.wav.stopped"
-    output_dir: str
-    manifest_path: str
+    capture_id: str
+    manifest_name: str
     files: list[LiveRealtimeDiagnosticsWavFileResponse]
     total_file_byte_length: int
     reason: LiveRealtimeDiagnosticsWavStopReason

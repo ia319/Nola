@@ -116,6 +116,11 @@ async def _receive_realtime_json(websocket: WebSocket) -> JsonValue:
             code="invalid_event",
             message="Realtime event payload is invalid JSON",
         ) from error
+    except KeyError as error:
+        raise LiveRealtimeSessionError(
+            code="invalid_event",
+            message="Realtime event must be sent as a JSON text frame",
+        ) from error
 
 
 async def _receive_audio_payload(websocket: WebSocket) -> bytes:

@@ -307,6 +307,57 @@ def test_live_realtime_stream_rejects_malformed_event_json(
         assert close_error.value.code == 1008
 
 
+def test_live_realtime_stream_rejects_binary_hello_event(
+    client: TestClient,
+) -> None:
+    """Live realtime stream should reject non-text hello events predictably."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+
+    with client.websocket_connect(
+        f"/api/live/sessions/{session_id}/stream"
+    ) as websocket:
+        websocket.send_bytes(b"{}")
+        error = websocket.receive_json()
+
+        assert error["type"] == "server.error"
+        assert error["error"]["code"] == "invalid_event"
+        assert (
+            error["error"]["message"]
+            == "Realtime event must be sent as a JSON text frame"
+        )
+        with pytest.raises(WebSocketDisconnect) as close_error:
+            websocket.receive_json()
+        assert close_error.value.code == 1008
+
+
+def test_live_realtime_stream_rejects_binary_runtime_event(
+    client: TestClient,
+) -> None:
+    """Live realtime stream should reject non-text runtime events predictably."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+
+    with client.websocket_connect(
+        f"/api/live/sessions/{session_id}/stream"
+    ) as websocket:
+        websocket.send_json(_realtime_event("client.hello", session_id))
+        assert websocket.receive_json()["type"] == "server.ready"
+
+        websocket.send_bytes(b"{}")
+        error = websocket.receive_json()
+
+        assert error["type"] == "server.error"
+        assert error["error"]["code"] == "invalid_event"
+        assert (
+            error["error"]["message"]
+            == "Realtime event must be sent as a JSON text frame"
+        )
+        with pytest.raises(WebSocketDisconnect) as close_error:
+            websocket.receive_json()
+        assert close_error.value.code == 1008
+
+
 def test_live_realtime_stream_handles_track_lifecycle(client: TestClient) -> None:
     """Live realtime stream should create and stop source tracks."""
     created = _create_live_session(client)
@@ -576,12 +627,22 @@ def test_live_realtime_stream_handles_explicit_wav_diagnostics(
         app.dependency_overrides.pop(get_live_diagnostics_output_dir, None)
 
     assert started["type"] == "diagnostics.wav.started"
+    assert "output_dir" not in started
+    assert "manifest_path" not in started
+    assert started["capture_id"].startswith(f"{session_id}-")
+    assert started["manifest_name"] == "manifest.json"
     assert started["max_duration_ms"] == 1000
     assert started["max_bytes"] == 4096
     assert started["tracks"] == [track_id]
     assert stopped["type"] == "diagnostics.wav.stopped"
+    assert "output_dir" not in stopped
+    assert "manifest_path" not in stopped
+    assert stopped["capture_id"] == started["capture_id"]
+    assert stopped["manifest_name"] == "manifest.json"
     assert stopped["reason"] == "client_stop"
     assert stopped["files"][0]["track_id"] == track_id
+    assert "path" not in stopped["files"][0]
+    assert stopped["files"][0]["file_name"] == f"{track_id}-microphone.wav"
     assert stopped["files"][0]["duration_ms"] == 20
     assert finished["type"] == "session.finished"
 
