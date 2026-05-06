@@ -52,6 +52,9 @@ export {
   resampleLinear,
 } from './capture/pcm'
 
+export type { LiveSessionDetailQuery } from './api'
+export { createLiveSession, finishLiveSession, getLiveSession } from './api'
+
 export type {
   LiveCaptureSessionSnapshot,
   LiveCaptureSlotState,
@@ -60,6 +63,29 @@ export type {
   LiveDeviceStoreState,
 } from './store/live-device-store'
 export { getLiveDeviceSelectionState, useLiveDeviceStore } from './store/live-device-store'
+
+export type {
+  LiveRealtimeDiagnosticsWavState,
+  LiveRealtimeRunState,
+  LiveRealtimeRuntimeError,
+  LiveRealtimeRuntimeErrorCode,
+  LiveRealtimeRuntimeState,
+} from './store/live-realtime-store'
+export { useLiveRealtimeStore } from './store/live-realtime-store'
+
+export type {
+  CreateAudioCaptureRepositoryFunction,
+  CreateLiveSessionFunction,
+  CreateRealtimeTransportFunction,
+  LiveRealtimeSessionServiceDependencies,
+  LiveRealtimeSessionStartOptions,
+} from './session/live-realtime-session-service'
+export {
+  LiveRealtimeSessionError,
+  LiveRealtimeSessionService,
+  createLiveRealtimeSessionService,
+  isLiveRealtimeSessionError,
+} from './session/live-realtime-session-service'
 
 export type {
   UseLiveDeviceInventoryOptions,
@@ -103,7 +129,9 @@ export type {
   LiveRealtimeTransportStateCallback,
   LiveRealtimeTransportStateChange,
   LiveRealtimeTranscriptFinalEvent,
+  LiveRealtimeTranscriptFinalPayload,
   LiveRealtimeTranscriptPartialEvent,
+  LiveRealtimeTranscriptPartialPayload,
 } from './transport/types'
 export {
   LIVE_REALTIME_AUDIO_CHANNEL_COUNT,
