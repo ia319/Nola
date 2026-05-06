@@ -48,6 +48,7 @@ from nola.application.live.realtime.protocol import (
     LiveRealtimeErrorCode,
 )
 from nola.application.live.realtime.session import (
+    LiveRealtimeAudioFrameResult,
     LiveRealtimeSessionRuntime,
     LiveRealtimeTrackStart,
     LiveRealtimeTrackStop,
@@ -86,6 +87,7 @@ __all__ = [
     "LiveRealtimeDiagnosticsWavStopped",
     "LiveRealtimeDiagnosticsWavStopReason",
     "LiveRealtimeAudioFrameMetadata",
+    "LiveRealtimeAudioFrameResult",
     "LiveRealtimeErrorCode",
     "LiveRealtimePcm16Frame",
     "LiveRealtimeSessionError",

@@ -147,6 +147,49 @@ describe('LiveRealtimeSessionService', () => {
     expect(state.lastError?.code).toBe('websocket_closed')
   })
 
+  it('stops active capture when the transport fails without an error payload', async () => {
+    const setup = createServiceSetup()
+
+    await setup.service.start({ sources: ['microphone'] })
+    setup.transport.fail()
+    await flushAsyncWork()
+
+    expect(setup.captureRepository.microphoneSessions[0]?.stop).toHaveBeenCalledTimes(1)
+    expect(setup.transport.closeCalls).toBe(1)
+
+    const state = useLiveRealtimeStore.getState()
+    expect(state.runState).toBe('failed')
+    expect(state.lastError?.code).toBe('websocket_closed')
+  })
+
+  it('fails start when the transport closes before track ready', async () => {
+    const setup = createServiceSetup()
+    setup.transport.closeAfterStartTrack = true
+
+    await expect(setup.service.start({ sources: ['microphone'] })).rejects.toMatchObject({
+      code: 'websocket_closed',
+      retryable: false,
+    })
+
+    expect(setup.captureRepository.microphoneSessions[0]?.stop).toHaveBeenCalledTimes(1)
+    expect(useLiveRealtimeStore.getState().runState).toBe('failed')
+  })
+
+  it('fails stop when the transport closes before session finished', async () => {
+    const setup = createServiceSetup()
+    setup.transport.finishEmitsSessionFinished = false
+
+    await setup.service.start({ sources: ['microphone'] })
+
+    await expect(setup.service.stop()).rejects.toMatchObject({
+      code: 'websocket_closed',
+      retryable: false,
+    })
+
+    expect(setup.service.state).toBe('failed')
+    expect(useLiveRealtimeStore.getState().runState).toBe('failed')
+  })
+
   it('marks the service failed when stopping capture fails', async () => {
     const setup = createServiceSetup()
 
@@ -215,6 +258,8 @@ class MockRealtimeTransport implements LiveRealtimeTransport {
   readonly diagnosticsStarts: Array<LiveRealtimeDiagnosticsWavStartOptions | undefined> = []
   closeCalls = 0
   finishCalls = 0
+  closeAfterStartTrack = false
+  finishEmitsSessionFinished = true
   private readonly eventCallbacks = new Set<LiveRealtimeServerEventCallback>()
   private readonly stateCallbacks = new Set<LiveRealtimeTransportStateCallback>()
   private connectionState: LiveRealtimeConnectionState = 'idle'
@@ -255,6 +300,11 @@ class MockRealtimeTransport implements LiveRealtimeTransport {
     const nextIndex = (this.trackIndexBySource.get(options.source) ?? 0) + 1
     this.trackIndexBySource.set(options.source, nextIndex)
     this.trackStarts.push(options)
+    if (this.closeAfterStartTrack) {
+      this.close()
+      return
+    }
+
     this.emitEvent(
       trackReadyEvent(sessionId, `track-${options.source}-${nextIndex}`, options.source),
     )
@@ -285,7 +335,9 @@ class MockRealtimeTransport implements LiveRealtimeTransport {
     const sessionId = requireSessionId(this.sessionId)
     this.finishCalls += 1
     this.setState('finishing')
-    this.emitEvent(sessionFinishedEvent(sessionId))
+    if (this.finishEmitsSessionFinished) {
+      this.emitEvent(sessionFinishedEvent(sessionId))
+    }
     this.setState('closed')
   }
 
@@ -309,7 +361,7 @@ class MockRealtimeTransport implements LiveRealtimeTransport {
     }
   }
 
-  fail(error: LiveRealtimeTransportErrorShape): void {
+  fail(error: LiveRealtimeTransportErrorShape | null = null): void {
     this.setState('failed', error)
   }
 

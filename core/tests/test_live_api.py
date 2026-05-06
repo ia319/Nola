@@ -647,6 +647,67 @@ def test_live_realtime_stream_handles_explicit_wav_diagnostics(
     assert finished["type"] == "session.finished"
 
 
+def test_live_realtime_stream_stops_wav_diagnostics_on_limit(
+    client: TestClient,
+    tmp_path: Path,
+) -> None:
+    """Live realtime stream should keep running after diagnostics limits stop."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+
+    app.dependency_overrides[get_live_diagnostics_output_dir] = (
+        lambda: tmp_path / "diagnostics"
+    )
+    try:
+        with client.websocket_connect(
+            f"/api/live/sessions/{session_id}/stream"
+        ) as websocket:
+            websocket.send_json(_realtime_event("client.hello", session_id))
+            assert websocket.receive_json()["type"] == "server.ready"
+            websocket.send_json(_track_start_event(session_id, source="microphone"))
+            track_ready = websocket.receive_json()
+            track_id = str(track_ready["track"]["track_id"])
+
+            websocket.send_json(
+                {
+                    **_realtime_event("diagnostics.wav.start", session_id),
+                    "max_duration_ms": 20,
+                    "max_bytes": 4096,
+                    "tracks": [track_id],
+                }
+            )
+            started = websocket.receive_json()
+            websocket.send_json(
+                _audio_frame_event(
+                    session_id,
+                    track_id=track_id,
+                    source="microphone",
+                    sequence=0,
+                )
+            )
+            websocket.send_bytes(b"\x00" * 640)
+            websocket.send_json(
+                _audio_frame_event(
+                    session_id,
+                    track_id=track_id,
+                    source="microphone",
+                    sequence=1,
+                )
+            )
+            websocket.send_bytes(b"\x00" * 640)
+            stopped = websocket.receive_json()
+            websocket.send_json(_realtime_event("session.finish", session_id))
+            finished = websocket.receive_json()
+    finally:
+        app.dependency_overrides.pop(get_live_diagnostics_output_dir, None)
+
+    assert started["type"] == "diagnostics.wav.started"
+    assert stopped["type"] == "diagnostics.wav.stopped"
+    assert stopped["reason"] == "limit_exceeded"
+    assert stopped["capture_id"] == started["capture_id"]
+    assert finished["type"] == "session.finished"
+
+
 def test_live_realtime_stream_rejects_missing_session(client: TestClient) -> None:
     """Live realtime stream should reject unknown sessions."""
     with client.websocket_connect(

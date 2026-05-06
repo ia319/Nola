@@ -245,31 +245,26 @@ class LiveRealtimeWavDiagnosticsSession:
             track_ids=self._track_ids,
         )
 
-    def record_frame(self, frame: LiveRealtimePcm16Frame) -> None:
+    def record_frame(
+        self,
+        frame: LiveRealtimePcm16Frame,
+    ) -> LiveRealtimeDiagnosticsWavStopped | None:
         """Write one validated PCM frame to its track WAV file."""
         if not self._active or not self._should_write_track(frame.track_id):
-            return
+            return None
 
         writer_entry = self._writers.get(frame.track_id)
         writer = writer_entry[1] if writer_entry is not None else None
         current_duration_ms = writer.duration_ms if writer is not None else 0
         projected_duration_ms = current_duration_ms + frame.duration_ms
         if projected_duration_ms > self._max_duration_ms:
-            self.close_silently(reason="limit_exceeded")
-            raise LiveRealtimeSessionError(
-                code="diagnostics_wav_limit_exceeded",
-                message="Diagnostics WAV duration limit was exceeded",
-            )
+            return self.stop_best_effort(reason="limit_exceeded")
 
         projected_bytes = self.total_file_byte_length + len(frame.payload)
         if writer is None:
             projected_bytes += _WAV_HEADER_BYTES
         if projected_bytes > self._max_bytes:
-            self.close_silently(reason="limit_exceeded")
-            raise LiveRealtimeSessionError(
-                code="diagnostics_wav_limit_exceeded",
-                message="Diagnostics WAV file size limit was exceeded",
-            )
+            return self.stop_best_effort(reason="limit_exceeded")
 
         if writer is None:
             writer = Pcm16WavWriter(
@@ -280,12 +275,10 @@ class LiveRealtimeWavDiagnosticsSession:
 
         try:
             writer.write_frame(frame.payload, duration_ms=frame.duration_ms)
-        except (OSError, wave.Error) as error:
-            self.close_silently(reason="write_failed")
-            raise LiveRealtimeSessionError(
-                code="diagnostics_wav_write_failed",
-                message="Diagnostics WAV frame could not be written",
-            ) from error
+        except (OSError, wave.Error):
+            return self.stop_best_effort(reason="write_failed")
+
+        return None
 
     def stop(
         self,
@@ -324,6 +317,15 @@ class LiveRealtimeWavDiagnosticsSession:
             self._write_manifest(status="stopped", reason=reason)
         except (OSError, wave.Error):
             pass
+
+    def stop_best_effort(
+        self,
+        *,
+        reason: LiveRealtimeDiagnosticsWavStopReason,
+    ) -> LiveRealtimeDiagnosticsWavStopped:
+        """Stop diagnostics without making optional capture fatal."""
+        self.close_silently(reason=reason)
+        return self._stopped_event(reason=reason)
 
     def _should_write_track(self, track_id: str) -> bool:
         return self._track_ids is None or track_id in self._track_ids

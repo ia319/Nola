@@ -20,6 +20,7 @@ import type {
   LiveRealtimeDiagnosticsWavStartOptions,
   LiveRealtimeServerEvent,
   LiveRealtimeTransport,
+  LiveRealtimeTransportStateChange,
 } from '../transport/types'
 import type { LiveDurationMs, LiveUnsubscribe } from '../types'
 import {
@@ -303,8 +304,14 @@ export class LiveRealtimeSessionService {
       }),
       transport.onStateChange((change) => {
         useLiveRealtimeStore.getState().setLiveRealtimeConnectionState(change)
-        if (change.state === 'failed' && change.error) {
-          this.handleRuntimeFailure(new LiveRealtimeSessionError(toRuntimeError(change.error)))
+        if (
+          change.state === 'failed' ||
+          (change.state === 'closed' &&
+            this.runState !== 'finishing' &&
+            this.runState !== 'finished' &&
+            this.runState !== 'failed')
+        ) {
+          this.handleRuntimeFailure(createTransportStateError(change))
         }
       }),
     )
@@ -385,19 +392,9 @@ export class LiveRealtimeSessionService {
           }
         }),
         transport.onStateChange((change) => {
-          if (change.state === 'failed') {
+          if (change.state === 'failed' || change.state === 'closed') {
             cleanup()
-            reject(
-              new LiveRealtimeSessionError(
-                change.error
-                  ? toRuntimeError(change.error)
-                  : {
-                      code: 'websocket_closed',
-                      message: 'Live realtime transport failed',
-                      retryable: false,
-                    },
-              ),
-            )
+            reject(createTransportStateError(change))
           }
         }),
         () => {
@@ -437,19 +434,9 @@ export class LiveRealtimeSessionService {
           }
         }),
         transport.onStateChange((change) => {
-          if (change.state === 'failed') {
+          if (change.state === 'failed' || change.state === 'closed') {
             cleanup()
-            reject(
-              new LiveRealtimeSessionError(
-                change.error
-                  ? toRuntimeError(change.error)
-                  : {
-                      code: 'websocket_closed',
-                      message: 'Live realtime transport failed',
-                      retryable: false,
-                    },
-              ),
-            )
+            reject(createTransportStateError(change))
           }
         }),
         () => {
@@ -656,6 +643,23 @@ function toRuntimeError(error: LiveRealtimeRuntimeError): LiveRealtimeRuntimeErr
     message: error.message,
     retryable: error.retryable,
   }
+}
+
+function createTransportStateError(
+  change: LiveRealtimeTransportStateChange,
+): LiveRealtimeSessionError {
+  return new LiveRealtimeSessionError(
+    change.error
+      ? toRuntimeError(change.error)
+      : {
+          code: 'websocket_closed',
+          message:
+            change.state === 'closed'
+              ? 'Live realtime transport closed'
+              : 'Live realtime transport failed',
+          retryable: false,
+        },
+  )
 }
 
 function normalizeLiveRealtimeSessionError(

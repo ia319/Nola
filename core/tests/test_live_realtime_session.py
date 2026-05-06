@@ -12,6 +12,8 @@ from nola.application.live.realtime import (
     LiveRealtimeSessionRuntime,
     LiveRealtimeTrackStart,
     LiveRealtimeTrackStop,
+    LiveRealtimeTranscriberFrame,
+    LiveRealtimeTranscriberResult,
     LiveRealtimeTranscriptFinal,
     LiveRealtimeTranscriptPartial,
 )
@@ -281,6 +283,69 @@ def test_realtime_session_uses_unique_wav_diagnostics_directories(
     assert Path(second_stopped.manifest_path).exists()
 
 
+def test_realtime_session_stops_wav_diagnostics_on_limit_without_failing(
+    tmp_path: Path,
+) -> None:
+    """Realtime runtime should stop optional diagnostics when limits are reached."""
+    output_dir = tmp_path / "diagnostics"
+    repository_root = tmp_path / "repo"
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+    runtime = LiveRealtimeSessionRuntime(
+        live_store=live_store,
+        session_id="live-001",
+        track_id_factory=lambda: "track-001",
+        timestamp_factory=lambda: "2026-01-01T00:00:00+00:00",
+        diagnostics_output_dir=output_dir,
+        repository_root=repository_root,
+    )
+    runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
+    runtime.start_track(_start_event())
+    runtime.start_diagnostics_wav(
+        LiveRealtimeDiagnosticsWavStart(
+            max_duration_ms=20,
+            max_bytes=4096,
+            track_ids=None,
+        )
+    )
+
+    first_result = runtime.accept_audio_frame(_audio_metadata(), b"\x00" * 640)
+    second_result = runtime.accept_audio_frame(
+        _audio_metadata(sequence=1, captured_at_ms=20),
+        b"\x00" * 640,
+    )
+    third_result = runtime.accept_audio_frame(
+        _audio_metadata(sequence=2, captured_at_ms=40),
+        b"\x00" * 640,
+    )
+
+    assert first_result.diagnostics_wav_stopped is None
+    assert second_result.diagnostics_wav_stopped is not None
+    assert second_result.diagnostics_wav_stopped.reason == "limit_exceeded"
+    assert third_result.diagnostics_wav_stopped is None
+    assert runtime.diagnostics_wav_active is False
+    assert runtime.active_track_count == 1
+
+
+def test_realtime_session_release_is_idempotent() -> None:
+    """Realtime runtime should release transcriber state once."""
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+    transcriber = _CountingTranscriber()
+    runtime = LiveRealtimeSessionRuntime(
+        live_store=live_store,
+        session_id="live-001",
+        track_id_factory=lambda: "track-001",
+        timestamp_factory=lambda: "2026-01-01T00:00:00+00:00",
+        transcriber=transcriber,
+    )
+    runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
+    runtime.start_track(_start_event())
+
+    runtime.finish()
+    runtime.release()
+
+    assert transcriber.release_count == 1
+
+
 def test_realtime_session_emits_mock_transcripts_and_persists_final() -> None:
     """Realtime runtime should send partials and persist final transcript segments."""
     live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
@@ -303,7 +368,7 @@ def test_realtime_session_emits_mock_transcripts_and_persists_final() -> None:
                 captured_at_ms=sequence * 20,
             ),
             b"\x00" * 640,
-        )
+        ).transcript_events
     )
     assert live_store.count_segments("live-001") == 0
 
@@ -316,7 +381,7 @@ def test_realtime_session_emits_mock_transcripts_and_persists_final() -> None:
                 captured_at_ms=sequence * 20,
             ),
             b"\x00" * 640,
-        )
+        ).transcript_events
     )
 
     assert len(partial_events) == 1
@@ -331,3 +396,17 @@ def test_realtime_session_emits_mock_transcripts_and_persists_final() -> None:
     assert final_events[0].end_ms == 1000
     assert final_events[0].text == "Mock microphone segment 1"
     assert live_store.count_segments("live-001") == 1
+
+
+class _CountingTranscriber:
+    def __init__(self) -> None:
+        self.release_count = 0
+
+    def accept_frame(
+        self,
+        _frame: LiveRealtimeTranscriberFrame,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return ()
+
+    def release(self) -> None:
+        self.release_count += 1

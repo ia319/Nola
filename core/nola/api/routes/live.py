@@ -407,11 +407,19 @@ async def stream_live_session_endpoint(
                 )
                 runtime.validate_audio_frame_metadata(audio_frame)
                 audio_payload = await _receive_audio_payload(websocket)
-                transcript_events = runtime.accept_audio_frame(
+                audio_frame_result = runtime.accept_audio_frame(
                     audio_frame,
                     audio_payload,
                 )
-                for transcript_event in transcript_events:
+                if audio_frame_result.diagnostics_wav_stopped is not None:
+                    await websocket.send_json(
+                        build_diagnostics_wav_stopped_event(
+                            session_id=session_id,
+                            stopped=audio_frame_result.diagnostics_wav_stopped,
+                        ).model_dump(mode="json")
+                    )
+
+                for transcript_event in audio_frame_result.transcript_events:
                     if isinstance(transcript_event, LiveRealtimeTranscriptPartial):
                         await websocket.send_json(
                             build_transcript_partial_event(

@@ -64,6 +64,14 @@ class LiveRealtimeTrackStop:
     sequence: int
 
 
+@dataclass(frozen=True)
+class LiveRealtimeAudioFrameResult:
+    """Carry runtime effects from one accepted audio frame."""
+
+    transcript_events: tuple[LiveRealtimeTranscriptEvent, ...]
+    diagnostics_wav_stopped: LiveRealtimeDiagnosticsWavStopped | None = None
+
+
 @dataclass
 class _LiveRealtimeTrackState:
     """Track connection-local audio ordering state."""
@@ -104,6 +112,7 @@ class LiveRealtimeSessionRuntime:
         self._tracks: dict[str, _LiveRealtimeTrackState] = {}
         self._diagnostics_wav: LiveRealtimeWavDiagnosticsSession | None = None
         self._next_segment_sequence = 1
+        self._released = False
 
     @property
     def handshake_complete(self) -> bool:
@@ -187,17 +196,23 @@ class LiveRealtimeSessionRuntime:
         self,
         event: LiveRealtimeAudioFrameMetadata,
         payload: bytes,
-    ) -> tuple[LiveRealtimeTranscriptEvent, ...]:
+    ) -> LiveRealtimeAudioFrameResult:
         """Validate one audio frame payload and return transcript events."""
         state = self._get_expected_audio_track(event)
         frame = build_pcm16le_frame(metadata=event, payload=payload)
 
+        diagnostics_wav_stopped: LiveRealtimeDiagnosticsWavStopped | None = None
         if self._diagnostics_wav is not None:
-            self._diagnostics_wav.record_frame(frame)
+            diagnostics_wav_stopped = self._diagnostics_wav.record_frame(frame)
+            if diagnostics_wav_stopped is not None:
+                self._diagnostics_wav = None
 
         transcript_events = self._accept_frame_for_transcription(frame)
         self._commit_audio_frame_metadata(state, event)
-        return transcript_events
+        return LiveRealtimeAudioFrameResult(
+            transcript_events=transcript_events,
+            diagnostics_wav_stopped=diagnostics_wav_stopped,
+        )
 
     def _accept_frame_for_transcription(
         self,
@@ -420,6 +435,10 @@ class LiveRealtimeSessionRuntime:
 
     def release(self) -> None:
         """Clear connection-local track buffers."""
+        if self._released:
+            return
+
+        self._released = True
         if self._diagnostics_wav is not None and self._diagnostics_wav.active:
             self._diagnostics_wav.close_silently(reason="connection_closed")
             self._diagnostics_wav = None
