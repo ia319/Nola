@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, TypeAlias
+from uuid import uuid4
 from wave import Wave_write
 
 from nola.application.live.realtime.audio import LiveRealtimePcm16Frame
@@ -49,6 +50,7 @@ class LiveRealtimeDiagnosticsWavFile:
 
     track_id: str
     source: LiveTrackSource
+    file_name: str
     path: str
     duration_ms: int
     audio_byte_length: int
@@ -59,6 +61,7 @@ class LiveRealtimeDiagnosticsWavFile:
         return {
             "track_id": self.track_id,
             "source": self.source,
+            "file_name": self.file_name,
             "path": self.path,
             "duration_ms": self.duration_ms,
             "audio_byte_length": self.audio_byte_length,
@@ -70,6 +73,8 @@ class LiveRealtimeDiagnosticsWavFile:
 class LiveRealtimeDiagnosticsWavStarted:
     """Describe a started diagnostics WAV capture."""
 
+    capture_id: str
+    manifest_name: str
     output_dir: str
     manifest_path: str
     max_duration_ms: int
@@ -81,6 +86,8 @@ class LiveRealtimeDiagnosticsWavStarted:
 class LiveRealtimeDiagnosticsWavStopped:
     """Describe a stopped diagnostics WAV capture."""
 
+    capture_id: str
+    manifest_name: str
     output_dir: str
     manifest_path: str
     files: tuple[LiveRealtimeDiagnosticsWavFile, ...]
@@ -137,6 +144,7 @@ class Pcm16WavWriter:
         return LiveRealtimeDiagnosticsWavFile(
             track_id=track_id,
             source=source,
+            file_name=self.path.name,
             path=str(self.path),
             duration_ms=self._duration_ms,
             audio_byte_length=self._audio_byte_length,
@@ -206,7 +214,7 @@ class LiveRealtimeWavDiagnosticsSession:
         )
         output_dir = base_dir / _diagnostics_session_name(session_id)
         try:
-            output_dir.mkdir(parents=True, exist_ok=True)
+            output_dir.mkdir(exist_ok=False)
         except OSError as error:
             raise LiveRealtimeSessionError(
                 code="diagnostics_wav_write_failed",
@@ -228,6 +236,8 @@ class LiveRealtimeWavDiagnosticsSession:
     def started_event(self) -> LiveRealtimeDiagnosticsWavStarted:
         """Return public metadata for a started diagnostics session."""
         return LiveRealtimeDiagnosticsWavStarted(
+            capture_id=self._output_dir.name,
+            manifest_name=self._manifest_path.name,
             output_dir=str(self._output_dir),
             manifest_path=str(self._manifest_path),
             max_duration_ms=self._max_duration_ms,
@@ -330,6 +340,8 @@ class LiveRealtimeWavDiagnosticsSession:
         reason: LiveRealtimeDiagnosticsWavStopReason,
     ) -> LiveRealtimeDiagnosticsWavStopped:
         return LiveRealtimeDiagnosticsWavStopped(
+            capture_id=self._output_dir.name,
+            manifest_name=self._manifest_path.name,
             output_dir=str(self._output_dir),
             manifest_path=str(self._manifest_path),
             files=self._files(),
@@ -430,7 +442,7 @@ def _resolve_max_bytes(value: int | None) -> int:
 
 def _diagnostics_session_name(session_id: str) -> str:
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    return f"{_safe_filename(session_id)}-{timestamp}"
+    return f"{_safe_filename(session_id)}-{timestamp}-{uuid4().hex[:12]}"
 
 
 def _safe_filename(value: str) -> str:

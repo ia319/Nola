@@ -154,8 +154,12 @@ def test_realtime_session_finish_releases_track_state() -> None:
     runtime.start_track(_start_event())
 
     payload = runtime.finish()
+    tracks = live_store.list_tracks("live-001")
 
     assert payload["status"] == "finished"
+    assert payload["ended_at"] == "2026-01-01T00:00:00+00:00"
+    assert payload["tracks"][0]["ended_at"] == "2026-01-01T00:00:00+00:00"
+    assert tracks[0]["ended_at"] == "2026-01-01T00:00:00+00:00"
     assert runtime.finished_normally is True
     assert runtime.active_track_count == 0
 
@@ -224,11 +228,57 @@ def test_realtime_session_writes_explicit_wav_diagnostics(tmp_path: Path) -> Non
     runtime.accept_audio_frame(_audio_metadata(), b"\x00" * 640)
     stopped = runtime.stop_diagnostics_wav(reason="client_stop")
 
+    assert started.capture_id.startswith("live-001-")
+    assert started.manifest_name == "manifest.json"
     assert started.manifest_path.endswith("manifest.json")
     assert stopped.reason == "client_stop"
+    assert stopped.capture_id == started.capture_id
+    assert stopped.manifest_name == "manifest.json"
     assert len(stopped.files) == 1
     assert stopped.files[0].track_id == "track-001"
+    assert stopped.files[0].file_name == "track-001-microphone.wav"
     assert stopped.files[0].duration_ms == 20
+
+
+def test_realtime_session_uses_unique_wav_diagnostics_directories(
+    tmp_path: Path,
+) -> None:
+    """Realtime runtime should isolate repeated diagnostics captures."""
+    output_dir = tmp_path / "diagnostics"
+    repository_root = tmp_path / "repo"
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+    runtime = LiveRealtimeSessionRuntime(
+        live_store=live_store,
+        session_id="live-001",
+        track_id_factory=lambda: "track-001",
+        timestamp_factory=lambda: "2026-01-01T00:00:00+00:00",
+        diagnostics_output_dir=output_dir,
+        repository_root=repository_root,
+    )
+    runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
+    runtime.start_track(_start_event())
+
+    first_started = runtime.start_diagnostics_wav(
+        LiveRealtimeDiagnosticsWavStart(
+            max_duration_ms=1000,
+            max_bytes=4096,
+            track_ids=None,
+        )
+    )
+    first_stopped = runtime.stop_diagnostics_wav(reason="client_stop")
+    second_started = runtime.start_diagnostics_wav(
+        LiveRealtimeDiagnosticsWavStart(
+            max_duration_ms=1000,
+            max_bytes=4096,
+            track_ids=None,
+        )
+    )
+    second_stopped = runtime.stop_diagnostics_wav(reason="client_stop")
+
+    assert first_started.capture_id != second_started.capture_id
+    assert first_stopped.output_dir != second_stopped.output_dir
+    assert Path(first_stopped.manifest_path).exists()
+    assert Path(second_stopped.manifest_path).exists()
 
 
 def test_realtime_session_emits_mock_transcripts_and_persists_final() -> None:

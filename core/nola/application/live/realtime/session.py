@@ -375,13 +375,38 @@ class LiveRealtimeSessionRuntime:
         if self._diagnostics_wav is not None and self._diagnostics_wav.active:
             self._diagnostics_wav.close_silently(reason="session_finish")
             self._diagnostics_wav = None
+        ended_at = self._timestamp_factory()
+        self._finish_open_tracks(ended_at=ended_at)
         payload = finish_live_session(
             live_store=self._live_store,
             session_id=self._session_id,
+            timestamp_factory=lambda: ended_at,
         )
         self._finished_normally = True
         self.release()
         return payload
+
+    def _finish_open_tracks(self, *, ended_at: str) -> None:
+        for track_id in tuple(self._tracks):
+            try:
+                track = self._live_store.finish_track(
+                    track_id,
+                    self._session_id,
+                    ended_at=ended_at,
+                )
+            except Exception as error:
+                raise LiveRealtimeSessionError(
+                    code="repository_write_failed",
+                    message="Live track could not be stopped",
+                ) from error
+
+            if track is None:
+                raise LiveRealtimeSessionError(
+                    code="repository_write_failed",
+                    message="Live track could not be stopped",
+                )
+
+            self._tracks.pop(track_id, None)
 
     def fail_after_disconnect(self) -> None:
         """Fail one handshaked session after an unexpected disconnect."""
