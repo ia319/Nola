@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { useLiveRealtimeStore } from '../live-realtime-store'
+import { LIVE_REALTIME_FINAL_TRANSCRIPT_LIMIT, useLiveRealtimeStore } from '../live-realtime-store'
 import type {
   LiveRealtimeTranscriptFinalPayload,
   LiveRealtimeTranscriptPartialPayload,
@@ -46,6 +46,19 @@ describe('live realtime store', () => {
     expect(state.finalTranscripts).toHaveLength(1)
     expect(state.finalTranscripts[0]?.text).toBe('final text')
   })
+
+  it('keeps only the newest final transcripts in memory', () => {
+    const store = useLiveRealtimeStore.getState()
+
+    for (let sequence = 1; sequence <= LIVE_REALTIME_FINAL_TRANSCRIPT_LIMIT + 1; sequence += 1) {
+      store.appendLiveRealtimeFinal(finalTranscript('track-1', sequence))
+    }
+
+    const state = useLiveRealtimeStore.getState()
+    expect(state.finalTranscripts).toHaveLength(LIVE_REALTIME_FINAL_TRANSCRIPT_LIMIT)
+    expect(state.finalTranscripts[0]?.sequence).toBe(2)
+    expect(state.finalTranscripts.at(-1)?.sequence).toBe(LIVE_REALTIME_FINAL_TRANSCRIPT_LIMIT + 1)
+  })
 })
 
 function liveTrack(sessionId: string, trackId: string, source: LiveTrack['source']): LiveTrack {
@@ -77,13 +90,13 @@ function partialTranscript(trackId: string): LiveRealtimeTranscriptPartialPayloa
   }
 }
 
-function finalTranscript(trackId: string): LiveRealtimeTranscriptFinalPayload {
+function finalTranscript(trackId: string, sequence = 1): LiveRealtimeTranscriptFinalPayload {
   return {
-    segment_id: 'segment-1',
+    segment_id: `segment-${sequence}`,
     session_id: 'session-1',
     track_id: trackId,
     source: 'microphone',
-    sequence: 1,
+    sequence,
     start_ms: 0,
     end_ms: 1000,
     text: 'final text',

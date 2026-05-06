@@ -14,6 +14,8 @@ import type {
 import type { LiveAudioSourceKind } from '../capture/types'
 import type { LiveSessionDetail, LiveTrack } from '@/shared/types'
 
+export const LIVE_REALTIME_FINAL_TRANSCRIPT_LIMIT = 1000
+
 export type LiveRealtimeRunState =
   | 'idle'
   | 'starting'
@@ -189,9 +191,13 @@ export const useLiveRealtimeStore = create<LiveRealtimeRuntimeState>((set) => ({
       }
       delete latestPartialsByTrackId[final.track_id]
 
+      const finalTranscripts = [...state.finalTranscripts, final].slice(
+        -LIVE_REALTIME_FINAL_TRANSCRIPT_LIMIT,
+      )
+
       return {
         latestPartialsByTrackId,
-        finalTranscripts: [...state.finalTranscripts, final],
+        finalTranscripts,
       }
     }),
 
