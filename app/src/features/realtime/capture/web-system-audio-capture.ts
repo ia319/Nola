@@ -67,6 +67,7 @@ export async function startSystemAudioCapture(
       deviceId: null,
       stream,
       levelSampleIntervalMs: options.levelSampleIntervalMs,
+      audioFrameDurationMs: options.audioFrameDurationMs,
     })
   } catch (error) {
     stopStreamTracks(stream)

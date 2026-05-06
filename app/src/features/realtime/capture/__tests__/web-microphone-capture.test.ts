@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { startMicrophoneCapture } from '../web-microphone-capture'
+import type { RealtimeAudioFrame } from '../types'
 
 interface MockTrack {
   enabled: boolean
@@ -40,8 +41,17 @@ function installAudioContextMock(sample = 255) {
     connect: vi.fn(),
     disconnect: vi.fn(),
   }
+  const processor = {
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    onaudioprocess: null as ((event: AudioProcessingEvent) => void) | null,
+  }
+  const destination = {}
   const close = vi.fn().mockResolvedValue(undefined)
   class MockAudioContext {
+    sampleRate = 48000
+    destination = destination
+
     createAnalyser() {
       return analyser
     }
@@ -50,11 +60,29 @@ function installAudioContextMock(sample = 255) {
       return source
     }
 
+    createScriptProcessor() {
+      return processor
+    }
+
     close = close
   }
 
   vi.stubGlobal('AudioContext', MockAudioContext)
-  return { analyser, close, source }
+  return { analyser, close, processor, source }
+}
+
+function buildAudioProcessEvent(samples: Float32Array): AudioProcessingEvent {
+  return {
+    inputBuffer: {
+      sampleRate: 48000,
+      numberOfChannels: 1,
+      getChannelData: () => samples,
+    },
+    outputBuffer: {
+      numberOfChannels: 1,
+      getChannelData: () => new Float32Array(samples.length),
+    },
+  } as unknown as AudioProcessingEvent
 }
 
 describe('startMicrophoneCapture', () => {
@@ -123,6 +151,42 @@ describe('startMicrophoneCapture', () => {
     expect(getUserMedia).toHaveBeenCalledWith({ audio: true })
     expect(session.deviceId).toBeNull()
     expect(levels[0]).toBeGreaterThan(0)
+
+    await session.stop()
+  })
+
+  it('emits realtime PCM audio frames from microphone capture', async () => {
+    const { processor } = installAudioContextMock()
+    const track = buildTrack()
+    const stream = buildStream([track])
+    vi.stubGlobal('navigator', {
+      mediaDevices: {
+        getUserMedia: vi.fn().mockResolvedValue(stream),
+      },
+    })
+
+    const session = await startMicrophoneCapture()
+    const frames: RealtimeAudioFrame[] = []
+    session.onAudioFrame((frame) => frames.push(frame))
+
+    const samples = new Float32Array(960)
+    samples.fill(0.5)
+    expect(processor.onaudioprocess).toBeDefined()
+    processor.onaudioprocess?.(buildAudioProcessEvent(samples))
+
+    expect(frames).toHaveLength(1)
+    expect(frames[0]).toMatchObject({
+      source: 'microphone',
+      sequence: 0,
+      sampleRate: 16000,
+      channelCount: 1,
+      format: 'pcm_s16le',
+      durationMs: 20,
+      capturedAtMs: 0,
+    })
+    expect(frames[0].payload.byteLength).toBe(640)
+    expect(new DataView(frames[0].payload).getInt16(0, true)).toBe(16384)
+    expect(new DataView(frames[0].payload).getInt16(638, true)).toBe(16384)
 
     await session.stop()
   })

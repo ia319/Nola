@@ -11,6 +11,7 @@ import type {
   LiveCaptureSession,
   LiveCaptureState,
   LiveCaptureStateChange,
+  RealtimeAudioFrame,
 } from '../../capture/types'
 import type {
   LiveAudioDeviceRepository,
@@ -118,6 +119,7 @@ function createDeviceRepository(
 
 function createCaptureSession(sourceKind: LiveAudioSourceKind, deviceId: string | null) {
   const levelCallbacks = new Set<(level: LiveAudioLevel) => void>()
+  const audioFrameCallbacks = new Set<(frame: RealtimeAudioFrame) => void>()
   const stateCallbacks = new Set<(change: LiveCaptureStateChange) => void>()
   const session: MockLiveCaptureSession = {
     id: `${sourceKind}-session-1`,
@@ -138,6 +140,12 @@ function createCaptureSession(sourceKind: LiveAudioSourceKind, deviceId: string 
       levelCallbacks.add(callback)
       return () => {
         levelCallbacks.delete(callback)
+      }
+    },
+    onAudioFrame: (callback: (frame: RealtimeAudioFrame) => void): LiveUnsubscribe => {
+      audioFrameCallbacks.add(callback)
+      return () => {
+        audioFrameCallbacks.delete(callback)
       }
     },
     onStateChange: (callback: (change: LiveCaptureStateChange) => void): LiveUnsubscribe => {

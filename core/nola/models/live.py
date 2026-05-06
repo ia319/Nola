@@ -222,6 +222,29 @@ class LiveDatabase:
             )
             return [self._to_track_record(row) for row in cursor.fetchall()]
 
+    def finish_track(
+        self,
+        track_id: str,
+        session_id: str,
+        *,
+        ended_at: str,
+    ) -> LiveTrackRecord | None:
+        """Mark one active live track finished and return the updated row."""
+        with closing(self._connect()) as conn:
+            with conn:
+                cursor = conn.execute(
+                    """
+                    UPDATE live_tracks
+                    SET ended_at = ?
+                    WHERE id = ? AND session_id = ? AND ended_at IS NULL
+                    RETURNING *
+                    """,
+                    (ended_at, track_id, session_id),
+                )
+                row = cursor.fetchone()
+
+        return self._to_track_record(row) if row is not None else None
+
     def create_segment(
         self,
         *,

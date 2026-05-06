@@ -4,6 +4,7 @@ import { waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { startSystemAudioCapture } from '../web-system-audio-capture'
+import type { RealtimeAudioFrame } from '../types'
 
 const originalSetSinkIdDescriptor = Object.getOwnPropertyDescriptor(
   HTMLMediaElement.prototype,
@@ -47,8 +48,17 @@ function installAudioContextMock(sample = 255) {
     connect: vi.fn(),
     disconnect: vi.fn(),
   }
+  const processor = {
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    onaudioprocess: null as ((event: AudioProcessingEvent) => void) | null,
+  }
+  const destination = {}
   const close = vi.fn().mockResolvedValue(undefined)
   class MockAudioContext {
+    sampleRate = 48000
+    destination = destination
+
     createAnalyser() {
       return analyser
     }
@@ -57,11 +67,29 @@ function installAudioContextMock(sample = 255) {
       return source
     }
 
+    createScriptProcessor() {
+      return processor
+    }
+
     close = close
   }
 
   vi.stubGlobal('AudioContext', MockAudioContext)
-  return { close, source }
+  return { close, processor, source }
+}
+
+function buildAudioProcessEvent(left: Float32Array, right: Float32Array): AudioProcessingEvent {
+  return {
+    inputBuffer: {
+      sampleRate: 48000,
+      numberOfChannels: 2,
+      getChannelData: (index: number) => (index === 0 ? left : right),
+    },
+    outputBuffer: {
+      numberOfChannels: 1,
+      getChannelData: () => new Float32Array(left.length),
+    },
+  } as unknown as AudioProcessingEvent
 }
 
 function restoreSpeakerSelectionSupport(): void {
@@ -138,6 +166,45 @@ describe('startSystemAudioCapture', () => {
     await session.stop()
     expect(audioTrack.stop).toHaveBeenCalledTimes(1)
     expect(videoTrack.stop).toHaveBeenCalledTimes(1)
+  })
+
+  it('emits downmixed realtime PCM audio frames from system capture', async () => {
+    const { processor } = installAudioContextMock()
+    const audioTrack = buildTrack('audio')
+    const videoTrack = buildTrack('video')
+    const stream = buildStream([audioTrack, videoTrack])
+    vi.stubGlobal('navigator', {
+      mediaDevices: {
+        getDisplayMedia: vi.fn().mockResolvedValue(stream),
+      },
+    })
+
+    const session = await startSystemAudioCapture()
+    const frames: RealtimeAudioFrame[] = []
+    session.onAudioFrame((frame) => frames.push(frame))
+
+    const left = new Float32Array(960)
+    const right = new Float32Array(960)
+    left.fill(1)
+    right.fill(-1)
+    expect(processor.onaudioprocess).toBeDefined()
+    processor.onaudioprocess?.(buildAudioProcessEvent(left, right))
+
+    expect(frames).toHaveLength(1)
+    expect(frames[0]).toMatchObject({
+      source: 'system',
+      sequence: 0,
+      sampleRate: 16000,
+      channelCount: 1,
+      format: 'pcm_s16le',
+      durationMs: 20,
+      capturedAtMs: 0,
+    })
+    expect(new DataView(frames[0].payload).getInt16(0, true)).toBe(0)
+    expect(new DataView(frames[0].payload).getInt16(320, true)).toBe(0)
+    expect(new DataView(frames[0].payload).getInt16(638, true)).toBe(0)
+
+    await session.stop()
   })
 
   it('stops returned tracks when display media has no audio track', async () => {

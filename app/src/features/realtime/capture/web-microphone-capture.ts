@@ -68,6 +68,7 @@ export async function startMicrophoneCapture(
       deviceId,
       stream,
       levelSampleIntervalMs: options.levelSampleIntervalMs,
+      audioFrameDurationMs: options.audioFrameDurationMs,
     })
   } catch (error) {
     stopStreamTracks(stream)

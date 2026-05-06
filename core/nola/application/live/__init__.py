@@ -1,6 +1,10 @@
 """Live transcription application-layer exports."""
 
-from nola.application.live.actions import create_live_session, finish_live_session
+from nola.application.live.actions import (
+    create_live_session,
+    fail_live_session,
+    finish_live_session,
+)
 from nola.application.live.contracts import (
     SupportsLiveRepository,
     SupportsLiveSegmentMutations,
@@ -76,6 +80,7 @@ __all__ = [
     "build_live_session_list_payload",
     "build_live_session_payload",
     "create_live_session",
+    "fail_live_session",
     "finish_live_session",
     "get_live_session",
     "list_live_sessions",

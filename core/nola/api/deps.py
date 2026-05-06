@@ -1,7 +1,12 @@
 """API dependency injection."""
 
 from functools import lru_cache
+from pathlib import Path
 
+from nola.application.live.realtime import (
+    LiveStreamConnectionRegistry,
+    default_diagnostics_output_dir,
+)
 from nola.application.models import ModelOperationLocks
 from nola.common.event_bus import EventBus, event_bus
 from nola.config import settings
@@ -25,6 +30,17 @@ def get_task_db() -> TaskDatabase:
 def get_live_db() -> LiveDatabase:
     """Get live database instance (singleton)."""
     return LiveDatabase(settings.db_path)
+
+
+@lru_cache
+def get_live_stream_connection_registry() -> LiveStreamConnectionRegistry:
+    """Get live stream connection registry instance."""
+    return LiveStreamConnectionRegistry()
+
+
+def get_live_diagnostics_output_dir() -> Path:
+    """Return the default live diagnostics output directory."""
+    return default_diagnostics_output_dir()
 
 
 @lru_cache

@@ -192,6 +192,40 @@ def test_create_tracks_and_segments(live_database):
     assert live_db.count_segments("live-001") == 2
 
 
+def test_finish_track_only_updates_open_track(live_database):
+    """finish_track() should persist one open live track end timestamp."""
+    live_db = live_database
+    _create_session(live_db)
+    live_db.create_track(
+        track_id="track-001",
+        session_id="live-001",
+        source="microphone",
+        label="Mic",
+        device_label="Built-in microphone",
+        sample_rate=16000,
+        channel_count=1,
+        started_at="2026-01-01T00:00:00",
+        ended_at=None,
+        created_at="2026-01-01T00:00:00",
+    )
+
+    finished = live_db.finish_track(
+        "track-001",
+        "live-001",
+        ended_at="2026-01-01T00:01:00",
+    )
+    repeated = live_db.finish_track(
+        "track-001",
+        "live-001",
+        ended_at="2026-01-01T00:02:00",
+    )
+
+    assert finished is not None
+    assert finished["ended_at"] == "2026-01-01T00:01:00"
+    assert repeated is None
+    assert live_db.list_tracks("live-001")[0]["ended_at"] == "2026-01-01T00:01:00"
+
+
 def test_create_segment_allows_untracked_segment(live_database):
     """Live segments may be stored before a source track is known."""
     live_db = live_database

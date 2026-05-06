@@ -1,4 +1,5 @@
 import { AudioLevelMeter } from './audio-level-meter'
+import { AudioFrameEmitter } from './audio-frame-emitter'
 import type {
   LiveAudioLevel,
   LiveAudioSourceKind,
@@ -6,6 +7,7 @@ import type {
   LiveCaptureSession,
   LiveCaptureState,
   LiveCaptureStateChange,
+  RealtimeAudioFrame,
 } from './types'
 import type { LiveDurationMs, LiveTimestampMs, LiveUnsubscribe } from '../types'
 
@@ -14,6 +16,7 @@ interface CreateLiveCaptureSessionOptions {
   deviceId: string | null
   stream: MediaStream
   levelSampleIntervalMs?: LiveDurationMs
+  audioFrameDurationMs?: LiveDurationMs
 }
 
 let captureSessionSequence = 0
@@ -40,6 +43,7 @@ export class WebLiveCaptureSession implements LiveCaptureSession {
   readonly startedAt: LiveTimestampMs
   private readonly stream: MediaStream
   private readonly levelMeter: AudioLevelMeter
+  private readonly audioFrameEmitter: AudioFrameEmitter
   private readonly stateCallbacks = new Set<(change: LiveCaptureStateChange) => void>()
   private readonly trackEndedHandler = () => {
     void this.handleInterrupted()
@@ -56,8 +60,14 @@ export class WebLiveCaptureSession implements LiveCaptureSession {
     this.levelMeter = new AudioLevelMeter(options.stream, {
       levelSampleIntervalMs: options.levelSampleIntervalMs,
     })
+    this.audioFrameEmitter = new AudioFrameEmitter({
+      sourceKind: options.sourceKind,
+      stream: options.stream,
+      frameDurationMs: options.audioFrameDurationMs,
+    })
     this.bindTrackEndListeners()
     this.levelMeter.start()
+    this.audioFrameEmitter.start()
   }
 
   async stop(): Promise<void> {
@@ -81,6 +91,7 @@ export class WebLiveCaptureSession implements LiveCaptureSession {
     for (const track of getStreamTracks(this.stream)) {
       track.enabled = false
     }
+    this.audioFrameEmitter.pause()
     this.setState('paused', null)
   }
 
@@ -92,11 +103,16 @@ export class WebLiveCaptureSession implements LiveCaptureSession {
     for (const track of getStreamTracks(this.stream)) {
       track.enabled = true
     }
+    this.audioFrameEmitter.resume()
     this.setState('capturing', null)
   }
 
   onLevel(callback: (level: LiveAudioLevel) => void): LiveUnsubscribe {
     return this.levelMeter.onLevel(callback)
+  }
+
+  onAudioFrame(callback: (frame: RealtimeAudioFrame) => void): LiveUnsubscribe {
+    return this.audioFrameEmitter.onAudioFrame(callback)
   }
 
   onStateChange(callback: (change: LiveCaptureStateChange) => void): LiveUnsubscribe {
@@ -123,6 +139,7 @@ export class WebLiveCaptureSession implements LiveCaptureSession {
   private async runCleanup(): Promise<void> {
     this.unbindTrackEndListeners()
     stopStreamTracks(this.stream)
+    await this.audioFrameEmitter.stop()
     await this.levelMeter.stop()
   }
 
