@@ -55,7 +55,7 @@ Keep the WhisperStreaming state relationships:
 - Use independent processor state for each Live track.
 - Use the current track accumulated audio buffer as inference input.
 - Use LocalAgreement-2 for stable text confirmation.
-- Use `last_commited_time - 0.1` as the timestamp boundary tolerance.
+- Use `last_committed_time - 0.1` as the timestamp boundary tolerance.
 - Compare 1 to 5 word n-grams between the committed tail and the new head for boundary deduplication.
 - Build prompt text from committed text that already scrolled out of the current audio buffer.
 - Treat context as committed text that still remains inside the current audio buffer and enters inference again.
@@ -94,7 +94,7 @@ Exclude these upstream parts from this module:
 - `line_packet.py` TCP line protocol.
 - Arbitrary `model_dir` input from upstream CLI.
 - Automatic model download behavior from upstream backend paths.
-- Silero VAC `torch.hub.load` path.
+- Silero VAD `torch.hub.load` path.
 - OpenAI API, MLX, and `whisper_timestamped` backend paths.
 
 ## License Source
