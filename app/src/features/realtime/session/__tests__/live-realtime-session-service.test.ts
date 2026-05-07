@@ -33,8 +33,8 @@ import type {
   LiveRealtimeTransportErrorShape,
   LiveRealtimeTransportStateCallback,
   LiveRealtimeTransportStateChange,
+  LiveRealtimeTranscriptCommittedPartialPayload,
   LiveRealtimeTranscriptFinalPayload,
-  LiveRealtimeTranscriptPartialPayload,
 } from '../../transport/types'
 import type { CreateLiveSessionRequest, LiveSessionDetail, LiveTrack } from '@/shared/types'
 
@@ -79,14 +79,14 @@ describe('LiveRealtimeSessionService', () => {
       durationMs: 20,
     })
 
-    setup.transport.emitEvent(transcriptPartialEvent('session-1', 'track-microphone-1'))
+    setup.transport.emitEvent(transcriptCommittedPartialEvent('session-1', 'track-microphone-1'))
     expect(
-      useLiveRealtimeStore.getState().latestPartialsByTrackId['track-microphone-1']?.text,
-    ).toBe('partial text')
+      useLiveRealtimeStore.getState().latestCommittedPartialsByTrackId['track-microphone-1']?.text,
+    ).toBe('committed partial text')
 
     setup.transport.emitEvent(transcriptFinalEvent('session-1', 'track-microphone-1'))
     const state = useLiveRealtimeStore.getState()
-    expect(state.latestPartialsByTrackId['track-microphone-1']).toBeUndefined()
+    expect(state.latestCommittedPartialsByTrackId['track-microphone-1']).toBeUndefined()
     expect(state.finalTranscripts[0]?.text).toBe('final text')
   })
 
@@ -549,10 +549,13 @@ function trackReadyEvent(
   }
 }
 
-function transcriptPartialEvent(sessionId: string, trackId: string): LiveRealtimeServerEvent {
+function transcriptCommittedPartialEvent(
+  sessionId: string,
+  trackId: string,
+): LiveRealtimeServerEvent {
   return {
-    ...serverEnvelope('transcript.partial', sessionId),
-    transcript: partialTranscript(trackId),
+    ...serverEnvelope('transcript.committed_partial', sessionId),
+    transcript: committedPartialTranscript(sessionId, trackId),
   }
 }
 
@@ -633,14 +636,19 @@ function liveTrack(
   }
 }
 
-function partialTranscript(trackId: string): LiveRealtimeTranscriptPartialPayload {
+function committedPartialTranscript(
+  sessionId: string,
+  trackId: string,
+): LiveRealtimeTranscriptCommittedPartialPayload {
   return {
+    result_kind: 'committed_partial',
+    session_id: sessionId,
     track_id: trackId,
     source: 'microphone',
-    partial_index: 1,
+    committed_index: 1,
     start_ms: 0,
     end_ms: 500,
-    text: 'partial text',
+    text: 'committed partial text',
     language: null,
     confidence: null,
     is_final: false,
@@ -649,6 +657,7 @@ function partialTranscript(trackId: string): LiveRealtimeTranscriptPartialPayloa
 
 function finalTranscript(sessionId: string, trackId: string): LiveRealtimeTranscriptFinalPayload {
   return {
+    result_kind: 'final',
     segment_id: 'segment-1',
     session_id: sessionId,
     track_id: trackId,

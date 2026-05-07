@@ -128,10 +128,12 @@ export type {
   LiveRealtimeTransportErrorShape,
   LiveRealtimeTransportStateCallback,
   LiveRealtimeTransportStateChange,
+  LiveRealtimeTranscriptCommittedPartialEvent,
+  LiveRealtimeTranscriptCommittedPartialPayload,
   LiveRealtimeTranscriptFinalEvent,
   LiveRealtimeTranscriptFinalPayload,
-  LiveRealtimeTranscriptPartialEvent,
-  LiveRealtimeTranscriptPartialPayload,
+  LiveRealtimeTranscriptPreviewEvent,
+  LiveRealtimeTranscriptPreviewPayload,
 } from './transport/types'
 export {
   LIVE_REALTIME_AUDIO_CHANNEL_COUNT,

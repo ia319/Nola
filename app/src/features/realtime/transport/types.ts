@@ -25,7 +25,8 @@ export type LiveRealtimeServerEventType =
   | 'track.ready'
   | 'diagnostics.wav.started'
   | 'diagnostics.wav.stopped'
-  | 'transcript.partial'
+  | 'transcript.preview'
+  | 'transcript.committed_partial'
   | 'transcript.final'
   | 'session.finished'
   | 'server.error'
@@ -51,6 +52,12 @@ export type LiveRealtimeErrorCode =
   | 'diagnostics_wav_write_failed'
   | 'connection_closed'
   | 'mock_transcriber_failed'
+  | 'runtime_config_invalid'
+  | 'runtime_model_not_configured'
+  | 'runtime_model_not_registered'
+  | 'runtime_model_not_downloaded'
+  | 'runtime_model_load_failed'
+  | 'runtime_inference_failed'
   | 'repository_write_failed'
   | 'internal_error'
 
@@ -202,10 +209,10 @@ export interface LiveRealtimeDiagnosticsWavStoppedEvent extends LiveRealtimeEven
   reason: LiveRealtimeDiagnosticsWavStopReason
 }
 
-export interface LiveRealtimeTranscriptPartialPayload {
+interface LiveRealtimeTranscriptRuntimePayloadBase {
+  session_id: string
   track_id: string
   source: LiveTrackSource
-  partial_index: number
   start_ms: LiveTimestampMs
   end_ms: LiveTimestampMs
   text: string
@@ -214,7 +221,18 @@ export interface LiveRealtimeTranscriptPartialPayload {
   is_final: false
 }
 
+export interface LiveRealtimeTranscriptPreviewPayload extends LiveRealtimeTranscriptRuntimePayloadBase {
+  result_kind: 'preview'
+  preview_index: number
+}
+
+export interface LiveRealtimeTranscriptCommittedPartialPayload extends LiveRealtimeTranscriptRuntimePayloadBase {
+  result_kind: 'committed_partial'
+  committed_index: number
+}
+
 export interface LiveRealtimeTranscriptFinalPayload {
+  result_kind: 'final'
   segment_id: string
   session_id: string
   track_id: string
@@ -229,8 +247,12 @@ export interface LiveRealtimeTranscriptFinalPayload {
   created_at: string
 }
 
-export interface LiveRealtimeTranscriptPartialEvent extends LiveRealtimeEventEnvelope<'transcript.partial'> {
-  transcript: LiveRealtimeTranscriptPartialPayload
+export interface LiveRealtimeTranscriptPreviewEvent extends LiveRealtimeEventEnvelope<'transcript.preview'> {
+  transcript: LiveRealtimeTranscriptPreviewPayload
+}
+
+export interface LiveRealtimeTranscriptCommittedPartialEvent extends LiveRealtimeEventEnvelope<'transcript.committed_partial'> {
+  transcript: LiveRealtimeTranscriptCommittedPartialPayload
 }
 
 export interface LiveRealtimeTranscriptFinalEvent extends LiveRealtimeEventEnvelope<'transcript.final'> {
@@ -252,7 +274,8 @@ export type LiveRealtimeServerEvent =
   | LiveRealtimeTrackReadyEvent
   | LiveRealtimeDiagnosticsWavStartedEvent
   | LiveRealtimeDiagnosticsWavStoppedEvent
-  | LiveRealtimeTranscriptPartialEvent
+  | LiveRealtimeTranscriptPreviewEvent
+  | LiveRealtimeTranscriptCommittedPartialEvent
   | LiveRealtimeTranscriptFinalEvent
   | LiveRealtimeSessionFinishedEvent
   | LiveRealtimeServerErrorEvent
