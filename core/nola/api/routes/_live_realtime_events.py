@@ -14,10 +14,12 @@ from nola.api.schemas.live_realtime import (
     LiveRealtimeServerReadyEvent,
     LiveRealtimeSessionFinishedEvent,
     LiveRealtimeTrackReadyEvent,
+    LiveRealtimeTranscriptCommittedPartialEvent,
+    LiveRealtimeTranscriptCommittedPartialPayload,
     LiveRealtimeTranscriptFinalEvent,
     LiveRealtimeTranscriptFinalPayload,
-    LiveRealtimeTranscriptPartialEvent,
-    LiveRealtimeTranscriptPartialPayload,
+    LiveRealtimeTranscriptPreviewEvent,
+    LiveRealtimeTranscriptPreviewPayload,
 )
 from nola.application.live._clock import now_iso
 from nola.application.live.realtime import (
@@ -25,8 +27,9 @@ from nola.application.live.realtime import (
     LiveRealtimeDiagnosticsWavStarted,
     LiveRealtimeDiagnosticsWavStopped,
     LiveRealtimeErrorCode,
+    LiveRealtimeTranscriptCommittedPartial,
     LiveRealtimeTranscriptFinal,
-    LiveRealtimeTranscriptPartial,
+    LiveRealtimeTranscriptPreview,
 )
 
 
@@ -141,27 +144,55 @@ def build_realtime_pong_event(*, session_id: str) -> LiveRealtimeServerPongEvent
     )
 
 
-def build_transcript_partial_event(
+def build_transcript_preview_event(
     *,
     session_id: str,
-    partial: LiveRealtimeTranscriptPartial,
-) -> LiveRealtimeTranscriptPartialEvent:
-    """Build a realtime partial transcript event."""
-    return LiveRealtimeTranscriptPartialEvent(
-        type="transcript.partial",
+    preview: LiveRealtimeTranscriptPreview,
+) -> LiveRealtimeTranscriptPreviewEvent:
+    """Build a realtime preview transcript event."""
+    return LiveRealtimeTranscriptPreviewEvent(
+        type="transcript.preview",
         protocol_version=LIVE_REALTIME_PROTOCOL_VERSION,
         session_id=session_id,
         event_id=_server_event_id(),
         sent_at=now_iso(),
-        transcript=LiveRealtimeTranscriptPartialPayload(
-            track_id=partial.track_id,
-            source=partial.source,
-            partial_index=partial.partial_index,
-            start_ms=partial.start_ms,
-            end_ms=partial.end_ms,
-            text=partial.text,
-            language=partial.language,
-            confidence=partial.confidence,
+        transcript=LiveRealtimeTranscriptPreviewPayload(
+            session_id=session_id,
+            track_id=preview.track_id,
+            source=preview.source,
+            preview_index=preview.preview_index,
+            start_ms=preview.start_ms,
+            end_ms=preview.end_ms,
+            text=preview.text,
+            language=preview.language,
+            confidence=preview.confidence,
+            is_final=False,
+        ),
+    )
+
+
+def build_transcript_committed_partial_event(
+    *,
+    session_id: str,
+    committed_partial: LiveRealtimeTranscriptCommittedPartial,
+) -> LiveRealtimeTranscriptCommittedPartialEvent:
+    """Build a realtime committed partial transcript event."""
+    return LiveRealtimeTranscriptCommittedPartialEvent(
+        type="transcript.committed_partial",
+        protocol_version=LIVE_REALTIME_PROTOCOL_VERSION,
+        session_id=session_id,
+        event_id=_server_event_id(),
+        sent_at=now_iso(),
+        transcript=LiveRealtimeTranscriptCommittedPartialPayload(
+            session_id=session_id,
+            track_id=committed_partial.track_id,
+            source=committed_partial.source,
+            committed_index=committed_partial.committed_index,
+            start_ms=committed_partial.start_ms,
+            end_ms=committed_partial.end_ms,
+            text=committed_partial.text,
+            language=committed_partial.language,
+            confidence=committed_partial.confidence,
             is_final=False,
         ),
     )
@@ -180,6 +211,7 @@ def build_transcript_final_event(
         event_id=_server_event_id(),
         sent_at=now_iso(),
         transcript=LiveRealtimeTranscriptFinalPayload(
+            result_kind="final",
             segment_id=final.segment_id,
             session_id=final.session_id,
             track_id=final.track_id,

@@ -462,10 +462,12 @@ def test_live_realtime_stream_emits_mock_transcripts(
         websocket.send_json(_realtime_event("session.finish", session_id))
         finished = websocket.receive_json()
 
-    assert partial["type"] == "transcript.partial"
+    assert partial["type"] == "transcript.committed_partial"
+    assert partial["transcript"]["result_kind"] == "committed_partial"
+    assert partial["transcript"]["session_id"] == session_id
     assert partial["transcript"]["track_id"] == track_id
     assert partial["transcript"]["source"] == "microphone"
-    assert partial["transcript"]["partial_index"] == 1
+    assert partial["transcript"]["committed_index"] == 1
     assert partial["transcript"]["start_ms"] == 0
     assert partial["transcript"]["end_ms"] == 500
     assert partial["transcript"]["text"] == "Mock microphone partial 1"
@@ -474,6 +476,7 @@ def test_live_realtime_stream_emits_mock_transcripts(
     assert interim_detail["segments"] == []
 
     assert final["type"] == "transcript.final"
+    assert final["transcript"]["result_kind"] == "final"
     assert final["transcript"]["track_id"] == track_id
     assert final["transcript"]["source"] == "microphone"
     assert final["transcript"]["sequence"] == 1

@@ -21,8 +21,9 @@ from nola.api.routes._live_realtime_events import (
     build_server_ready_event,
     build_session_finished_event,
     build_track_ready_event,
+    build_transcript_committed_partial_event,
     build_transcript_final_event,
-    build_transcript_partial_event,
+    build_transcript_preview_event,
 )
 from nola.api.schemas import (
     CreateLiveSessionRequest,
@@ -61,7 +62,8 @@ from nola.application.live.realtime import (
     LiveRealtimeSessionRuntime,
     LiveRealtimeTrackStart,
     LiveRealtimeTrackStop,
-    LiveRealtimeTranscriptPartial,
+    LiveRealtimeTranscriptCommittedPartial,
+    LiveRealtimeTranscriptPreview,
     LiveStreamConnectionRegistry,
     ensure_pcm16le_contract,
 )
@@ -420,11 +422,21 @@ async def stream_live_session_endpoint(
                     )
 
                 for transcript_event in audio_frame_result.transcript_events:
-                    if isinstance(transcript_event, LiveRealtimeTranscriptPartial):
+                    if isinstance(transcript_event, LiveRealtimeTranscriptPreview):
                         await websocket.send_json(
-                            build_transcript_partial_event(
+                            build_transcript_preview_event(
                                 session_id=session_id,
-                                partial=transcript_event,
+                                preview=transcript_event,
+                            ).model_dump(mode="json")
+                        )
+                    elif isinstance(
+                        transcript_event,
+                        LiveRealtimeTranscriptCommittedPartial,
+                    ):
+                        await websocket.send_json(
+                            build_transcript_committed_partial_event(
+                                session_id=session_id,
+                                committed_partial=transcript_event,
                             ).model_dump(mode="json")
                         )
                     else:
