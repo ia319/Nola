@@ -93,8 +93,8 @@ def test_mock_transcriber_tracks_sources_independently() -> None:
     assert system_results == ()
 
 
-def test_realtime_transcript_preview_contract_is_websocket_only() -> None:
-    """Preview transcript should expose a stable non-final result kind."""
+def test_realtime_transcript_preview_discriminator_and_index() -> None:
+    """Validate the preview discriminator and index fields."""
     preview = LiveRealtimeTranscriptPreview(
         track_id="track-001",
         source="microphone",
