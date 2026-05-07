@@ -23,7 +23,10 @@ from nola.application.live.realtime.diagnostics import (
     LiveRealtimeDiagnosticsWavStopReason,
     LiveRealtimeWavDiagnosticsSession,
 )
-from nola.application.live.realtime.errors import LiveRealtimeSessionError
+from nola.application.live.realtime.errors import (
+    LiveRealtimeSessionError,
+    LiveRealtimeTranscriberError,
+)
 from nola.application.live.realtime.mock_transcriber import MockLiveRealtimeTranscriber
 from nola.application.live.realtime.protocol import (
     LIVE_REALTIME_SUPPORTED_PROTOCOL_VERSIONS,
@@ -31,10 +34,11 @@ from nola.application.live.realtime.protocol import (
 from nola.application.live.realtime.transcriber import (
     LiveRealtimeTranscriber,
     LiveRealtimeTranscriberFrame,
+    LiveRealtimeTranscriptCommittedPartial,
     LiveRealtimeTranscriptEvent,
     LiveRealtimeTranscriptFinal,
     LiveRealtimeTranscriptFinalCandidate,
-    LiveRealtimeTranscriptPartial,
+    LiveRealtimeTranscriptPreview,
 )
 from nola.application.live.types import (
     LiveSessionPayload,
@@ -230,6 +234,11 @@ class LiveRealtimeSessionRuntime:
         )
         try:
             results = self._transcriber.accept_frame(transcriber_frame)
+        except LiveRealtimeTranscriberError as error:
+            raise LiveRealtimeSessionError(
+                code=error.code,
+                message=error.message,
+            ) from error
         except Exception as error:
             raise LiveRealtimeSessionError(
                 code="mock_transcriber_failed",
@@ -240,9 +249,16 @@ class LiveRealtimeSessionRuntime:
 
     def _persist_transcript_result(
         self,
-        result: LiveRealtimeTranscriptPartial | LiveRealtimeTranscriptFinalCandidate,
+        result: (
+            LiveRealtimeTranscriptPreview
+            | LiveRealtimeTranscriptCommittedPartial
+            | LiveRealtimeTranscriptFinalCandidate
+        ),
     ) -> LiveRealtimeTranscriptEvent:
-        if isinstance(result, LiveRealtimeTranscriptPartial):
+        if isinstance(
+            result,
+            LiveRealtimeTranscriptPreview | LiveRealtimeTranscriptCommittedPartial,
+        ):
             return result
 
         now = self._timestamp_factory()

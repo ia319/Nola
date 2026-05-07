@@ -12,10 +12,12 @@ from nola.application.live.realtime import (
     LiveRealtimeSessionRuntime,
     LiveRealtimeTrackStart,
     LiveRealtimeTrackStop,
+    LiveRealtimeTranscriberError,
     LiveRealtimeTranscriberFrame,
     LiveRealtimeTranscriberResult,
     LiveRealtimeTranscriptFinal,
     LiveRealtimeTranscriptPartial,
+    LiveRealtimeTranscriptPreview,
 )
 from nola.application.live.types import LiveTrackSource
 from tests.test_live_use_cases import FakeLiveStore, _session
@@ -398,6 +400,47 @@ def test_realtime_session_emits_mock_transcripts_and_persists_final() -> None:
     assert live_store.count_segments("live-001") == 1
 
 
+def test_realtime_session_keeps_preview_out_of_persistence() -> None:
+    """Realtime runtime should not persist preview transcript results."""
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+    runtime = LiveRealtimeSessionRuntime(
+        live_store=live_store,
+        session_id="live-001",
+        track_id_factory=lambda: "track-001",
+        timestamp_factory=lambda: "2026-01-01T00:00:00+00:00",
+        transcriber=_PreviewTranscriber(),
+    )
+    runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
+    runtime.start_track(_start_event())
+
+    result = runtime.accept_audio_frame(_audio_metadata(), b"\x00" * 640)
+
+    assert len(result.transcript_events) == 1
+    assert isinstance(result.transcript_events[0], LiveRealtimeTranscriptPreview)
+    assert result.transcript_events[0].result_kind == "preview"
+    assert live_store.count_segments("live-001") == 0
+
+
+def test_realtime_session_maps_stable_transcriber_error() -> None:
+    """Realtime runtime should preserve stable transcriber error codes."""
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+    runtime = LiveRealtimeSessionRuntime(
+        live_store=live_store,
+        session_id="live-001",
+        track_id_factory=lambda: "track-001",
+        timestamp_factory=lambda: "2026-01-01T00:00:00+00:00",
+        transcriber=_FailingTranscriber(),
+    )
+    runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
+    runtime.start_track(_start_event())
+
+    with pytest.raises(LiveRealtimeSessionError) as error:
+        runtime.accept_audio_frame(_audio_metadata(), b"\x00" * 640)
+
+    assert error.value.code == "runtime_inference_failed"
+    assert error.value.message == "Realtime transcription inference failed"
+
+
 class _CountingTranscriber:
     def __init__(self) -> None:
         self.release_count = 0
@@ -408,5 +451,77 @@ class _CountingTranscriber:
     ) -> tuple[LiveRealtimeTranscriberResult, ...]:
         return ()
 
+    def flush_track(
+        self,
+        *,
+        track_id: str,
+        source: LiveTrackSource,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        del track_id, source
+        return ()
+
+    def flush_all(self) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return ()
+
     def release(self) -> None:
         self.release_count += 1
+
+
+class _PreviewTranscriber:
+    def accept_frame(
+        self,
+        frame: LiveRealtimeTranscriberFrame,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return (
+            LiveRealtimeTranscriptPreview(
+                track_id=frame.track_id,
+                source=frame.source,
+                preview_index=1,
+                start_ms=frame.start_ms,
+                end_ms=frame.end_ms,
+                text="Preview text",
+                language=None,
+                confidence=None,
+            ),
+        )
+
+    def flush_track(
+        self,
+        *,
+        track_id: str,
+        source: LiveTrackSource,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        del track_id, source
+        return ()
+
+    def flush_all(self) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return ()
+
+    def release(self) -> None:
+        return None
+
+
+class _FailingTranscriber:
+    def accept_frame(
+        self,
+        _frame: LiveRealtimeTranscriberFrame,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        raise LiveRealtimeTranscriberError(
+            code="runtime_inference_failed",
+            message="Realtime transcription inference failed",
+        )
+
+    def flush_track(
+        self,
+        *,
+        track_id: str,
+        source: LiveTrackSource,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        del track_id, source
+        return ()
+
+    def flush_all(self) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return ()
+
+    def release(self) -> None:
+        return None
