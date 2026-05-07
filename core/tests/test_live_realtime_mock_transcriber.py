@@ -7,7 +7,6 @@ from nola.application.live.realtime.transcriber import (
     LiveRealtimeTranscriberFrame,
     LiveRealtimeTranscriptCommittedPartial,
     LiveRealtimeTranscriptFinalCandidate,
-    LiveRealtimeTranscriptPartial,
     LiveRealtimeTranscriptPreview,
 )
 
@@ -49,10 +48,8 @@ def test_mock_transcriber_emits_deterministic_partial_and_final() -> None:
     partial = partial_results[0]
     final = final_results[0]
 
-    assert isinstance(partial, LiveRealtimeTranscriptPartial)
     assert isinstance(partial, LiveRealtimeTranscriptCommittedPartial)
     assert partial.result_kind == "committed_partial"
-    assert partial.partial_index == 1
     assert partial.committed_index == 1
     assert partial.start_ms == 0
     assert partial.end_ms == 500
@@ -90,7 +87,7 @@ def test_mock_transcriber_tracks_sources_independently() -> None:
     )
 
     assert len(microphone_results) == 1
-    assert isinstance(microphone_results[0], LiveRealtimeTranscriptPartial)
+    assert isinstance(microphone_results[0], LiveRealtimeTranscriptCommittedPartial)
     assert microphone_results[0].result_kind == "committed_partial"
     assert microphone_results[0].text == "Mock microphone partial 1"
     assert system_results == ()

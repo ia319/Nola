@@ -64,7 +64,6 @@ from nola.application.live.realtime.transcriber import (
     LiveRealtimeTranscriptEvent,
     LiveRealtimeTranscriptFinal,
     LiveRealtimeTranscriptFinalCandidate,
-    LiveRealtimeTranscriptPartial,
     LiveRealtimeTranscriptPreview,
 )
 
@@ -103,7 +102,6 @@ __all__ = [
     "LiveRealtimeTranscriptCommittedPartial",
     "LiveRealtimeTranscriptFinal",
     "LiveRealtimeTranscriptFinalCandidate",
-    "LiveRealtimeTranscriptPartial",
     "LiveRealtimeTranscriptPreview",
     "LiveRealtimeTranscriber",
     "LiveRealtimeTranscriberFrame",

@@ -22,7 +22,7 @@ class _MockTrackTranscriptionState:
     segment_start_ms: int | None = None
     segment_duration_ms: int = 0
     next_partial_duration_ms: int = LIVE_REALTIME_MOCK_PARTIAL_INTERVAL_MS
-    partial_index: int = 0
+    committed_index: int = 0
     segment_index: int = 0
 
 
@@ -76,14 +76,14 @@ class MockLiveRealtimeTranscriber:
             return (final,)
 
         if state.segment_duration_ms >= state.next_partial_duration_ms:
-            state.partial_index += 1
+            state.committed_index += 1
             partial = LiveRealtimeTranscriptCommittedPartial(
                 track_id=frame.track_id,
                 source=frame.source,
-                committed_index=state.partial_index,
+                committed_index=state.committed_index,
                 start_ms=state.segment_start_ms,
                 end_ms=frame.end_ms,
-                text=f"Mock {frame.source} partial {state.partial_index}",
+                text=f"Mock {frame.source} partial {state.committed_index}",
                 language=None,
                 confidence=None,
             )

@@ -15,8 +15,8 @@ from nola.application.live.realtime import (
     LiveRealtimeTranscriberError,
     LiveRealtimeTranscriberFrame,
     LiveRealtimeTranscriberResult,
+    LiveRealtimeTranscriptCommittedPartial,
     LiveRealtimeTranscriptFinal,
-    LiveRealtimeTranscriptPartial,
     LiveRealtimeTranscriptPreview,
 )
 from nola.application.live.types import LiveTrackSource
@@ -387,7 +387,7 @@ def test_realtime_session_emits_mock_transcripts_and_persists_final() -> None:
     )
 
     assert len(partial_events) == 1
-    assert isinstance(partial_events[0], LiveRealtimeTranscriptPartial)
+    assert isinstance(partial_events[0], LiveRealtimeTranscriptCommittedPartial)
     assert partial_events[0].text == "Mock microphone partial 1"
 
     assert len(final_events) == 1

@@ -56,11 +56,6 @@ class LiveRealtimeTranscriptCommittedPartial:
         """Return the stable transcriber result kind."""
         return "committed_partial"
 
-    @property
-    def partial_index(self) -> int:
-        """Return the legacy partial index during protocol migration."""
-        return self.committed_index
-
 
 @dataclass(frozen=True)
 class LiveRealtimeTranscriptFinalCandidate:
@@ -97,7 +92,6 @@ class LiveRealtimeTranscriptFinal:
     created_at: str
 
 
-LiveRealtimeTranscriptPartial = LiveRealtimeTranscriptCommittedPartial
 LiveRealtimeTranscriberResult: TypeAlias = (
     LiveRealtimeTranscriptPreview
     | LiveRealtimeTranscriptCommittedPartial
