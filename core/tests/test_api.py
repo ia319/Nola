@@ -318,6 +318,11 @@ class TestTranscriptionsAPI:
         data = response.json()
         assert data["model_id"] == "large-v3"
         assert data["options"] == {"language": "en"}
+        assert data["runtime_config"]["model_id"] == "large-v3"
+        assert data["runtime_config"]["engine_device"] == "cuda"
+        assert data["runtime_config"]["engine_compute_type"] == "float16"
+        assert data["runtime_config"]["transcription_options"]["language"] == "en"
+        assert data["runtime_config"]["request_options"] == {"language": "en"}
 
         stored = task_db.get_task(data["task_id"])
         assert stored is not None
@@ -325,6 +330,39 @@ class TestTranscriptionsAPI:
         assert stored["engine_device"] == "cuda"
         assert stored["engine_compute_type"] == "float16"
         assert stored["options"] == {"language": "en"}
+        assert stored["runtime_config"] == data["runtime_config"]
+
+    def test_create_task_runtime_config_uses_creation_time_defaults(
+        self, client: TestClient
+    ):
+        """Task runtime snapshots should not drift with later defaults changes."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+        config_db = get_app_config_db()
+        config_db.set_many("transcription.", {"beam_size": 3})
+        file_db.create_file(
+            file_id="task-runtime-file",
+            filename="task-runtime.mp3",
+            path="/tmp/task-runtime.mp3",
+            size=1000,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks",
+            json={"file_id": "task-runtime-file"},
+        )
+        assert response.status_code == 200
+        task_id = response.json()["task_id"]
+
+        config_db.set_many("transcription.", {"beam_size": 1})
+        detail_response = client.get(f"/api/transcription-tasks/{task_id}")
+        stored = task_db.get_task(task_id)
+
+        assert detail_response.status_code == 200
+        detail_runtime_config = detail_response.json()["runtime_config"]
+        assert detail_runtime_config["transcription_options"]["beam_size"] == 3
+        assert stored is not None
+        assert stored["runtime_config"] == detail_runtime_config
 
     def test_create_task_persists_session_execution_defaults(self, client: TestClient):
         """Task creation should materialize execution defaults when omitted."""

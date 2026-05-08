@@ -2,7 +2,7 @@
 
 from typing import TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from nola.api.schemas.live_realtime_config import LiveRealtimeRuntimeOverridesRequest
 from nola.application.live.types import (
@@ -80,6 +80,7 @@ class LiveSessionSummaryResponse(BaseModel):
 class LiveSessionDetailResponse(LiveSessionSummaryResponse):
     """Expose one live session with tracks and a paged segment window."""
 
+    runtime_config: dict[str, JsonValue] | None = None
     tracks: list[LiveTrackResponse]
     segments: list[LiveSegmentResponse]
     segment_total: int

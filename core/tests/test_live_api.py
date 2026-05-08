@@ -191,6 +191,7 @@ def test_list_live_sessions_uses_dependency_override(client: TestClient) -> None
                 "model_id": None,
                 "runtime": None,
                 "audio_format": None,
+                "runtime_config": None,
                 "started_at": "2026-01-01T00:00:00+00:00",
                 "ended_at": None,
                 "error": None,
