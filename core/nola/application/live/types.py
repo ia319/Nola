@@ -2,12 +2,14 @@
 
 from typing import Literal, TypeAlias, TypedDict
 
+from nola.common.types import JsonDict
 from nola.config.common import ConfigMap
 
 LiveSessionStatus = Literal["active", "finished", "failed"]
 LiveSessionMode = Literal["streaming", "background"]
 LiveTrackSource = Literal["microphone", "system"]
 LiveRealtimeRuntimeOverrides: TypeAlias = ConfigMap
+LiveRuntimeConfig: TypeAlias = JsonDict
 
 LIVE_SESSION_STATUSES: tuple[LiveSessionStatus, ...] = (
     "active",
@@ -33,6 +35,7 @@ class LiveSessionRecord(TypedDict):
     model_id: str | None
     runtime: str | None
     audio_format: str | None
+    runtime_config: LiveRuntimeConfig | None
     started_at: str
     ended_at: str | None
     error: str | None
@@ -123,6 +126,7 @@ class LiveSegmentPayload(TypedDict):
 class LiveSessionPayload(LiveSessionSummaryPayload):
     """Live session detail payload with tracks and segments."""
 
+    runtime_config: LiveRuntimeConfig | None
     tracks: list[LiveTrackPayload]
     segments: list[LiveSegmentPayload]
     segment_total: int

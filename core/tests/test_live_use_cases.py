@@ -48,6 +48,7 @@ class FakeLiveStore:
         model_id: str | None,
         runtime: str | None,
         audio_format: str | None,
+        runtime_config: dict[str, object] | None = None,
         started_at: str,
         created_at: str,
         updated_at: str,
@@ -61,6 +62,7 @@ class FakeLiveStore:
             "model_id": model_id,
             "runtime": runtime,
             "audio_format": audio_format,
+            "runtime_config": runtime_config,
             "started_at": started_at,
             "ended_at": None,
             "error": None,
@@ -232,6 +234,7 @@ def _session(
         "model_id": "small",
         "runtime": None,
         "audio_format": None,
+        "runtime_config": None,
         "started_at": started_at,
         "ended_at": "2026-01-01T00:10:00" if status != "active" else None,
         "error": "failed" if status == "failed" else None,
@@ -249,6 +252,7 @@ def test_create_live_session_returns_active_payload() -> None:
         mode="background",
         language_hint="zh",
         model_id="small",
+        runtime_config={"schema_version": 1, "runtime": "mock"},
         session_id_factory=lambda: "live-001",
         timestamp_factory=lambda: "2026-01-01T00:00:00",
     )
@@ -259,12 +263,17 @@ def test_create_live_session_returns_active_payload() -> None:
     assert payload["status"] == "active"
     assert payload["language_hint"] == "zh"
     assert payload["model_id"] == "small"
+    assert payload["runtime_config"] == {"schema_version": 1, "runtime": "mock"}
     assert payload["tracks"] == []
     assert payload["segments"] == []
     assert payload["segment_total"] == 0
     assert payload["segment_limit"] == DEFAULT_LIVE_SEGMENT_LIMIT
     assert payload["segment_offset"] == 0
     assert live_store.created_sessions[0]["started_at"] == "2026-01-01T00:00:00"
+    assert live_store.created_sessions[0]["runtime_config"] == {
+        "schema_version": 1,
+        "runtime": "mock",
+    }
 
 
 def test_create_live_session_accepts_runtime_overrides_at_boundary() -> None:

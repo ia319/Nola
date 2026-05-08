@@ -9,6 +9,7 @@ from nola.application.live.payloads import build_live_session_payload
 from nola.application.live.types import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
     LiveRealtimeRuntimeOverrides,
+    LiveRuntimeConfig,
     LiveSessionMode,
     LiveSessionPayload,
 )
@@ -23,6 +24,7 @@ def create_live_session(
     language_hint: str | None,
     model_id: str | None,
     runtime_overrides: LiveRealtimeRuntimeOverrides | None = None,
+    runtime_config: LiveRuntimeConfig | None = None,
     session_id_factory: Callable[[], str] | None = None,
     timestamp_factory: Callable[[], str] | None = None,
 ) -> LiveSessionPayload:
@@ -39,6 +41,7 @@ def create_live_session(
         model_id=model_id,
         runtime=None,
         audio_format=None,
+        runtime_config=runtime_config,
         started_at=now,
         created_at=now,
         updated_at=now,
