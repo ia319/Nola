@@ -85,6 +85,10 @@ def _build_live_realtime_builtin_defaults() -> ConfigMap:
         **_WHISPER_STREAMING_DEFAULTS,
     }
     for key in _FASTER_WHISPER_KEYS:
+        if key not in faster_whisper_defaults:
+            raise TypeError(
+                f"faster-whisper defaults missing required Live realtime key: {key}"
+            )
         defaults[key] = faster_whisper_defaults[key]
 
     defaults["vad_parameters"] = {

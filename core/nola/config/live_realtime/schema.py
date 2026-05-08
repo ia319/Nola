@@ -458,9 +458,18 @@ def get_live_realtime_param_schema() -> list[LiveRealtimeOptionGroupSchema]:
     schema = _build_live_realtime_param_schema()
     filtered: list[LiveRealtimeOptionGroupSchema] = []
     for group in schema:
-        group.fields = _filter_supported_fields(group.fields)
-        if group.fields:
-            filtered.append(group.model_copy(deep=True))
+        filtered_fields = _filter_supported_fields(group.fields)
+        if filtered_fields:
+            filtered.append(
+                group.model_copy(
+                    update={
+                        "fields": [
+                            field.model_copy(deep=True) for field in filtered_fields
+                        ]
+                    },
+                    deep=True,
+                )
+            )
     return filtered
 
 
