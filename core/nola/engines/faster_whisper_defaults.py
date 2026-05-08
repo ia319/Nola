@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from dataclasses import fields as dataclass_fields
-from math import isinf
+from math import isinf, isnan
 from typing import TypeAlias, cast
 
 from faster_whisper.vad import VadOptions
@@ -27,8 +27,11 @@ FASTER_WHISPER_TASK_VALUES: tuple[str, ...] = ("transcribe", "translate")
 
 def serialize_faster_whisper_default(value: object) -> SerializedDefaultValue:
     """Convert non-JSON faster-whisper defaults into API-safe values."""
-    if isinstance(value, float) and isinf(value):
-        return "inf"
+    if isinstance(value, float):
+        if isinf(value):
+            return "inf" if value > 0 else "-inf"
+        if isnan(value):
+            raise TypeError("faster-whisper defaults must not contain NaN")
     if isinstance(value, dict):
         return {
             key: serialize_faster_whisper_default(item) for key, item in value.items()

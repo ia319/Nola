@@ -5,6 +5,7 @@ from dataclasses import asdict
 import pytest
 from faster_whisper.vad import VadOptions
 
+from nola.config.live_realtime import defaults as live_realtime_defaults_module
 from nola.config.live_realtime import (
     get_live_realtime_builtin_defaults,
     get_live_realtime_default_keys,
@@ -12,9 +13,13 @@ from nola.config.live_realtime import (
     get_live_realtime_param_schema,
     get_live_realtime_vad_parameter_keys,
 )
+from nola.config.live_realtime import schema as live_realtime_schema_module
 from nola.config.transcription.defaults import get_engine_defaults
 from nola.engines.base import TranscribeOptions
-from nola.engines.faster_whisper_defaults import get_faster_whisper_defaults
+from nola.engines.faster_whisper_defaults import (
+    get_faster_whisper_defaults,
+    serialize_faster_whisper_default,
+)
 
 
 class StubConfigStore:
@@ -47,6 +52,16 @@ class TestFasterWhisperDefaults:
 
         assert get_faster_whisper_defaults() == expected
         assert get_engine_defaults() == expected
+
+    def test_serializer_preserves_infinity_sign(self) -> None:
+        """Keep signed infinity explicit at API boundaries."""
+        assert serialize_faster_whisper_default(float("inf")) == "inf"
+        assert serialize_faster_whisper_default(float("-inf")) == "-inf"
+
+    def test_serializer_rejects_nan(self) -> None:
+        """Reject non-JSON NaN values instead of exposing them in config."""
+        with pytest.raises(TypeError, match="NaN"):
+            serialize_faster_whisper_default(float("nan"))
 
 
 class TestLiveRealtimeDefaults:
@@ -152,6 +167,21 @@ class TestLiveRealtimeDefaults:
                 StubConfigStore({"live_realtime.": {"temperature": []}})
             )
 
+    def test_builtin_defaults_reports_missing_required_faster_whisper_key(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Missing upstream defaults should fail with a clear key name."""
+        defaults = dict(get_faster_whisper_defaults())
+        defaults.pop("beam_size")
+        monkeypatch.setattr(
+            live_realtime_defaults_module,
+            "get_faster_whisper_defaults",
+            lambda: defaults,
+        )
+
+        with pytest.raises(TypeError, match="beam_size"):
+            get_live_realtime_builtin_defaults()
+
 
 class TestLiveRealtimeSchema:
     """Verify Live realtime schema metadata."""
@@ -218,3 +248,25 @@ class TestLiveRealtimeSchema:
         first[0].fields.append(first[0].fields[0].model_copy())
 
         assert len(second[0].fields) + 1 == len(first[0].fields)
+
+    def test_schema_filtering_does_not_mutate_source_groups(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Filtering should not rewrite the source group returned by the builder."""
+        source_group = get_live_realtime_param_schema()[0]
+        original_count = len(source_group.fields)
+        monkeypatch.setattr(
+            live_realtime_schema_module,
+            "_build_live_realtime_param_schema",
+            lambda: [source_group],
+        )
+        monkeypatch.setattr(
+            live_realtime_schema_module,
+            "_filter_supported_fields",
+            lambda fields: list(fields[1:]),
+        )
+
+        filtered = get_live_realtime_param_schema()
+
+        assert len(source_group.fields) == original_count
+        assert len(filtered[0].fields) == original_count - 1
