@@ -8,6 +8,7 @@ from nola.application.live.contracts import SupportsLiveSessionMutations
 from nola.application.live.payloads import build_live_session_payload
 from nola.application.live.types import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
+    LiveRealtimeRuntimeOverrides,
     LiveSessionMode,
     LiveSessionPayload,
 )
@@ -21,6 +22,7 @@ def create_live_session(
     mode: LiveSessionMode,
     language_hint: str | None,
     model_id: str | None,
+    runtime_overrides: LiveRealtimeRuntimeOverrides | None = None,
     session_id_factory: Callable[[], str] | None = None,
     timestamp_factory: Callable[[], str] | None = None,
 ) -> LiveSessionPayload:

@@ -1,10 +1,13 @@
 """Shared payload and value types for live transcription use-cases."""
 
-from typing import Literal, TypedDict
+from typing import Literal, TypeAlias, TypedDict
+
+from nola.config.common import ConfigMap
 
 LiveSessionStatus = Literal["active", "finished", "failed"]
 LiveSessionMode = Literal["streaming", "background"]
 LiveTrackSource = Literal["microphone", "system"]
+LiveRealtimeRuntimeOverrides: TypeAlias = ConfigMap
 
 LIVE_SESSION_STATUSES: tuple[LiveSessionStatus, ...] = (
     "active",

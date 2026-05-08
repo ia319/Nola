@@ -267,6 +267,25 @@ def test_create_live_session_returns_active_payload() -> None:
     assert live_store.created_sessions[0]["started_at"] == "2026-01-01T00:00:00"
 
 
+def test_create_live_session_accepts_runtime_overrides_at_boundary() -> None:
+    live_store = FakeLiveStore()
+
+    payload = create_live_session(
+        live_store=live_store,
+        title="Planning",
+        mode="streaming",
+        language_hint="zh",
+        model_id="small",
+        runtime_overrides={"language": "en", "context_prompt": None},
+        session_id_factory=lambda: "live-overrides",
+        timestamp_factory=lambda: "2026-01-01T00:00:00",
+    )
+
+    assert payload["session_id"] == "live-overrides"
+    assert payload["language_hint"] == "zh"
+    assert "runtime_overrides" not in live_store.created_sessions[0]
+
+
 def test_create_live_session_rejects_invalid_mode() -> None:
     live_store = FakeLiveStore()
 
