@@ -35,6 +35,7 @@ import type {
   LiveRealtimeTransportStateChange,
   LiveRealtimeTranscriptCommittedPartialPayload,
   LiveRealtimeTranscriptFinalPayload,
+  LiveRealtimeTranscriptPreviewPayload,
 } from '../../transport/types'
 import type { CreateLiveSessionRequest, LiveSessionDetail, LiveTrack } from '@/shared/types'
 
@@ -79,7 +80,15 @@ describe('LiveRealtimeSessionService', () => {
       durationMs: 20,
     })
 
+    setup.transport.emitEvent(transcriptPreviewEvent('session-1', 'track-microphone-1'))
+    expect(
+      useLiveRealtimeStore.getState().currentPreviewsByTrackId['track-microphone-1']?.text,
+    ).toBe('preview text')
+
     setup.transport.emitEvent(transcriptCommittedPartialEvent('session-1', 'track-microphone-1'))
+    expect(
+      useLiveRealtimeStore.getState().currentPreviewsByTrackId['track-microphone-1'],
+    ).toBeUndefined()
     expect(
       useLiveRealtimeStore.getState().latestCommittedPartialsByTrackId['track-microphone-1']?.text,
     ).toBe('committed partial text')
@@ -559,6 +568,13 @@ function transcriptCommittedPartialEvent(
   }
 }
 
+function transcriptPreviewEvent(sessionId: string, trackId: string): LiveRealtimeServerEvent {
+  return {
+    ...serverEnvelope('transcript.preview', sessionId),
+    transcript: previewTranscript(sessionId, trackId),
+  }
+}
+
 function transcriptFinalEvent(sessionId: string, trackId: string): LiveRealtimeServerEvent {
   return {
     ...serverEnvelope('transcript.final', sessionId),
@@ -649,6 +665,25 @@ function committedPartialTranscript(
     start_ms: 0,
     end_ms: 500,
     text: 'committed partial text',
+    language: null,
+    confidence: null,
+    is_final: false,
+  }
+}
+
+function previewTranscript(
+  sessionId: string,
+  trackId: string,
+): LiveRealtimeTranscriptPreviewPayload {
+  return {
+    result_kind: 'preview',
+    session_id: sessionId,
+    track_id: trackId,
+    source: 'microphone',
+    preview_index: 1,
+    start_ms: 0,
+    end_ms: 240,
+    text: 'preview text',
     language: null,
     confidence: null,
     is_final: false,

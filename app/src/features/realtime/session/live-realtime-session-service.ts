@@ -326,6 +326,8 @@ export class LiveRealtimeSessionService {
         this.tracksBySource.set(event.track.source, event.track)
         useLiveRealtimeStore.getState().setLiveRealtimeTrack(event.track)
       }
+    } else if (event.type === 'transcript.preview') {
+      useLiveRealtimeStore.getState().setLiveRealtimePreview(event.transcript)
     } else if (event.type === 'transcript.committed_partial') {
       useLiveRealtimeStore.getState().setLiveRealtimeCommittedPartial(event.transcript)
     } else if (event.type === 'transcript.final') {
