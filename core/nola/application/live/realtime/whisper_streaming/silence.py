@@ -39,7 +39,10 @@ class WhisperStreamingSilenceDetector:
         *,
         duration_ms: int,
     ) -> WhisperStreamingSilenceUpdate:
-        """Inspect one waveform frame and return boundary decisions."""
+        """Inspect one positive-duration frame and return boundary decisions."""
+        if duration_ms <= 0:
+            raise ValueError("duration_ms must be positive")
+
         rms = _rms(waveform)
         is_silence = rms <= self._config.silence_rms_threshold
         if is_silence:

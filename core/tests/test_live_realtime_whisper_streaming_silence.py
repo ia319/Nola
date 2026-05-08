@@ -1,5 +1,7 @@
 """Unit tests for WhisperStreaming silence boundary detection."""
 
+import pytest
+
 from nola.application.live.realtime.whisper_streaming import (
     WhisperStreamingRuntimeConfig,
     WhisperStreamingSilenceDetector,
@@ -41,3 +43,11 @@ def test_silence_detector_resets_after_speech() -> None:
     assert speech.is_silence is False
     assert speech.consecutive_silence_ms == 0
     assert detector.consecutive_silence_ms == 0
+
+
+def test_silence_detector_rejects_non_positive_duration() -> None:
+    """Validate positive duration requirements at the detector boundary."""
+    detector = WhisperStreamingSilenceDetector(config=WhisperStreamingRuntimeConfig())
+
+    with pytest.raises(ValueError, match="duration_ms must be positive"):
+        detector.inspect((), duration_ms=0)

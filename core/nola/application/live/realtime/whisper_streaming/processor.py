@@ -77,7 +77,7 @@ class WhisperStreamingOnlineProcessor:
     ) -> WhisperStreamingProcessorUpdate:
         """Accept one 16 kHz mono waveform frame and emit transcript updates."""
         self._ensure_open()
-        if end_ms < start_ms:
+        if end_ms <= start_ms:
             raise _runtime_error(
                 code="runtime_inference_failed",
                 message="WhisperStreaming frame timing is invalid",

@@ -188,6 +188,16 @@ def test_online_processor_suppresses_empty_silence_final() -> None:
     assert backend.waveform_lengths == []
 
 
+def test_online_processor_rejects_zero_duration_frames() -> None:
+    """Validate stable runtime errors for invalid frame timing."""
+    processor = WhisperStreamingOnlineProcessor(backend=_FakeBackend(()))
+
+    with pytest.raises(WhisperStreamingRuntimeError) as exc_info:
+        processor.accept_waveform((), start_ms=1000, end_ms=1000)
+
+    assert exc_info.value.code == "runtime_inference_failed"
+
+
 def _output(
     words: tuple[WhisperStreamingWord, ...],
     segment_end_ms: tuple[int, ...],
