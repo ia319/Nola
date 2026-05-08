@@ -1,6 +1,7 @@
 """Unit tests for live transcription application use-cases."""
 
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import cast
 
 import pytest
@@ -25,6 +26,8 @@ from nola.application.live.types import (
     LiveTrackRecord,
     LiveTrackSource,
 )
+from nola.config.common.types import ConfigMap
+from nola.model_hub.contracts import ModelCacheState
 
 
 class FakeLiveStore:
@@ -219,6 +222,28 @@ class FakeLiveStore:
         return len(self.segments.get(session_id, []))
 
 
+class FakeConfigStore:
+    """In-memory config store for Live runtime use-case tests."""
+
+    def __init__(self, values_by_prefix: dict[str, ConfigMap]) -> None:
+        self.values_by_prefix = values_by_prefix
+
+    def get_all(self, prefix: str) -> ConfigMap:
+        """Return values under one prefix."""
+        return dict(self.values_by_prefix.get(prefix, {}))
+
+
+class FakeModelStorage:
+    """Expose downloaded model state for Live runtime use-case tests."""
+
+    cache_dir = Path("D:/fake-model-cache")
+
+    def get_cache_state(self, repo_id: str) -> ModelCacheState:
+        """Return downloaded for registered test models."""
+        assert repo_id
+        return "downloaded"
+
+
 def _session(
     *,
     session_id: str,
@@ -276,7 +301,25 @@ def test_create_live_session_returns_active_payload() -> None:
     }
 
 
-def test_create_live_session_accepts_runtime_overrides_at_boundary() -> None:
+def test_create_live_session_requires_config_store_for_runtime_overrides() -> None:
+    live_store = FakeLiveStore()
+
+    with pytest.raises(ValueError, match="config_store is required"):
+        create_live_session(
+            live_store=live_store,
+            title="Planning",
+            mode="streaming",
+            language_hint="zh",
+            model_id="small",
+            runtime_overrides={"language": "en", "context_prompt": None},
+            session_id_factory=lambda: "live-overrides",
+            timestamp_factory=lambda: "2026-01-01T00:00:00",
+        )
+
+    assert live_store.created_sessions == []
+
+
+def test_create_live_session_resolves_runtime_config_before_writing() -> None:
     live_store = FakeLiveStore()
 
     payload = create_live_session(
@@ -285,14 +328,23 @@ def test_create_live_session_accepts_runtime_overrides_at_boundary() -> None:
         mode="streaming",
         language_hint="zh",
         model_id="small",
-        runtime_overrides={"language": "en", "context_prompt": None},
-        session_id_factory=lambda: "live-overrides",
+        runtime_overrides={"language": "en", "beam_size": 3},
+        runtime_adapter="whisper_streaming",
+        config_store=FakeConfigStore({"live_realtime.": {"beam_size": 2}}),
+        model_storage=FakeModelStorage(),
+        session_id_factory=lambda: "live-runtime",
         timestamp_factory=lambda: "2026-01-01T00:00:00",
     )
 
-    assert payload["session_id"] == "live-overrides"
-    assert payload["language_hint"] == "zh"
-    assert "runtime_overrides" not in live_store.created_sessions[0]
+    stored = live_store.created_sessions[0]
+    assert payload["session_id"] == "live-runtime"
+    assert payload["runtime"] == "whisper_streaming"
+    assert payload["model_id"] == "small"
+    assert payload["runtime_config"]["language"] == "en"
+    assert payload["runtime_config"]["faster_whisper"]["beam_size"] == 3
+    assert stored["runtime"] == "whisper_streaming"
+    assert stored["audio_format"] == "pcm_s16le_16khz_mono"
+    assert stored["runtime_config"] == payload["runtime_config"]
 
 
 def test_create_live_session_rejects_invalid_mode() -> None:
