@@ -6,6 +6,7 @@ from nola.config.live_realtime.defaults import (
     get_live_realtime_default_keys,
     get_live_realtime_effective_defaults,
     get_live_realtime_vad_parameter_keys,
+    resolve_live_realtime_defaults,
 )
 from nola.config.live_realtime.schema import get_live_realtime_param_schema
 from nola.config.live_realtime.types import (
@@ -32,4 +33,5 @@ __all__ = [
     "LiveRealtimeOptionGroupSchema",
     "LiveRealtimeTask",
     "LiveRealtimeVadParameters",
+    "resolve_live_realtime_defaults",
 ]

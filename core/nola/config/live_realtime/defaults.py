@@ -100,19 +100,24 @@ def _validate_defaults(values: ConfigMap) -> LiveRealtimeDefaults:
     return LiveRealtimeDefaults.model_validate(values)
 
 
+def resolve_live_realtime_defaults(overrides: ConfigMap | None = None) -> ConfigMap:
+    """Return API-safe Live realtime defaults with optional overrides."""
+    builtin_defaults = _build_live_realtime_builtin_defaults()
+    merged = deep_merge(builtin_defaults, overrides or {})
+    return _validate_defaults(merged).to_config_map()
+
+
 def get_live_realtime_builtin_defaults() -> ConfigMap:
     """Return API-safe Live realtime built-in defaults."""
-    return _validate_defaults(_build_live_realtime_builtin_defaults()).to_config_map()
+    return resolve_live_realtime_defaults()
 
 
 def get_live_realtime_effective_defaults(
     config_db: SupportsConfigRead,
 ) -> ConfigMap:
     """Return Live realtime defaults merged with persisted overrides."""
-    builtin_defaults = _build_live_realtime_builtin_defaults()
     persisted_defaults = config_db.get_all(LIVE_REALTIME_CONFIG_PREFIX)
-    merged = deep_merge(builtin_defaults, persisted_defaults)
-    return _validate_defaults(merged).to_config_map()
+    return resolve_live_realtime_defaults(persisted_defaults)
 
 
 __all__ = [
@@ -121,4 +126,5 @@ __all__ = [
     "get_live_realtime_effective_defaults",
     "get_live_realtime_vad_parameter_keys",
     "LIVE_REALTIME_CONFIG_PREFIX",
+    "resolve_live_realtime_defaults",
 ]
