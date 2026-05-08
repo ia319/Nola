@@ -4,6 +4,7 @@ from typing import TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from nola.api.schemas.live_realtime_config import LiveRealtimeRuntimeOverridesRequest
 from nola.application.live.types import (
     LiveSessionMode,
     LiveSessionStatus,
@@ -24,6 +25,7 @@ class CreateLiveSessionRequest(BaseModel):
     mode: LiveSessionModeLiteral
     language_hint: str | None = Field(None, max_length=32)
     model_id: str | None = Field(None, max_length=200)
+    runtime_overrides: LiveRealtimeRuntimeOverridesRequest | None = None
 
 
 class LiveTrackResponse(BaseModel):

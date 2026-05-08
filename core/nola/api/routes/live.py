@@ -207,6 +207,11 @@ def create_live_session_endpoint(
             mode=request.mode,
             language_hint=request.language_hint,
             model_id=request.model_id,
+            runtime_overrides=(
+                request.runtime_overrides.get_options_dict()
+                if request.runtime_overrides is not None
+                else None
+            ),
         )
     except LiveUseCaseError as error:
         _raise_live_http_error(error)

@@ -6,6 +6,7 @@ from unittest.mock import PropertyMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 from starlette.websockets import WebSocketDisconnect
 
 from nola.api.deps import (
@@ -17,6 +18,7 @@ from nola.api.deps import (
     get_live_stream_connection_registry,
     get_task_db,
 )
+from nola.api.schemas import CreateLiveSessionRequest
 from nola.application.live import DEFAULT_LIVE_SESSION_LIMIT, LiveSessionRecord
 from nola.application.live.realtime import (
     LIVE_REALTIME_PROTOCOL_VERSION,
@@ -234,6 +236,110 @@ def test_create_list_get_and_finish_live_session(client: TestClient) -> None:
     assert finish_response.json()["ended_at"] is not None
     assert repeated_finish_response.status_code == 200
     assert repeated_finish_response.json()["status"] == "finished"
+
+
+def test_create_live_session_accepts_runtime_overrides_without_persisting_defaults(
+    client: TestClient,
+) -> None:
+    """Live session overrides should stay scoped to the create request."""
+    before_defaults = client.get("/api/config/live-realtime/defaults")
+    response = client.post(
+        "/api/live/sessions",
+        json={
+            "title": "Runtime overrides",
+            "mode": "streaming",
+            "language_hint": "zh",
+            "model_id": "small",
+            "runtime_overrides": {
+                "language": "en",
+                "context_prompt": None,
+                "beam_size": 3,
+                "vad_parameters": {"threshold": 0.6},
+            },
+        },
+    )
+    after_defaults = client.get("/api/config/live-realtime/defaults")
+    config_db = get_app_config_db()
+
+    assert before_defaults.status_code == 200
+    assert response.status_code == 200
+    assert response.json()["language_hint"] == "zh"
+    assert after_defaults.status_code == 200
+    assert after_defaults.json() == before_defaults.json()
+    assert config_db.get_all("live_realtime.") == {}
+    assert config_db.get_all("transcription.") == {}
+
+
+def test_create_live_session_rejects_unknown_runtime_override(
+    client: TestClient,
+) -> None:
+    """Live session overrides should reject unknown top-level keys."""
+    response = client.post(
+        "/api/live/sessions",
+        json={
+            "mode": "streaming",
+            "runtime_overrides": {"unknown": True},
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_live_session_rejects_unknown_vad_runtime_override(
+    client: TestClient,
+) -> None:
+    """Live session overrides should reject unknown nested VAD keys."""
+    response = client.post(
+        "/api/live/sessions",
+        json={
+            "mode": "streaming",
+            "runtime_overrides": {"vad_parameters": {"unknown": 0.1}},
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_live_session_runtime_overrides_preserve_null_context_prompt() -> None:
+    """Per-session null prompt should remain visible to the runtime resolver."""
+    request = CreateLiveSessionRequest.model_validate(
+        {
+            "mode": "streaming",
+            "runtime_overrides": {"context_prompt": None},
+        }
+    )
+
+    assert request.runtime_overrides is not None
+    assert request.runtime_overrides.get_options_dict() == {"context_prompt": None}
+
+
+def test_create_live_session_runtime_overrides_reject_unsupported_nulls() -> None:
+    """Per-session null should stay limited to context prompt semantics."""
+    with pytest.raises(ValidationError):
+        CreateLiveSessionRequest.model_validate(
+            {
+                "mode": "streaming",
+                "runtime_overrides": {
+                    "beam_size": None,
+                    "vad_parameters": {"threshold": None},
+                },
+            }
+        )
+
+
+def test_create_live_session_runtime_overrides_reject_fuzzy_value_types() -> None:
+    """Runtime override values should not coerce bools or numeric strings."""
+    with pytest.raises(ValidationError):
+        CreateLiveSessionRequest.model_validate(
+            {
+                "mode": "streaming",
+                "runtime_overrides": {
+                    "beam_size": True,
+                    "vad_filter": 1,
+                    "vad_parameters": {"threshold": "0.6"},
+                },
+            }
+        )
 
 
 def test_live_realtime_stream_returns_server_ready(client: TestClient) -> None:
