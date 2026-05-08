@@ -23,6 +23,7 @@ from nola.application.live.realtime import (
     LiveRealtimeTranscriberFrame,
     LiveRealtimeTranscriberResult,
     LiveRealtimeTranscriptFinalCandidate,
+    LiveRealtimeTranscriptPreview,
 )
 from nola.application.live.types import LiveTrackSource
 from nola.config.settings import Settings
@@ -539,6 +540,54 @@ def test_live_realtime_stream_emits_flush_final_on_track_stop(
     assert finished["session"]["segments"][0]["text"] == "flush stop final"
 
 
+def test_live_realtime_stream_emits_preview_transcript(
+    client: TestClient,
+) -> None:
+    """Live realtime stream should send preview transcript events."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+
+    app.dependency_overrides[get_live_realtime_transcriber_factory] = (
+        lambda: _PreviewRouteTranscriber
+    )
+    try:
+        with client.websocket_connect(
+            f"/api/live/sessions/{session_id}/stream"
+        ) as websocket:
+            websocket.send_json(_realtime_event("client.hello", session_id))
+            assert websocket.receive_json()["type"] == "server.ready"
+            websocket.send_json(_track_start_event(session_id, source="microphone"))
+            track_ready = websocket.receive_json()
+            track_id = str(track_ready["track"]["track_id"])
+
+            websocket.send_json(
+                _audio_frame_event(
+                    session_id,
+                    track_id=track_id,
+                    source="microphone",
+                    sequence=0,
+                )
+            )
+            websocket.send_bytes(b"\x00" * 640)
+            preview = websocket.receive_json()
+            websocket.send_json(_realtime_event("session.finish", session_id))
+            finished = websocket.receive_json()
+    finally:
+        app.dependency_overrides.pop(get_live_realtime_transcriber_factory, None)
+
+    assert preview["type"] == "transcript.preview"
+    assert preview["transcript"]["result_kind"] == "preview"
+    assert preview["transcript"]["track_id"] == track_id
+    assert preview["transcript"]["source"] == "microphone"
+    assert preview["transcript"]["preview_index"] == 1
+    assert preview["transcript"]["start_ms"] == 0
+    assert preview["transcript"]["end_ms"] == 20
+    assert preview["transcript"]["text"] == "route preview"
+    assert preview["transcript"]["is_final"] is False
+    assert finished["type"] == "session.finished"
+    assert finished["session"]["segment_total"] == 0
+
+
 def test_live_realtime_stream_rejects_unknown_track_audio(
     client: TestClient,
 ) -> None:
@@ -993,6 +1042,40 @@ class _FlushTrackRouteTranscriber:
                 confidence=None,
             ),
         )
+
+    def flush_all(self) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return ()
+
+    def release(self) -> None:
+        return None
+
+
+class _PreviewRouteTranscriber:
+    def accept_frame(
+        self,
+        frame: LiveRealtimeTranscriberFrame,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return (
+            LiveRealtimeTranscriptPreview(
+                track_id=frame.track_id,
+                source=frame.source,
+                preview_index=1,
+                start_ms=frame.start_ms,
+                end_ms=frame.end_ms,
+                text="route preview",
+                language=None,
+                confidence=None,
+            ),
+        )
+
+    def flush_track(
+        self,
+        *,
+        track_id: str,
+        source: LiveTrackSource,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        del track_id, source
+        return ()
 
     def flush_all(self) -> tuple[LiveRealtimeTranscriberResult, ...]:
         return ()
