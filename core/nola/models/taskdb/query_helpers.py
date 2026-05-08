@@ -5,6 +5,7 @@ import logging
 import sqlite3
 from typing import Any, cast
 
+from nola.common.types import JsonDict
 from nola.models.taskdb.types import TaskRow
 
 logger = logging.getLogger(__name__)
@@ -40,4 +41,19 @@ def parse_task_row(row: sqlite3.Row, task_id: str) -> TaskRow:
         except json.JSONDecodeError:
             logger.warning("Corrupted options JSON for task %s", task_id)
             task["options"] = None
+
+    runtime_config_raw = task.get("runtime_config")
+    if runtime_config_raw:
+        try:
+            runtime_config = json.loads(runtime_config_raw)
+            if isinstance(runtime_config, dict):
+                task["runtime_config"] = cast(JsonDict, runtime_config)
+            else:
+                logger.warning("Invalid runtime_config JSON shape for task %s", task_id)
+                task["runtime_config"] = None
+        except json.JSONDecodeError:
+            logger.warning("Corrupted runtime_config JSON for task %s", task_id)
+            task["runtime_config"] = None
+    else:
+        task["runtime_config"] = None
     return cast(TaskRow, task)

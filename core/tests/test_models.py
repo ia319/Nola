@@ -521,8 +521,14 @@ class TestTaskDatabase:
             task_db = TaskDatabase(db_path)
             task = task_db.get_task("legacy-task")
 
-            assert {"model_id", "engine_device", "engine_compute_type"} <= columns
+            assert {
+                "model_id",
+                "engine_device",
+                "engine_compute_type",
+                "runtime_config",
+            } <= columns
             assert task is not None
             assert task["model_id"] is None
             assert task["engine_device"] is None
             assert task["engine_compute_type"] is None
+            assert task["runtime_config"] is None

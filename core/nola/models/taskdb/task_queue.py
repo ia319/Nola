@@ -6,6 +6,7 @@ from contextlib import closing
 from datetime import datetime, timedelta
 from typing import Any, cast
 
+from nola.common.types import JsonDict
 from nola.models.taskdb.base import TaskRepositoryBase
 from nola.models.taskdb.types import TaskRowRaw, TaskStatus
 
@@ -25,6 +26,7 @@ class TaskQueueRepository(TaskRepositoryBase):
         model_id: str | None = None,
         engine_device: str | None = None,
         engine_compute_type: str | None = None,
+        runtime_config: JsonDict | None = None,
     ) -> None:
         """Add task to queue."""
         with closing(self._connect()) as conn:
@@ -33,8 +35,9 @@ class TaskQueueRepository(TaskRepositoryBase):
                     """
                     INSERT INTO transcription_tasks
                     (id, file_id, status, priority, max_retries, options,
-                     model_id, engine_device, engine_compute_type, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     runtime_config, model_id, engine_device, engine_compute_type,
+                     created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         task_id,
@@ -43,6 +46,11 @@ class TaskQueueRepository(TaskRepositoryBase):
                         priority,
                         max_retries,
                         json.dumps(options) if options else None,
+                        (
+                            json.dumps(runtime_config, allow_nan=False)
+                            if runtime_config is not None
+                            else None
+                        ),
                         model_id,
                         engine_device,
                         engine_compute_type,

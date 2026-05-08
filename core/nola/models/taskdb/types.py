@@ -5,9 +5,11 @@ from typing import Any, Literal, TypedDict
 
 from typing_extensions import NotRequired
 
+from nola.common.types import JsonDict
+
 
 class TaskRowRaw(TypedDict):
-    """Raw row from SQLite, segments/options are JSON strings."""
+    """Raw row from SQLite, JSON columns are still serialized strings."""
 
     id: str
     file_id: str
@@ -24,6 +26,7 @@ class TaskRowRaw(TypedDict):
     last_heartbeat: str | None
     timeout_seconds: int
     options: str | None
+    runtime_config: str | None
     progress: float
     duration: float | None
     segments: str | None
@@ -33,7 +36,7 @@ class TaskRowRaw(TypedDict):
 
 
 class TaskRow(TypedDict):
-    """Parsed task row, segments/options already deserialized."""
+    """Parsed task row with JSON columns already deserialized."""
 
     id: str
     file_id: str
@@ -50,6 +53,7 @@ class TaskRow(TypedDict):
     last_heartbeat: str | None
     timeout_seconds: int
     options: dict[str, Any] | None
+    runtime_config: JsonDict | None
     progress: float
     duration: float | None
     segments: list[dict[str, Any]] | None

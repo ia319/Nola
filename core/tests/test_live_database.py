@@ -24,7 +24,11 @@ def live_database():
             gc.collect()
 
 
-def _create_session(live_db: LiveDatabase, session_id: str = "live-001") -> None:
+def _create_session(
+    live_db: LiveDatabase,
+    session_id: str = "live-001",
+    runtime_config: dict[str, object] | None = None,
+) -> None:
     """Create one active live session for repository tests."""
     live_db.create_session(
         session_id=session_id,
@@ -35,6 +39,7 @@ def _create_session(live_db: LiveDatabase, session_id: str = "live-001") -> None
         model_id=None,
         runtime=None,
         audio_format="pcm_s16le_16khz_mono",
+        runtime_config=runtime_config,
         started_at="2026-01-01T00:00:00",
         created_at="2026-01-01T00:00:00",
         updated_at="2026-01-01T00:00:00",
@@ -74,6 +79,59 @@ def test_init_db_creates_live_tables_and_indexes():
     } <= indexes
 
 
+def test_init_db_adds_live_runtime_config_to_legacy_database():
+    """init_db() should add runtime_config to older live session tables."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "legacy.db"
+        with closing(sqlite3.connect(db_path)) as conn:
+            with conn:
+                conn.execute("""
+                    CREATE TABLE live_sessions (
+                        id TEXT PRIMARY KEY,
+                        title TEXT,
+                        mode TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        language_hint TEXT,
+                        model_id TEXT,
+                        runtime TEXT,
+                        audio_format TEXT,
+                        started_at TEXT NOT NULL,
+                        ended_at TEXT,
+                        error TEXT,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                """)
+                conn.execute(
+                    """
+                    INSERT INTO live_sessions
+                    (id, title, mode, status, started_at, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        "legacy-live",
+                        "Legacy",
+                        "streaming",
+                        "active",
+                        "2026-01-01T00:00:00",
+                        "2026-01-01T00:00:00",
+                        "2026-01-01T00:00:00",
+                    ),
+                )
+
+        init_db(db_path)
+        live_db = LiveDatabase(db_path)
+        stored = live_db.get_session("legacy-live")
+
+        with closing(sqlite3.connect(db_path)) as conn:
+            rows = conn.execute("PRAGMA table_info(live_sessions)").fetchall()
+
+    columns = {row[1] for row in rows}
+    assert "runtime_config" in columns
+    assert stored is not None
+    assert stored["runtime_config"] is None
+
+
 def test_create_get_list_and_count_session(live_database):
     """Live sessions should be created and listed independently."""
     live_db = live_database
@@ -88,8 +146,32 @@ def test_create_get_list_and_count_session(live_database):
     assert stored["mode"] == "streaming"
     assert stored["status"] == "active"
     assert stored["audio_format"] == "pcm_s16le_16khz_mono"
+    assert stored["runtime_config"] is None
     assert live_db.count_sessions() == 1
     assert [session["id"] for session in sessions] == ["live-001"]
+
+
+def test_create_session_preserves_runtime_config_snapshot(live_database):
+    """Live sessions should store resolved runtime config snapshots."""
+    live_db = live_database
+
+    _create_session(
+        live_db,
+        runtime_config={
+            "schema_version": 1,
+            "runtime": "mock",
+            "language": "en",
+        },
+    )
+
+    stored = live_db.get_session("live-001")
+
+    assert stored is not None
+    assert stored["runtime_config"] == {
+        "schema_version": 1,
+        "runtime": "mock",
+        "language": "en",
+    }
 
 
 def test_finish_session_only_updates_active_session(live_database):

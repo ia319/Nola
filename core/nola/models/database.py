@@ -57,6 +57,7 @@ def init_db(db_path: str | Path | None = None) -> None:
 
                     -- Transcription options (JSON)
                     options TEXT,
+                    runtime_config TEXT,
 
                     -- Task execution config
                     model_id TEXT,
@@ -110,6 +111,7 @@ def init_db(db_path: str | Path | None = None) -> None:
                     model_id TEXT,
                     runtime TEXT,
                     audio_format TEXT,
+                    runtime_config TEXT,
                     started_at TEXT NOT NULL,
                     ended_at TEXT,
                     error TEXT,
@@ -188,7 +190,15 @@ def init_db(db_path: str | Path | None = None) -> None:
                     "ALTER TABLE transcription_tasks "
                     "ADD COLUMN engine_compute_type TEXT"
                 ),
+                "runtime_config": (
+                    "ALTER TABLE transcription_tasks ADD COLUMN runtime_config TEXT"
+                ),
             }
             for column_name, alter_sql in task_execution_columns.items():
                 if column_name not in existing_columns:
                     conn.execute(alter_sql)
+
+            cursor = conn.execute("PRAGMA table_info(live_sessions)")
+            existing_live_columns = {row[1] for row in cursor.fetchall()}
+            if "runtime_config" not in existing_live_columns:
+                conn.execute("ALTER TABLE live_sessions ADD COLUMN runtime_config TEXT")
