@@ -121,30 +121,36 @@ class WhisperStreamingLiveTranscriber:
                 message="WhisperStreaming track source does not match",
             )
 
-        update = self._finish_processor(state)
-        self._tracks.pop(track_id, None)
-        return self._update_to_results(
-            track_id=track_id,
-            source=source,
-            state=state,
-            update=update,
-        )
+        try:
+            update = self._finish_processor(state)
+            return self._update_to_results(
+                track_id=track_id,
+                source=source,
+                state=state,
+                update=update,
+            )
+        finally:
+            self._tracks.pop(track_id, None)
+            state.processor.close()
 
     def flush_all(self) -> tuple[LiveRealtimeTranscriberResult, ...]:
         """Flush and remove every open track processor."""
         self._ensure_open()
         results: list[LiveRealtimeTranscriberResult] = []
         for track_id, state in tuple(self._tracks.items()):
-            update = self._finish_processor(state)
-            self._tracks.pop(track_id, None)
-            results.extend(
-                self._update_to_results(
-                    track_id=track_id,
-                    source=state.source,
-                    state=state,
-                    update=update,
+            try:
+                update = self._finish_processor(state)
+                results.extend(
+                    self._update_to_results(
+                        track_id=track_id,
+                        source=state.source,
+                        state=state,
+                        update=update,
+                    )
                 )
-            )
+            finally:
+                self._tracks.pop(track_id, None)
+                state.processor.close()
         return tuple(results)
 
     def release(self) -> None:

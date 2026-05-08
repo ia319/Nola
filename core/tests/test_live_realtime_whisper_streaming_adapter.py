@@ -1,6 +1,7 @@
 """Unit tests for the Live WhisperStreaming transcriber adapter."""
 
 from collections.abc import Sequence
+from typing import cast
 
 import pytest
 
@@ -13,8 +14,11 @@ from nola.application.live.realtime import (
 from nola.application.live.realtime.whisper_streaming import (
     WhisperStreamingLiveTranscriber,
     WhisperStreamingModelOutput,
+    WhisperStreamingOnlineProcessor,
+    WhisperStreamingProcessorUpdate,
     WhisperStreamingRuntimeConfig,
     WhisperStreamingRuntimeError,
+    WhisperStreamingTranscriptChunk,
     WhisperStreamingWord,
 )
 from nola.application.live.types import LiveTrackSource
@@ -39,6 +43,58 @@ class _FakeBackend:
         output = self._outputs[self._call_index]
         self._call_index += 1
         return output
+
+    def close(self) -> None:
+        self.close_count += 1
+
+
+class _CloseTrackingProcessorFactory:
+    def __init__(self) -> None:
+        self.processors: list[_CloseTrackingProcessor] = []
+
+    def __call__(
+        self,
+        *,
+        backend: object,
+        config: WhisperStreamingRuntimeConfig | None = None,
+        offset_ms: int = 0,
+    ) -> WhisperStreamingOnlineProcessor:
+        del backend, config, offset_ms
+        processor = _CloseTrackingProcessor()
+        self.processors.append(processor)
+        return cast(WhisperStreamingOnlineProcessor, processor)
+
+
+class _CloseTrackingProcessor:
+    def __init__(self) -> None:
+        self.finish_count = 0
+        self.close_count = 0
+
+    def accept_waveform(
+        self,
+        waveform: Sequence[float],
+        *,
+        start_ms: int,
+        end_ms: int,
+    ) -> WhisperStreamingProcessorUpdate:
+        del waveform, start_ms, end_ms
+        return _processor_update(
+            preview=WhisperStreamingTranscriptChunk(
+                start_ms=0,
+                end_ms=200,
+                text="preview",
+            )
+        )
+
+    def finish(self) -> WhisperStreamingProcessorUpdate:
+        self.finish_count += 1
+        return _processor_update(
+            final=WhisperStreamingTranscriptChunk(
+                start_ms=0,
+                end_ms=400,
+                text="final",
+            )
+        )
 
     def close(self) -> None:
         self.close_count += 1
@@ -95,6 +151,24 @@ def test_whisper_streaming_live_transcriber_flushes_track_final() -> None:
     assert repeated == ()
 
 
+def test_whisper_streaming_live_transcriber_closes_flushed_track_processor() -> None:
+    """Close a flushed track processor when it leaves adapter ownership."""
+    backend = _FakeBackend(())
+    processor_factory = _CloseTrackingProcessorFactory()
+    transcriber = WhisperStreamingLiveTranscriber(
+        backend=backend,
+        processor_factory=processor_factory,
+    )
+
+    transcriber.accept_frame(_frame(sequence=0, start_ms=0, end_ms=1000))
+    results = transcriber.flush_track(track_id="track-001", source="microphone")
+    transcriber.release()
+
+    assert len(results) == 1
+    assert processor_factory.processors[0].finish_count == 1
+    assert processor_factory.processors[0].close_count == 1
+
+
 def test_whisper_streaming_live_transcriber_flushes_all_tracks() -> None:
     """Flush independent track processors through one shared backend."""
     backend = _FakeBackend(
@@ -130,6 +204,47 @@ def test_whisper_streaming_live_transcriber_flushes_all_tracks() -> None:
     assert all(
         isinstance(result, LiveRealtimeTranscriptFinalCandidate) for result in results
     )
+
+
+def test_whisper_streaming_live_transcriber_closes_all_flushed_processors() -> None:
+    """Close every flushed processor when flushing all tracks."""
+    backend = _FakeBackend(())
+    processor_factory = _CloseTrackingProcessorFactory()
+    transcriber = WhisperStreamingLiveTranscriber(
+        backend=backend,
+        processor_factory=processor_factory,
+    )
+    transcriber.accept_frame(
+        _frame(
+            track_id="track-mic",
+            source="microphone",
+            sequence=0,
+            start_ms=0,
+            end_ms=1000,
+        )
+    )
+    transcriber.accept_frame(
+        _frame(
+            track_id="track-system",
+            source="system",
+            sequence=0,
+            start_ms=0,
+            end_ms=1000,
+        )
+    )
+
+    results = transcriber.flush_all()
+    transcriber.release()
+
+    assert [result.track_id for result in results] == ["track-mic", "track-system"]
+    assert [processor.finish_count for processor in processor_factory.processors] == [
+        1,
+        1,
+    ]
+    assert [processor.close_count for processor in processor_factory.processors] == [
+        1,
+        1,
+    ]
 
 
 def test_whisper_streaming_live_transcriber_release_is_idempotent() -> None:
@@ -171,6 +286,20 @@ def _output(
     segment_end_ms: tuple[int, ...],
 ) -> WhisperStreamingModelOutput:
     return WhisperStreamingModelOutput(words=words, segment_end_ms=segment_end_ms)
+
+
+def _processor_update(
+    *,
+    preview: WhisperStreamingTranscriptChunk | None = None,
+    final: WhisperStreamingTranscriptChunk | None = None,
+) -> WhisperStreamingProcessorUpdate:
+    empty = WhisperStreamingTranscriptChunk(start_ms=None, end_ms=None, text="")
+    return WhisperStreamingProcessorUpdate(
+        processed=True,
+        preview=preview or empty,
+        committed_partial=empty,
+        final=final or empty,
+    )
 
 
 def _word(start_ms: int, end_ms: int, text: str) -> WhisperStreamingWord:
