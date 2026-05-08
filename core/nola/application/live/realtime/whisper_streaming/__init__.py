@@ -1,5 +1,9 @@
 """Expose the Live WhisperStreaming runtime package boundary."""
 
+from nola.application.live.realtime.whisper_streaming.adapter import (
+    WhisperStreamingLiveTranscriber,
+    WhisperStreamingProcessorFactory,
+)
 from nola.application.live.realtime.whisper_streaming.backend import (
     WhisperStreamingFasterWhisperBackend,
     WhisperStreamingFasterWhisperBackendConfig,
@@ -53,8 +57,10 @@ __all__ = [
     "WhisperStreamingFasterWhisperBackendConfig",
     "WhisperStreamingFasterWhisperModel",
     "WhisperStreamingInferenceBackend",
+    "WhisperStreamingLiveTranscriber",
     "WhisperStreamingModelOutput",
     "WhisperStreamingOnlineProcessor",
+    "WhisperStreamingProcessorFactory",
     "WhisperStreamingProcessorUpdate",
     "WhisperStreamingResolvedModel",
     "WhisperStreamingRuntimeConfig",
