@@ -11,10 +11,14 @@ from starlette.websockets import WebSocketDisconnect
 
 from nola.api.deps import (
     LiveRealtimeTranscriberFactory,
+    ModelStorageProvider,
+    get_app_config_db,
     get_live_db,
     get_live_diagnostics_output_dir,
+    get_live_realtime_adapter,
     get_live_realtime_transcriber_factory,
     get_live_stream_connection_registry,
+    get_model_storage_provider,
 )
 from nola.api.routes._live_realtime_events import (
     build_diagnostics_wav_started_event,
@@ -76,6 +80,8 @@ from nola.application.live.realtime import (
 )
 from nola.application.live.values import ensure_live_session_status
 from nola.common.types import JsonValue
+from nola.config.live_realtime import LiveRealtimeAdapter
+from nola.models import AppConfigDatabase
 
 router = APIRouter(prefix="/api/live", tags=["live"])
 LiveStoreDependency: TypeAlias = Annotated[SupportsLiveRepository, Depends(get_live_db)]
@@ -90,6 +96,18 @@ LiveDiagnosticsOutputDependency: TypeAlias = Annotated[
 LiveRealtimeTranscriberFactoryDependency: TypeAlias = Annotated[
     LiveRealtimeTranscriberFactory,
     Depends(get_live_realtime_transcriber_factory),
+]
+LiveRealtimeAdapterDependency: TypeAlias = Annotated[
+    LiveRealtimeAdapter,
+    Depends(get_live_realtime_adapter),
+]
+AppConfigDependency: TypeAlias = Annotated[
+    AppConfigDatabase,
+    Depends(get_app_config_db),
+]
+ModelStorageProviderDependency: TypeAlias = Annotated[
+    ModelStorageProvider,
+    Depends(get_model_storage_provider),
 ]
 
 LIVE_REALTIME_CLOSE_NORMAL = 1000
@@ -198,6 +216,9 @@ async def _send_transcript_events(
 def create_live_session_endpoint(
     request: CreateLiveSessionRequest,
     live_store: LiveStoreDependency,
+    config_store: AppConfigDependency,
+    model_storage_provider: ModelStorageProviderDependency,
+    runtime_adapter: LiveRealtimeAdapterDependency,
 ) -> LiveSessionPayload:
     """Create an active live transcription session."""
     try:
@@ -210,6 +231,13 @@ def create_live_session_endpoint(
             runtime_overrides=(
                 request.runtime_overrides.get_options_dict()
                 if request.runtime_overrides is not None
+                else None
+            ),
+            runtime_adapter=runtime_adapter,
+            config_store=config_store,
+            model_storage=(
+                model_storage_provider()
+                if runtime_adapter == "whisper_streaming"
                 else None
             ),
         )

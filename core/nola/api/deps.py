@@ -19,11 +19,18 @@ from nola.application.live.realtime.whisper_streaming import (
 from nola.application.models import ModelOperationLocks
 from nola.common.event_bus import EventBus, event_bus
 from nola.config import settings
+from nola.config.live_realtime import LiveRealtimeAdapter
 from nola.engines.base import EngineConfig
-from nola.model_hub import ModelDownloader, ModelStorage, resolve_model_dir
+from nola.model_hub import (
+    ModelDownloader,
+    ModelStorage,
+    ModelStoragePort,
+    resolve_model_dir,
+)
 from nola.models import AppConfigDatabase, FileDatabase, LiveDatabase, TaskDatabase
 
 LiveRealtimeTranscriberFactory = Callable[[], LiveRealtimeTranscriber]
+ModelStorageProvider = Callable[[], ModelStoragePort]
 _LIVE_REALTIME_TRANSCRIBER_MOCK = "mock"
 _LIVE_REALTIME_TRANSCRIBER_WHISPER_STREAMING = "whisper_streaming"
 
@@ -67,6 +74,11 @@ def get_live_realtime_transcriber_factory() -> LiveRealtimeTranscriberFactory:
     return _create_invalid_live_realtime_transcriber
 
 
+def get_live_realtime_adapter() -> LiveRealtimeAdapter:
+    """Return the configured Live realtime adapter name."""
+    return settings.live_realtime_transcriber
+
+
 @lru_cache
 def get_app_config_db() -> AppConfigDatabase:
     """Get app-config database instance (singleton)."""
@@ -96,6 +108,11 @@ def _resolve_effective_model_dir() -> str:
 def get_model_storage() -> ModelStorage:
     """Get model storage instance (singleton)."""
     return ModelStorage(_resolve_effective_model_dir())
+
+
+def get_model_storage_provider() -> ModelStorageProvider:
+    """Return a lazy model-storage provider."""
+    return get_model_storage
 
 
 @lru_cache

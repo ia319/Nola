@@ -1,6 +1,7 @@
 """Tests for live transcription API endpoints."""
 
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import PropertyMock, patch
 
@@ -14,8 +15,10 @@ from nola.api.deps import (
     get_file_db,
     get_live_db,
     get_live_diagnostics_output_dir,
+    get_live_realtime_adapter,
     get_live_realtime_transcriber_factory,
     get_live_stream_connection_registry,
+    get_model_storage_provider,
     get_task_db,
 )
 from nola.api.schemas import CreateLiveSessionRequest
@@ -30,6 +33,7 @@ from nola.application.live.realtime import (
 from nola.application.live.types import LiveTrackSource
 from nola.config.settings import Settings
 from nola.main import app
+from nola.model_hub.contracts import ModelCacheState
 from nola.models import init_db
 
 
@@ -86,6 +90,28 @@ def _create_live_session(client: TestClient) -> dict[str, object]:
     )
     assert response.status_code == 200
     return response.json()
+
+
+class _DownloadedModelStorage:
+    """Pretend every registered test model is already cached."""
+
+    cache_dir = Path("D:/fake-model-cache")
+
+    def __init__(self, state: ModelCacheState = "downloaded") -> None:
+        self.state = state
+
+    def get_cache_state(self, repo_id: str) -> ModelCacheState:
+        assert repo_id
+        return self.state
+
+
+def _model_storage_provider(
+    state: ModelCacheState = "downloaded",
+) -> Callable[[], _DownloadedModelStorage]:
+    def _provider() -> _DownloadedModelStorage:
+        return _DownloadedModelStorage(state)
+
+    return _provider
 
 
 def _realtime_event(
@@ -239,36 +265,140 @@ def test_create_list_get_and_finish_live_session(client: TestClient) -> None:
     assert repeated_finish_response.json()["status"] == "finished"
 
 
+def test_create_live_session_mock_runtime_does_not_resolve_model_storage(
+    client: TestClient,
+) -> None:
+    """Mock session creation should not touch model storage."""
+
+    def _fail_provider() -> _DownloadedModelStorage:
+        raise AssertionError("model storage provider should not be called")
+
+    app.dependency_overrides[get_model_storage_provider] = lambda: _fail_provider
+    try:
+        response = client.post(
+            "/api/live/sessions",
+            json={
+                "title": "Mock runtime",
+                "mode": "streaming",
+                "model_id": "small",
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(get_model_storage_provider, None)
+
+    assert response.status_code == 200
+    assert response.json()["runtime"] == "mock"
+    assert response.json()["runtime_config"]["runtime"] == "mock"
+
+
 def test_create_live_session_accepts_runtime_overrides_without_persisting_defaults(
     client: TestClient,
 ) -> None:
     """Live session overrides should stay scoped to the create request."""
-    before_defaults = client.get("/api/config/live-realtime/defaults")
-    response = client.post(
-        "/api/live/sessions",
-        json={
-            "title": "Runtime overrides",
-            "mode": "streaming",
-            "language_hint": "zh",
-            "model_id": "small",
-            "runtime_overrides": {
-                "language": "en",
-                "context_prompt": None,
-                "beam_size": 3,
-                "vad_parameters": {"threshold": 0.6},
-            },
-        },
+    app.dependency_overrides[get_live_realtime_adapter] = lambda: "whisper_streaming"
+    app.dependency_overrides[get_model_storage_provider] = (
+        lambda: _model_storage_provider()
     )
-    after_defaults = client.get("/api/config/live-realtime/defaults")
-    config_db = get_app_config_db()
+    before_defaults = client.get("/api/config/live-realtime/defaults")
+    try:
+        response = client.post(
+            "/api/live/sessions",
+            json={
+                "title": "Runtime overrides",
+                "mode": "streaming",
+                "language_hint": "zh",
+                "model_id": "small",
+                "runtime_overrides": {
+                    "language": "en",
+                    "context_prompt": None,
+                    "beam_size": 3,
+                    "vad_parameters": {"threshold": 0.6},
+                },
+            },
+        )
+        after_defaults = client.get("/api/config/live-realtime/defaults")
+        config_db = get_app_config_db()
+    finally:
+        app.dependency_overrides.pop(get_live_realtime_adapter, None)
+        app.dependency_overrides.pop(get_model_storage_provider, None)
 
     assert before_defaults.status_code == 200
     assert response.status_code == 200
     assert response.json()["language_hint"] == "zh"
+    assert response.json()["runtime"] == "whisper_streaming"
+    assert response.json()["runtime_config"]["language"] == "en"
+    assert response.json()["runtime_config"]["context_prompt"] is None
+    assert response.json()["runtime_config"]["faster_whisper"]["beam_size"] == 3
+    assert (
+        response.json()["runtime_config"]["vad"]["vad_parameters"]["threshold"] == 0.6
+    )
     assert after_defaults.status_code == 200
     assert after_defaults.json() == before_defaults.json()
     assert config_db.get_all("live_realtime.") == {}
     assert config_db.get_all("transcription.") == {}
+
+
+def test_create_live_session_runtime_config_uses_creation_time_defaults(
+    client: TestClient,
+) -> None:
+    """Live session snapshots should not drift with later defaults changes."""
+    app.dependency_overrides[get_live_realtime_adapter] = lambda: "whisper_streaming"
+    app.dependency_overrides[get_model_storage_provider] = (
+        lambda: _model_storage_provider()
+    )
+    config_db = get_app_config_db()
+    config_db.set_many("live_realtime.", {"beam_size": 3})
+    try:
+        response = client.post(
+            "/api/live/sessions",
+            json={
+                "title": "Runtime snapshot",
+                "mode": "streaming",
+                "model_id": "small",
+            },
+        )
+        session_id = response.json()["session_id"]
+
+        config_db.set_many("live_realtime.", {"beam_size": 1})
+        detail_response = client.get(f"/api/live/sessions/{session_id}")
+    finally:
+        app.dependency_overrides.pop(get_live_realtime_adapter, None)
+        app.dependency_overrides.pop(get_model_storage_provider, None)
+
+    assert response.status_code == 200
+    assert response.json()["runtime_config"]["faster_whisper"]["beam_size"] == 3
+    assert detail_response.status_code == 200
+    assert detail_response.json()["runtime_config"]["faster_whisper"]["beam_size"] == 3
+
+
+def test_create_live_session_rejects_undownloaded_runtime_model(
+    client: TestClient,
+) -> None:
+    """Live session creation should not start missing model downloads."""
+    app.dependency_overrides[get_live_realtime_adapter] = lambda: "whisper_streaming"
+    app.dependency_overrides[get_model_storage_provider] = (
+        lambda: _model_storage_provider("not_downloaded")
+    )
+    try:
+        response = client.post(
+            "/api/live/sessions",
+            json={
+                "title": "Missing model",
+                "mode": "streaming",
+                "model_id": "small",
+            },
+        )
+        sessions = get_live_db().list_sessions()
+    finally:
+        app.dependency_overrides.pop(get_live_realtime_adapter, None)
+        app.dependency_overrides.pop(get_model_storage_provider, None)
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == {
+        "code": "runtime_model_not_downloaded",
+        "message": "Live realtime model is not downloaded",
+    }
+    assert sessions == []
 
 
 def test_create_live_session_rejects_unknown_runtime_override(
