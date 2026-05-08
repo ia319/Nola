@@ -33,6 +33,7 @@ class WhisperStreamingRuntimeConfig:
     max_duplicate_ngram: int = 5
     vad_filter: bool = False
     vad_parameters: WhisperStreamingVadParameters | None = None
+    silence_rms_threshold: float = 0.01
     segment_close_silence_ms: int = 500
     context_reset_silence_ms: int = 2000
 
@@ -63,6 +64,11 @@ def validate_whisper_streaming_runtime_config(
     if config.timestamp_tolerance_ms < 0:
         raise WhisperStreamingRuntimeConfigError(
             "timestamp_tolerance_ms must be greater than or equal to 0"
+        )
+
+    if config.silence_rms_threshold <= 0:
+        raise WhisperStreamingRuntimeConfigError(
+            "silence_rms_threshold must be greater than 0"
         )
 
     if config.context_reset_silence_ms < config.segment_close_silence_ms:

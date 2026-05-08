@@ -33,6 +33,17 @@ class WhisperStreamingTranscriptChunk:
 
 
 @dataclass(frozen=True)
+class WhisperStreamingProcessorUpdate:
+    """Carry one online processor update."""
+
+    processed: bool
+    preview: WhisperStreamingTranscriptChunk
+    committed_partial: WhisperStreamingTranscriptChunk
+    final: WhisperStreamingTranscriptChunk
+    context_reset: bool = False
+
+
+@dataclass(frozen=True)
 class WhisperStreamingModelOutput:
     """Carry one inference result normalized for online processing."""
 
@@ -63,6 +74,7 @@ class WhisperStreamingInferenceBackend(Protocol):
 __all__ = [
     "WhisperStreamingInferenceBackend",
     "WhisperStreamingModelOutput",
+    "WhisperStreamingProcessorUpdate",
     "WhisperStreamingTranscriptChunk",
     "WhisperStreamingWord",
 ]
