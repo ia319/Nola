@@ -13,11 +13,18 @@ from nola.api.deps import (
     get_file_db,
     get_live_db,
     get_live_diagnostics_output_dir,
+    get_live_realtime_transcriber_factory,
     get_live_stream_connection_registry,
     get_task_db,
 )
 from nola.application.live import DEFAULT_LIVE_SESSION_LIMIT, LiveSessionRecord
-from nola.application.live.realtime import LIVE_REALTIME_PROTOCOL_VERSION
+from nola.application.live.realtime import (
+    LIVE_REALTIME_PROTOCOL_VERSION,
+    LiveRealtimeTranscriberFrame,
+    LiveRealtimeTranscriberResult,
+    LiveRealtimeTranscriptFinalCandidate,
+)
+from nola.application.live.types import LiveTrackSource
 from nola.config.settings import Settings
 from nola.main import app
 from nola.models import init_db
@@ -489,6 +496,49 @@ def test_live_realtime_stream_emits_mock_transcripts(
     assert finished["session"]["segments"][0]["text"] == "Mock microphone segment 1"
 
 
+def test_live_realtime_stream_emits_flush_final_on_track_stop(
+    client: TestClient,
+) -> None:
+    """Live realtime stream should send flush finals from track.stop."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+
+    app.dependency_overrides[get_live_realtime_transcriber_factory] = (
+        lambda: _FlushTrackRouteTranscriber
+    )
+    try:
+        with client.websocket_connect(
+            f"/api/live/sessions/{session_id}/stream"
+        ) as websocket:
+            websocket.send_json(_realtime_event("client.hello", session_id))
+            assert websocket.receive_json()["type"] == "server.ready"
+            websocket.send_json(_track_start_event(session_id, source="microphone"))
+            track_ready = websocket.receive_json()
+            track_id = str(track_ready["track"]["track_id"])
+
+            websocket.send_json(
+                _track_stop_event(
+                    session_id,
+                    track_id=track_id,
+                    source="microphone",
+                    sequence=0,
+                )
+            )
+            final = websocket.receive_json()
+            websocket.send_json(_realtime_event("session.finish", session_id))
+            finished = websocket.receive_json()
+    finally:
+        app.dependency_overrides.pop(get_live_realtime_transcriber_factory, None)
+
+    assert final["type"] == "transcript.final"
+    assert final["transcript"]["track_id"] == track_id
+    assert final["transcript"]["source"] == "microphone"
+    assert final["transcript"]["text"] == "flush stop final"
+    assert finished["type"] == "session.finished"
+    assert finished["session"]["segment_total"] == 1
+    assert finished["session"]["segments"][0]["text"] == "flush stop final"
+
+
 def test_live_realtime_stream_rejects_unknown_track_audio(
     client: TestClient,
 ) -> None:
@@ -917,3 +967,35 @@ def test_openapi_exposes_live_paths(client: TestClient) -> None:
     assert "/api/live/sessions" in paths
     assert "/api/live/sessions/{session_id}" in paths
     assert "/api/live/sessions/{session_id}/finish" in paths
+
+
+class _FlushTrackRouteTranscriber:
+    def accept_frame(
+        self,
+        _frame: LiveRealtimeTranscriberFrame,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return ()
+
+    def flush_track(
+        self,
+        *,
+        track_id: str,
+        source: LiveTrackSource,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return (
+            LiveRealtimeTranscriptFinalCandidate(
+                track_id=track_id,
+                source=source,
+                start_ms=0,
+                end_ms=200,
+                text="flush stop final",
+                language=None,
+                confidence=None,
+            ),
+        )
+
+    def flush_all(self) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return ()
+
+    def release(self) -> None:
+        return None

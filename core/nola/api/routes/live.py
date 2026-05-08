@@ -9,8 +9,10 @@ from pydantic import ValidationError
 from starlette.websockets import WebSocketDisconnect
 
 from nola.api.deps import (
+    LiveRealtimeTranscriberFactory,
     get_live_db,
     get_live_diagnostics_output_dir,
+    get_live_realtime_transcriber_factory,
     get_live_stream_connection_registry,
 )
 from nola.api.routes._live_realtime_events import (
@@ -55,6 +57,7 @@ from nola.application.live import (
     list_live_sessions,
 )
 from nola.application.live.realtime import (
+    LIVE_REALTIME_SUPPORTED_PROTOCOL_VERSIONS,
     LiveRealtimeAudioFrameMetadata,
     LiveRealtimeDiagnosticsWavStart,
     LiveRealtimeErrorCode,
@@ -62,7 +65,10 @@ from nola.application.live.realtime import (
     LiveRealtimeSessionRuntime,
     LiveRealtimeTrackStart,
     LiveRealtimeTrackStop,
+    LiveRealtimeTranscriberError,
     LiveRealtimeTranscriptCommittedPartial,
+    LiveRealtimeTranscriptEvent,
+    LiveRealtimeTranscriptFinal,
     LiveRealtimeTranscriptPreview,
     LiveStreamConnectionRegistry,
     ensure_pcm16le_contract,
@@ -79,6 +85,10 @@ LiveStreamRegistryDependency: TypeAlias = Annotated[
 LiveDiagnosticsOutputDependency: TypeAlias = Annotated[
     Path,
     Depends(get_live_diagnostics_output_dir),
+]
+LiveRealtimeTranscriberFactoryDependency: TypeAlias = Annotated[
+    LiveRealtimeTranscriberFactory,
+    Depends(get_live_realtime_transcriber_factory),
 ]
 
 LIVE_REALTIME_CLOSE_NORMAL = 1000
@@ -138,6 +148,45 @@ async def _receive_audio_payload(websocket: WebSocket) -> bytes:
             message="Audio frame metadata must be followed by a binary payload",
         )
     return payload
+
+
+async def _send_transcript_events(
+    websocket: WebSocket,
+    *,
+    session_id: str,
+    transcript_events: tuple[LiveRealtimeTranscriptEvent, ...],
+) -> None:
+    """Send transcript events produced by the session runtime."""
+    for transcript_event in transcript_events:
+        if isinstance(transcript_event, LiveRealtimeTranscriptPreview):
+            await websocket.send_json(
+                build_transcript_preview_event(
+                    session_id=session_id,
+                    preview=transcript_event,
+                ).model_dump(mode="json")
+            )
+        elif isinstance(
+            transcript_event,
+            LiveRealtimeTranscriptCommittedPartial,
+        ):
+            await websocket.send_json(
+                build_transcript_committed_partial_event(
+                    session_id=session_id,
+                    committed_partial=transcript_event,
+                ).model_dump(mode="json")
+            )
+        elif isinstance(transcript_event, LiveRealtimeTranscriptFinal):
+            await websocket.send_json(
+                build_transcript_final_event(
+                    session_id=session_id,
+                    final=transcript_event,
+                ).model_dump(mode="json")
+            )
+        else:
+            raise LiveRealtimeSessionError(
+                code="internal_error",
+                message="Realtime transcript event is not supported",
+            )
 
 
 @router.post(
@@ -259,6 +308,7 @@ async def stream_live_session_endpoint(
     live_store: LiveStoreDependency,
     stream_registry: LiveStreamRegistryDependency,
     diagnostics_output_dir: LiveDiagnosticsOutputDependency,
+    transcriber_factory: LiveRealtimeTranscriberFactoryDependency,
 ) -> None:
     """Handle one live realtime WebSocket stream."""
     await websocket.accept()
@@ -319,12 +369,6 @@ async def stream_live_session_endpoint(
             await websocket.close(code=LIVE_REALTIME_CLOSE_CONFLICT)
             return
 
-        runtime = LiveRealtimeSessionRuntime(
-            live_store=live_store,
-            session_id=session_id,
-            diagnostics_output_dir=diagnostics_output_dir,
-        )
-
         raw_hello = await _receive_realtime_json(websocket)
         base_hello = LiveRealtimeEventEnvelope.model_validate(raw_hello)
         if base_hello.session_id != session_id:
@@ -339,6 +383,18 @@ async def stream_live_session_endpoint(
             )
 
         hello = LiveRealtimeClientHelloEvent.model_validate(raw_hello)
+        if hello.protocol_version not in LIVE_REALTIME_SUPPORTED_PROTOCOL_VERSIONS:
+            raise LiveRealtimeSessionError(
+                code="protocol_version_unsupported",
+                message="Realtime protocol version is not supported",
+            )
+
+        runtime = LiveRealtimeSessionRuntime(
+            live_store=live_store,
+            session_id=session_id,
+            diagnostics_output_dir=diagnostics_output_dir,
+            transcriber=transcriber_factory(),
+        )
         runtime.accept_hello(protocol_version=hello.protocol_version)
 
         session_payload = get_live_session(
@@ -421,31 +477,11 @@ async def stream_live_session_endpoint(
                         ).model_dump(mode="json")
                     )
 
-                for transcript_event in audio_frame_result.transcript_events:
-                    if isinstance(transcript_event, LiveRealtimeTranscriptPreview):
-                        await websocket.send_json(
-                            build_transcript_preview_event(
-                                session_id=session_id,
-                                preview=transcript_event,
-                            ).model_dump(mode="json")
-                        )
-                    elif isinstance(
-                        transcript_event,
-                        LiveRealtimeTranscriptCommittedPartial,
-                    ):
-                        await websocket.send_json(
-                            build_transcript_committed_partial_event(
-                                session_id=session_id,
-                                committed_partial=transcript_event,
-                            ).model_dump(mode="json")
-                        )
-                    else:
-                        await websocket.send_json(
-                            build_transcript_final_event(
-                                session_id=session_id,
-                                final=transcript_event,
-                            ).model_dump(mode="json")
-                        )
+                await _send_transcript_events(
+                    websocket,
+                    session_id=session_id,
+                    transcript_events=audio_frame_result.transcript_events,
+                )
                 continue
 
             if base_event.type == "diagnostics.wav.start":
@@ -482,12 +518,17 @@ async def stream_live_session_endpoint(
 
             if base_event.type == "track.stop":
                 track_stop = LiveRealtimeTrackStopEvent.model_validate(raw_event)
-                runtime.stop_track(
+                track_stop_result = runtime.stop_track(
                     LiveRealtimeTrackStop(
                         track_id=track_stop.track_id,
                         source=track_stop.source,
                         sequence=track_stop.sequence,
                     )
+                )
+                await _send_transcript_events(
+                    websocket,
+                    session_id=session_id,
+                    transcript_events=track_stop_result.transcript_events,
                 )
                 continue
 
@@ -502,9 +543,14 @@ async def stream_live_session_endpoint(
                         ).model_dump(mode="json")
                     )
 
-                finish_payload = runtime.finish()
+                finish_result = runtime.finish()
+                await _send_transcript_events(
+                    websocket,
+                    session_id=session_id,
+                    transcript_events=finish_result.transcript_events,
+                )
                 session_response = LiveSessionDetailResponse.model_validate(
-                    finish_payload
+                    finish_result.session
                 )
                 finished = build_session_finished_event(
                     session_id=session_id,
@@ -527,6 +573,14 @@ async def stream_live_session_endpoint(
         )
         await websocket.close(code=LIVE_REALTIME_CLOSE_POLICY)
     except LiveRealtimeSessionError as error:
+        await _send_realtime_error(
+            websocket,
+            session_id=session_id,
+            code=error.code,
+            message=error.message,
+        )
+        await websocket.close(code=LIVE_REALTIME_CLOSE_POLICY)
+    except LiveRealtimeTranscriberError as error:
         await _send_realtime_error(
             websocket,
             session_id=session_id,
