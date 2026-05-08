@@ -4,8 +4,10 @@ import pytest
 
 from nola.application.live.realtime.whisper_streaming import (
     WHISPER_STREAMING_SAMPLE_RATE,
+    WhisperStreamingFasterWhisperBackend,
     WhisperStreamingRuntimeConfig,
     WhisperStreamingRuntimeConfigError,
+    WhisperStreamingRuntimeLoader,
     WhisperStreamingTranscriptChunk,
     WhisperStreamingVadParameters,
     validate_whisper_streaming_runtime_config,
@@ -20,6 +22,8 @@ def test_whisper_streaming_package_exports_runtime_config() -> None:
     assert config.buffer_trimming_ms == 15000
     assert config.prompt_max_chars == 200
     assert config.max_duplicate_ngram == 5
+    assert WhisperStreamingFasterWhisperBackend.separator == ""
+    assert WhisperStreamingRuntimeLoader is not None
 
 
 def test_whisper_streaming_config_accepts_typed_vad_parameters() -> None:
