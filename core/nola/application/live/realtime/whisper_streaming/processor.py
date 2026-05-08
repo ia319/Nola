@@ -112,6 +112,8 @@ class WhisperStreamingOnlineProcessor:
     def build_prompt(self) -> tuple[str, str]:
         """Return the prompt and in-buffer committed context."""
         separator = self._backend.separator
+        # TODO: Validate the prompt split before using context output; the upstream
+        # len-1 split can keep one scrolled-out word out of the prompt [2026-05-08].
         split_index = max(0, len(self._committed_history) - 1)
         while (
             split_index > 0
@@ -139,14 +141,14 @@ class WhisperStreamingOnlineProcessor:
         if self._closed:
             return _empty_update()
 
+        # TODO: Verify track-stop audio shorter than min_chunk_ms before changing
+        # finish; upstream-style flush can skip unprocessed tail audio [2026-05-08].
         final = self._close_pending_segment(include_unconfirmed=True)
         self._closed = True
         return _with_final(_empty_update(), final)
 
     def close(self) -> None:
         """Close the processor and clear connection-local buffers."""
-        if self._closed:
-            return
         self._closed = True
         self._audio_buffer.clear()
         self._committed_history.clear()

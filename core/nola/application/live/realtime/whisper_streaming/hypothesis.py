@@ -23,7 +23,8 @@ class LocalAgreementHypothesisBuffer:
         offset_ms: int = 0,
     ) -> None:
         self._config = config
-        # Keep upstream list semantics; validate pop(0) cost before using deque.
+        # TODO: Validate pop(0) cost before replacing upstream list semantics with
+        # deque [2026-05-08].
         self._committed_in_buffer: list[WhisperStreamingWord] = []
         self._buffer: list[WhisperStreamingWord] = []
         self._new: list[WhisperStreamingWord] = []
@@ -103,6 +104,8 @@ class LocalAgreementHypothesisBuffer:
             len(self._new),
             self._config.max_duplicate_ngram,
         )
+        # TODO: Validate longest-match duplicate trimming with repeated words; the
+        # upstream smallest-match scan can leave a boundary duplicate [2026-05-08].
         for ngram_size in range(1, max_ngram + 1):
             committed_tail = _join_text(tuple(self._committed_in_buffer[-ngram_size:]))
             new_head = _join_text(tuple(self._new[:ngram_size]))
