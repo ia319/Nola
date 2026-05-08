@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, HTTPException, Response, status
+from pydantic import ValidationError
 
 from nola.api.deps import get_app_config_db
 from nola.api.routes._model_helpers import (
@@ -15,6 +16,10 @@ from nola.api.routes._model_helpers import (
 )
 from nola.api.schemas import (
     ExportDefaultsUpdateRequest,
+    LiveRealtimeDefaultsPatchResponse,
+    LiveRealtimeDefaultsResponse,
+    LiveRealtimeDefaultsUpdateRequest,
+    LiveRealtimeSchemaResponse,
     SessionDefaultsResponse,
     SessionDefaultsUpdateRequest,
     SessionExecutionDefaultsResponse,
@@ -30,6 +35,13 @@ from nola.config.export import (
 )
 from nola.config.export import (
     get_effective_defaults as get_effective_export_defaults,
+)
+from nola.config.live_realtime import (
+    LIVE_REALTIME_CONFIG_PREFIX,
+    LiveRealtimeDefaults,
+    get_live_realtime_effective_defaults,
+    get_live_realtime_param_schema,
+    resolve_live_realtime_defaults,
 )
 from nola.config.session import (
     get_session_defaults,
@@ -137,6 +149,28 @@ def _to_export_resolved_defaults(
     return ExportResolvedDefaultsResponse.model_validate(dict(defaults))
 
 
+def _to_live_realtime_resolved_defaults(
+    defaults: Mapping[str, object],
+) -> LiveRealtimeDefaults:
+    """Validate Live realtime defaults against the typed API response contract."""
+    return LiveRealtimeDefaults.model_validate(dict(defaults))
+
+
+def _raise_live_realtime_validation_error(error: ValidationError) -> None:
+    """Convert resolved-default validation errors into API validation details."""
+    detail = [
+        {
+            "loc": ["body", *item["loc"]],
+            "msg": item["msg"],
+            "type": item["type"],
+        }
+        for item in error.errors()
+    ]
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail
+    )
+
+
 def _build_session_defaults_response(
     config_db: AppConfigDatabase,
 ) -> SessionDefaultsResponse:
@@ -167,6 +201,24 @@ def _apply_transcription_defaults_patch(
         current_overrides = config_db.get_all("transcription.")
         next_overrides = apply_override_patch(current_overrides, patch_values)
         config_db.replace_many("transcription.", next_overrides)
+
+
+def _apply_live_realtime_defaults_patch(
+    config_db: AppConfigDatabase,
+    request: LiveRealtimeDefaultsUpdateRequest,
+) -> None:
+    """Apply Live realtime-defaults PATCH semantics."""
+    patch_values = request.get_options_dict()
+    if not patch_values:
+        return
+
+    current_overrides = config_db.get_all(LIVE_REALTIME_CONFIG_PREFIX)
+    next_overrides = apply_override_patch(current_overrides, patch_values)
+    try:
+        resolve_live_realtime_defaults(next_overrides)
+    except ValidationError as error:
+        _raise_live_realtime_validation_error(error)
+    config_db.replace_many(LIVE_REALTIME_CONFIG_PREFIX, next_overrides)
 
 
 def _build_model_config(config_db: AppConfigDatabase) -> ModelConfigResponse:
@@ -261,6 +313,81 @@ def patch_transcription_defaults(
     return TranscriptionDefaultsPatchResponse(
         defaults=_to_resolved_defaults(get_effective_transcription_defaults(config_db))
     )
+
+
+@router.get(
+    "/live-realtime/defaults",
+    summary="Get effective Live realtime defaults",
+    description=(
+        "Return Live realtime defaults after applying persisted overrides on "
+        "top of built-in runtime defaults."
+    ),
+    response_model=LiveRealtimeDefaultsResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_live_realtime_defaults() -> LiveRealtimeDefaultsResponse:
+    """Return effective Live realtime defaults."""
+    config_db = get_app_config_db()
+    return LiveRealtimeDefaultsResponse(
+        defaults=_to_live_realtime_resolved_defaults(
+            get_live_realtime_effective_defaults(config_db)
+        )
+    )
+
+
+@router.get(
+    "/live-realtime/schema",
+    summary="Get Live realtime option schema",
+    description=(
+        "Return schema-driven Live realtime option metadata, including i18n "
+        "keys, field types, ranges, defaults, and adapter support."
+    ),
+    response_model=LiveRealtimeSchemaResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_live_realtime_schema() -> LiveRealtimeSchemaResponse:
+    """Return Live realtime option metadata."""
+    return LiveRealtimeSchemaResponse(schema=get_live_realtime_param_schema())
+
+
+@router.patch(
+    "/live-realtime/defaults",
+    summary="Update persisted Live realtime defaults",
+    description=(
+        "Apply a partial update to persisted Live realtime defaults. Explicit "
+        "null removes an override key, and nested VAD parameters are merged "
+        "without replacing untouched subkeys."
+    ),
+    response_model=LiveRealtimeDefaultsPatchResponse,
+    status_code=status.HTTP_200_OK,
+)
+def patch_live_realtime_defaults(
+    request: LiveRealtimeDefaultsUpdateRequest,
+) -> LiveRealtimeDefaultsPatchResponse:
+    """Persist a partial Live realtime-defaults update."""
+    config_db = get_app_config_db()
+    _apply_live_realtime_defaults_patch(config_db, request)
+
+    return LiveRealtimeDefaultsPatchResponse(
+        defaults=_to_live_realtime_resolved_defaults(
+            get_live_realtime_effective_defaults(config_db)
+        )
+    )
+
+
+@router.delete(
+    "/live-realtime/defaults",
+    summary="Reset persisted Live realtime defaults",
+    description=(
+        "Delete persisted Live realtime default overrides and fall back to "
+        "built-in runtime defaults."
+    ),
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_live_realtime_defaults() -> Response:
+    """Remove all persisted Live realtime overrides."""
+    get_app_config_db().delete_all(LIVE_REALTIME_CONFIG_PREFIX)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
