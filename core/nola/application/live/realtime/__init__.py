@@ -52,9 +52,11 @@ from nola.application.live.realtime.protocol import (
 )
 from nola.application.live.realtime.session import (
     LiveRealtimeAudioFrameResult,
+    LiveRealtimeSessionFinishResult,
     LiveRealtimeSessionRuntime,
     LiveRealtimeTrackStart,
     LiveRealtimeTrackStop,
+    LiveRealtimeTrackStopResult,
 )
 from nola.application.live.realtime.transcriber import (
     LiveRealtimeTranscriber,
@@ -92,6 +94,7 @@ __all__ = [
     "LiveRealtimeDiagnosticsWavStopReason",
     "LiveRealtimeAudioFrameMetadata",
     "LiveRealtimeAudioFrameResult",
+    "LiveRealtimeSessionFinishResult",
     "LiveRealtimeErrorCode",
     "LiveRealtimePcm16Frame",
     "LiveRealtimeSessionError",
@@ -108,6 +111,7 @@ __all__ = [
     "LiveRealtimeTranscriberResult",
     "LiveRealtimeTrackStart",
     "LiveRealtimeTrackStop",
+    "LiveRealtimeTrackStopResult",
     "LiveRealtimeWavDiagnosticsSession",
     "MockLiveRealtimeTranscriber",
     "Pcm16WavWriter",

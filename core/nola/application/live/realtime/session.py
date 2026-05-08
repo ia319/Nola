@@ -34,6 +34,7 @@ from nola.application.live.realtime.protocol import (
 from nola.application.live.realtime.transcriber import (
     LiveRealtimeTranscriber,
     LiveRealtimeTranscriberFrame,
+    LiveRealtimeTranscriberResult,
     LiveRealtimeTranscriptCommittedPartial,
     LiveRealtimeTranscriptEvent,
     LiveRealtimeTranscriptFinal,
@@ -74,6 +75,22 @@ class LiveRealtimeAudioFrameResult:
 
     transcript_events: tuple[LiveRealtimeTranscriptEvent, ...]
     diagnostics_wav_stopped: LiveRealtimeDiagnosticsWavStopped | None = None
+
+
+@dataclass(frozen=True)
+class LiveRealtimeTrackStopResult:
+    """Carry runtime effects from one stopped track."""
+
+    track: LiveTrackPayload
+    transcript_events: tuple[LiveRealtimeTranscriptEvent, ...]
+
+
+@dataclass(frozen=True)
+class LiveRealtimeSessionFinishResult:
+    """Carry runtime effects from finishing one realtime session."""
+
+    session: LiveSessionPayload
+    transcript_events: tuple[LiveRealtimeTranscriptEvent, ...]
 
 
 @dataclass
@@ -241,10 +258,55 @@ class LiveRealtimeSessionRuntime:
             ) from error
         except Exception as error:
             raise LiveRealtimeSessionError(
-                code="mock_transcriber_failed",
-                message="Mock transcriber could not process the audio frame",
+                code="runtime_inference_failed",
+                message="Realtime transcriber could not process the audio frame",
             ) from error
 
+        return self._persist_transcriber_results(results)
+
+    def _flush_track_for_transcription(
+        self,
+        *,
+        track_id: str,
+        source: LiveTrackSource,
+    ) -> tuple[LiveRealtimeTranscriptEvent, ...]:
+        try:
+            results = self._transcriber.flush_track(track_id=track_id, source=source)
+        except LiveRealtimeTranscriberError as error:
+            raise LiveRealtimeSessionError(
+                code=error.code,
+                message=error.message,
+            ) from error
+        except Exception as error:
+            raise LiveRealtimeSessionError(
+                code="runtime_inference_failed",
+                message="Realtime transcriber could not flush the track",
+            ) from error
+
+        return self._persist_transcriber_results(results)
+
+    def _flush_all_for_transcription(
+        self,
+    ) -> tuple[LiveRealtimeTranscriptEvent, ...]:
+        try:
+            results = self._transcriber.flush_all()
+        except LiveRealtimeTranscriberError as error:
+            raise LiveRealtimeSessionError(
+                code=error.code,
+                message=error.message,
+            ) from error
+        except Exception as error:
+            raise LiveRealtimeSessionError(
+                code="runtime_inference_failed",
+                message="Realtime transcriber could not flush open tracks",
+            ) from error
+
+        return self._persist_transcriber_results(results)
+
+    def _persist_transcriber_results(
+        self,
+        results: tuple[LiveRealtimeTranscriberResult, ...],
+    ) -> tuple[LiveRealtimeTranscriptEvent, ...]:
         return tuple(self._persist_transcript_result(result) for result in results)
 
     def _persist_transcript_result(
@@ -372,11 +434,15 @@ class LiveRealtimeSessionRuntime:
         self._ensure_expected_sequence(state, event.sequence)
         return state
 
-    def stop_track(self, event: LiveRealtimeTrackStop) -> LiveTrackPayload:
+    def stop_track(self, event: LiveRealtimeTrackStop) -> LiveRealtimeTrackStopResult:
         """Stop one live track and persist its end timestamp."""
         self._ensure_ready()
         state = self._get_writable_track(event.track_id, event.source)
         self._ensure_expected_sequence(state, event.sequence)
+        transcript_events = self._flush_track_for_transcription(
+            track_id=event.track_id,
+            source=event.source,
+        )
 
         now = self._timestamp_factory()
         try:
@@ -398,14 +464,18 @@ class LiveRealtimeSessionRuntime:
             )
 
         self._tracks.pop(event.track_id, None)
-        return to_live_track_payload(track)
+        return LiveRealtimeTrackStopResult(
+            track=to_live_track_payload(track),
+            transcript_events=transcript_events,
+        )
 
-    def finish(self) -> LiveSessionPayload:
+    def finish(self) -> LiveRealtimeSessionFinishResult:
         """Finish the live session and release connection-local buffers."""
         self._ensure_ready()
         if self._diagnostics_wav is not None and self._diagnostics_wav.active:
             self._diagnostics_wav.close_silently(reason="session_finish")
             self._diagnostics_wav = None
+        transcript_events = self._flush_all_for_transcription()
         ended_at = self._timestamp_factory()
         self._finish_open_tracks(ended_at=ended_at)
         payload = finish_live_session(
@@ -415,7 +485,10 @@ class LiveRealtimeSessionRuntime:
         )
         self._finished_normally = True
         self.release()
-        return payload
+        return LiveRealtimeSessionFinishResult(
+            session=payload,
+            transcript_events=transcript_events,
+        )
 
     def _finish_open_tracks(self, *, ended_at: str) -> None:
         for track_id in tuple(self._tracks):
