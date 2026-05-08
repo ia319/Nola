@@ -20,7 +20,6 @@ from nola.api.schemas import (
     SessionExecutionDefaultsResponse,
     TranscriptionDefaultsUpdateRequest,
 )
-from nola.api.schemas.models import ModelConfigResponse
 from nola.config import settings
 from nola.config.common import apply_override_patch
 from nola.config.export import (
@@ -41,6 +40,7 @@ from nola.config.transcription import (
     AppConfigResponse,
     EngineConfigResponse,
     EngineDefaultsResponse,
+    ModelConfigResponse,
     TranscriptionConfigResponse,
     TranscriptionDefaultsPatchResponse,
     TranscriptionResolvedDefaultsResponse,

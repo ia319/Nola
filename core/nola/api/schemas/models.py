@@ -136,13 +136,3 @@ class DetailResponse(BaseModel):
     """Expose one JSON error detail message."""
 
     detail: str
-
-
-class ModelConfigResponse(BaseModel):
-    """Expose model state inside the aggregated /api/config response."""
-
-    configured_model_id: str | None = None
-    last_loaded_model_id: str | None = None
-    last_loaded_device: EngineDevice | None = None
-    last_loaded_compute_type: EngineComputeType | None = None
-    restart_required: bool = False
