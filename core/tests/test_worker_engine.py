@@ -83,6 +83,7 @@ def _raw_task(
         "last_heartbeat": None,
         "timeout_seconds": 3600,
         "options": None,
+        "runtime_config": None,
         "progress": 0.0,
         "duration": None,
         "segments": None,

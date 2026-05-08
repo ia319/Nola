@@ -102,6 +102,29 @@ class TestBuildTranscribeOptions:
         assert options.beam_size == 7
         assert options.task == "translate"
 
+    def test_runtime_config_snapshot_overrides_current_defaults(self):
+        """Stored runtime snapshots should bypass execution-time defaults."""
+        options = build_transcribe_options(
+            {"beam_size": 7},
+            StubConfigStore({"beam_size": 3, "task": "translate"}),
+            runtime_config={
+                "schema_version": 1,
+                "model_id": "small",
+                "engine_device": "cpu",
+                "engine_compute_type": "default",
+                "transcription_options": {
+                    "language": "en",
+                    "task": "transcribe",
+                    "beam_size": 1,
+                },
+                "request_options": None,
+            },
+        )
+
+        assert options.language == "en"
+        assert options.task == "transcribe"
+        assert options.beam_size == 1
+
     def test_nested_vad_parameters_deep_merge_across_layers(self):
         """Nested VAD overrides should merge instead of replacing whole objects."""
         options = build_transcribe_options(
@@ -170,7 +193,10 @@ class TestBuildTranscribeOptions:
         assert options.hotwords == "inf"
 
 
-def _raw_task(task_id: str = "task-1") -> TaskRowRaw:
+def _raw_task(
+    task_id: str = "task-1",
+    runtime_config: str | None = None,
+) -> TaskRowRaw:
     """Build one raw task row for worker loop tests."""
     return {
         "id": task_id,
@@ -187,6 +213,7 @@ def _raw_task(task_id: str = "task-1") -> TaskRowRaw:
         "last_heartbeat": None,
         "timeout_seconds": 3600,
         "options": None,
+        "runtime_config": runtime_config,
         "progress": 0.0,
         "duration": None,
         "segments": None,
