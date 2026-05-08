@@ -6,6 +6,7 @@ from typing import Annotated, NoReturn, TypeAlias
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket
 from pydantic import ValidationError
+from starlette.concurrency import run_in_threadpool
 from starlette.websockets import WebSocketDisconnect
 
 from nola.api.deps import (
@@ -393,7 +394,7 @@ async def stream_live_session_endpoint(
             live_store=live_store,
             session_id=session_id,
             diagnostics_output_dir=diagnostics_output_dir,
-            transcriber=transcriber_factory(),
+            transcriber=await run_in_threadpool(transcriber_factory),
         )
         runtime.accept_hello(protocol_version=hello.protocol_version)
 
