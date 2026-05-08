@@ -23,6 +23,7 @@ class LocalAgreementHypothesisBuffer:
         offset_ms: int = 0,
     ) -> None:
         self._config = config
+        # Keep upstream list semantics; validate pop(0) cost before using deque.
         self._committed_in_buffer: list[WhisperStreamingWord] = []
         self._buffer: list[WhisperStreamingWord] = []
         self._new: list[WhisperStreamingWord] = []
