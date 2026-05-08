@@ -326,8 +326,10 @@ export class LiveRealtimeSessionService {
         this.tracksBySource.set(event.track.source, event.track)
         useLiveRealtimeStore.getState().setLiveRealtimeTrack(event.track)
       }
-    } else if (event.type === 'transcript.partial') {
-      useLiveRealtimeStore.getState().setLiveRealtimePartial(event.transcript)
+    } else if (event.type === 'transcript.preview') {
+      useLiveRealtimeStore.getState().setLiveRealtimePreview(event.transcript)
+    } else if (event.type === 'transcript.committed_partial') {
+      useLiveRealtimeStore.getState().setLiveRealtimeCommittedPartial(event.transcript)
     } else if (event.type === 'transcript.final') {
       useLiveRealtimeStore.getState().appendLiveRealtimeFinal(event.transcript)
     } else if (event.type === 'diagnostics.wav.started') {

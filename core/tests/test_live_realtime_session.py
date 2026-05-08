@@ -12,10 +12,13 @@ from nola.application.live.realtime import (
     LiveRealtimeSessionRuntime,
     LiveRealtimeTrackStart,
     LiveRealtimeTrackStop,
+    LiveRealtimeTranscriberError,
     LiveRealtimeTranscriberFrame,
     LiveRealtimeTranscriberResult,
+    LiveRealtimeTranscriptCommittedPartial,
     LiveRealtimeTranscriptFinal,
-    LiveRealtimeTranscriptPartial,
+    LiveRealtimeTranscriptFinalCandidate,
+    LiveRealtimeTranscriptPreview,
 )
 from nola.application.live.types import LiveTrackSource
 from tests.test_live_use_cases import FakeLiveStore, _session
@@ -129,7 +132,7 @@ def test_realtime_session_validates_audio_sequence_and_stop_state() -> None:
     assert repeated_error.value.code == "audio_sequence_invalid"
     assert skipped_error.value.code == "audio_sequence_invalid"
     assert stopped_error.value.code == "invalid_track"
-    assert stopped["ended_at"] == "2026-01-01T00:00:00+00:00"
+    assert stopped.track["ended_at"] == "2026-01-01T00:00:00+00:00"
     assert runtime.active_track_count == 0
 
 
@@ -155,7 +158,8 @@ def test_realtime_session_finish_releases_track_state() -> None:
     runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
     runtime.start_track(_start_event())
 
-    payload = runtime.finish()
+    result = runtime.finish()
+    payload = result.session
     tracks = live_store.list_tracks("live-001")
 
     assert payload["status"] == "finished"
@@ -385,7 +389,7 @@ def test_realtime_session_emits_mock_transcripts_and_persists_final() -> None:
     )
 
     assert len(partial_events) == 1
-    assert isinstance(partial_events[0], LiveRealtimeTranscriptPartial)
+    assert isinstance(partial_events[0], LiveRealtimeTranscriptCommittedPartial)
     assert partial_events[0].text == "Mock microphone partial 1"
 
     assert len(final_events) == 1
@@ -398,6 +402,106 @@ def test_realtime_session_emits_mock_transcripts_and_persists_final() -> None:
     assert live_store.count_segments("live-001") == 1
 
 
+def test_realtime_session_keeps_preview_out_of_persistence() -> None:
+    """Realtime runtime should not persist preview transcript results."""
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+    runtime = LiveRealtimeSessionRuntime(
+        live_store=live_store,
+        session_id="live-001",
+        track_id_factory=lambda: "track-001",
+        timestamp_factory=lambda: "2026-01-01T00:00:00+00:00",
+        transcriber=_PreviewTranscriber(),
+    )
+    runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
+    runtime.start_track(_start_event())
+
+    result = runtime.accept_audio_frame(_audio_metadata(), b"\x00" * 640)
+
+    assert len(result.transcript_events) == 1
+    assert isinstance(result.transcript_events[0], LiveRealtimeTranscriptPreview)
+    assert result.transcript_events[0].result_kind == "preview"
+    assert live_store.count_segments("live-001") == 0
+
+
+def test_realtime_session_flushes_track_stop_final() -> None:
+    """Realtime runtime should flush one track before stopping it."""
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+    transcriber = _FlushTrackTranscriber()
+    runtime = LiveRealtimeSessionRuntime(
+        live_store=live_store,
+        session_id="live-001",
+        track_id_factory=lambda: "track-001",
+        segment_id_factory=lambda: "segment-stop",
+        timestamp_factory=lambda: "2026-01-01T00:00:00+00:00",
+        transcriber=transcriber,
+    )
+    runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
+    runtime.start_track(_start_event())
+
+    result = runtime.stop_track(
+        LiveRealtimeTrackStop(
+            track_id="track-001",
+            source="microphone",
+            sequence=0,
+        )
+    )
+
+    assert transcriber.flushed_tracks == [("track-001", "microphone")]
+    assert result.track["ended_at"] == "2026-01-01T00:00:00+00:00"
+    assert len(result.transcript_events) == 1
+    assert isinstance(result.transcript_events[0], LiveRealtimeTranscriptFinal)
+    assert result.transcript_events[0].segment_id == "segment-stop"
+    assert result.transcript_events[0].text == "flush track final"
+    assert live_store.count_segments("live-001") == 1
+    assert runtime.active_track_count == 0
+
+
+def test_realtime_session_finish_flushes_open_track_final() -> None:
+    """Realtime runtime should flush open tracks before finishing the session."""
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+    runtime = LiveRealtimeSessionRuntime(
+        live_store=live_store,
+        session_id="live-001",
+        track_id_factory=lambda: "track-001",
+        segment_id_factory=lambda: "segment-finish",
+        timestamp_factory=lambda: "2026-01-01T00:00:00+00:00",
+        transcriber=_FlushAllTranscriber(),
+    )
+    runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
+    runtime.start_track(_start_event())
+
+    result = runtime.finish()
+
+    assert result.session["status"] == "finished"
+    assert result.session["tracks"][0]["ended_at"] == "2026-01-01T00:00:00+00:00"
+    assert len(result.transcript_events) == 1
+    assert isinstance(result.transcript_events[0], LiveRealtimeTranscriptFinal)
+    assert result.transcript_events[0].segment_id == "segment-finish"
+    assert result.transcript_events[0].text == "flush all final"
+    assert live_store.count_segments("live-001") == 1
+    assert runtime.active_track_count == 0
+
+
+def test_realtime_session_maps_stable_transcriber_error() -> None:
+    """Realtime runtime should preserve stable transcriber error codes."""
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+    runtime = LiveRealtimeSessionRuntime(
+        live_store=live_store,
+        session_id="live-001",
+        track_id_factory=lambda: "track-001",
+        timestamp_factory=lambda: "2026-01-01T00:00:00+00:00",
+        transcriber=_FailingTranscriber(),
+    )
+    runtime.accept_hello(protocol_version=LIVE_REALTIME_PROTOCOL_VERSION)
+    runtime.start_track(_start_event())
+
+    with pytest.raises(LiveRealtimeSessionError) as error:
+        runtime.accept_audio_frame(_audio_metadata(), b"\x00" * 640)
+
+    assert error.value.code == "runtime_inference_failed"
+    assert error.value.message == "Realtime transcription inference failed"
+
+
 class _CountingTranscriber:
     def __init__(self) -> None:
         self.release_count = 0
@@ -408,5 +512,146 @@ class _CountingTranscriber:
     ) -> tuple[LiveRealtimeTranscriberResult, ...]:
         return ()
 
+    def flush_track(
+        self,
+        *,
+        track_id: str,
+        source: LiveTrackSource,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        del track_id, source
+        return ()
+
+    def flush_all(self) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return ()
+
     def release(self) -> None:
         self.release_count += 1
+
+
+class _PreviewTranscriber:
+    def accept_frame(
+        self,
+        frame: LiveRealtimeTranscriberFrame,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return (
+            LiveRealtimeTranscriptPreview(
+                track_id=frame.track_id,
+                source=frame.source,
+                preview_index=1,
+                start_ms=frame.start_ms,
+                end_ms=frame.end_ms,
+                text="Preview text",
+                language=None,
+                confidence=None,
+            ),
+        )
+
+    def flush_track(
+        self,
+        *,
+        track_id: str,
+        source: LiveTrackSource,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        del track_id, source
+        return ()
+
+    def flush_all(self) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return ()
+
+    def release(self) -> None:
+        return None
+
+
+class _FailingTranscriber:
+    def accept_frame(
+        self,
+        _frame: LiveRealtimeTranscriberFrame,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        raise LiveRealtimeTranscriberError(
+            code="runtime_inference_failed",
+            message="Realtime transcription inference failed",
+        )
+
+    def flush_track(
+        self,
+        *,
+        track_id: str,
+        source: LiveTrackSource,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        del track_id, source
+        return ()
+
+    def flush_all(self) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return ()
+
+    def release(self) -> None:
+        return None
+
+
+class _FlushTrackTranscriber:
+    def __init__(self) -> None:
+        self.flushed_tracks: list[tuple[str, LiveTrackSource]] = []
+
+    def accept_frame(
+        self,
+        _frame: LiveRealtimeTranscriberFrame,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return ()
+
+    def flush_track(
+        self,
+        *,
+        track_id: str,
+        source: LiveTrackSource,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        self.flushed_tracks.append((track_id, source))
+        return (
+            LiveRealtimeTranscriptFinalCandidate(
+                track_id=track_id,
+                source=source,
+                start_ms=0,
+                end_ms=120,
+                text="flush track final",
+                language=None,
+                confidence=None,
+            ),
+        )
+
+    def flush_all(self) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return ()
+
+    def release(self) -> None:
+        return None
+
+
+class _FlushAllTranscriber:
+    def accept_frame(
+        self,
+        _frame: LiveRealtimeTranscriberFrame,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return ()
+
+    def flush_track(
+        self,
+        *,
+        track_id: str,
+        source: LiveTrackSource,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        del track_id, source
+        return ()
+
+    def flush_all(self) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        return (
+            LiveRealtimeTranscriptFinalCandidate(
+                track_id="track-001",
+                source="microphone",
+                start_ms=0,
+                end_ms=180,
+                text="flush all final",
+                language=None,
+                confidence=None,
+            ),
+        )
+
+    def release(self) -> None:
+        return None

@@ -2,8 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { LIVE_REALTIME_FINAL_TRANSCRIPT_LIMIT, useLiveRealtimeStore } from '../live-realtime-store'
 import type {
+  LiveRealtimeTranscriptCommittedPartialPayload,
   LiveRealtimeTranscriptFinalPayload,
-  LiveRealtimeTranscriptPartialPayload,
+  LiveRealtimeTranscriptPreviewPayload,
 } from '../../transport/types'
 import type { LiveTrack } from '@/shared/types'
 
@@ -31,20 +32,36 @@ describe('live realtime store', () => {
     expect(state.tracksBySource.microphone?.track_id).toBe('track-1')
   })
 
-  it('keeps partial transcripts in memory and clears them after final', () => {
+  it('keeps committed partial transcripts in memory and clears them after final', () => {
     const store = useLiveRealtimeStore.getState()
 
-    store.setLiveRealtimePartial(partialTranscript('track-1'))
-    expect(useLiveRealtimeStore.getState().latestPartialsByTrackId['track-1']?.text).toBe(
-      'partial text',
+    store.setLiveRealtimePreview(previewTranscript('track-1'))
+    store.setLiveRealtimeCommittedPartial(committedPartialTranscript('track-1'))
+    expect(useLiveRealtimeStore.getState().latestCommittedPartialsByTrackId['track-1']?.text).toBe(
+      'committed partial text',
     )
+    expect(useLiveRealtimeStore.getState().currentPreviewsByTrackId['track-1']).toBeUndefined()
 
     store.appendLiveRealtimeFinal(finalTranscript('track-1'))
 
     const state = useLiveRealtimeStore.getState()
-    expect(state.latestPartialsByTrackId['track-1']).toBeUndefined()
+    expect(state.currentPreviewsByTrackId['track-1']).toBeUndefined()
+    expect(state.latestCommittedPartialsByTrackId['track-1']).toBeUndefined()
     expect(state.finalTranscripts).toHaveLength(1)
     expect(state.finalTranscripts[0]?.text).toBe('final text')
+  })
+
+  it('keeps only the current preview by track', () => {
+    const store = useLiveRealtimeStore.getState()
+
+    store.setLiveRealtimePreview(previewTranscript('track-1', 1, 'first preview'))
+    store.setLiveRealtimePreview(previewTranscript('track-1', 2, 'second preview'))
+    store.setLiveRealtimePreview(previewTranscript('track-2', 1, 'other preview'))
+
+    const state = useLiveRealtimeStore.getState()
+    expect(Object.keys(state.currentPreviewsByTrackId)).toEqual(['track-1', 'track-2'])
+    expect(state.currentPreviewsByTrackId['track-1']?.preview_index).toBe(2)
+    expect(state.currentPreviewsByTrackId['track-1']?.text).toBe('second preview')
   })
 
   it('keeps only the newest final transcripts in memory', () => {
@@ -76,14 +93,38 @@ function liveTrack(sessionId: string, trackId: string, source: LiveTrack['source
   }
 }
 
-function partialTranscript(trackId: string): LiveRealtimeTranscriptPartialPayload {
+function committedPartialTranscript(
+  trackId: string,
+): LiveRealtimeTranscriptCommittedPartialPayload {
   return {
+    result_kind: 'committed_partial',
+    session_id: 'session-1',
     track_id: trackId,
     source: 'microphone',
-    partial_index: 1,
+    committed_index: 1,
     start_ms: 0,
     end_ms: 500,
-    text: 'partial text',
+    text: 'committed partial text',
+    language: null,
+    confidence: null,
+    is_final: false,
+  }
+}
+
+function previewTranscript(
+  trackId: string,
+  previewIndex = 1,
+  text = 'preview text',
+): LiveRealtimeTranscriptPreviewPayload {
+  return {
+    result_kind: 'preview',
+    session_id: 'session-1',
+    track_id: trackId,
+    source: 'microphone',
+    preview_index: previewIndex,
+    start_ms: 0,
+    end_ms: 320,
+    text,
     language: null,
     confidence: null,
     is_final: false,
@@ -92,6 +133,7 @@ function partialTranscript(trackId: string): LiveRealtimeTranscriptPartialPayloa
 
 function finalTranscript(trackId: string, sequence = 1): LiveRealtimeTranscriptFinalPayload {
   return {
+    result_kind: 'final',
     segment_id: `segment-${sequence}`,
     session_id: 'session-1',
     track_id: trackId,

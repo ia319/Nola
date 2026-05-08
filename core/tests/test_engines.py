@@ -93,7 +93,7 @@ class TestTranscriptionEngine:
 class TestFasterWhisperEngine:
     """Test FasterWhisperEngine implementation."""
 
-    @patch("nola.engines.faster_whisper.WhisperModel")
+    @patch("nola.engines.faster_whisper_runtime.WhisperModel")
     def test_engine_creation_default_config(self, mock_model: MagicMock) -> None:
         """Create engine with default configuration."""
         engine = FasterWhisperEngine()
@@ -105,7 +105,7 @@ class TestFasterWhisperEngine:
         )
         assert engine._config.model_size == settings.model_size
 
-    @patch("nola.engines.faster_whisper.WhisperModel")
+    @patch("nola.engines.faster_whisper_runtime.WhisperModel")
     def test_engine_creation_custom_config(self, mock_model: MagicMock) -> None:
         """Create engine with custom configuration."""
         config = EngineConfig(model_size="small", device="cpu", compute_type="int8")
@@ -114,7 +114,7 @@ class TestFasterWhisperEngine:
         mock_model.assert_called_once_with("small", device="cpu", compute_type="int8")
         assert engine._config.model_size == "small"
 
-    @patch("nola.engines.faster_whisper.WhisperModel")
+    @patch("nola.engines.faster_whisper_runtime.WhisperModel")
     def test_engine_creation_with_download_root(
         self, mock_model: MagicMock, tmp_path: Path
     ) -> None:
@@ -135,7 +135,7 @@ class TestFasterWhisperEngine:
         )
         assert engine._config.download_root == tmp_path
 
-    @patch("nola.engines.faster_whisper.WhisperModel")
+    @patch("nola.engines.faster_whisper_runtime.WhisperModel")
     def test_transcribe_yields_segments(self, mock_model: MagicMock) -> None:
         """Verify transcribe method yields Segment objects."""
         # Mock segment objects from faster-whisper
@@ -150,7 +150,7 @@ class TestFasterWhisperEngine:
         assert segments[0] == Segment(start=0.0, end=1.5, text="Hello")
         assert segments[1] == Segment(start=1.5, end=3.0, text="World")
 
-    @patch("nola.engines.faster_whisper.WhisperModel")
+    @patch("nola.engines.faster_whisper_runtime.WhisperModel")
     def test_transcribe_stream_not_implemented(self, mock_model: MagicMock) -> None:
         """Verify transcribe_stream raises NotImplementedError."""
         engine = FasterWhisperEngine()
@@ -158,7 +158,7 @@ class TestFasterWhisperEngine:
         with pytest.raises(NotImplementedError, match="Streaming"):
             engine.transcribe_stream(b"audio_data")
 
-    @patch("nola.engines.faster_whisper.WhisperModel")
+    @patch("nola.engines.faster_whisper_runtime.WhisperModel")
     def test_close_releases_model_reference(self, mock_model: MagicMock) -> None:
         """Close the engine before replacing a loaded faster-whisper model."""
         engine = FasterWhisperEngine()
@@ -171,7 +171,7 @@ class TestFasterWhisperEngine:
         with pytest.raises(RuntimeError, match="closed"):
             engine.transcribe("test.mp3")
 
-    @patch("nola.engines.faster_whisper.WhisperModel")
+    @patch("nola.engines.faster_whisper_runtime.WhisperModel")
     def test_transcribe_with_options(self, mock_model: MagicMock) -> None:
         """Verify transcribe passes options to model."""
         from nola.engines import TranscribeOptions

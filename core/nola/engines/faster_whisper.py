@@ -12,6 +12,11 @@ from nola.engines.base import (
     TranscribeOptions,
     TranscriptionEngine,
 )
+from nola.engines.faster_whisper_runtime import (
+    FasterWhisperModelConfig,
+    close_faster_whisper_model,
+    create_faster_whisper_model,
+)
 
 
 class FasterWhisperEngine(TranscriptionEngine):
@@ -20,13 +25,14 @@ class FasterWhisperEngine(TranscriptionEngine):
     def __init__(self, config: EngineConfig | None = None) -> None:
         """Initialize engine with optional configuration."""
         cfg = config or EngineConfig()
-        init_kwargs: dict[str, object] = {
-            "device": cfg.device,
-            "compute_type": cfg.compute_type,
-        }
-        if cfg.download_root is not None:
-            init_kwargs["download_root"] = str(cfg.download_root)
-        self.model: WhisperModel | None = WhisperModel(cfg.model_size, **init_kwargs)
+        self.model: WhisperModel | None = create_faster_whisper_model(
+            FasterWhisperModelConfig(
+                model_size_or_path=cfg.model_size,
+                device=cfg.device,
+                compute_type=cfg.compute_type,
+                download_root=cfg.download_root,
+            )
+        )
         self._config = cfg
 
     def transcribe(
@@ -96,6 +102,6 @@ class FasterWhisperEngine(TranscriptionEngine):
             return
 
         try:
-            model.model.unload_model()
+            close_faster_whisper_model(model)
         finally:
             self.model = None

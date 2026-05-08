@@ -26,7 +26,8 @@ export const LIVE_REALTIME_SERVER_EVENT_TYPES = [
   'track.ready',
   'diagnostics.wav.started',
   'diagnostics.wav.stopped',
-  'transcript.partial',
+  'transcript.preview',
+  'transcript.committed_partial',
   'transcript.final',
   'session.finished',
   'server.error',
@@ -62,6 +63,12 @@ const LIVE_REALTIME_ERROR_CODE_SET = new Set<string>([
   'diagnostics_wav_write_failed',
   'connection_closed',
   'mock_transcriber_failed',
+  'runtime_config_invalid',
+  'runtime_model_not_configured',
+  'runtime_model_not_registered',
+  'runtime_model_not_downloaded',
+  'runtime_model_load_failed',
+  'runtime_inference_failed',
   'repository_write_failed',
   'internal_error',
 ] satisfies readonly LiveRealtimeErrorCode[])
@@ -125,8 +132,10 @@ export function isLiveRealtimeServerEvent(value: unknown): value is LiveRealtime
         isNumber(value.total_file_byte_length) &&
         isDiagnosticsStopReason(value.reason)
       )
-    case 'transcript.partial':
-      return isTranscriptPartial(value.transcript)
+    case 'transcript.preview':
+      return isTranscriptPreview(value.transcript)
+    case 'transcript.committed_partial':
+      return isTranscriptCommittedPartial(value.transcript)
     case 'transcript.final':
       return isTranscriptFinal(value.transcript)
     case 'session.finished':
@@ -266,20 +275,42 @@ function isDiagnosticsWavFile(value: unknown): boolean {
   )
 }
 
-function isTranscriptPartial(value: unknown): boolean {
+function hasTranscriptTimingAndText(value: JsonRecord): boolean {
+  return (
+    isString(value.track_id) &&
+    isLiveTrackSource(value.source) &&
+    isNumber(value.start_ms) &&
+    isNumber(value.end_ms) &&
+    isString(value.text) &&
+    isNullableString(value.language) &&
+    (value.confidence === null || isNumber(value.confidence))
+  )
+}
+
+function isTranscriptPreview(value: unknown): boolean {
   if (!isJsonRecord(value)) {
     return false
   }
 
   return (
-    isString(value.track_id) &&
-    isLiveTrackSource(value.source) &&
-    isNumber(value.partial_index) &&
-    isNumber(value.start_ms) &&
-    isNumber(value.end_ms) &&
-    isString(value.text) &&
-    isNullableString(value.language) &&
-    (value.confidence === null || isNumber(value.confidence)) &&
+    value.result_kind === 'preview' &&
+    isString(value.session_id) &&
+    isNumber(value.preview_index) &&
+    hasTranscriptTimingAndText(value) &&
+    value.is_final === false
+  )
+}
+
+function isTranscriptCommittedPartial(value: unknown): boolean {
+  if (!isJsonRecord(value)) {
+    return false
+  }
+
+  return (
+    value.result_kind === 'committed_partial' &&
+    isString(value.session_id) &&
+    isNumber(value.committed_index) &&
+    hasTranscriptTimingAndText(value) &&
     value.is_final === false
   )
 }
@@ -290,6 +321,7 @@ function isTranscriptFinal(value: unknown): boolean {
   }
 
   return (
+    value.result_kind === 'final' &&
     isString(value.segment_id) &&
     isString(value.session_id) &&
     isString(value.track_id) &&

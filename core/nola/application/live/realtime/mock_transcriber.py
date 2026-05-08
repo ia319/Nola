@@ -6,9 +6,10 @@ from typing import Final
 from nola.application.live.realtime.transcriber import (
     LiveRealtimeTranscriberFrame,
     LiveRealtimeTranscriberResult,
+    LiveRealtimeTranscriptCommittedPartial,
     LiveRealtimeTranscriptFinalCandidate,
-    LiveRealtimeTranscriptPartial,
 )
+from nola.application.live.types import LiveTrackSource
 
 LIVE_REALTIME_MOCK_PARTIAL_INTERVAL_MS: Final = 500
 LIVE_REALTIME_MOCK_FINAL_SEGMENT_MS: Final = 1000
@@ -21,7 +22,7 @@ class _MockTrackTranscriptionState:
     segment_start_ms: int | None = None
     segment_duration_ms: int = 0
     next_partial_duration_ms: int = LIVE_REALTIME_MOCK_PARTIAL_INTERVAL_MS
-    partial_index: int = 0
+    committed_index: int = 0
     segment_index: int = 0
 
 
@@ -75,14 +76,14 @@ class MockLiveRealtimeTranscriber:
             return (final,)
 
         if state.segment_duration_ms >= state.next_partial_duration_ms:
-            state.partial_index += 1
-            partial = LiveRealtimeTranscriptPartial(
+            state.committed_index += 1
+            partial = LiveRealtimeTranscriptCommittedPartial(
                 track_id=frame.track_id,
                 source=frame.source,
-                partial_index=state.partial_index,
+                committed_index=state.committed_index,
                 start_ms=state.segment_start_ms,
                 end_ms=frame.end_ms,
-                text=f"Mock {frame.source} partial {state.partial_index}",
+                text=f"Mock {frame.source} partial {state.committed_index}",
                 language=None,
                 confidence=None,
             )
@@ -90,6 +91,22 @@ class MockLiveRealtimeTranscriber:
                 state.next_partial_duration_ms += self._partial_interval_ms
             return (partial,)
 
+        return ()
+
+    def flush_track(
+        self,
+        *,
+        track_id: str,
+        source: LiveTrackSource,
+    ) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        """Flush and clear one mock track without producing extra transcripts."""
+        del source
+        self._tracks.pop(track_id, None)
+        return ()
+
+    def flush_all(self) -> tuple[LiveRealtimeTranscriberResult, ...]:
+        """Flush and clear all mock tracks without producing extra transcripts."""
+        self._tracks.clear()
         return ()
 
     def release(self) -> None:

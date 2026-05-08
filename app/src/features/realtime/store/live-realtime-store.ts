@@ -8,8 +8,9 @@ import type {
   LiveRealtimeTransportErrorCode,
   LiveRealtimeTransportErrorShape,
   LiveRealtimeTransportStateChange,
+  LiveRealtimeTranscriptCommittedPartialPayload,
   LiveRealtimeTranscriptFinalPayload,
-  LiveRealtimeTranscriptPartialPayload,
+  LiveRealtimeTranscriptPreviewPayload,
 } from '../transport/types'
 import type { LiveAudioSourceKind } from '../capture/types'
 import type { LiveSessionDetail, LiveTrack } from '@/shared/types'
@@ -52,7 +53,8 @@ export interface LiveRealtimeRuntimeState {
   session: LiveSessionDetail | null
   connectionState: LiveRealtimeConnectionState
   tracksBySource: Partial<Record<LiveAudioSourceKind, LiveTrack>>
-  latestPartialsByTrackId: Record<string, LiveRealtimeTranscriptPartialPayload>
+  currentPreviewsByTrackId: Record<string, LiveRealtimeTranscriptPreviewPayload>
+  latestCommittedPartialsByTrackId: Record<string, LiveRealtimeTranscriptCommittedPartialPayload>
   finalTranscripts: LiveRealtimeTranscriptFinalPayload[]
   diagnosticsWav: LiveRealtimeDiagnosticsWavState
   lastError: LiveRealtimeRuntimeError | null
@@ -65,7 +67,10 @@ export interface LiveRealtimeRuntimeState {
   setLiveRealtimeConnectionState: (change: LiveRealtimeTransportStateChange) => void
   setLiveRealtimeTrack: (track: LiveTrack) => void
   removeLiveRealtimeTrack: (source: LiveAudioSourceKind) => void
-  setLiveRealtimePartial: (partial: LiveRealtimeTranscriptPartialPayload) => void
+  setLiveRealtimePreview: (preview: LiveRealtimeTranscriptPreviewPayload) => void
+  setLiveRealtimeCommittedPartial: (
+    committedPartial: LiveRealtimeTranscriptCommittedPartialPayload,
+  ) => void
   appendLiveRealtimeFinal: (final: LiveRealtimeTranscriptFinalPayload) => void
   setLiveRealtimeDiagnosticsStarted: (event: LiveRealtimeDiagnosticsWavStartedEvent) => void
   setLiveRealtimeDiagnosticsStopped: (event: LiveRealtimeDiagnosticsWavStoppedEvent) => void
@@ -86,7 +91,8 @@ function getInitialLiveRealtimeRuntimeState(): Pick<
   | 'session'
   | 'connectionState'
   | 'tracksBySource'
-  | 'latestPartialsByTrackId'
+  | 'currentPreviewsByTrackId'
+  | 'latestCommittedPartialsByTrackId'
   | 'finalTranscripts'
   | 'diagnosticsWav'
   | 'lastError'
@@ -96,7 +102,8 @@ function getInitialLiveRealtimeRuntimeState(): Pick<
     session: null,
     connectionState: 'idle',
     tracksBySource: {},
-    latestPartialsByTrackId: {},
+    currentPreviewsByTrackId: {},
+    latestCommittedPartialsByTrackId: {},
     finalTranscripts: [],
     diagnosticsWav: createDiagnosticsWavState(),
     lastError: null,
@@ -142,6 +149,8 @@ export const useLiveRealtimeStore = create<LiveRealtimeRuntimeState>((set) => ({
       session: session ?? state.session,
       connectionState: 'closed',
       tracksBySource: {},
+      currentPreviewsByTrackId: {},
+      latestCommittedPartialsByTrackId: {},
     })),
 
   setLiveRealtimeFailure: (error) =>
@@ -169,34 +178,68 @@ export const useLiveRealtimeStore = create<LiveRealtimeRuntimeState>((set) => ({
       const tracksBySource = {
         ...state.tracksBySource,
       }
+      const currentPreviewsByTrackId = {
+        ...state.currentPreviewsByTrackId,
+      }
+      const latestCommittedPartialsByTrackId = {
+        ...state.latestCommittedPartialsByTrackId,
+      }
+      const trackId = tracksBySource[source]?.track_id
       delete tracksBySource[source]
+      if (trackId) {
+        delete currentPreviewsByTrackId[trackId]
+        delete latestCommittedPartialsByTrackId[trackId]
+      }
 
       return {
         tracksBySource,
+        currentPreviewsByTrackId,
+        latestCommittedPartialsByTrackId,
       }
     }),
 
-  setLiveRealtimePartial: (partial) =>
+  setLiveRealtimePreview: (preview) =>
     set((state) => ({
-      latestPartialsByTrackId: {
-        ...state.latestPartialsByTrackId,
-        [partial.track_id]: partial,
+      currentPreviewsByTrackId: {
+        ...state.currentPreviewsByTrackId,
+        [preview.track_id]: preview,
       },
     })),
 
+  setLiveRealtimeCommittedPartial: (committedPartial) =>
+    set((state) => {
+      const currentPreviewsByTrackId = {
+        ...state.currentPreviewsByTrackId,
+      }
+      delete currentPreviewsByTrackId[committedPartial.track_id]
+
+      return {
+        currentPreviewsByTrackId,
+        latestCommittedPartialsByTrackId: {
+          ...state.latestCommittedPartialsByTrackId,
+          [committedPartial.track_id]: committedPartial,
+        },
+      }
+    }),
+
   appendLiveRealtimeFinal: (final) =>
     set((state) => {
-      const latestPartialsByTrackId = {
-        ...state.latestPartialsByTrackId,
+      const currentPreviewsByTrackId = {
+        ...state.currentPreviewsByTrackId,
       }
-      delete latestPartialsByTrackId[final.track_id]
+      const latestCommittedPartialsByTrackId = {
+        ...state.latestCommittedPartialsByTrackId,
+      }
+      delete currentPreviewsByTrackId[final.track_id]
+      delete latestCommittedPartialsByTrackId[final.track_id]
 
       const finalTranscripts = [...state.finalTranscripts, final].slice(
         -LIVE_REALTIME_FINAL_TRANSCRIPT_LIMIT,
       )
 
       return {
-        latestPartialsByTrackId,
+        currentPreviewsByTrackId,
+        latestCommittedPartialsByTrackId,
         finalTranscripts,
       }
     }),

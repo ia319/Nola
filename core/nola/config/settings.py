@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     device: str = "auto"  # "auto", "cpu", "cuda"
     compute_type: str = "default"  # "default", "float16", "int8"
 
+    # Live realtime settings
+    live_realtime_transcriber: str = "mock"
     # Server settings
     host: str = "127.0.0.1"
     port: int = 8000

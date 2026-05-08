@@ -40,7 +40,8 @@ LiveRealtimeServerEventType: TypeAlias = Literal[
     "track.ready",
     "diagnostics.wav.started",
     "diagnostics.wav.stopped",
-    "transcript.partial",
+    "transcript.preview",
+    "transcript.committed_partial",
     "transcript.final",
     "session.finished",
     "server.error",
@@ -241,12 +242,30 @@ class LiveRealtimeDiagnosticsWavStoppedEvent(LiveRealtimeServerBaseEvent):
     reason: LiveRealtimeDiagnosticsWavStopReason
 
 
-class LiveRealtimeTranscriptPartialPayload(BaseModel):
-    """Expose one non-persisted realtime partial transcript."""
+class LiveRealtimeTranscriptPreviewPayload(BaseModel):
+    """Expose one non-persisted realtime preview transcript."""
 
+    result_kind: Literal["preview"] = "preview"
+    session_id: LiveRealtimeSessionId
     track_id: LiveRealtimeTrackId
     source: LiveTrackSource
-    partial_index: int = Field(ge=1)
+    preview_index: int = Field(ge=1)
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(ge=0)
+    text: str
+    language: str | None = None
+    confidence: float | None = None
+    is_final: Literal[False] = False
+
+
+class LiveRealtimeTranscriptCommittedPartialPayload(BaseModel):
+    """Expose one non-persisted realtime committed transcript."""
+
+    result_kind: Literal["committed_partial"] = "committed_partial"
+    session_id: LiveRealtimeSessionId
+    track_id: LiveRealtimeTrackId
+    source: LiveTrackSource
+    committed_index: int = Field(ge=1)
     start_ms: int = Field(ge=0)
     end_ms: int = Field(ge=0)
     text: str
@@ -258,6 +277,7 @@ class LiveRealtimeTranscriptPartialPayload(BaseModel):
 class LiveRealtimeTranscriptFinalPayload(BaseModel):
     """Expose one persisted realtime final transcript."""
 
+    result_kind: Literal["final"] = "final"
     segment_id: str
     session_id: LiveRealtimeSessionId
     track_id: LiveRealtimeTrackId
@@ -272,11 +292,18 @@ class LiveRealtimeTranscriptFinalPayload(BaseModel):
     created_at: str
 
 
-class LiveRealtimeTranscriptPartialEvent(LiveRealtimeServerBaseEvent):
-    """Expose one realtime partial transcript event."""
+class LiveRealtimeTranscriptPreviewEvent(LiveRealtimeServerBaseEvent):
+    """Expose one realtime preview transcript event."""
 
-    type: Literal["transcript.partial"] = "transcript.partial"
-    transcript: LiveRealtimeTranscriptPartialPayload
+    type: Literal["transcript.preview"] = "transcript.preview"
+    transcript: LiveRealtimeTranscriptPreviewPayload
+
+
+class LiveRealtimeTranscriptCommittedPartialEvent(LiveRealtimeServerBaseEvent):
+    """Expose one realtime committed transcript event."""
+
+    type: Literal["transcript.committed_partial"] = "transcript.committed_partial"
+    transcript: LiveRealtimeTranscriptCommittedPartialPayload
 
 
 class LiveRealtimeTranscriptFinalEvent(LiveRealtimeServerBaseEvent):
