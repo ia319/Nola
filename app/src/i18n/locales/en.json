@@ -591,6 +591,9 @@
     },
     "detailSheet": {
       "close": "Close"
+    },
+    "workspaceSidePanel": {
+      "close": "Close panel"
     }
   },
   "routes": {

@@ -590,6 +590,9 @@
     },
     "detailSheet": {
       "close": "关闭"
+    },
+    "workspaceSidePanel": {
+      "close": "关闭面板"
     }
   },
   "routes": {
