@@ -50,6 +50,10 @@ describe('LiveRealtimeSessionService', () => {
 
     await setup.service.start({
       title: 'Live test',
+      runtimeOverrides: {
+        language: 'en',
+        min_chunk_ms: 800,
+      },
       sources: ['microphone', 'system'],
       microphoneCapture: {
         deviceId: 'temp-microphone-1',
@@ -60,6 +64,10 @@ describe('LiveRealtimeSessionService', () => {
     expect(setup.createSession).toHaveBeenCalledWith({
       mode: 'streaming',
       title: 'Live test',
+      runtime_overrides: {
+        language: 'en',
+        min_chunk_ms: 800,
+      },
     })
     expect(setup.transport.connectCalls).toEqual(['session-1'])
     expect(setup.captureRepository.microphoneSessions).toHaveLength(1)

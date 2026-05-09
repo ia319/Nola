@@ -22,6 +22,9 @@ function buildCreateLiveSessionBody(payload: CreateLiveSessionRequest): CreateLi
   if (payload.model_id !== undefined) {
     body.model_id = payload.model_id
   }
+  if (payload.runtime_overrides !== undefined) {
+    body.runtime_overrides = payload.runtime_overrides
+  }
 
   return body
 }

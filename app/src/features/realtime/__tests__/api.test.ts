@@ -29,6 +29,13 @@ describe('realtime api', () => {
         mode: 'streaming',
         title: 'Live test',
         language_hint: null,
+        runtime_overrides: {
+          language: 'en',
+          min_chunk_ms: 700,
+          vad_parameters: {
+            threshold: 0.6,
+          },
+        },
       },
       signal,
     )
@@ -39,6 +46,13 @@ describe('realtime api', () => {
         mode: 'streaming',
         title: 'Live test',
         language_hint: null,
+        runtime_overrides: {
+          language: 'en',
+          min_chunk_ms: 700,
+          vad_parameters: {
+            threshold: 0.6,
+          },
+        },
       },
       { signal },
     )

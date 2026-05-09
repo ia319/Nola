@@ -55,6 +55,7 @@ export interface LiveRealtimeSessionStartOptions {
   title?: string | null
   languageHint?: string | null
   modelId?: string | null
+  runtimeOverrides?: CreateLiveSessionRequest['runtime_overrides']
   sources?: LiveAudioSourceKind[]
   microphoneCapture?: LiveMicrophoneCaptureOptions
   systemAudioCapture?: LiveSystemAudioCaptureOptions
@@ -613,6 +614,9 @@ function buildCreateLiveSessionPayload(
   }
   if (options.modelId !== undefined) {
     payload.model_id = options.modelId
+  }
+  if (options.runtimeOverrides !== undefined) {
+    payload.runtime_overrides = options.runtimeOverrides
   }
 
   return payload
