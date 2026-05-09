@@ -10,7 +10,10 @@ import numpy.typing as npt
 
 from nola.application.live.realtime.whisper_streaming.config import (
     WhisperStreamingRuntimeConfig,
+    WhisperStreamingTask,
+    WhisperStreamingTemperature,
     WhisperStreamingVadParameters,
+    combine_initial_prompt,
 )
 from nola.application.live.realtime.whisper_streaming.errors import (
     WhisperStreamingRuntimeError,
@@ -73,8 +76,14 @@ class WhisperStreamingFasterWhisperModel(FasterWhisperModelHandle, Protocol):
         audio: npt.NDArray[np.float32],
         *,
         language: str | None,
+        task: WhisperStreamingTask,
         initial_prompt: str | None,
         beam_size: int,
+        best_of: int,
+        temperature: WhisperStreamingTemperature,
+        compression_ratio_threshold: float | None,
+        log_prob_threshold: float | None,
+        no_speech_threshold: float | None,
         word_timestamps: bool,
         condition_on_previous_text: bool,
         vad_filter: bool,
@@ -130,14 +139,24 @@ class WhisperStreamingFasterWhisperBackend(WhisperStreamingInferenceBackend):
         """Return timestamped words and segment boundaries for one audio window."""
         model = self._require_model()
         audio = np.asarray(waveform, dtype=np.float32)
+        initial_prompt = combine_initial_prompt(
+            context_prompt=config.context_prompt,
+            dynamic_prompt=prompt,
+        )
         try:
             segments, _info = model.transcribe(
                 audio,
-                language=None,
-                initial_prompt=prompt or None,
-                beam_size=5,
+                language=config.language,
+                task=config.task,
+                initial_prompt=initial_prompt,
+                beam_size=config.beam_size,
+                best_of=config.best_of,
+                temperature=config.temperature,
+                compression_ratio_threshold=config.compression_ratio_threshold,
+                log_prob_threshold=config.log_prob_threshold,
+                no_speech_threshold=config.no_speech_threshold,
                 word_timestamps=True,
-                condition_on_previous_text=True,
+                condition_on_previous_text=config.condition_on_previous_text,
                 vad_filter=config.vad_filter,
                 vad_parameters=config.vad_parameters,
             )
