@@ -1,5 +1,5 @@
 import { Link, useLocation } from '@tanstack/react-router'
-import { AudioLines, Boxes, Settings2, TimerReset, type LucideIcon } from 'lucide-react'
+import { AudioLines, Boxes, Radio, Settings2, TimerReset, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { localizePath, stripLocalePrefix } from '@/app/locale/locale-routing'
@@ -8,11 +8,15 @@ import nolaLogoMark from '@/assets/brand/nola-logo-mark.svg'
 import { cn } from '@/lib/utils'
 import { useBreakpoint } from '@/shared/responsive'
 
+type SidebarNavKey = 'tasks' | 'live' | 'history' | 'models' | 'settings'
+type SidebarNavHref = '/' | '/live' | '/history' | '/models' | '/settings'
+type SidebarNavLabelKey = `shell.navigation.${SidebarNavKey}`
+
 type SidebarNavItem = {
-  key: 'tasks' | 'history' | 'models' | 'settings'
-  href?: '/' | '/history' | '/models' | '/settings'
+  key: SidebarNavKey
+  href?: SidebarNavHref
   icon: LucideIcon
-  labelKey: string
+  labelKey: SidebarNavLabelKey
   disabled?: boolean
 }
 
@@ -22,6 +26,12 @@ const SIDEBAR_NAV_ITEMS: readonly SidebarNavItem[] = [
     href: '/',
     icon: AudioLines,
     labelKey: 'shell.navigation.tasks',
+  },
+  {
+    key: 'live',
+    href: '/live',
+    icon: Radio,
+    labelKey: 'shell.navigation.live',
   },
   {
     key: 'history',

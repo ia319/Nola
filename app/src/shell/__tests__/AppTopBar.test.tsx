@@ -32,6 +32,7 @@ vi.mock('react-i18next', () => ({
     t: (key: string, params?: TranslationParams) => {
       const messages: Record<string, string> = {
         'shell.navigation.tasks': 'Tasks',
+        'shell.navigation.live': 'Live',
         'shell.navigation.history': 'History',
         'shell.navigation.models': 'Models',
         'shell.navigation.settings': 'Settings',
@@ -85,11 +86,19 @@ describe('AppTopBar', () => {
   })
 
   it('maps the current route to the matching shell title', () => {
-    topBarMocks.pathname = '/models/library'
+    topBarMocks.pathname = '/live/session'
 
     render(<AppTopBar />)
 
-    expect(screen.getByText('Models')).toBeTruthy()
+    expect(screen.getByText('Live')).toBeTruthy()
+  })
+
+  it('maps localized routes to the matching shell title', () => {
+    topBarMocks.pathname = '/zh/live'
+
+    render(<AppTopBar />)
+
+    expect(screen.getByText('Live')).toBeTruthy()
   })
 
   it('renders the settings tab slot only on settings routes', () => {
