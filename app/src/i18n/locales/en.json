@@ -618,7 +618,25 @@
         "runtime": "Runtime"
       },
       "sessionSetup": {
-        "title": "Session setup"
+        "title": "Session setup",
+        "loading": "Loading",
+        "unavailable": "Unavailable",
+        "settings": "Session settings",
+        "model": {
+          "label": "Model",
+          "loading": "Loading models",
+          "noDownloaded": "No downloaded models"
+        },
+        "task": {
+          "label": "Task"
+        },
+        "language": {
+          "label": "Language",
+          "auto": "Auto detect"
+        },
+        "runtime": {
+          "label": "Runtime"
+        }
       },
       "settings": {
         "eyebrow": "Session settings",

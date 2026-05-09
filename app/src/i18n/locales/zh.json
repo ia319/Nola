@@ -617,7 +617,25 @@
         "runtime": "运行环境"
       },
       "sessionSetup": {
-        "title": "会话启动设置"
+        "title": "会话启动设置",
+        "loading": "加载中",
+        "unavailable": "不可用",
+        "settings": "会话设置",
+        "model": {
+          "label": "模型",
+          "loading": "正在加载模型",
+          "noDownloaded": "没有已下载模型"
+        },
+        "task": {
+          "label": "任务"
+        },
+        "language": {
+          "label": "语言",
+          "auto": "自动检测"
+        },
+        "runtime": {
+          "label": "运行环境"
+        }
       },
       "settings": {
         "eyebrow": "会话设置",
