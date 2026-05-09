@@ -24,6 +24,11 @@ describe('object-path', () => {
     expect(getValueByPath(null, 'audio.language.code')).toBeUndefined()
   })
 
+  it('does not read prototype pollution path segments', () => {
+    expect(getValueByPath({}, 'constructor.prototype.polluted')).toBeUndefined()
+    expect(getValueByPath({}, '__proto__.polluted')).toBeUndefined()
+  })
+
   it('sets nested values and creates missing objects', () => {
     const target: Record<string, unknown> = {}
 
@@ -50,5 +55,16 @@ describe('object-path', () => {
         temperature: 0.7,
       },
     })
+  })
+
+  it('does not write prototype pollution path segments', () => {
+    const target: Record<string, unknown> = {}
+
+    setValueByPath(target, '__proto__.polluted', true)
+    setValueByPath(target, 'constructor.prototype.polluted', true)
+    setValueByPath(target, 'safe.prototype.polluted', true)
+
+    expect(target).toEqual({})
+    expect(({} as { polluted?: unknown }).polluted).toBeUndefined()
   })
 })
