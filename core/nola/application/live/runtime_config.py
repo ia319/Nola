@@ -16,7 +16,6 @@ from nola.common.merge import deep_merge
 from nola.common.types import JsonDict
 from nola.config.common.types import ConfigMap
 from nola.config.live_realtime import (
-    LIVE_REALTIME_CONFIG_PREFIX,
     LiveRealtimeAdapter,
     get_live_realtime_effective_defaults,
     resolve_live_realtime_defaults,
@@ -244,10 +243,9 @@ def _build_mock_snapshot(
 
 def _reject_mock_runtime_overrides(
     *,
-    persisted_overrides: ConfigMap,
     session_overrides: ConfigMap,
 ) -> None:
-    if not persisted_overrides and not session_overrides:
+    if not session_overrides:
         return
     _raise_runtime_config_error(
         status_code=422,
@@ -267,11 +265,9 @@ def build_live_runtime_config(
 ) -> ResolvedLiveRuntimeConfig:
     """Resolve Live realtime config layers into one immutable snapshot."""
     runtime = _ensure_runtime_adapter(runtime_adapter)
-    persisted_overrides = config_store.get_all(LIVE_REALTIME_CONFIG_PREFIX)
 
     if runtime == "mock":
         _reject_mock_runtime_overrides(
-            persisted_overrides=persisted_overrides,
             session_overrides=runtime_overrides or {},
         )
         model_id = _resolve_optional_registered_model_id(request_model_id)

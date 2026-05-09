@@ -244,7 +244,8 @@ def _optional_string(values: JsonDict, key: str) -> str | None:
     if value is None:
         return None
     if isinstance(value, str):
-        return value
+        normalized = value.strip()
+        return normalized or None
     raise WhisperStreamingRuntimeConfigError(f"{key} must be a string or null")
 
 

@@ -5,6 +5,9 @@ from pathlib import Path
 import pytest
 
 from nola.application.live.errors import LiveUseCaseError
+from nola.application.live.realtime.whisper_streaming.config import (
+    whisper_streaming_runtime_snapshot_from_live_snapshot,
+)
 from nola.application.live.runtime_config import (
     LIVE_REALTIME_AUDIO_FORMAT,
     LIVE_RUNTIME_CONFIG_SCHEMA_VERSION,
@@ -166,6 +169,27 @@ def test_live_runtime_config_rejects_undownloaded_model() -> None:
     }
 
 
+def test_mock_runtime_ignores_persisted_live_realtime_defaults() -> None:
+    """Mock runtime should not be blocked by WhisperStreaming app defaults."""
+    resolved = build_live_runtime_config(
+        runtime_adapter="mock",
+        request_model_id=None,
+        language_hint=None,
+        runtime_overrides=None,
+        config_store=FakeConfigStore({"live_realtime.": {"beam_size": 3}}),
+        model_storage=None,
+    )
+
+    assert resolved.runtime == "mock"
+    assert resolved.model_id is None
+    assert resolved.snapshot == {
+        "schema_version": LIVE_RUNTIME_CONFIG_SCHEMA_VERSION,
+        "runtime": "mock",
+        "model_id": None,
+        "audio_format": LIVE_REALTIME_AUDIO_FORMAT,
+    }
+
+
 def test_mock_runtime_rejects_explicit_live_realtime_overrides() -> None:
     """Mock runtime should not accept WhisperStreaming option overrides."""
     with pytest.raises(LiveUseCaseError) as error:
@@ -183,3 +207,22 @@ def test_mock_runtime_rejects_explicit_live_realtime_overrides() -> None:
         "code": "runtime_config_invalid",
         "message": "Mock Live realtime does not support runtime option overrides",
     }
+
+
+def test_whisper_streaming_snapshot_normalizes_blank_language() -> None:
+    """Snapshot parsing should not pass blank language values to inference."""
+    resolved = build_live_runtime_config(
+        runtime_adapter="whisper_streaming",
+        request_model_id="small",
+        language_hint=None,
+        runtime_overrides=None,
+        config_store=FakeConfigStore(),
+        model_storage=FakeModelStorage(),
+    )
+    faster_whisper = resolved.snapshot["faster_whisper"]
+    assert isinstance(faster_whisper, dict)
+    faster_whisper["language"] = "   "
+
+    snapshot = whisper_streaming_runtime_snapshot_from_live_snapshot(resolved.snapshot)
+
+    assert snapshot.config.language is None
