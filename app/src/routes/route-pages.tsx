@@ -21,6 +21,10 @@ const HistoryPage = lazy(async () => {
   const module = await import('@/pages/history-center/HistoryPage')
   return { default: module.HistoryPage }
 })
+const LiveWorkbenchPage = lazy(async () => {
+  const module = await import('@/pages/live-workbench/LiveWorkbenchPage')
+  return { default: module.LiveWorkbenchPage }
+})
 const ModelsPage = lazy(async () => {
   const module = await import('@/pages/models-management/ModelsPage')
   return { default: module.ModelsPage }
@@ -36,6 +40,7 @@ const SettingsTabPage = lazy(async () => {
 
 type RouteLoadingLabelKey =
   | 'routes.loading.tasks'
+  | 'routes.loading.live'
   | 'routes.loading.history'
   | 'routes.loading.models'
   | 'routes.loading.settings'
@@ -82,6 +87,14 @@ export function TaskWorkbenchRoutePage() {
   return (
     <RouteSuspense labelKey="routes.loading.tasks">
       <TaskWorkbenchPage />
+    </RouteSuspense>
+  )
+}
+
+export function LiveWorkbenchRoutePage() {
+  return (
+    <RouteSuspense labelKey="routes.loading.live">
+      <LiveWorkbenchPage />
     </RouteSuspense>
   )
 }

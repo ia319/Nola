@@ -7,6 +7,7 @@ import {
   HistoryRoutePage,
   LocalizedHistoryRoutePage,
   LocalizedSettingsTabRoutePage,
+  LiveWorkbenchRoutePage,
   ModelsRoutePage,
   SettingsRoutePage,
   SettingsTabRoutePage,
@@ -30,6 +31,12 @@ const historyRoute = createRoute({
   path: '/history',
   validateSearch: normalizeHistorySearch,
   component: HistoryRoutePage,
+})
+
+const liveRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/live',
+  component: LiveWorkbenchRoutePage,
 })
 
 const modelsRoute = createRoute({
@@ -80,6 +87,20 @@ const localizedHistoryRoute = createRoute({
     }
   },
   component: LocalizedHistoryRoutePage,
+})
+
+const localizedLiveRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/$locale/live',
+  beforeLoad: ({ location, params }) => {
+    if (!isUiLanguage(params.locale)) {
+      throw redirect({
+        to: stripLocalePrefix(location.pathname),
+        replace: true,
+      })
+    }
+  },
+  component: LiveWorkbenchRoutePage,
 })
 
 const localizedModelsRoute = createRoute({
@@ -150,10 +171,12 @@ const localizedSettingsTabRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   homeRoute,
+  liveRoute,
   historyRoute,
   modelsRoute,
   settingsRoute.addChildren([settingsTabRoute]),
   localizedHomeRoute,
+  localizedLiveRoute,
   localizedHistoryRoute,
   localizedModelsRoute,
   localizedSettingsRoute.addChildren([localizedSettingsTabRoute]),
