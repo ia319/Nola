@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
+from typing import cast
 
 from nola.application.live.realtime import (
     LiveRealtimeTranscriber,
@@ -82,7 +83,9 @@ def get_live_realtime_transcriber_factory() -> LiveRealtimeTranscriberFactory:
 
 def get_live_realtime_adapter() -> LiveRealtimeAdapter:
     """Return the configured Live realtime adapter name."""
-    return settings.live_realtime_transcriber
+    return cast(
+        LiveRealtimeAdapter, settings.live_realtime_transcriber.strip().casefold()
+    )
 
 
 @lru_cache
