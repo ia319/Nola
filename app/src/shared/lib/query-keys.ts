@@ -58,6 +58,8 @@ export const queryKeys = {
     transcriptionDefaults: () => ['config', 'transcription', 'defaults'] as const,
     transcriptionEngineDefaults: () => ['config', 'transcription', 'engine-defaults'] as const,
     sessionDefaults: () => ['config', 'session-defaults'] as const,
+    liveRealtimeDefaults: () => ['config', 'live-realtime', 'defaults'] as const,
+    liveRealtimeSchema: () => ['config', 'live-realtime', 'schema'] as const,
     export: () => ['config', 'export'] as const,
     exportDefaults: () => ['config', 'export', 'defaults'] as const,
   },
