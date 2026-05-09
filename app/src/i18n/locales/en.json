@@ -599,9 +599,23 @@
   "routes": {
     "loading": {
       "tasks": "Loading task workbench...",
+      "live": "Loading live workbench...",
       "history": "Loading history...",
       "models": "Loading models...",
       "settings": "Loading settings..."
+    }
+  },
+  "live": {
+    "workbench": {
+      "title": "Live",
+      "description": "Real-time transcription",
+      "sessionSetup": {
+        "title": "Session setup"
+      },
+      "transcript": {
+        "title": "Live transcript",
+        "empty": "No transcript yet"
+      }
     }
   },
   "error": {
@@ -823,6 +837,7 @@
     "navigation": {
       "label": "Primary navigation",
       "tasks": "Tasks",
+      "live": "Live",
       "history": "History",
       "models": "Models",
       "settings": "Settings"

@@ -598,9 +598,23 @@
   "routes": {
     "loading": {
       "tasks": "正在加载任务工作台...",
+      "live": "正在加载实时转录工作台...",
       "history": "正在加载历史...",
       "models": "正在加载模型...",
       "settings": "正在加载设置..."
+    }
+  },
+  "live": {
+    "workbench": {
+      "title": "实时",
+      "description": "实时显示麦克风和系统音频转录。",
+      "sessionSetup": {
+        "title": "会话启动设置"
+      },
+      "transcript": {
+        "title": "实时转录结果",
+        "empty": "暂无转录结果"
+      }
     }
   },
   "error": {
@@ -822,6 +836,7 @@
     "navigation": {
       "label": "主导航",
       "tasks": "任务",
+      "live": "实时",
       "history": "历史",
       "models": "模型",
       "settings": "设置"
