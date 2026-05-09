@@ -5,6 +5,7 @@ from typing import Protocol
 from nola.application.live.types import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
     DEFAULT_LIVE_SESSION_LIMIT,
+    LiveRuntimeConfig,
     LiveSegmentRecord,
     LiveSessionMode,
     LiveSessionRecord,
@@ -46,6 +47,7 @@ class SupportsLiveSessionMutations(Protocol):
         model_id: str | None,
         runtime: str | None,
         audio_format: str | None,
+        runtime_config: LiveRuntimeConfig | None = None,
         started_at: str,
         created_at: str,
         updated_at: str,

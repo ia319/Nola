@@ -11,10 +11,14 @@ from starlette.websockets import WebSocketDisconnect
 
 from nola.api.deps import (
     LiveRealtimeTranscriberFactory,
+    ModelStorageProvider,
+    get_app_config_db,
     get_live_db,
     get_live_diagnostics_output_dir,
+    get_live_realtime_adapter,
     get_live_realtime_transcriber_factory,
     get_live_stream_connection_registry,
+    get_model_storage_provider,
 )
 from nola.api.routes._live_realtime_events import (
     build_diagnostics_wav_started_event,
@@ -74,8 +78,11 @@ from nola.application.live.realtime import (
     LiveStreamConnectionRegistry,
     ensure_pcm16le_contract,
 )
+from nola.application.live.types import LiveRuntimeConfig
 from nola.application.live.values import ensure_live_session_status
 from nola.common.types import JsonValue
+from nola.config.live_realtime import LiveRealtimeAdapter
+from nola.models import AppConfigDatabase
 
 router = APIRouter(prefix="/api/live", tags=["live"])
 LiveStoreDependency: TypeAlias = Annotated[SupportsLiveRepository, Depends(get_live_db)]
@@ -91,6 +98,18 @@ LiveRealtimeTranscriberFactoryDependency: TypeAlias = Annotated[
     LiveRealtimeTranscriberFactory,
     Depends(get_live_realtime_transcriber_factory),
 ]
+LiveRealtimeAdapterDependency: TypeAlias = Annotated[
+    LiveRealtimeAdapter,
+    Depends(get_live_realtime_adapter),
+]
+AppConfigDependency: TypeAlias = Annotated[
+    AppConfigDatabase,
+    Depends(get_app_config_db),
+]
+ModelStorageProviderDependency: TypeAlias = Annotated[
+    ModelStorageProvider,
+    Depends(get_model_storage_provider),
+]
 
 LIVE_REALTIME_CLOSE_NORMAL = 1000
 LIVE_REALTIME_CLOSE_POLICY = 1008
@@ -101,6 +120,18 @@ LIVE_REALTIME_CLOSE_CONFLICT = 4409
 def _raise_live_http_error(error: LiveUseCaseError) -> NoReturn:
     """Raise an HTTPException from a live use-case error."""
     raise HTTPException(status_code=error.status_code, detail=error.detail) from error
+
+
+def _require_live_runtime_config(
+    runtime_config: LiveRuntimeConfig | None,
+) -> LiveRuntimeConfig:
+    """Return a saved session runtime snapshot or raise a realtime error."""
+    if runtime_config is not None:
+        return runtime_config
+    raise LiveRealtimeSessionError(
+        code="runtime_config_invalid",
+        message="Live session runtime config is missing",
+    )
 
 
 async def _send_realtime_error(
@@ -198,6 +229,9 @@ async def _send_transcript_events(
 def create_live_session_endpoint(
     request: CreateLiveSessionRequest,
     live_store: LiveStoreDependency,
+    config_store: AppConfigDependency,
+    model_storage_provider: ModelStorageProviderDependency,
+    runtime_adapter: LiveRealtimeAdapterDependency,
 ) -> LiveSessionPayload:
     """Create an active live transcription session."""
     try:
@@ -207,6 +241,18 @@ def create_live_session_endpoint(
             mode=request.mode,
             language_hint=request.language_hint,
             model_id=request.model_id,
+            runtime_overrides=(
+                request.runtime_overrides.get_options_dict()
+                if request.runtime_overrides is not None
+                else None
+            ),
+            runtime_adapter=runtime_adapter,
+            config_store=config_store,
+            model_storage=(
+                model_storage_provider()
+                if runtime_adapter == "whisper_streaming"
+                else None
+            ),
         )
     except LiveUseCaseError as error:
         _raise_live_http_error(error)
@@ -335,6 +381,17 @@ async def stream_live_session_endpoint(
         await websocket.close(code=LIVE_REALTIME_CLOSE_CONFLICT)
         return
 
+    runtime_config = session["runtime_config"]
+    if runtime_config is None:
+        await _send_realtime_error(
+            websocket,
+            session_id=session_id,
+            code="runtime_config_invalid",
+            message="Live session runtime config is missing",
+        )
+        await websocket.close(code=LIVE_REALTIME_CLOSE_POLICY)
+        return
+
     acquired = await stream_registry.acquire(session_id)
     if not acquired:
         await _send_realtime_error(
@@ -370,6 +427,8 @@ async def stream_live_session_endpoint(
             await websocket.close(code=LIVE_REALTIME_CLOSE_CONFLICT)
             return
 
+        runtime_config = _require_live_runtime_config(session["runtime_config"])
+
         raw_hello = await _receive_realtime_json(websocket)
         base_hello = LiveRealtimeEventEnvelope.model_validate(raw_hello)
         if base_hello.session_id != session_id:
@@ -394,7 +453,10 @@ async def stream_live_session_endpoint(
             live_store=live_store,
             session_id=session_id,
             diagnostics_output_dir=diagnostics_output_dir,
-            transcriber=await run_in_threadpool(transcriber_factory),
+            transcriber=await run_in_threadpool(
+                transcriber_factory,
+                runtime_config,
+            ),
         )
         runtime.accept_hello(protocol_version=hello.protocol_version)
 

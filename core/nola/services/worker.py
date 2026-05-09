@@ -9,11 +9,14 @@ import signal
 import socket
 import threading
 import time
-from dataclasses import asdict, fields
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from nola.common.merge import deep_merge
+from nola.application.tasks.runtime_config import (
+    resolve_task_transcribe_options,
+    transcribe_options_from_runtime_config,
+)
+from nola.application.tasks.types import TaskRuntimeConfig
 from nola.engines.base import TranscribeOptions, TranscriptionEngine
 from nola.models import AppConfigDatabase, FileDatabase, TaskDatabase, init_db
 from nola.models.tasks import TaskRowRaw
@@ -37,69 +40,66 @@ def get_worker_id() -> str:
     return f"worker-{socket.gethostname()}-{threading.current_thread().ident}"
 
 
-def _filter_valid_options(raw_options: dict[str, Any] | None) -> dict[str, Any]:
-    """Discard top-level keys that are not part of TranscribeOptions."""
-    if not raw_options:
-        return {}
-
-    valid_fields = {field.name for field in fields(TranscribeOptions)}
-    return {key: value for key, value in raw_options.items() if key in valid_fields}
-
-
-def _deserialize_special_values(value: Any, *, key: str | None = None) -> Any:
-    """Convert API sentinel values back to runtime types.
-
-    Symmetric counterpart to ``_serialize_special_values`` in defaults.py,
-    including recursive list/tuple handling. The ``"inf"`` sentinel is only
-    converted for known numeric fields to avoid mutating user text values.
-    The current API contract only serializes positive infinity as ``"inf"``.
-    """
-    if isinstance(value, dict):
-        return {
-            child_key: _deserialize_special_values(child_value, key=child_key)
-            for child_key, child_value in value.items()
-        }
-    if isinstance(value, list):
-        return [_deserialize_special_values(item, key=key) for item in value]
-    if isinstance(value, tuple):
-        return [_deserialize_special_values(item, key=key) for item in value]
-    if key == "max_speech_duration_s" and value == "inf":
-        return float("inf")
-    return value
-
-
 def build_transcribe_options(
     task_options: dict[str, Any] | None,
     config_db: AppConfigDatabase | None = None,
+    runtime_config: TaskRuntimeConfig | None = None,
 ) -> TranscribeOptions:
-    """Build TranscribeOptions from engine defaults, app defaults, and task options.
+    """Build TranscribeOptions from snapshot or legacy config layers.
 
     Args:
         task_options: Dict of per-task overrides from the task record
         config_db: App config store used to load persisted defaults
+        runtime_config: Resolved task runtime config fixed at creation time
 
     Returns:
-        TranscribeOptions with the three-layer merge applied
+        TranscribeOptions used by the worker
     """
-    # Plain deep_merge is intentional here: None values in engine defaults
-    # (e.g. initial_prompt=None) are real defaults, not "remove override"
-    # instructions. The null-removes-key semantics only apply to the PATCH
-    # endpoint in config routes.
-    merged_options = asdict(TranscribeOptions())
+    if runtime_config is not None:
+        return transcribe_options_from_runtime_config(runtime_config)
 
-    if config_db is not None:
-        app_defaults = _filter_valid_options(config_db.get_all("transcription."))
-        merged_options = deep_merge(merged_options, app_defaults)
+    return resolve_task_transcribe_options(task_options, config_db)
 
-    task_overrides = _filter_valid_options(task_options)
-    if task_overrides:
-        merged_options = deep_merge(merged_options, task_overrides)
 
-    # Convert API sentinel values (e.g. "inf") back to runtime types
-    # before constructing the dataclass.
-    merged_options = _deserialize_special_values(merged_options)
+def _parse_task_runtime_config(
+    raw_runtime_config: object,
+    *,
+    task_id: str,
+    task_db: TaskDatabase,
+) -> TaskRuntimeConfig | None:
+    """Parse a raw task runtime snapshot from the database row."""
+    if raw_runtime_config is None:
+        return None
+    if isinstance(raw_runtime_config, dict):
+        return cast(TaskRuntimeConfig, raw_runtime_config)
+    if not isinstance(raw_runtime_config, str):
+        task_db.fail(
+            task_id,
+            "Runtime config must be a JSON object, got "
+            f"{type(raw_runtime_config).__name__}",
+            should_retry=False,
+        )
+        return None
 
-    return TranscribeOptions(**merged_options)
+    try:
+        runtime_config = json.loads(raw_runtime_config)
+    except json.JSONDecodeError as error:
+        task_db.fail(
+            task_id,
+            f"Invalid runtime_config JSON: {error}",
+            should_retry=False,
+        )
+        return None
+
+    if not isinstance(runtime_config, dict):
+        task_db.fail(
+            task_id,
+            "Runtime config must be a JSON object, got "
+            f"{type(runtime_config).__name__}",
+            should_retry=False,
+        )
+        return None
+    return cast(TaskRuntimeConfig, runtime_config)
 
 
 def run_transcription(
@@ -160,7 +160,24 @@ def run_transcription(
             )
             return
 
-        options = build_transcribe_options(task_options, app_config_db)
+        raw_runtime_config = task.get("runtime_config")
+        runtime_config = _parse_task_runtime_config(
+            raw_runtime_config,
+            task_id=task_id,
+            task_db=task_db,
+        )
+        if raw_runtime_config is not None and runtime_config is None:
+            return
+
+        try:
+            options = build_transcribe_options(
+                task_options,
+                app_config_db,
+                runtime_config=runtime_config,
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            task_db.fail(task_id, str(error), should_retry=False)
+            return
 
         if task_options:
             logger.info(f"Starting transcription with options: {task_options}")

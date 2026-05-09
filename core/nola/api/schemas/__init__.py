@@ -2,6 +2,9 @@
 
 from nola.api.schemas.config import (
     ExportDefaultsUpdateRequest,
+    LiveRealtimeDefaultsPatchResponse,
+    LiveRealtimeDefaultsResponse,
+    LiveRealtimeSchemaResponse,
     SessionDefaultsResponse,
     SessionDefaultsUpdateRequest,
     SessionExecutionDefaultsResponse,
@@ -56,6 +59,11 @@ from nola.api.schemas.live_realtime import (
     LiveRealtimeTranscriptPreviewEvent,
     LiveRealtimeTranscriptPreviewPayload,
 )
+from nola.api.schemas.live_realtime_config import (
+    LiveRealtimeDefaultsUpdateRequest,
+    LiveRealtimeRuntimeOverridesRequest,
+    LiveRealtimeVadParametersUpdateRequest,
+)
 from nola.api.schemas.responses import (
     BatchTaskActionResponse,
     BatchTaskActionResultResponse,
@@ -108,8 +116,13 @@ __all__ = [
     "LiveRealtimeClientPingEvent",
     "LiveRealtimeDiagnosticsWavStartEvent",
     "LiveRealtimeDiagnosticsWavStopEvent",
+    "LiveRealtimeDefaultsPatchResponse",
+    "LiveRealtimeDefaultsResponse",
+    "LiveRealtimeDefaultsUpdateRequest",
     "LiveRealtimeErrorPayload",
     "LiveRealtimeEventEnvelope",
+    "LiveRealtimeRuntimeOverridesRequest",
+    "LiveRealtimeSchemaResponse",
     "LiveRealtimeServerBaseEvent",
     "LiveRealtimeServerErrorEvent",
     "LiveRealtimeServerPongEvent",
@@ -125,6 +138,7 @@ __all__ = [
     "LiveRealtimeTrackReadyEvent",
     "LiveRealtimeTrackStartEvent",
     "LiveRealtimeTrackStopEvent",
+    "LiveRealtimeVadParametersUpdateRequest",
     "LiveSessionDetailResponse",
     "LiveSessionListResponse",
     "LiveSessionSummaryResponse",

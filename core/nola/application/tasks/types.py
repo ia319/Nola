@@ -1,8 +1,9 @@
 """Shared payload and value types for task use-cases."""
 
 from dataclasses import dataclass
-from typing import Literal, TypedDict
+from typing import Literal, TypeAlias, TypedDict
 
+from nola.common.types import JsonDict
 from nola.engines.base import EngineComputeType, EngineDevice
 
 TaskStatusValue = str
@@ -14,6 +15,7 @@ BatchTaskActionErrorCode = Literal[
 ]
 TaskOptions = dict[str, object]
 TaskSegment = dict[str, object]
+TaskRuntimeConfig: TypeAlias = JsonDict
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +54,7 @@ class TaskDetailPayload(TaskSummaryPayload):
     duration: float | None
     segments: list[TaskSegment] | None
     error: str | None
+    runtime_config: TaskRuntimeConfig | None
 
 
 class TaskListPayload(TypedDict):
@@ -72,6 +75,7 @@ class CreateTaskPayload(TypedDict):
     status: Literal["pending"]
     options: TaskOptions | None
     model_id: str | None
+    runtime_config: TaskRuntimeConfig | None
 
 
 class CancelTaskPayload(TypedDict):

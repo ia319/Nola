@@ -65,10 +65,13 @@ app/                          # Frontend workspace root
 │   │       └── nola-logo-mark.svg # Nola shell logo mark
 │   │
 │   ├── config/               # Centralized configuration
-│   │   ├── api.ts            # Config API (fetch + transcription/session/export defaults update/reset)
+│   │   ├── api.ts            # Config API (fetch + transcription/live realtime/session/export defaults update/reset)
 │   │   ├── cache-invalidation.ts # Refresh shared config/default caches after mutations
 │   │   ├── __tests__/        # Config store and preference persistence tests
+│   │   │   ├── api.test.ts # Verify config API request wiring
+│   │   │   ├── engine-options.test.ts # Verify engine option metadata handling
 │   │   │   ├── ui-preferences-storage.test.ts # Storage migration/fallback tests
+│   │   │   ├── ui-preferences-storage-runtime.test.ts # Storage runtime fallback tests
 │   │   │   └── use-app-config.test.ts # Shared config cache/store tests
 │   │   ├── constants.ts      # App constants (synced with backend)
 │   │   ├── engine-options.ts # Typed engine option defaults, constants, and guards
@@ -403,9 +406,9 @@ app/                          # Frontend workspace root
 │   │       ├── openapi.d.ts   # AUTO-GENERATED (pnpm gen:types)
 │   │       ├── api-error.ts   # Backend error payload types
 │   │       ├── app-error.ts   # Frontend standardized error model
-│   │       ├── config.ts      # Config response aliases (schema/defaults)
+│   │       ├── config.ts      # Config aliases, including Live realtime defaults/schema
 │   │       ├── file.ts        # FileInfo, FileUploadResponse, etc.
-│   │       ├── live.ts        # Live REST response aliases derived from OpenAPI
+│   │       ├── live.ts        # Live REST response aliases and runtime snapshot fields
 │   │       ├── model.ts       # Model response aliases and download-state contracts
 │   │       ├── task.ts        # TaskSummary, TaskStatus, ExportFormat, etc.
 │   │       ├── task-query.ts  # Shared task query model contracts
@@ -454,9 +457,10 @@ app/                          # Frontend workspace root
 │   │   │   ├── ModelsPage.tsx # Compose model management page
 │   │   │   └── __tests__/    # Model management page tests
 │   │   │       └── ModelsPage.test.tsx # Verify model page rendering and actions
-│   │   ├── settings/         # General, Transcription, Export, Model Storage, System Info
+│   │   ├── settings/         # General, Transcription, Live Realtime, Export, Model Storage, System Info
 │   │   │   ├── ExportTab.tsx # Render export defaults settings
 │   │   │   ├── GeneralTab.tsx # Render language/theme/unit settings
+│   │   │   ├── LiveRealtimeTab.tsx # Render schema-driven Live realtime defaults settings
 │   │   │   ├── ModelStorageTab.tsx # Render model storage settings
 │   │   │   ├── settings-tabs.ts # Define settings tab registry
 │   │   │   ├── SettingsPage.tsx # Compose settings route shell
@@ -518,6 +522,8 @@ Keep future Storybook stories colocated under `src` beside the component or page
 - `src/pages/`: Keep route page implementations outside `features/*`.
 - `src/features/activity/`: Aggregate task and model-download activity into `needsAttention`, `inProgress`, and `recent`.
 - `src/features/realtime/`: Provide UI-less Live device inventory, Web/Tauri adapter factories, capture sessions, PCM frame output, WebSocket transport, diagnostics, preview/committed/final transcript handling, runtime store, and session-service orchestration.
+- `src/pages/settings/LiveRealtimeTab.tsx`: Render schema-driven Live realtime defaults beside Transcription as a separate Settings tab.
+- `src/config/api.ts`: Provide Live realtime defaults and schema helpers alongside transcription/session/export config helpers.
 - `src/lib/runtime-environment.ts`: Centralize Web/Tauri runtime detection for app-level and realtime platform selection.
 - `src/shared/lib/query-*`: Centralize TanStack Query keys, fetcher, and client defaults.
 - `src/shared/lib/overlay-events.ts`: Coordinate mutually exclusive detail sheets and Activity Center.
@@ -530,6 +536,10 @@ Keep future Storybook stories colocated under `src` beside the component or page
 
 - Keep Settings subpage content direct; do not add page-level title/description blocks inside each settings tab.
 - Keep Settings controls compact and continuous; do not split one tab into separate heavy cards.
+- Keep Live Realtime as a separate Settings tab immediately after Transcription; do not nest it inside Transcription.
+- Keep Live Realtime Settings focused on persisted defaults; do not add production Live controls or sidebar entries from this tab.
+- Render Live realtime controls from backend schema metadata and i18n keys; do not hardcode Live realtime parameter lists, ranges, labels, or descriptions.
+- Clear local number draft and validation error when a Live realtime special-value token is selected.
 - Let Task Workbench control task-level `model_id`, `device`, and `compute_type`; select only downloaded models.
 - Derive Workbench `device` and `compute_type` options from `/api/config.engine.schema`; do not hardcode option lists or label keys in the frontend.
 - Initialize Task Workbench execution config from Session defaults, then configured model, then last-loaded model fallback; do not auto-select the first downloaded model.
@@ -551,6 +561,7 @@ Keep future Storybook stories colocated under `src` beside the component or page
 - Keep History-only query/action hooks in `src/pages/history-center/hooks`; do not restore `src/features/tasks/history`.
 - Keep Upload Queue row clicks as selection toggles. Start transcription only from selected successful uploads.
 - Keep Live as an independent `features/realtime` runtime foundation until an approved Live UI phase adds pages/routes.
+- Pass Live session `runtime_overrides` through generated OpenAPI DTO aliases; do not hand-maintain override field shapes in feature code.
 - Keep realtime device detection in the client runtime. Do not add backend APIs that enumerate the user's browser or desktop devices.
 - Keep microphones and speakers as separate inventory lists. Treat speakers as output devices, not as system-audio transcription input.
 - Treat system audio as a capture source. In Web runtime, use explicit user-triggered capture and return structured unsupported/limited states when the browser cannot provide audio.
@@ -584,7 +595,7 @@ Keep future Storybook stories colocated under `src` beside the component or page
 >    - `src/lib/*`: app/platform-level helpers (e.g., shadcn `cn`)
 >    - `src/shared/lib/*`: cross-feature reusable runtime helpers
 >    - `src/features/*/lib/*`: feature-private helpers; promote to `shared/lib` only when reused by another feature
-> 8. **Schema-Driven Controls**: Drive language/task/initial prompt, advanced controls, and engine execution selects from backend schema metadata; do not reintroduce hardcoded option groups.
+> 8. **Schema-Driven Controls**: Drive language/task/prompt context, advanced controls, Live realtime defaults, and engine execution selects from backend schema metadata; do not reintroduce hardcoded option groups.
 > 9. **Transcription Defaults Priority**: Apply `engine defaults < persisted defaults < task overrides` when composing transcription request payloads and defaults patches.
 > 10. **Defaults Patch Semantics**: Use `undefined` for unchanged fields, use `null` to clear persisted overrides, and send concrete values for explicit overrides.
 > 11. **Execution Config Boundary**: Keep `model_id`, `device`, and `compute_type` out of `transcription-options`; compose them as `model_id` and `engine` in Workbench.
@@ -629,9 +640,14 @@ Keep future Storybook stories colocated under `src` beside the component or page
 > 23. **Query Semantics Boundary**:
 >     - Sort remote or paged datasets through API query params, not current-page arrays.
 >     - Keep task/file/model runtime option arrays in shared or feature query-option helpers; do not duplicate status arrays in pages.
+> 24. **Live Realtime Settings Boundary**:
+>     - Use `/settings/live-realtime` as the Settings tab for Live realtime defaults.
+>     - Keep it adjacent to Transcription and outside the Transcription tab content.
+>     - Use backend schema `label_key`, `description_key`, `group_label_key`, default values, adapter support, and range metadata for controls.
+>     - Keep `context_prompt` user-facing; do not expose faster-whisper `initial_prompt`.
 >
 > [!IMPORTANT]
-> Use `GET /api/config`, `GET /api/config/transcription/engine-defaults`, and `GET /api/config/session-defaults` as the config/default sources.
+> Use `GET /api/config`, `GET /api/config/transcription/engine-defaults`, `GET /api/config/session-defaults`, and `/api/config/live-realtime/*` as the config/default sources.
 > Do not add new frontend calls to `/api/transcriptions/options/defaults`.
 >
 > [!NOTE]
@@ -659,6 +675,7 @@ Backend (Pydantic) ──► openapi.json ──► openapi.d.ts ──► domai
 
 - `TaskStatus` and `ExportFormat` are **derived from OpenAPI enum**, not hardcoded. This ensures Single Source of Truth — backend adds a new status/format, frontend auto-inherits after `pnpm gen:types`.
 - Domain aliases/contracts avoid verbose `components['schemas']['TaskSummaryResponse']` paths in business code.
+- Live realtime config DTOs must follow the config alias path: derive defaults, patch, and schema types from generated OpenAPI in `shared/types/config.ts`.
 - Live REST DTOs must follow the same thin-alias path: derive aliases from generated OpenAPI types in `shared/types/live.ts`, then import those aliases from `@/shared/types`.
 - Live WebSocket DTOs are not generated from OpenAPI. Keep them in `features/realtime/transport/types.ts` and validate inbound events, including `transcript.preview`, `transcript.committed_partial`, and `transcript.final`, with `features/realtime/transport/protocol.ts`.
 - Runtime helpers such as `formatApiError` and AppError factories live in `shared/lib/*`, not in `shared/types/*`.
@@ -788,7 +805,7 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `index.ts`: Expose model feature public exports.
 - **realtime**:
   - `index.ts`: Expose the public realtime foundation surface: REST API helpers, primitive types, device repository factory, capture repository factory, transport factory, session service, diagnostics, transcript event contracts, stores, hook, and runtime adapter helpers.
-  - `api.ts`: Create and fetch Live sessions through `/api/live/*` REST endpoints using shared Live DTO aliases.
+  - `api.ts`: Create and fetch Live sessions through `/api/live/*` REST endpoints using shared Live DTO aliases, including `runtime_overrides`.
   - `types.ts`: Keep shared realtime primitive aliases (`LiveTimestampMs`, `LiveDurationMs`, `LiveUnsubscribe`) and runtime capability states.
   - `platform/runtime-environment.ts`: Wrap app-level runtime detection and choose Web/Tauri realtime adapters through explicit factories.
   - `devices/types.ts`: Keep microphone/speaker inventory, permission, capability, temporary-device, and warning code contracts.
@@ -810,7 +827,7 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `store/live-device-store.ts`: Store serializable inventory, selected/active devices, capture states, and latest level snapshots; normalize `temp-*` device IDs to `null`.
   - `store/live-realtime-store.ts`: Store current Live session, connection state, active tracks, current previews, latest committed partials, capped final transcripts, diagnostics state, and last runtime error.
   - `hooks/useLiveDeviceInventory.ts`: Own repository creation, `devicechange` subscriptions, capture session lifecycle, cleanup on teardown, and store updates.
-  - `session/live-realtime-session-service.ts`: Compose Live REST creation, WebSocket transport, capture sessions, diagnostics controls, transcript event store updates, track routing, stop/failure cleanup, closed-transport wait rejection, and server-finished cleanup without adding UI.
+  - `session/live-realtime-session-service.ts`: Compose Live REST creation, optional runtime overrides, WebSocket transport, capture sessions, diagnostics controls, transcript event store updates, track routing, stop/failure cleanup, closed-transport wait rejection, and server-finished cleanup without adding UI.
   - `transport/types.ts`: Keep hand-maintained Live WebSocket event, transcript, audio frame, diagnostics, and state contracts.
   - `transport/protocol.ts`: Validate server events, including preview/committed/final transcript payloads, build WebSocket URLs from origins, and keep protocol constants.
   - `transport/web-realtime-transport.ts`: Implement browser WebSocket handshake, control event sending, JSON metadata plus binary payload audio frames, and state changes.
@@ -854,7 +871,8 @@ Route page implementations.
 - **task-workbench/**: Compose upload queue, session config, Advanced side sheet, and current-batch task table. Let session config create task-level execution payloads with `model_id` and schema-derived `engine` values.
 - **history-center/**: Compose Task ID and Filename modes, URL search state, pagination, detail dialogs, export dialog loading, and page-local history hooks.
 - **models-management/**: Compose model overview, model table, detail sheet, mutation de-duplication, canonical `configured_model_id` handling, Default/Running display, model refresh, and restart-free model selection feedback.
-- **settings/**: Compose General, Transcription, Export, Model Storage, and System Info tabs. Keep subpage titles removed; show settings content directly. Keep engine resources read-only and use task-boundary reload language instead of restart-required language.
+- **settings/**: Compose General, Transcription, Live Realtime, Export, Model Storage, and System Info tabs. Keep subpage titles removed; show settings content directly. Keep engine resources read-only and use task-boundary reload language instead of restart-required language.
+- **settings/LiveRealtimeTab.tsx**: Render Live realtime defaults from backend schema metadata, persist patches through config API helpers, and keep special-value token state consistent with local validation.
 
 ### src/shell/
 
@@ -900,9 +918,9 @@ Cross-feature shared code, split into `lib/` and `types/`.
 - **types/openapi.d.ts**: Auto-generated by `pnpm gen:types`. Never edit manually.
 - **types/api-error.ts**: Backend error payload contracts (`ApiError`, `ValidationErrorItem`).
 - **types/app-error.ts**: Frontend error contract (`AppError`: `code`, `i18nKey`, `params`, `retriable`).
-- **types/config.ts**: Thin aliases for config contracts (`AppConfig`, `EngineDefaults`, `SessionDefaults`, `EngineDevice`, `EngineComputeType`, defaults update requests).
+- **types/config.ts**: Thin aliases for config contracts (`AppConfig`, `EngineDefaults`, `SessionDefaults`, `LiveRealtimeDefaults`, `LiveRealtimeOptionGroup`, `EngineDevice`, `EngineComputeType`, defaults update requests).
 - **types/file.ts**: Thin aliases over OpenAPI file schemas (`FileInfo`, `FileUploadResponse`, etc.).
-- **types/live.ts**: Thin aliases over OpenAPI Live REST schemas (`CreateLiveSessionRequest`, `LiveSessionDetail`, `LiveTrack`, `LiveSegment`, etc.).
+- **types/live.ts**: Thin aliases over OpenAPI Live REST schemas (`CreateLiveSessionRequest`, `LiveSessionDetail`, `LiveTrack`, `LiveSegment`, runtime snapshot fields, etc.).
 - **types/model.ts**: Thin aliases over OpenAPI model schemas and active download contracts.
 - **types/task.ts**: Thin aliases over OpenAPI task schemas + derived types (`TaskStatus`, `ExportFormat` from schema enums); task read responses expose persisted `model_id` context.
 - **types/task-query.ts**: Shared query model for list toolbar and pagination contracts.
@@ -915,7 +933,7 @@ Keep route adapters and search-model helpers in this directory. Keep page implem
 - **AppShell.tsx**: Keep deprecated wrapper around `src/shell/AppShell`.
 - **HistoryPage.tsx**: Keep deprecated wrapper around `src/pages/history-center/HistoryPage`.
 - **ModelsPage.tsx**: Keep deprecated wrapper around `src/pages/models-management/ModelsPage`.
-- **route-pages.tsx**: Lazy-load primary pages, settings tabs, and route loading fallbacks.
+- **route-pages.tsx**: Lazy-load primary pages, Settings tabs including Live Realtime, and route loading fallbacks.
 - **history-search.ts**: Normalize route search params and build task query model.
 
 ### src/lib/
@@ -937,7 +955,7 @@ Use `src/app/locale/*` for route-prefix language behavior and Settings-triggered
 
 Runtime config access and fallback constants.
 
-- **api.ts**: Config endpoints (`fetchAppConfig`, `fetchEngineDefaults`, `fetchSessionDefaults`, `patchSessionDefaults`, transcription defaults `PATCH`/`DELETE`, export defaults `GET/PATCH/DELETE`).
+- **api.ts**: Config endpoints (`fetchAppConfig`, `fetchEngineDefaults`, `fetchSessionDefaults`, `patchSessionDefaults`, transcription defaults `PATCH`/`DELETE`, Live realtime defaults `GET/PATCH/DELETE`, Live realtime schema `GET`, export defaults `GET/PATCH/DELETE`).
 - **cache-invalidation.ts**: Refresh shared config and all config query caches after mutations.
 - **engine-options.ts**: Build engine device and compute-type select options from `/api/config.engine.schema`; use the resolved current value only as a fallback when schema metadata is unavailable.
 - **use-app-config.ts**: Shared config singleton store using `useSyncExternalStore`, plus `refreshAppConfig()`. Notify all mounted consumers when the shared snapshot changes.
@@ -1043,3 +1061,4 @@ Frontend (Vite/React) ───[ HTTP Proxy /api/* ]───▶ Backend (FastAP
 | Live Audio Frames | PCM16LE, 16 kHz, mono; default capture path does not denoise, gain-normalize, compress, EQ, or trim content |
 | Live Transcript Events | `preview` and `committed_partial` stay WebSocket-only; `final` enters capped runtime output and backend history |
 | Live Diagnostics | Explicit WebSocket control only; frontend receives `capture_id`, `manifest_name`, and `file_name`, not server absolute paths |
+| Live Realtime Settings | Separate Settings tab after Transcription; render persisted defaults from backend schema and i18n keys |

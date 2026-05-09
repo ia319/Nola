@@ -7,6 +7,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from nola.api.schemas.transcriptions import TranscriptionDefaultsUpdateRequest
 from nola.config.common import ConfigMap
 from nola.config.export import ExportFormat
+from nola.config.live_realtime import (
+    LiveRealtimeDefaults,
+    LiveRealtimeOptionGroupSchema,
+)
 from nola.config.session import SessionExecutionDefaultsPatch
 from nola.config.transcription.schema.responses import (
     TranscriptionResolvedDefaultsResponse,
@@ -32,6 +36,22 @@ class ExportDefaultsUpdateRequest(BaseModel):
     def get_options_dict(self) -> ConfigMap:
         """Return explicitly provided keys, preserving nulls for field resets."""
         return cast(ConfigMap, self.model_dump(exclude_unset=True))
+
+
+class LiveRealtimeDefaultsResponse(BaseModel):
+    """Expose resolved Live realtime defaults."""
+
+    defaults: LiveRealtimeDefaults
+
+
+class LiveRealtimeDefaultsPatchResponse(LiveRealtimeDefaultsResponse):
+    """Expose Live realtime defaults after a persisted PATCH."""
+
+
+class LiveRealtimeSchemaResponse(BaseModel):
+    """Expose Live realtime option metadata for schema-driven clients."""
+
+    schema_: list[LiveRealtimeOptionGroupSchema] = Field(alias="schema")
 
 
 class SessionExecutionDefaultsResponse(BaseModel):

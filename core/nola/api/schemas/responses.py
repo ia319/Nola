@@ -2,7 +2,7 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, JsonValue
 
 # Derive from backend TaskStatus enum values.
 TaskStatusLiteral = Literal["pending", "processing", "completed", "failed", "cancelled"]
@@ -41,6 +41,7 @@ class TaskDetailResponse(TaskSummaryResponse):
     duration: float | None
     segments: list[SegmentResponse] | None
     error: str | None
+    runtime_config: dict[str, JsonValue] | None = None
 
 
 class TaskListResponse(BaseModel):
@@ -61,6 +62,7 @@ class CreateTaskResponse(BaseModel):
     status: TaskStatusLiteral
     options: dict[str, Any] | None
     model_id: str | None = None
+    runtime_config: dict[str, JsonValue] | None = None
 
 
 class CancelTaskResponse(BaseModel):

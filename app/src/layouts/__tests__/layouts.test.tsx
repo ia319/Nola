@@ -43,6 +43,7 @@ vi.mock('react-i18next', () => ({
         'settings.navigationLabel': 'Settings sections',
         'settings.tabs.general': 'General',
         'settings.tabs.transcription': 'Transcription',
+        'settings.tabs.liveRealtime': 'Live Realtime',
         'settings.tabs.export': 'Export',
         'settings.tabs.modelStorage': 'Model Storage',
         'settings.tabs.systemInfo': 'System Info',
@@ -166,6 +167,18 @@ describe('SettingsLayout', () => {
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy()
     expect(screen.getByText('Review and adjust product-level configuration.')).toBeTruthy()
     expect(screen.getByRole('navigation', { name: 'Settings sections' })).toBeTruthy()
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'General',
+      'Transcription',
+      'Live Realtime',
+      'Export',
+      'Model Storage',
+      'System Info',
+    ])
+    expect(screen.getByRole('link', { name: 'Live Realtime' })).toHaveAttribute(
+      'href',
+      '/settings/live-realtime',
+    )
     expect(screen.getByRole('link', { name: 'Export' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByText('Export body')).toBeTruthy()
   })

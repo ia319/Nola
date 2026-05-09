@@ -54,6 +54,7 @@ class FakeTaskStore:
         model_id: str | None = None,
         engine_device: str | None = None,
         engine_compute_type: str | None = None,
+        runtime_config: dict[str, object] | None = None,
     ) -> None:
         task = {
             "id": task_id,
@@ -66,6 +67,7 @@ class FakeTaskStore:
             "created_at": "2026-01-01T00:00:00",
             "completed_at": None,
             "options": options,
+            "runtime_config": runtime_config,
         }
         self.tasks[task_id] = task
         self.enqueued.append(
@@ -78,6 +80,7 @@ class FakeTaskStore:
                 "model_id": model_id,
                 "engine_device": engine_device,
                 "engine_compute_type": engine_compute_type,
+                "runtime_config": runtime_config,
             }
         )
 
@@ -109,6 +112,7 @@ class FailingEnqueueTaskStore(FakeTaskStore):
         model_id: str | None = None,
         engine_device: str | None = None,
         engine_compute_type: str | None = None,
+        runtime_config: dict[str, object] | None = None,
     ) -> None:
         if task_id in self.fail_enqueue_task_ids:
             raise RuntimeError("sqlite busy")
@@ -121,6 +125,7 @@ class FailingEnqueueTaskStore(FakeTaskStore):
             model_id=model_id,
             engine_device=engine_device,
             engine_compute_type=engine_compute_type,
+            runtime_config=runtime_config,
         )
 
 
@@ -136,6 +141,7 @@ def _base_task(*, task_id: str, file_id: str, status: str) -> dict[str, object]:
         "created_at": "2026-01-01T00:00:00",
         "completed_at": None,
         "options": None,
+        "runtime_config": None,
     }
 
 
@@ -221,6 +227,14 @@ def test_create_task_persists_execution_config() -> None:
             "engine_device": "cpu",
             "engine_compute_type": "default",
         },
+        runtime_config={
+            "schema_version": 1,
+            "model_id": "small",
+            "engine_device": "cpu",
+            "engine_compute_type": "default",
+            "transcription_options": {"language": "en"},
+            "request_options": {"language": "en"},
+        },
         task_id_factory=lambda: "task-001",
     )
 
@@ -236,6 +250,14 @@ def test_create_task_persists_execution_config() -> None:
             "model_id": "small",
             "engine_device": "cpu",
             "engine_compute_type": "default",
+            "runtime_config": {
+                "schema_version": 1,
+                "model_id": "small",
+                "engine_device": "cpu",
+                "engine_compute_type": "default",
+                "transcription_options": {"language": "en"},
+                "request_options": {"language": "en"},
+            },
         }
     ]
 
@@ -255,6 +277,14 @@ def test_batch_retry_tasks_returns_mixed_outcomes() -> None:
                 "model_id": "small",
                 "engine_device": "cuda",
                 "engine_compute_type": "float16",
+                "runtime_config": {
+                    "schema_version": 1,
+                    "model_id": "small",
+                    "engine_device": "cuda",
+                    "engine_compute_type": "float16",
+                    "transcription_options": {"language": "zh"},
+                    "request_options": {"language": "zh"},
+                },
             },
             "pending": _base_task(task_id="pending", file_id="f2", status="pending"),
             "cancelled_missing_file": _base_task(
@@ -287,6 +317,14 @@ def test_batch_retry_tasks_returns_mixed_outcomes() -> None:
     assert task_store.enqueued[0]["model_id"] == "small"
     assert task_store.enqueued[0]["engine_device"] == "cuda"
     assert task_store.enqueued[0]["engine_compute_type"] == "float16"
+    assert task_store.enqueued[0]["runtime_config"] == {
+        "schema_version": 1,
+        "model_id": "small",
+        "engine_device": "cuda",
+        "engine_compute_type": "float16",
+        "transcription_options": {"language": "zh"},
+        "request_options": {"language": "zh"},
+    }
     assert results[1]["error_code"] == "file_missing"
     assert results[2]["error_code"] == "invalid_status"
     assert results[3]["error_code"] == "not_found"

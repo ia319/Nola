@@ -25,6 +25,8 @@ from nola.application.live.types import (
     LiveTrackRecord,
     LiveTrackSource,
 )
+from nola.config.common.types import ConfigMap
+from nola.model_hub.contracts import ModelCacheState
 
 
 class FakeLiveStore:
@@ -48,6 +50,7 @@ class FakeLiveStore:
         model_id: str | None,
         runtime: str | None,
         audio_format: str | None,
+        runtime_config: dict[str, object] | None = None,
         started_at: str,
         created_at: str,
         updated_at: str,
@@ -61,6 +64,7 @@ class FakeLiveStore:
             "model_id": model_id,
             "runtime": runtime,
             "audio_format": audio_format,
+            "runtime_config": runtime_config,
             "started_at": started_at,
             "ended_at": None,
             "error": None,
@@ -217,6 +221,26 @@ class FakeLiveStore:
         return len(self.segments.get(session_id, []))
 
 
+class FakeConfigStore:
+    """In-memory config store for Live runtime use-case tests."""
+
+    def __init__(self, values_by_prefix: dict[str, ConfigMap]) -> None:
+        self.values_by_prefix = values_by_prefix
+
+    def get_all(self, prefix: str) -> ConfigMap:
+        """Return values under one prefix."""
+        return dict(self.values_by_prefix.get(prefix, {}))
+
+
+class FakeModelStorage:
+    """Expose downloaded model state for Live runtime use-case tests."""
+
+    def get_cache_state(self, repo_id: str) -> ModelCacheState:
+        """Return downloaded for registered test models."""
+        assert repo_id
+        return "downloaded"
+
+
 def _session(
     *,
     session_id: str,
@@ -232,6 +256,7 @@ def _session(
         "model_id": "small",
         "runtime": None,
         "audio_format": None,
+        "runtime_config": None,
         "started_at": started_at,
         "ended_at": "2026-01-01T00:10:00" if status != "active" else None,
         "error": "failed" if status == "failed" else None,
@@ -249,6 +274,7 @@ def test_create_live_session_returns_active_payload() -> None:
         mode="background",
         language_hint="zh",
         model_id="small",
+        runtime_config={"schema_version": 1, "runtime": "mock"},
         session_id_factory=lambda: "live-001",
         timestamp_factory=lambda: "2026-01-01T00:00:00",
     )
@@ -259,12 +285,63 @@ def test_create_live_session_returns_active_payload() -> None:
     assert payload["status"] == "active"
     assert payload["language_hint"] == "zh"
     assert payload["model_id"] == "small"
+    assert payload["runtime_config"] == {"schema_version": 1, "runtime": "mock"}
     assert payload["tracks"] == []
     assert payload["segments"] == []
     assert payload["segment_total"] == 0
     assert payload["segment_limit"] == DEFAULT_LIVE_SEGMENT_LIMIT
     assert payload["segment_offset"] == 0
     assert live_store.created_sessions[0]["started_at"] == "2026-01-01T00:00:00"
+    assert live_store.created_sessions[0]["runtime_config"] == {
+        "schema_version": 1,
+        "runtime": "mock",
+    }
+
+
+def test_create_live_session_requires_config_store_for_runtime_overrides() -> None:
+    live_store = FakeLiveStore()
+
+    with pytest.raises(ValueError, match="config_store is required"):
+        create_live_session(
+            live_store=live_store,
+            title="Planning",
+            mode="streaming",
+            language_hint="zh",
+            model_id="small",
+            runtime_overrides={"language": "en", "context_prompt": None},
+            session_id_factory=lambda: "live-overrides",
+            timestamp_factory=lambda: "2026-01-01T00:00:00",
+        )
+
+    assert live_store.created_sessions == []
+
+
+def test_create_live_session_resolves_runtime_config_before_writing() -> None:
+    live_store = FakeLiveStore()
+
+    payload = create_live_session(
+        live_store=live_store,
+        title="Planning",
+        mode="streaming",
+        language_hint="zh",
+        model_id="small",
+        runtime_overrides={"language": "en", "beam_size": 3},
+        runtime_adapter="whisper_streaming",
+        config_store=FakeConfigStore({"live_realtime.": {"beam_size": 2}}),
+        model_storage=FakeModelStorage(),
+        session_id_factory=lambda: "live-runtime",
+        timestamp_factory=lambda: "2026-01-01T00:00:00",
+    )
+
+    stored = live_store.created_sessions[0]
+    assert payload["session_id"] == "live-runtime"
+    assert payload["runtime"] == "whisper_streaming"
+    assert payload["model_id"] == "small"
+    assert payload["runtime_config"]["language"] == "en"
+    assert payload["runtime_config"]["faster_whisper"]["beam_size"] == 3
+    assert stored["runtime"] == "whisper_streaming"
+    assert stored["audio_format"] == "pcm_s16le_16khz_mono"
+    assert stored["runtime_config"] == payload["runtime_config"]
 
 
 def test_create_live_session_rejects_invalid_mode() -> None:

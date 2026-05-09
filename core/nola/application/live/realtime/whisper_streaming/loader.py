@@ -60,6 +60,7 @@ class WhisperStreamingRuntimeLoaderConfig:
     default_model_dir: Path
     device: EngineDevice
     compute_type: EngineComputeType
+    model_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,7 +95,10 @@ class WhisperStreamingRuntimeLoader:
     def resolve_model(self) -> WhisperStreamingResolvedModel:
         """Return the configured, registered, and downloaded Live model."""
         model_config = self._config_store.get_all("model.")
-        configured_model_id = _require_configured_model_id(model_config)
+        configured_model_id = _resolve_model_id(
+            model_config=model_config,
+            runtime_model_id=self._config.model_id,
+        )
         model_info = _require_registered_model(configured_model_id)
         model_dir = _resolve_configured_model_dir(
             model_config=model_config,
@@ -132,6 +136,16 @@ class WhisperStreamingRuntimeLoader:
                 code="runtime_model_load_failed",
                 message="Live realtime model could not be loaded",
             ) from error
+
+
+def _resolve_model_id(
+    *,
+    model_config: ConfigMap,
+    runtime_model_id: str | None,
+) -> str:
+    if runtime_model_id is not None and runtime_model_id.strip():
+        return runtime_model_id.strip()
+    return _require_configured_model_id(model_config)
 
 
 def _require_configured_model_id(model_config: ConfigMap) -> str:

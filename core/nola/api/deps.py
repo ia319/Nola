@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
+from typing import cast
 
 from nola.application.live.realtime import (
     LiveRealtimeTranscriber,
@@ -15,15 +16,28 @@ from nola.application.live.realtime.whisper_streaming import (
     WhisperStreamingLiveTranscriber,
     WhisperStreamingRuntimeLoader,
     WhisperStreamingRuntimeLoaderConfig,
+    whisper_streaming_runtime_snapshot_from_live_snapshot,
 )
+from nola.application.live.runtime_config import (
+    LIVE_REALTIME_AUDIO_FORMAT,
+    LIVE_RUNTIME_CONFIG_SCHEMA_VERSION,
+)
+from nola.application.live.types import LiveRuntimeConfig
 from nola.application.models import ModelOperationLocks
 from nola.common.event_bus import EventBus, event_bus
 from nola.config import settings
+from nola.config.live_realtime import LiveRealtimeAdapter
 from nola.engines.base import EngineConfig
-from nola.model_hub import ModelDownloader, ModelStorage, resolve_model_dir
+from nola.model_hub import (
+    ModelDownloader,
+    ModelStorage,
+    ModelStoragePort,
+    resolve_model_dir,
+)
 from nola.models import AppConfigDatabase, FileDatabase, LiveDatabase, TaskDatabase
 
-LiveRealtimeTranscriberFactory = Callable[[], LiveRealtimeTranscriber]
+LiveRealtimeTranscriberFactory = Callable[[LiveRuntimeConfig], LiveRealtimeTranscriber]
+ModelStorageProvider = Callable[[], ModelStoragePort]
 _LIVE_REALTIME_TRANSCRIBER_MOCK = "mock"
 _LIVE_REALTIME_TRANSCRIBER_WHISPER_STREAMING = "whisper_streaming"
 
@@ -61,10 +75,17 @@ def get_live_realtime_transcriber_factory() -> LiveRealtimeTranscriberFactory:
     """Return the configured Live realtime transcriber factory."""
     mode = settings.live_realtime_transcriber.strip().casefold()
     if mode == _LIVE_REALTIME_TRANSCRIBER_MOCK:
-        return MockLiveRealtimeTranscriber
+        return _create_mock_live_realtime_transcriber
     if mode == _LIVE_REALTIME_TRANSCRIBER_WHISPER_STREAMING:
         return _create_whisper_streaming_live_transcriber
     return _create_invalid_live_realtime_transcriber
+
+
+def get_live_realtime_adapter() -> LiveRealtimeAdapter:
+    """Return the configured Live realtime adapter name."""
+    return cast(
+        LiveRealtimeAdapter, settings.live_realtime_transcriber.strip().casefold()
+    )
 
 
 @lru_cache
@@ -98,6 +119,11 @@ def get_model_storage() -> ModelStorage:
     return ModelStorage(_resolve_effective_model_dir())
 
 
+def get_model_storage_provider() -> ModelStorageProvider:
+    """Return a lazy model-storage provider."""
+    return get_model_storage
+
+
 @lru_cache
 def get_model_downloader() -> ModelDownloader:
     """Get model downloader instance (singleton)."""
@@ -113,8 +139,21 @@ def get_model_operation_locks() -> ModelOperationLocks:
     return ModelOperationLocks()
 
 
-def _create_whisper_streaming_live_transcriber() -> LiveRealtimeTranscriber:
+def _create_mock_live_realtime_transcriber(
+    runtime_config: LiveRuntimeConfig,
+) -> LiveRealtimeTranscriber:
+    """Create a mock transcriber from a mock session snapshot."""
+    _validate_mock_live_runtime_config(runtime_config)
+    return MockLiveRealtimeTranscriber()
+
+
+def _create_whisper_streaming_live_transcriber(
+    runtime_config: LiveRuntimeConfig,
+) -> LiveRealtimeTranscriber:
     """Create one Live WhisperStreaming transcriber instance."""
+    runtime_snapshot = whisper_streaming_runtime_snapshot_from_live_snapshot(
+        runtime_config
+    )
     engine_config = EngineConfig()
     loader = WhisperStreamingRuntimeLoader(
         config_store=get_app_config_db(),
@@ -123,18 +162,47 @@ def _create_whisper_streaming_live_transcriber() -> LiveRealtimeTranscriber:
             default_model_dir=settings.default_model_dir,
             device=engine_config.device,
             compute_type=engine_config.compute_type,
+            model_id=runtime_snapshot.model_id,
         ),
         storage_factory=ModelStorage,
     )
-    return WhisperStreamingLiveTranscriber.from_loader(loader)
+    return WhisperStreamingLiveTranscriber.from_loader(
+        loader,
+        config=runtime_snapshot.config,
+    )
 
 
-def _create_invalid_live_realtime_transcriber() -> LiveRealtimeTranscriber:
+def _create_invalid_live_realtime_transcriber(
+    _runtime_config: LiveRuntimeConfig,
+) -> LiveRealtimeTranscriber:
     """Reject an unsupported Live realtime transcriber mode."""
     raise LiveRealtimeTranscriberError(
         code="runtime_config_invalid",
         message="Live realtime transcriber setting is invalid",
     )
+
+
+def _validate_mock_live_runtime_config(runtime_config: LiveRuntimeConfig) -> None:
+    """Reject non-mock runtime snapshots before creating a mock transcriber."""
+    allowed_keys = {"schema_version", "runtime", "model_id", "audio_format"}
+    if set(runtime_config) != allowed_keys:
+        raise LiveRealtimeTranscriberError(
+            code="runtime_config_invalid",
+            message="Mock Live realtime snapshot is invalid",
+        )
+    if runtime_config["runtime"] != _LIVE_REALTIME_TRANSCRIBER_MOCK:
+        raise LiveRealtimeTranscriberError(
+            code="runtime_config_invalid",
+            message="Live realtime snapshot does not match the configured adapter",
+        )
+    if (
+        runtime_config["schema_version"] != LIVE_RUNTIME_CONFIG_SCHEMA_VERSION
+        or runtime_config["audio_format"] != LIVE_REALTIME_AUDIO_FORMAT
+    ):
+        raise LiveRealtimeTranscriberError(
+            code="runtime_config_invalid",
+            message="Mock Live realtime snapshot is invalid",
+        )
 
 
 def invalidate_model_dir_caches() -> None:

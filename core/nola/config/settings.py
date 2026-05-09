@@ -1,8 +1,12 @@
 """Application configuration using Pydantic Settings."""
 
 from pathlib import Path
+from typing import Literal, TypeAlias
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+LiveRealtimeTranscriberSetting: TypeAlias = Literal["mock", "whisper_streaming"]
 
 
 class Settings(BaseSettings):
@@ -17,7 +21,7 @@ class Settings(BaseSettings):
     compute_type: str = "default"  # "default", "float16", "int8"
 
     # Live realtime settings
-    live_realtime_transcriber: str = "mock"
+    live_realtime_transcriber: LiveRealtimeTranscriberSetting = "mock"
     # Server settings
     host: str = "127.0.0.1"
     port: int = 8000
@@ -45,6 +49,14 @@ class Settings(BaseSettings):
     def default_model_dir(self) -> Path:
         """Directory for managed model cache files."""
         return self.data_dir / "models"
+
+    @field_validator("live_realtime_transcriber", mode="before")
+    @classmethod
+    def normalize_live_realtime_transcriber(cls, value: object) -> object:
+        """Normalize the Live realtime transcriber before Literal validation."""
+        if isinstance(value, str):
+            return value.strip().casefold()
+        return value
 
 
 settings = Settings()

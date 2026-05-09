@@ -4,6 +4,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from nola.common.types import JsonDict
 from nola.models.taskdb import (
     CANCELLABLE_TASK_STATUSES,
     DEFAULT_TASK_SORT_BY,
@@ -52,6 +53,7 @@ class TaskDatabase:
         model_id: str | None = None,
         engine_device: str | None = None,
         engine_compute_type: str | None = None,
+        runtime_config: JsonDict | None = None,
     ) -> None:
         """Add task to queue."""
         self._queue.enqueue(
@@ -63,6 +65,7 @@ class TaskDatabase:
             model_id=model_id,
             engine_device=engine_device,
             engine_compute_type=engine_compute_type,
+            runtime_config=runtime_config,
         )
 
     def dequeue(self, worker_id: str) -> TaskRowRaw | None:

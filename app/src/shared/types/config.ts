@@ -20,6 +20,27 @@ export type SessionDefaults = Schemas['SessionDefaultsResponse']
 /** PATCH /api/config/session-defaults request body. */
 export type SessionDefaultsUpdateRequest = Schemas['SessionDefaultsUpdateRequest']
 
+/** GET /api/config/live-realtime/defaults response. */
+export type LiveRealtimeDefaultsResponse = Schemas['LiveRealtimeDefaultsResponse']
+
+/** Effective Live realtime defaults exposed inside the defaults response. */
+export type LiveRealtimeDefaults = Schemas['LiveRealtimeDefaults']
+
+/** PATCH /api/config/live-realtime/defaults response. */
+export type LiveRealtimeDefaultsPatchResponse = Schemas['LiveRealtimeDefaultsPatchResponse']
+
+/** PATCH /api/config/live-realtime/defaults request body. */
+export type LiveRealtimeDefaultsUpdateRequest = Schemas['LiveRealtimeDefaultsUpdateRequest']
+
+/** GET /api/config/live-realtime/schema response. */
+export type LiveRealtimeSchemaResponse = Schemas['LiveRealtimeSchemaResponse']
+
+/** Schema group describing frontend-renderable Live realtime options. */
+export type LiveRealtimeOptionGroup = Schemas['LiveRealtimeOptionGroupSchema']
+
+/** Union of all field schema variants under a Live realtime option group. */
+export type LiveRealtimeOptionField = LiveRealtimeOptionGroup['fields'][number]
+
 /** Execution defaults exposed inside GET /api/config/session-defaults. */
 export type SessionExecutionDefaults = Schemas['SessionExecutionDefaultsResponse']
 

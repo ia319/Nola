@@ -340,6 +340,230 @@ class TestConfigAPI:
         assert defaults["beam_size"] == 5
         assert defaults["vad_filter"] is False
 
+    def test_get_live_realtime_defaults_returns_effective_defaults(
+        self, client: TestClient
+    ) -> None:
+        """Live realtime defaults should expose the resolved config contract."""
+        response = client.get("/api/config/live-realtime/defaults")
+
+        assert response.status_code == 200
+        defaults = response.json()["defaults"]
+        assert defaults["language"] is None
+        assert defaults["task"] == "transcribe"
+        assert defaults["context_prompt"] is None
+        assert defaults["beam_size"] == 5
+        assert defaults["condition_on_previous_text"] is True
+        assert defaults["vad_parameters"]["threshold"] == 0.5
+        assert defaults["vad_parameters"]["max_speech_duration_s"] == "inf"
+
+    def test_get_live_realtime_schema_returns_field_metadata(
+        self, client: TestClient
+    ) -> None:
+        """Live realtime schema should expose i18n keys and adapter support."""
+        response = client.get("/api/config/live-realtime/schema")
+
+        assert response.status_code == 200
+        schema = response.json()["schema"]
+        groups = {group["group"] for group in schema}
+        assert {"common", "whisperStreaming", "vad", "vadAdvanced"} <= groups
+
+        fields = {field["key"]: field for group in schema for field in group["fields"]}
+        context_prompt = fields["context_prompt"]
+        assert context_prompt["type"] == "textarea"
+        assert context_prompt["label_key"] == "liveRealtime.options.field.contextPrompt"
+        assert context_prompt["description_key"] == (
+            "liveRealtime.options.description.contextPrompt"
+        )
+        assert context_prompt["supported_adapters"] == ["whisper_streaming"]
+        assert fields["vad_parameters.max_speech_duration_s"]["special_values"] == [
+            "inf"
+        ]
+
+    def test_patch_live_realtime_defaults_applies_deep_merge(
+        self, client: TestClient
+    ) -> None:
+        """Nested Live defaults updates should preserve untouched VAD keys."""
+        config_db = get_app_config_db()
+        config_db.set_many("transcription.", {"beam_size": 9})
+
+        first = client.patch(
+            "/api/config/live-realtime/defaults",
+            json={
+                "beam_size": 3,
+                "vad_parameters": {
+                    "threshold": 0.6,
+                    "speech_pad_ms": 500,
+                },
+            },
+        )
+        second = client.patch(
+            "/api/config/live-realtime/defaults",
+            json={"vad_parameters": {"min_silence_duration_ms": 1500}},
+        )
+
+        assert first.status_code == 200
+        assert second.status_code == 200
+        defaults = second.json()["defaults"]
+        assert defaults["beam_size"] == 3
+        assert defaults["vad_parameters"]["threshold"] == 0.6
+        assert defaults["vad_parameters"]["speech_pad_ms"] == 500
+        assert defaults["vad_parameters"]["min_silence_duration_ms"] == 1500
+        assert config_db.get_all("transcription.") == {"beam_size": 9}
+
+    def test_patch_live_realtime_defaults_clears_override_with_null(
+        self, client: TestClient
+    ) -> None:
+        """Explicit null should remove Live top-level and nested overrides."""
+        precondition = client.patch(
+            "/api/config/live-realtime/defaults",
+            json={
+                "beam_size": 3,
+                "vad_parameters": {
+                    "threshold": 0.6,
+                    "speech_pad_ms": 500,
+                },
+            },
+        )
+        assert precondition.status_code == 200
+
+        response = client.patch(
+            "/api/config/live-realtime/defaults",
+            json={
+                "beam_size": None,
+                "vad_parameters": {"threshold": None},
+            },
+        )
+
+        assert response.status_code == 200
+        defaults = response.json()["defaults"]
+        assert defaults["beam_size"] == 5
+        assert defaults["vad_parameters"]["threshold"] == 0.5
+        assert defaults["vad_parameters"]["speech_pad_ms"] == 500
+
+    def test_patch_live_realtime_defaults_trims_blank_context_prompt(
+        self, client: TestClient
+    ) -> None:
+        """Blank prompt text should clear the persisted prompt override."""
+        precondition = client.patch(
+            "/api/config/live-realtime/defaults",
+            json={"context_prompt": "Domain terms"},
+        )
+        assert precondition.status_code == 200
+
+        response = client.patch(
+            "/api/config/live-realtime/defaults",
+            json={"context_prompt": " " * 3000},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["defaults"]["context_prompt"] is None
+
+    def test_patch_live_realtime_defaults_rejects_long_context_prompt(
+        self, client: TestClient
+    ) -> None:
+        """Non-blank prompt text should enforce the configured length limit."""
+        response = client.patch(
+            "/api/config/live-realtime/defaults",
+            json={"context_prompt": (" " * 10) + ("a" * 2001)},
+        )
+
+        assert response.status_code == 422
+        assert any(
+            item.get("loc", [None])[-1] == "context_prompt"
+            for item in response.json()["detail"]
+        )
+
+    def test_delete_live_realtime_defaults_resets_only_live_prefix(
+        self, client: TestClient
+    ) -> None:
+        """Delete should reset Live overrides without touching other prefixes."""
+        config_db = get_app_config_db()
+        config_db.set_many("transcription.", {"beam_size": 9})
+        precondition = client.patch(
+            "/api/config/live-realtime/defaults",
+            json={"beam_size": 3, "vad_filter": True},
+        )
+        assert precondition.status_code == 200
+
+        delete_response = client.delete("/api/config/live-realtime/defaults")
+        get_response = client.get("/api/config/live-realtime/defaults")
+
+        assert delete_response.status_code == 204
+        defaults = get_response.json()["defaults"]
+        assert defaults["beam_size"] == 5
+        assert defaults["vad_filter"] is False
+        assert config_db.get_all("transcription.") == {"beam_size": 9}
+
+    def test_patch_live_realtime_defaults_rejects_unknown_keys(
+        self, client: TestClient
+    ) -> None:
+        """Unknown Live realtime default keys should fail validation."""
+        top_level = client.patch(
+            "/api/config/live-realtime/defaults",
+            json={"word_timestamps": True},
+        )
+        nested = client.patch(
+            "/api/config/live-realtime/defaults",
+            json={"vad_parameters": {"unknown_key": 1}},
+        )
+
+        assert top_level.status_code == 422
+        assert nested.status_code == 422
+        assert any(
+            item.get("loc", [None])[-1] == "word_timestamps"
+            for item in top_level.json()["detail"]
+        )
+        assert any(
+            "unknown_key" in item.get("msg", "") for item in nested.json()["detail"]
+        )
+
+    def test_patch_live_realtime_defaults_rejects_invalid_values(
+        self, client: TestClient
+    ) -> None:
+        """Invalid Live realtime values should fail before persistence."""
+        out_of_range = client.patch(
+            "/api/config/live-realtime/defaults",
+            json={"no_speech_threshold": 1.2},
+        )
+        empty_temperature = client.patch(
+            "/api/config/live-realtime/defaults",
+            json={"temperature": []},
+        )
+
+        assert out_of_range.status_code == 422
+        assert empty_temperature.status_code == 422
+        assert any(
+            item.get("loc", [None])[-1] == "no_speech_threshold"
+            for item in out_of_range.json()["detail"]
+        )
+        assert any(
+            item.get("loc", [None])[-1] == "temperature"
+            for item in empty_temperature.json()["detail"]
+        )
+
+    def test_patch_live_realtime_defaults_rejects_invalid_effective_state(
+        self, client: TestClient
+    ) -> None:
+        """Cross-field effective validation should run before writes."""
+        precondition = client.patch(
+            "/api/config/live-realtime/defaults",
+            json={
+                "segment_close_silence_ms": 3000,
+                "context_reset_silence_ms": 4000,
+            },
+        )
+        assert precondition.status_code == 200
+
+        response = client.patch(
+            "/api/config/live-realtime/defaults",
+            json={"context_reset_silence_ms": 1000},
+        )
+        defaults = client.get("/api/config/live-realtime/defaults").json()["defaults"]
+
+        assert response.status_code == 422
+        assert defaults["segment_close_silence_ms"] == 3000
+        assert defaults["context_reset_silence_ms"] == 4000
+
     def test_get_session_defaults_returns_settings_fallback(
         self, client: TestClient
     ) -> None:

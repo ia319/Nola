@@ -6,10 +6,28 @@ from contextlib import closing
 from datetime import datetime, timedelta
 from typing import Any, cast
 
+from nola.common.types import JsonDict
 from nola.models.taskdb.base import TaskRepositoryBase
 from nola.models.taskdb.types import TaskRowRaw, TaskStatus
 
 logger = logging.getLogger(__name__)
+
+
+def _serialize_json_field(
+    value: dict[str, Any] | JsonDict | None,
+    *,
+    field_name: str,
+) -> str | None:
+    """Return JSON for a stored task config field."""
+    if value is None:
+        return None
+    try:
+        return json.dumps(value, allow_nan=False)
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            f"{field_name} must be JSON-serializable and cannot contain "
+            f"NaN/Infinity: {error}"
+        ) from error
 
 
 class TaskQueueRepository(TaskRepositoryBase):
@@ -25,6 +43,7 @@ class TaskQueueRepository(TaskRepositoryBase):
         model_id: str | None = None,
         engine_device: str | None = None,
         engine_compute_type: str | None = None,
+        runtime_config: JsonDict | None = None,
     ) -> None:
         """Add task to queue."""
         with closing(self._connect()) as conn:
@@ -33,8 +52,9 @@ class TaskQueueRepository(TaskRepositoryBase):
                     """
                     INSERT INTO transcription_tasks
                     (id, file_id, status, priority, max_retries, options,
-                     model_id, engine_device, engine_compute_type, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     runtime_config, model_id, engine_device, engine_compute_type,
+                     created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         task_id,
@@ -42,7 +62,11 @@ class TaskQueueRepository(TaskRepositoryBase):
                         TaskStatus.PENDING.value,
                         priority,
                         max_retries,
-                        json.dumps(options) if options else None,
+                        _serialize_json_field(options, field_name="options"),
+                        _serialize_json_field(
+                            runtime_config,
+                            field_name="runtime_config",
+                        ),
                         model_id,
                         engine_device,
                         engine_compute_type,

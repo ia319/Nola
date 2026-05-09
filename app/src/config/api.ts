@@ -2,6 +2,10 @@ import apiClient from '@/shared/lib/api-client'
 import type {
   AppConfig,
   EngineDefaults,
+  LiveRealtimeDefaultsPatchResponse,
+  LiveRealtimeDefaultsResponse,
+  LiveRealtimeDefaultsUpdateRequest,
+  LiveRealtimeSchemaResponse,
   SessionDefaults,
   SessionDefaultsUpdateRequest,
   TranscriptionDefaultsPatchResponse,
@@ -21,6 +25,28 @@ export async function fetchEngineDefaults(signal?: AbortSignal): Promise<EngineD
     {
       signal,
     },
+  )
+  return data
+}
+
+/** Fetch resolved Live realtime defaults from `GET /api/config/live-realtime/defaults`. */
+export async function fetchLiveRealtimeDefaults(
+  signal?: AbortSignal,
+): Promise<LiveRealtimeDefaultsResponse> {
+  const { data } = await apiClient.get<LiveRealtimeDefaultsResponse>(
+    '/api/config/live-realtime/defaults',
+    { signal },
+  )
+  return data
+}
+
+/** Fetch Live realtime field metadata from `GET /api/config/live-realtime/schema`. */
+export async function fetchLiveRealtimeSchema(
+  signal?: AbortSignal,
+): Promise<LiveRealtimeSchemaResponse> {
+  const { data } = await apiClient.get<LiveRealtimeSchemaResponse>(
+    '/api/config/live-realtime/schema',
+    { signal },
   )
   return data
 }
@@ -57,9 +83,31 @@ export async function patchSessionDefaults(
 }
 
 /**
+ * Persist Live realtime default overrides via `PATCH /api/config/live-realtime/defaults`.
+ * Keep write requests non-cancelable until the UI adds an explicit cancel/retry flow.
+ */
+export async function patchLiveRealtimeDefaults(
+  payload: LiveRealtimeDefaultsUpdateRequest,
+): Promise<LiveRealtimeDefaultsPatchResponse> {
+  const { data } = await apiClient.patch<LiveRealtimeDefaultsPatchResponse>(
+    '/api/config/live-realtime/defaults',
+    payload,
+  )
+  return data
+}
+
+/**
  * Remove all persisted transcription-default overrides via `DELETE /api/config/transcription/defaults`.
  * Keep write requests non-cancelable until the UI adds an explicit cancel/retry flow.
  */
 export async function deleteTranscriptionDefaults(): Promise<void> {
   await apiClient.delete('/api/config/transcription/defaults')
+}
+
+/**
+ * Remove all persisted Live realtime overrides via `DELETE /api/config/live-realtime/defaults`.
+ * Keep write requests non-cancelable until the UI adds an explicit cancel/retry flow.
+ */
+export async function deleteLiveRealtimeDefaults(): Promise<void> {
+  await apiClient.delete('/api/config/live-realtime/defaults')
 }

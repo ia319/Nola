@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from nola.application.tasks.types import TaskOptions
+from nola.application.tasks.types import TaskOptions, TaskRuntimeConfig
 from nola.models.files import FileRow
 from nola.models.tasks import TaskRow, TaskRowRaw, TaskSortField, TaskSortOrder
 
@@ -52,6 +52,7 @@ class SupportsTaskMutations(Protocol):
         model_id: str | None = None,
         engine_device: str | None = None,
         engine_compute_type: str | None = None,
+        runtime_config: TaskRuntimeConfig | None = None,
     ) -> None:
         """Insert a pending task."""
         ...

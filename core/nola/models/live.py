@@ -1,5 +1,7 @@
 """Live transcription database operations."""
 
+import json
+import logging
 import sqlite3
 from contextlib import closing
 from pathlib import Path
@@ -15,6 +17,22 @@ from nola.application.live.types import (
     LiveTrackRecord,
     LiveTrackSource,
 )
+from nola.common.types import JsonDict
+
+logger = logging.getLogger(__name__)
+
+
+def _serialize_runtime_config(runtime_config: JsonDict | None) -> str | None:
+    """Return a JSON snapshot string or reject unsafe runtime config."""
+    if runtime_config is None:
+        return None
+    try:
+        return json.dumps(runtime_config, allow_nan=False)
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            "runtime_config must be JSON-serializable and cannot contain "
+            f"NaN/Infinity: {error}"
+        ) from error
 
 
 class LiveDatabase:
@@ -32,7 +50,25 @@ class LiveDatabase:
 
     def _to_session_record(self, row: sqlite3.Row) -> LiveSessionRecord:
         """Return one live session row as an application record."""
-        return cast(LiveSessionRecord, dict(row))
+        values = dict(row)
+        runtime_config_raw = values.get("runtime_config")
+        if runtime_config_raw:
+            try:
+                runtime_config = json.loads(runtime_config_raw)
+                if isinstance(runtime_config, dict):
+                    values["runtime_config"] = cast(JsonDict, runtime_config)
+                else:
+                    logger.warning(
+                        "Invalid live runtime_config shape for %s",
+                        row["id"],
+                    )
+                    values["runtime_config"] = None
+            except json.JSONDecodeError:
+                logger.warning("Corrupted live runtime_config for %s", row["id"])
+                values["runtime_config"] = None
+        else:
+            values["runtime_config"] = None
+        return cast(LiveSessionRecord, values)
 
     def _to_track_record(self, row: sqlite3.Row) -> LiveTrackRecord:
         """Return one live track row as an application record."""
@@ -55,6 +91,7 @@ class LiveDatabase:
         model_id: str | None,
         runtime: str | None,
         audio_format: str | None,
+        runtime_config: JsonDict | None = None,
         started_at: str,
         created_at: str,
         updated_at: str,
@@ -66,9 +103,10 @@ class LiveDatabase:
                     """
                     INSERT INTO live_sessions (
                         id, title, mode, status, language_hint, model_id,
-                        runtime, audio_format, started_at, created_at, updated_at
+                        runtime, audio_format, runtime_config, started_at,
+                        created_at, updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     RETURNING *
                     """,
                     (
@@ -80,6 +118,7 @@ class LiveDatabase:
                         model_id,
                         runtime,
                         audio_format,
+                        _serialize_runtime_config(runtime_config),
                         started_at,
                         created_at,
                         updated_at,

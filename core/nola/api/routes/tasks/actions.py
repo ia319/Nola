@@ -22,6 +22,7 @@ from nola.application.tasks.actions import (
 )
 from nola.application.tasks.errors import TaskUseCaseError
 from nola.application.tasks.execution_config import resolve_task_execution_config
+from nola.application.tasks.runtime_config import build_task_runtime_config
 from nola.application.tasks.types import (
     BatchTaskActionPayload,
     CancelTaskPayload,
@@ -32,6 +33,7 @@ from nola.application.tasks.types import (
 from nola.config import settings
 from nola.config.session import get_session_execution_defaults
 from nola.model_hub import get_model
+from nola.models import AppConfigDatabase
 
 router = APIRouter()
 
@@ -52,8 +54,10 @@ def _build_request_execution_values(
     )
 
 
-def _build_session_execution_values() -> TaskExecutionConfigValues:
-    defaults = get_session_execution_defaults(get_app_config_db())
+def _build_session_execution_values(
+    config_db: AppConfigDatabase,
+) -> TaskExecutionConfigValues:
+    defaults = get_session_execution_defaults(config_db)
     return TaskExecutionConfigValues(
         model_id=defaults.model_id,
         device=defaults.device,
@@ -85,18 +89,26 @@ async def create_transcription(request: TranscriptionRequest) -> CreateTaskPaylo
     (engine defaults plus persisted application overrides) are used.
     """
     try:
+        request_options = request.get_options_dict()
+        config_db = get_app_config_db()
         execution_config = resolve_task_execution_config(
             request=_build_request_execution_values(request),
-            session_defaults=_build_session_execution_values(),
+            session_defaults=_build_session_execution_values(config_db),
             settings_defaults=_build_settings_execution_values(),
             model_resolver=_resolve_model_id,
+        )
+        runtime_config = build_task_runtime_config(
+            request_options=request_options,
+            execution_config=execution_config,
+            config_store=config_db,
         )
         return create_task(
             file_store=get_file_db(),
             task_store=get_task_db(),
             file_id=request.file_id,
-            options=request.get_options_dict(),
+            options=request_options,
             execution_config=execution_config,
+            runtime_config=runtime_config,
         )
     except TaskUseCaseError as error:
         raise_http_error(error)
