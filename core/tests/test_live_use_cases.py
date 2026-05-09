@@ -1,7 +1,6 @@
 """Unit tests for live transcription application use-cases."""
 
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import cast
 
 import pytest
@@ -235,8 +234,6 @@ class FakeConfigStore:
 
 class FakeModelStorage:
     """Expose downloaded model state for Live runtime use-case tests."""
-
-    cache_dir = Path("D:/fake-model-cache")
 
     def get_cache_state(self, repo_id: str) -> ModelCacheState:
         """Return downloaded for registered test models."""
