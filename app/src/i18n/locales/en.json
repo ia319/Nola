@@ -253,9 +253,9 @@
         "vadMaxSpeechDurationS": "VAD Max Speech Duration (s)"
       },
       "description": {
-        "language": "Choose the language hint for new Live realtime sessions.",
-        "task": "Choose whether Live realtime transcribes source audio or translates it to English.",
-        "contextPrompt": "Provide domain terms, names, or spelling hints for new Live realtime sessions.",
+        "language": "Choose the language hint for new Live Realtime sessions.",
+        "task": "Choose whether Live Realtime transcribes source audio or translates it to English.",
+        "contextPrompt": "Provide domain terms, names, or spelling hints for new Live Realtime sessions.",
         "minChunkMs": "Control the minimum audio window sent to the realtime transcriber.",
         "bufferTrimmingMs": "Control how much recent audio context remains in the streaming buffer.",
         "promptMaxChars": "Limit the text context carried forward between realtime decoding passes.",
@@ -271,7 +271,7 @@
         "logProbThreshold": "Reject low-confidence output below this average log probability.",
         "noSpeechThreshold": "Tune the model no-speech gate before accepting decoded text.",
         "conditionOnPreviousText": "Let each decode pass condition on previous realtime text context.",
-        "vadFilter": "Enable faster-whisper voice activity filtering before decoding.",
+        "vadFilter": "Enable Faster-Whisper voice activity filtering before decoding.",
         "vadThreshold": "Tune the probability threshold used to detect speech.",
         "vadMinSilenceDurationMs": "Set the silence duration required to split speech regions.",
         "vadSpeechPadMs": "Add audio padding before and after detected speech regions.",
@@ -1004,12 +1004,12 @@
       }
     },
     "liveRealtime": {
-      "loading": "Loading Live realtime defaults...",
-      "unavailable": "Live realtime defaults are not available.",
+      "loading": "Loading Live Realtime defaults...",
+      "unavailable": "Live Realtime defaults are not available.",
       "sections": {
         "defaults": {
           "label": "Live Realtime Defaults",
-          "description": "Configure defaults used when a new Live realtime session starts."
+          "description": "Configure defaults used when a new Live Realtime session starts."
         }
       },
       "actions": {
@@ -1031,8 +1031,8 @@
         "step": "step {{value}}"
       },
       "toast": {
-        "saved": "Live realtime defaults updated",
-        "reset": "Live realtime defaults reset"
+        "saved": "Live Realtime defaults updated",
+        "reset": "Live Realtime defaults reset"
       }
     },
     "export": {
