@@ -68,6 +68,54 @@ export interface paths {
     patch: operations['patch_transcription_defaults_api_config_transcription_defaults_patch']
     trace?: never
   }
+  '/api/config/live-realtime/defaults': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get effective Live realtime defaults
+     * @description Return Live realtime defaults after applying persisted overrides on top of built-in runtime defaults.
+     */
+    get: operations['get_live_realtime_defaults_api_config_live_realtime_defaults_get']
+    put?: never
+    post?: never
+    /**
+     * Reset persisted Live realtime defaults
+     * @description Delete persisted Live realtime default overrides and fall back to built-in runtime defaults.
+     */
+    delete: operations['delete_live_realtime_defaults_api_config_live_realtime_defaults_delete']
+    options?: never
+    head?: never
+    /**
+     * Update persisted Live realtime defaults
+     * @description Apply a partial update to persisted Live realtime defaults. Explicit null removes an override key, and nested VAD parameters are merged without replacing untouched subkeys.
+     */
+    patch: operations['patch_live_realtime_defaults_api_config_live_realtime_defaults_patch']
+    trace?: never
+  }
+  '/api/config/live-realtime/schema': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get Live realtime option schema
+     * @description Return schema-driven Live realtime option metadata, including i18n keys, field types, ranges, defaults, and adapter support.
+     */
+    get: operations['get_live_realtime_schema_api_config_live_realtime_schema_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/config/session-defaults': {
     parameters: {
       query?: never
@@ -990,6 +1038,7 @@ export interface components {
       language_hint?: string | null
       /** Model Id */
       model_id?: string | null
+      runtime_overrides?: components['schemas']['LiveRealtimeRuntimeOverridesRequest'] | null
     }
     /**
      * CreateTaskResponse
@@ -1013,6 +1062,10 @@ export interface components {
       } | null
       /** Model Id */
       model_id?: string | null
+      /** Runtime Config */
+      runtime_config?: {
+        [key: string]: components['schemas']['JsonValue']
+      } | null
     }
     /**
      * DeleteResponse
@@ -1207,6 +1260,7 @@ export interface components {
       /** Missing Count */
       missing_count: number
     }
+    JsonValue: unknown
     /**
      * LanguageOptionSchema
      * @description Describe one selectable language option.
@@ -1216,6 +1270,407 @@ export interface components {
       code: string
       /** Label Key */
       label_key: string
+    }
+    /**
+     * LiveRealtimeDefaults
+     * @description Validate one resolved Live realtime defaults payload.
+     */
+    LiveRealtimeDefaults: {
+      /** Language */
+      language?: string | null
+      /**
+       * Task
+       * @enum {string}
+       */
+      task: 'transcribe' | 'translate'
+      /** Context Prompt */
+      context_prompt?: string | null
+      /** Min Chunk Ms */
+      min_chunk_ms: number
+      /** Buffer Trimming Ms */
+      buffer_trimming_ms: number
+      /** Prompt Max Chars */
+      prompt_max_chars: number
+      /** Timestamp Tolerance Ms */
+      timestamp_tolerance_ms: number
+      /** Max Duplicate Ngram */
+      max_duplicate_ngram: number
+      /** Silence Rms Threshold */
+      silence_rms_threshold: number
+      /** Segment Close Silence Ms */
+      segment_close_silence_ms: number
+      /** Context Reset Silence Ms */
+      context_reset_silence_ms: number
+      /** Beam Size */
+      beam_size: number
+      /** Best Of */
+      best_of: number
+      /** Temperature */
+      temperature: number | number[]
+      /** Compression Ratio Threshold */
+      compression_ratio_threshold?: number | null
+      /** Log Prob Threshold */
+      log_prob_threshold?: number | null
+      /** No Speech Threshold */
+      no_speech_threshold?: number | null
+      /** Condition On Previous Text */
+      condition_on_previous_text: boolean
+      /** Vad Filter */
+      vad_filter: boolean
+      vad_parameters: components['schemas']['LiveRealtimeVadParameters']
+    }
+    /**
+     * LiveRealtimeDefaultsPatchResponse
+     * @description Expose Live realtime defaults after a persisted PATCH.
+     */
+    LiveRealtimeDefaultsPatchResponse: {
+      defaults: components['schemas']['LiveRealtimeDefaults']
+    }
+    /**
+     * LiveRealtimeDefaultsResponse
+     * @description Expose resolved Live realtime defaults.
+     */
+    LiveRealtimeDefaultsResponse: {
+      defaults: components['schemas']['LiveRealtimeDefaults']
+    }
+    /**
+     * LiveRealtimeDefaultsUpdateRequest
+     * @description Partial update payload for application-level Live realtime defaults.
+     * @example {
+     *       "beam_size": 3,
+     *       "context_prompt": "Domain terms and proper nouns",
+     *       "language": "en",
+     *       "vad_parameters": {
+     *         "threshold": 0.6
+     *       }
+     *     }
+     */
+    LiveRealtimeDefaultsUpdateRequest: {
+      /** Language */
+      language?: string | null
+      /** Task */
+      task?: string | null
+      /** Context Prompt */
+      context_prompt?: string | null
+      /** Min Chunk Ms */
+      min_chunk_ms?: number | null
+      /** Buffer Trimming Ms */
+      buffer_trimming_ms?: number | null
+      /** Prompt Max Chars */
+      prompt_max_chars?: number | null
+      /** Timestamp Tolerance Ms */
+      timestamp_tolerance_ms?: number | null
+      /** Max Duplicate Ngram */
+      max_duplicate_ngram?: number | null
+      /** Silence Rms Threshold */
+      silence_rms_threshold?: number | null
+      /** Segment Close Silence Ms */
+      segment_close_silence_ms?: number | null
+      /** Context Reset Silence Ms */
+      context_reset_silence_ms?: number | null
+      /** Beam Size */
+      beam_size?: number | null
+      /** Best Of */
+      best_of?: number | null
+      /** Temperature */
+      temperature?: number | number[] | null
+      /** Compression Ratio Threshold */
+      compression_ratio_threshold?: number | null
+      /** Log Prob Threshold */
+      log_prob_threshold?: number | null
+      /** No Speech Threshold */
+      no_speech_threshold?: number | null
+      /** Condition On Previous Text */
+      condition_on_previous_text?: boolean | null
+      /** Vad Filter */
+      vad_filter?: boolean | null
+      vad_parameters?: components['schemas']['LiveRealtimeVadParametersUpdateRequest'] | null
+    }
+    /**
+     * LiveRealtimeNumberFieldSchema
+     * @description Describe a number-input Live realtime field.
+     */
+    LiveRealtimeNumberFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /** Description Key */
+      description_key: string
+      /** Default Value */
+      default_value: string | number | boolean | number[] | null
+      /** Supported Adapters */
+      supported_adapters: ('mock' | 'whisper_streaming')[]
+      /** Depends On */
+      depends_on?: string | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'number'
+      /** Min */
+      min?: number | null
+      /** Max */
+      max?: number | null
+      /** Step */
+      step?: number | null
+      /** Special Values */
+      special_values?: string[] | null
+    }
+    /**
+     * LiveRealtimeNumberListFieldSchema
+     * @description Describe a comma-separated numeric-list Live realtime field.
+     */
+    LiveRealtimeNumberListFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /** Description Key */
+      description_key: string
+      /** Default Value */
+      default_value: string | number | boolean | number[] | null
+      /** Supported Adapters */
+      supported_adapters: ('mock' | 'whisper_streaming')[]
+      /** Depends On */
+      depends_on?: string | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'number_list'
+      /**
+       * Allow Negative
+       * @default false
+       */
+      allow_negative: boolean
+      /**
+       * Collapse Single Value
+       * @default false
+       */
+      collapse_single_value: boolean
+    }
+    /**
+     * LiveRealtimeOptionGroupSchema
+     * @description Group related Live realtime option fields under one UI section.
+     */
+    LiveRealtimeOptionGroupSchema: {
+      /** Group */
+      group: string
+      /** Group Label Key */
+      group_label_key: string
+      /** Fields */
+      fields: (
+        | components['schemas']['LiveRealtimeSliderFieldSchema']
+        | components['schemas']['LiveRealtimeNumberFieldSchema']
+        | components['schemas']['LiveRealtimeNumberListFieldSchema']
+        | components['schemas']['LiveRealtimeSwitchFieldSchema']
+        | components['schemas']['LiveRealtimeTextareaFieldSchema']
+        | components['schemas']['LiveRealtimeSelectFieldSchema']
+      )[]
+    }
+    /**
+     * LiveRealtimeRuntimeOverridesRequest
+     * @description Partial Live realtime option payload for one session create request.
+     */
+    LiveRealtimeRuntimeOverridesRequest: {
+      /** Language */
+      language?: string | null
+      /** Task */
+      task?: string | null
+      /** Context Prompt */
+      context_prompt?: string | null
+      /** Min Chunk Ms */
+      min_chunk_ms?: number | null
+      /** Buffer Trimming Ms */
+      buffer_trimming_ms?: number | null
+      /** Prompt Max Chars */
+      prompt_max_chars?: number | null
+      /** Timestamp Tolerance Ms */
+      timestamp_tolerance_ms?: number | null
+      /** Max Duplicate Ngram */
+      max_duplicate_ngram?: number | null
+      /** Silence Rms Threshold */
+      silence_rms_threshold?: number | null
+      /** Segment Close Silence Ms */
+      segment_close_silence_ms?: number | null
+      /** Context Reset Silence Ms */
+      context_reset_silence_ms?: number | null
+      /** Beam Size */
+      beam_size?: number | null
+      /** Best Of */
+      best_of?: number | null
+      /** Temperature */
+      temperature?: number | number[] | null
+      /** Compression Ratio Threshold */
+      compression_ratio_threshold?: number | null
+      /** Log Prob Threshold */
+      log_prob_threshold?: number | null
+      /** No Speech Threshold */
+      no_speech_threshold?: number | null
+      /** Condition On Previous Text */
+      condition_on_previous_text?: boolean | null
+      /** Vad Filter */
+      vad_filter?: boolean | null
+      vad_parameters?: components['schemas']['LiveRealtimeVadParametersUpdateRequest'] | null
+    }
+    /**
+     * LiveRealtimeSchemaResponse
+     * @description Expose Live realtime option metadata for schema-driven clients.
+     */
+    LiveRealtimeSchemaResponse: {
+      /** Schema */
+      schema: components['schemas']['LiveRealtimeOptionGroupSchema'][]
+    }
+    /**
+     * LiveRealtimeSelectFieldSchema
+     * @description Describe a single-select Live realtime field.
+     */
+    LiveRealtimeSelectFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /** Description Key */
+      description_key: string
+      /** Default Value */
+      default_value: string | number | boolean | number[] | null
+      /** Supported Adapters */
+      supported_adapters: ('mock' | 'whisper_streaming')[]
+      /** Depends On */
+      depends_on?: string | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'select'
+      /** Options */
+      options?: components['schemas']['LiveRealtimeSelectOptionSchema'][] | null
+      /** Options Source */
+      options_source?: 'effective_languages' | null
+    }
+    /**
+     * LiveRealtimeSelectOptionSchema
+     * @description Describe one selectable Live realtime option.
+     */
+    LiveRealtimeSelectOptionSchema: {
+      /** Value */
+      value: string
+      /** Label Key */
+      label_key: string
+    }
+    /**
+     * LiveRealtimeSliderFieldSchema
+     * @description Describe a slider-backed Live realtime numeric field.
+     */
+    LiveRealtimeSliderFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /** Description Key */
+      description_key: string
+      /** Default Value */
+      default_value: string | number | boolean | number[] | null
+      /** Supported Adapters */
+      supported_adapters: ('mock' | 'whisper_streaming')[]
+      /** Depends On */
+      depends_on?: string | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'slider'
+      /** Min */
+      min: number
+      /** Max */
+      max: number
+      /** Step */
+      step: number
+    }
+    /**
+     * LiveRealtimeSwitchFieldSchema
+     * @description Describe a boolean Live realtime field.
+     */
+    LiveRealtimeSwitchFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /** Description Key */
+      description_key: string
+      /** Default Value */
+      default_value: string | number | boolean | number[] | null
+      /** Supported Adapters */
+      supported_adapters: ('mock' | 'whisper_streaming')[]
+      /** Depends On */
+      depends_on?: string | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'switch'
+    }
+    /**
+     * LiveRealtimeTextareaFieldSchema
+     * @description Describe a multi-line text Live realtime field.
+     */
+    LiveRealtimeTextareaFieldSchema: {
+      /** Key */
+      key: string
+      /** Label Key */
+      label_key: string
+      /** Description Key */
+      description_key: string
+      /** Default Value */
+      default_value: string | number | boolean | number[] | null
+      /** Supported Adapters */
+      supported_adapters: ('mock' | 'whisper_streaming')[]
+      /** Depends On */
+      depends_on?: string | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'textarea'
+      /** Max Length */
+      max_length?: number | null
+    }
+    /**
+     * LiveRealtimeVadParameters
+     * @description Validate faster-whisper VAD options exposed by Live realtime.
+     */
+    LiveRealtimeVadParameters: {
+      /** Threshold */
+      threshold: number
+      /** Neg Threshold */
+      neg_threshold?: number | null
+      /** Min Speech Duration Ms */
+      min_speech_duration_ms: number
+      /** Max Speech Duration S */
+      max_speech_duration_s: number | 'inf'
+      /** Min Silence Duration Ms */
+      min_silence_duration_ms: number
+      /** Speech Pad Ms */
+      speech_pad_ms: number
+    }
+    /**
+     * LiveRealtimeVadParametersUpdateRequest
+     * @description Partial update payload for Live realtime VAD defaults.
+     */
+    LiveRealtimeVadParametersUpdateRequest: {
+      /** Threshold */
+      threshold?: number | null
+      /** Neg Threshold */
+      neg_threshold?: number | null
+      /** Min Speech Duration Ms */
+      min_speech_duration_ms?: number | null
+      /** Max Speech Duration S */
+      max_speech_duration_s?: number | 'inf' | null
+      /** Min Silence Duration Ms */
+      min_silence_duration_ms?: number | null
+      /** Speech Pad Ms */
+      speech_pad_ms?: number | null
     }
     /**
      * LiveSegmentResponse
@@ -1282,6 +1737,10 @@ export interface components {
       created_at: string
       /** Updated At */
       updated_at: string
+      /** Runtime Config */
+      runtime_config?: {
+        [key: string]: components['schemas']['JsonValue']
+      } | null
       /** Tracks */
       tracks: components['schemas']['LiveTrackResponse'][]
       /** Segments */
@@ -1860,6 +2319,10 @@ export interface components {
       segments: components['schemas']['SegmentResponse'][] | null
       /** Error */
       error: string | null
+      /** Runtime Config */
+      runtime_config?: {
+        [key: string]: components['schemas']['JsonValue']
+      } | null
     }
     /**
      * TaskEngineRequest
@@ -2646,6 +3109,97 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_live_realtime_defaults_api_config_live_realtime_defaults_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['LiveRealtimeDefaultsResponse']
+        }
+      }
+    }
+  }
+  delete_live_realtime_defaults_api_config_live_realtime_defaults_delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  patch_live_realtime_defaults_api_config_live_realtime_defaults_patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LiveRealtimeDefaultsUpdateRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['LiveRealtimeDefaultsPatchResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_live_realtime_schema_api_config_live_realtime_schema_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['LiveRealtimeSchemaResponse']
         }
       }
     }
