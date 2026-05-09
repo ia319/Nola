@@ -609,12 +609,35 @@
     "workbench": {
       "title": "Live",
       "description": "Real-time transcription",
+      "statusBar": {
+        "region": "Real-time transcription status",
+        "session": "Session",
+        "duration": "Duration",
+        "connection": "Connection",
+        "tracks": "Tracks",
+        "runtime": "Runtime"
+      },
       "sessionSetup": {
         "title": "Session setup"
+      },
+      "settings": {
+        "eyebrow": "Session settings",
+        "title": "Runtime configuration",
+        "description": "Review per-session runtime parameters.",
+        "empty": {
+          "title": "No adjustable settings",
+          "description": "This session currently has no editable runtime settings."
+        }
       },
       "transcript": {
         "title": "Live transcript",
         "empty": "No transcript yet"
+      },
+      "compact": {
+        "title": "Compact live view",
+        "expand": "Expand compact view",
+        "close": "Close compact view",
+        "empty": "No live transcript yet"
       }
     }
   },

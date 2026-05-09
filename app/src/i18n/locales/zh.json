@@ -608,12 +608,35 @@
     "workbench": {
       "title": "实时",
       "description": "实时显示麦克风和系统音频转录。",
+      "statusBar": {
+        "region": "实时转录状态",
+        "session": "会话",
+        "duration": "时长",
+        "connection": "连接",
+        "tracks": "来源",
+        "runtime": "运行环境"
+      },
       "sessionSetup": {
         "title": "会话启动设置"
+      },
+      "settings": {
+        "eyebrow": "会话设置",
+        "title": "运行参数",
+        "description": "查看本次会话的运行参数。",
+        "empty": {
+          "title": "暂无可调整设置",
+          "description": "当前会话没有可编辑的运行参数。"
+        }
       },
       "transcript": {
         "title": "实时转录结果",
         "empty": "暂无转录结果"
+      },
+      "compact": {
+        "title": "实时小窗",
+        "expand": "展开实时小窗",
+        "close": "关闭实时小窗",
+        "empty": "暂无实时转录结果"
       }
     }
   },
