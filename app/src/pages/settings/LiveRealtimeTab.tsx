@@ -274,7 +274,11 @@ function NumberField({ field, value, disabled, onChange }: NumberFieldProps) {
             size="sm"
             variant={activeSpecial === token ? 'default' : 'outline'}
             disabled={disabled}
-            onClick={() => onChange(token)}
+            onClick={() => {
+              setError(null)
+              setDraft('')
+              onChange(token)
+            }}
           >
             {token}
           </Button>
