@@ -30,7 +30,7 @@ from nola.application.live.realtime import (
     LiveRealtimeTranscriptFinalCandidate,
     LiveRealtimeTranscriptPreview,
 )
-from nola.application.live.types import LiveTrackSource
+from nola.application.live.types import LiveRuntimeConfig, LiveTrackSource
 from nola.config.settings import Settings
 from nola.main import app
 from nola.model_hub.contracts import ModelCacheState
@@ -507,6 +507,65 @@ def test_live_realtime_stream_returns_server_ready(client: TestClient) -> None:
         assert close_error.value.code == 1000
 
 
+def test_live_realtime_stream_uses_session_runtime_snapshot(
+    client: TestClient,
+) -> None:
+    """Live realtime stream should pass the saved snapshot to the factory."""
+    created = _create_live_session(client)
+    session_id = str(created["session_id"])
+    snapshots: list[LiveRuntimeConfig] = []
+
+    def _factory(snapshot: LiveRuntimeConfig) -> _PreviewRouteTranscriber:
+        snapshots.append(snapshot.copy())
+        return _PreviewRouteTranscriber()
+
+    app.dependency_overrides[get_live_realtime_transcriber_factory] = lambda: _factory
+    try:
+        with client.websocket_connect(
+            f"/api/live/sessions/{session_id}/stream"
+        ) as websocket:
+            websocket.send_json(_realtime_event("client.hello", session_id))
+            assert websocket.receive_json()["type"] == "server.ready"
+            websocket.send_json(_realtime_event("session.finish", session_id))
+            assert websocket.receive_json()["type"] == "session.finished"
+    finally:
+        app.dependency_overrides.pop(get_live_realtime_transcriber_factory, None)
+
+    assert snapshots == [created["runtime_config"]]
+
+
+def test_live_realtime_stream_rejects_missing_runtime_config(
+    client: TestClient,
+) -> None:
+    """Legacy active sessions without snapshots should fail explicitly."""
+    session_id = "legacy-live-session"
+    get_live_db().create_session(
+        session_id=session_id,
+        title="Legacy",
+        mode="streaming",
+        status="active",
+        language_hint=None,
+        model_id=None,
+        runtime=None,
+        audio_format=None,
+        runtime_config=None,
+        started_at="2026-01-01T00:00:00+00:00",
+        created_at="2026-01-01T00:00:00+00:00",
+        updated_at="2026-01-01T00:00:00+00:00",
+    )
+
+    with client.websocket_connect(
+        f"/api/live/sessions/{session_id}/stream"
+    ) as websocket:
+        error = websocket.receive_json()
+
+        assert error["type"] == "server.error"
+        assert error["error"]["code"] == "runtime_config_invalid"
+        with pytest.raises(WebSocketDisconnect) as close_error:
+            websocket.receive_json()
+        assert close_error.value.code == 1008
+
+
 def test_live_realtime_stream_rejects_malformed_hello_json(
     client: TestClient,
 ) -> None:
@@ -742,7 +801,7 @@ def test_live_realtime_stream_emits_flush_final_on_track_stop(
     session_id = str(created["session_id"])
 
     app.dependency_overrides[get_live_realtime_transcriber_factory] = (
-        lambda: _FlushTrackRouteTranscriber
+        lambda: lambda _snapshot: _FlushTrackRouteTranscriber()
     )
     try:
         with client.websocket_connect(
@@ -785,7 +844,7 @@ def test_live_realtime_stream_emits_preview_transcript(
     session_id = str(created["session_id"])
 
     app.dependency_overrides[get_live_realtime_transcriber_factory] = (
-        lambda: _PreviewRouteTranscriber
+        lambda: lambda _snapshot: _PreviewRouteTranscriber()
     )
     try:
         with client.websocket_connect(
