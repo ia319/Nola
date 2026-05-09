@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useId } from 'react'
+import { useCallback, useEffect, useId, useRef } from 'react'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -47,7 +47,47 @@ export function WorkspaceSidePanel({
   const { t } = useTranslation()
   const titleId = useId()
   const descriptionId = useId()
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null)
   const resolvedCloseLabel = closeLabel ?? t('components.workspaceSidePanel.close')
+  const closePanel = useCallback(() => {
+    onOpenChange(false)
+  }, [onOpenChange])
+
+  useEffect(() => {
+    if (!open) return
+
+    const activeElement = document.activeElement
+    previouslyFocusedElementRef.current =
+      activeElement instanceof HTMLElement ? activeElement : null
+    closeButtonRef.current?.focus()
+
+    return () => {
+      const elementToRestore = previouslyFocusedElementRef.current
+      previouslyFocusedElementRef.current = null
+
+      if (elementToRestore?.isConnected) {
+        elementToRestore.focus()
+      }
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.key !== 'Escape') return
+
+      event.stopPropagation()
+      closePanel()
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [closePanel, open])
 
   if (!open) {
     return null
@@ -90,8 +130,9 @@ export function WorkspaceSidePanel({
           type="button"
           size="icon-sm"
           variant="ghost"
+          ref={closeButtonRef}
           aria-label={resolvedCloseLabel}
-          onClick={() => onOpenChange(false)}
+          onClick={closePanel}
         >
           <X className="size-4" />
         </Button>

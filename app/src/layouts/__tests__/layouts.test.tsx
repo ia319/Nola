@@ -174,6 +174,26 @@ describe('WorkspaceSidePanel', () => {
     )
   }
 
+  function WorkspaceSidePanelFocusHarness() {
+    const [isOpen, setIsOpen] = useState(false)
+
+    return (
+      <div className="flex min-h-0">
+        <button type="button" onClick={() => setIsOpen(true)}>
+          Open settings
+        </button>
+        <WorkspaceSidePanel
+          open={isOpen}
+          onOpenChange={setIsOpen}
+          title="Session settings"
+          description="Tune runtime parameters."
+        >
+          <button type="button">Runtime option</button>
+        </WorkspaceSidePanel>
+      </div>
+    )
+  }
+
   it('renders inline panel content and keeps slot class names separate', () => {
     render(<WorkspaceSidePanelHarness />)
 
@@ -202,6 +222,21 @@ describe('WorkspaceSidePanel', () => {
 
     expect(screen.queryByText('Runtime controls')).toBeNull()
     expect(screen.getByText('Main workspace')).toBeTruthy()
+  })
+
+  it('moves focus into the panel and restores focus after Escape closes it', () => {
+    render(<WorkspaceSidePanelFocusHarness />)
+
+    const trigger = screen.getByRole('button', { name: 'Open settings' })
+    trigger.focus()
+    fireEvent.click(trigger)
+
+    expect(screen.getByRole('button', { name: 'Close panel' })).toHaveFocus()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByText('Runtime option')).toBeNull()
+    expect(trigger).toHaveFocus()
   })
 })
 
