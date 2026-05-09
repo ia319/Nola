@@ -8,6 +8,36 @@ import {
 } from '../live-realtime-config-draft'
 import type { LiveRealtimeDefaults } from '@/shared/types'
 
+const defaults: LiveRealtimeDefaults = {
+  language: null,
+  task: 'transcribe',
+  context_prompt: null,
+  min_chunk_ms: 700,
+  buffer_trimming_ms: 15_000,
+  prompt_max_chars: 2_000,
+  timestamp_tolerance_ms: 80,
+  max_duplicate_ngram: 5,
+  silence_rms_threshold: 0.01,
+  segment_close_silence_ms: 800,
+  context_reset_silence_ms: 12_000,
+  beam_size: 5,
+  best_of: 5,
+  temperature: 0,
+  compression_ratio_threshold: 2.4,
+  log_prob_threshold: -1,
+  no_speech_threshold: 0.6,
+  condition_on_previous_text: true,
+  vad_filter: true,
+  vad_parameters: {
+    threshold: 0.5,
+    neg_threshold: null,
+    min_speech_duration_ms: 250,
+    max_speech_duration_s: 'inf',
+    min_silence_duration_ms: 500,
+    speech_pad_ms: 400,
+  },
+}
+
 describe('live realtime config draft helpers', () => {
   it('removes draft entries that match resolved defaults', () => {
     const draft: LiveRealtimeDraft = {
@@ -56,33 +86,3 @@ describe('live realtime config draft helpers', () => {
     })
   })
 })
-
-const defaults: LiveRealtimeDefaults = {
-  language: null,
-  task: 'transcribe',
-  context_prompt: null,
-  min_chunk_ms: 700,
-  buffer_trimming_ms: 15_000,
-  prompt_max_chars: 2_000,
-  timestamp_tolerance_ms: 80,
-  max_duplicate_ngram: 5,
-  silence_rms_threshold: 0.01,
-  segment_close_silence_ms: 800,
-  context_reset_silence_ms: 12_000,
-  beam_size: 5,
-  best_of: 5,
-  temperature: 0,
-  compression_ratio_threshold: 2.4,
-  log_prob_threshold: -1,
-  no_speech_threshold: 0.6,
-  condition_on_previous_text: true,
-  vad_filter: true,
-  vad_parameters: {
-    threshold: 0.5,
-    neg_threshold: null,
-    min_speech_duration_ms: 250,
-    max_speech_duration_s: 'inf',
-    min_silence_duration_ms: 500,
-    speech_pad_ms: 400,
-  },
-}
