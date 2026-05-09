@@ -40,7 +40,12 @@ def serialize_faster_whisper_default(value: object) -> SerializedDefaultValue:
         return [serialize_faster_whisper_default(item) for item in value]
     if isinstance(value, tuple):
         return [serialize_faster_whisper_default(item) for item in value]
-    return cast(SerializedDefaultValue, value)
+    if isinstance(value, str | int | float | bool) or value is None:
+        return cast(SerializedDefaultValue, value)
+    raise TypeError(
+        "Unsupported type for faster-whisper default serialization: "
+        f"{type(value).__name__}"
+    )
 
 
 def build_faster_whisper_defaults() -> ConfigMap:
