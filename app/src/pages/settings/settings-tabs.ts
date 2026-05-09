@@ -10,6 +10,11 @@ export const SETTINGS_TABS = [
     labelKey: 'settings.tabs.transcription',
   },
   {
+    key: 'live-realtime',
+    href: '/settings/live-realtime',
+    labelKey: 'settings.tabs.liveRealtime',
+  },
+  {
     key: 'export',
     href: '/settings/export',
     labelKey: 'settings.tabs.export',

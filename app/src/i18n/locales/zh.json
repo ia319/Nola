@@ -214,6 +214,91 @@
       "languageDetectionSegments": "语言检测片段数"
     }
   },
+  "liveRealtime": {
+    "options": {
+      "group": {
+        "common": "通用",
+        "whisperStreaming": "WhisperStreaming",
+        "silence": "实时静音",
+        "fasterWhisper": "Faster-Whisper",
+        "vad": "语音活动检测",
+        "vadAdvanced": "VAD 高级"
+      },
+      "field": {
+        "language": "语言",
+        "task": "任务类型",
+        "contextPrompt": "上下文提示词",
+        "minChunkMs": "最小分块 (ms)",
+        "bufferTrimmingMs": "缓冲裁剪 (ms)",
+        "promptMaxChars": "提示词窗口",
+        "timestampToleranceMs": "时间戳容差 (ms)",
+        "maxDuplicateNgram": "重复 N-Gram 限制",
+        "silenceRmsThreshold": "静音 RMS 阈值",
+        "segmentCloseSilenceMs": "分段闭合静音 (ms)",
+        "contextResetSilenceMs": "上下文重置静音 (ms)",
+        "beamSize": "搜索宽度",
+        "bestOf": "候选采样数",
+        "temperature": "温度",
+        "compressionRatioThreshold": "压缩比阈值",
+        "logProbThreshold": "对数概率阈值",
+        "noSpeechThreshold": "无语音阈值",
+        "conditionOnPreviousText": "基于前文续写",
+        "vadFilter": "VAD 过滤",
+        "vadThreshold": "VAD 阈值",
+        "vadMinSilenceDurationMs": "VAD 最小静音时长 (ms)",
+        "vadSpeechPadMs": "VAD 语音填充 (ms)",
+        "vadNegThreshold": "VAD 负阈值",
+        "vadMinSpeechDurationMs": "VAD 最小语音时长 (ms)",
+        "vadMaxSpeechDurationS": "VAD 最大语音时长 (s)"
+      },
+      "description": {
+        "language": "为新的实时转写会话选择语言提示。",
+        "task": "选择实时转写保留原语言，还是翻译为英文。",
+        "contextPrompt": "为新的实时转写会话提供领域术语、人名或拼写提示。",
+        "minChunkMs": "控制送入实时转写器的最小音频窗口。",
+        "bufferTrimmingMs": "控制流式缓冲区中保留的最近音频上下文长度。",
+        "promptMaxChars": "限制实时解码之间继续传递的文本上下文长度。",
+        "timestampToleranceMs": "合并实时片段时允许小幅时间戳偏移。",
+        "maxDuplicateNgram": "抑制相邻分块之间重复出现的短语。",
+        "silenceRmsThreshold": "设置实时分段器判定静音的音频 RMS 阈值。",
+        "segmentCloseSilenceMs": "检测到指定静音时长后闭合当前分段。",
+        "contextResetSilenceMs": "在较长静音间隔后重置滚动文本上下文。",
+        "beamSize": "设置每次实时解码的 beam search 宽度。",
+        "bestOf": "设置采样式解码时考虑的候选数量。",
+        "temperature": "设置一个或多个解码温度，作为回退尝试序列。",
+        "compressionRatioThreshold": "拒绝压缩比过高、可能重复的输出。",
+        "logProbThreshold": "拒绝平均对数概率过低的低置信度输出。",
+        "noSpeechThreshold": "调整模型接受解码文本前的无语音门限。",
+        "conditionOnPreviousText": "允许每次解码基于此前的实时文本上下文。",
+        "vadFilter": "在解码前启用 faster-whisper 语音活动过滤。",
+        "vadThreshold": "调整检测语音状态的概率阈值。",
+        "vadMinSilenceDurationMs": "设置切分语音区域所需的静音时长。",
+        "vadSpeechPadMs": "在检测到的语音区域前后补充音频边界。",
+        "vadNegThreshold": "调整离开语音状态时使用的低阈值。",
+        "vadMinSpeechDurationMs": "忽略短于该时长的语音区域。",
+        "vadMaxSpeechDurationS": "拆分超过该时长的语音区域。"
+      },
+      "task": {
+        "transcribe": "转写",
+        "translate": "翻译为英文"
+      },
+      "adapter": {
+        "supported": "{{adapter}} 支持",
+        "unsupported": "{{adapter}} 不支持"
+      }
+    },
+    "errors": {
+      "invalidNumber": "请输入合法数字",
+      "belowMin": "数值不能小于 {{value}}",
+      "aboveMax": "数值不能大于 {{value}}",
+      "numberList": {
+        "emptySegment": "逗号只能用于分隔数字",
+        "invalidCharacter": "请输入用逗号分隔的数字",
+        "invalidNumber": "每个值都必须是合法数字",
+        "negativeNotAllowed": "数值必须为非负数字"
+      }
+    }
+  },
   "tasks": {
     "currentBatch": {
       "title": "本次任务",
@@ -802,6 +887,7 @@
     "tabs": {
       "general": "常规",
       "transcription": "转写",
+      "liveRealtime": "实时转写",
       "export": "导出",
       "modelStorage": "模型存储",
       "systemInfo": "系统信息"
@@ -914,6 +1000,38 @@
         "disabled": "已禁用",
         "multilingual": "多语言",
         "englishOnly": "仅英语"
+      }
+    },
+    "liveRealtime": {
+      "loading": "正在加载实时转写默认值...",
+      "unavailable": "当前无法获取实时转写默认值。",
+      "sections": {
+        "defaults": {
+          "label": "实时转写默认值",
+          "description": "配置新建实时转写会话启动时使用的默认值。"
+        }
+      },
+      "actions": {
+        "retry": "重试",
+        "save": "保存更改",
+        "saving": "保存中...",
+        "reset": "重置为默认值",
+        "resetting": "重置中..."
+      },
+      "values": {
+        "empty": "未设置",
+        "enabled": "已启用",
+        "disabled": "已禁用",
+        "auto": "自动检测",
+        "characterCount": "{{count}} / {{max}} 字符",
+        "numberListHint": "使用逗号分隔数字，例如 0.0, 0.2, 0.4",
+        "min": "最小 {{value}}",
+        "max": "最大 {{value}}",
+        "step": "步长 {{value}}"
+      },
+      "toast": {
+        "saved": "实时转写默认值已更新",
+        "reset": "实时转写默认值已重置"
       }
     },
     "export": {

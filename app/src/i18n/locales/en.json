@@ -215,6 +215,91 @@
       "languageDetectionSegments": "Language Detection Segments"
     }
   },
+  "liveRealtime": {
+    "options": {
+      "group": {
+        "common": "Common",
+        "whisperStreaming": "WhisperStreaming",
+        "silence": "Live Silence",
+        "fasterWhisper": "Faster-Whisper",
+        "vad": "Voice Activity Detection",
+        "vadAdvanced": "VAD Advanced"
+      },
+      "field": {
+        "language": "Language",
+        "task": "Task",
+        "contextPrompt": "Context Prompt",
+        "minChunkMs": "Minimum Chunk (ms)",
+        "bufferTrimmingMs": "Buffer Trimming (ms)",
+        "promptMaxChars": "Prompt Window",
+        "timestampToleranceMs": "Timestamp Tolerance (ms)",
+        "maxDuplicateNgram": "Duplicate N-Gram Limit",
+        "silenceRmsThreshold": "Silence RMS Threshold",
+        "segmentCloseSilenceMs": "Segment Close Silence (ms)",
+        "contextResetSilenceMs": "Context Reset Silence (ms)",
+        "beamSize": "Beam Size",
+        "bestOf": "Best Of",
+        "temperature": "Temperature",
+        "compressionRatioThreshold": "Compression Ratio Threshold",
+        "logProbThreshold": "Log Prob Threshold",
+        "noSpeechThreshold": "No Speech Threshold",
+        "conditionOnPreviousText": "Condition on Previous Text",
+        "vadFilter": "VAD Filter",
+        "vadThreshold": "VAD Threshold",
+        "vadMinSilenceDurationMs": "VAD Min Silence Duration (ms)",
+        "vadSpeechPadMs": "VAD Speech Pad (ms)",
+        "vadNegThreshold": "VAD Negative Threshold",
+        "vadMinSpeechDurationMs": "VAD Min Speech Duration (ms)",
+        "vadMaxSpeechDurationS": "VAD Max Speech Duration (s)"
+      },
+      "description": {
+        "language": "Choose the language hint for new Live realtime sessions.",
+        "task": "Choose whether Live realtime transcribes source audio or translates it to English.",
+        "contextPrompt": "Provide domain terms, names, or spelling hints for new Live realtime sessions.",
+        "minChunkMs": "Control the minimum audio window sent to the realtime transcriber.",
+        "bufferTrimmingMs": "Control how much recent audio context remains in the streaming buffer.",
+        "promptMaxChars": "Limit the text context carried forward between realtime decoding passes.",
+        "timestampToleranceMs": "Allow small timestamp shifts when merging realtime segments.",
+        "maxDuplicateNgram": "Suppress repeated text when the same phrase appears across adjacent chunks.",
+        "silenceRmsThreshold": "Set the audio RMS level treated as silence by the realtime segmenter.",
+        "segmentCloseSilenceMs": "Close the current segment after this amount of detected silence.",
+        "contextResetSilenceMs": "Reset rolling text context after a longer silence gap.",
+        "beamSize": "Set the beam-search width for each realtime decode pass.",
+        "bestOf": "Set the number of candidates considered during sampling-based decoding.",
+        "temperature": "Set one or more decoding temperatures used as fallback attempts.",
+        "compressionRatioThreshold": "Reject likely repetitive output above this compression ratio.",
+        "logProbThreshold": "Reject low-confidence output below this average log probability.",
+        "noSpeechThreshold": "Tune the model no-speech gate before accepting decoded text.",
+        "conditionOnPreviousText": "Let each decode pass condition on previous realtime text context.",
+        "vadFilter": "Enable faster-whisper voice activity filtering before decoding.",
+        "vadThreshold": "Tune the probability threshold used to detect speech.",
+        "vadMinSilenceDurationMs": "Set the silence duration required to split speech regions.",
+        "vadSpeechPadMs": "Add audio padding before and after detected speech regions.",
+        "vadNegThreshold": "Tune the lower threshold used when leaving speech state.",
+        "vadMinSpeechDurationMs": "Ignore detected speech regions shorter than this duration.",
+        "vadMaxSpeechDurationS": "Split speech regions that exceed this duration."
+      },
+      "task": {
+        "transcribe": "Transcribe",
+        "translate": "Translate to English"
+      },
+      "adapter": {
+        "supported": "Supported by {{adapter}}",
+        "unsupported": "Not supported by {{adapter}}"
+      }
+    },
+    "errors": {
+      "invalidNumber": "Enter a valid number",
+      "belowMin": "Value must be at least {{value}}",
+      "aboveMax": "Value must be at most {{value}}",
+      "numberList": {
+        "emptySegment": "Use commas only between numbers",
+        "invalidCharacter": "Use decimal numbers separated by commas",
+        "invalidNumber": "Each value must be a valid number",
+        "negativeNotAllowed": "Values must be non-negative"
+      }
+    }
+  },
   "tasks": {
     "currentBatch": {
       "title": "Current Session Tasks",
@@ -803,6 +888,7 @@
     "tabs": {
       "general": "General",
       "transcription": "Transcription",
+      "liveRealtime": "Live Realtime",
       "export": "Export",
       "modelStorage": "Model Storage",
       "systemInfo": "System Info"
@@ -915,6 +1001,38 @@
         "disabled": "Disabled",
         "multilingual": "Multilingual",
         "englishOnly": "English-only"
+      }
+    },
+    "liveRealtime": {
+      "loading": "Loading Live realtime defaults...",
+      "unavailable": "Live realtime defaults are not available.",
+      "sections": {
+        "defaults": {
+          "label": "Live Realtime Defaults",
+          "description": "Configure defaults used when a new Live realtime session starts."
+        }
+      },
+      "actions": {
+        "retry": "Retry",
+        "save": "Save Changes",
+        "saving": "Saving...",
+        "reset": "Reset to Defaults",
+        "resetting": "Resetting..."
+      },
+      "values": {
+        "empty": "Not set",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "auto": "Auto Detect",
+        "characterCount": "{{count}} / {{max}} characters",
+        "numberListHint": "Comma-separated numbers, e.g. 0.0, 0.2, 0.4",
+        "min": "min {{value}}",
+        "max": "max {{value}}",
+        "step": "step {{value}}"
+      },
+      "toast": {
+        "saved": "Live realtime defaults updated",
+        "reset": "Live realtime defaults reset"
       }
     },
     "export": {

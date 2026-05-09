@@ -11,6 +11,10 @@ const TranscriptionTab = lazy(async () => {
   const module = await import('./TranscriptionTab')
   return { default: module.TranscriptionTab }
 })
+const LiveRealtimeTab = lazy(async () => {
+  const module = await import('./LiveRealtimeTab')
+  return { default: module.LiveRealtimeTab }
+})
 const ExportTab = lazy(async () => {
   const module = await import('./ExportTab')
   return { default: module.ExportTab }
@@ -29,6 +33,7 @@ type SettingsTabComponent = LazyExoticComponent<ComponentType>
 const SETTINGS_TAB_COMPONENTS = {
   general: GeneralTab,
   transcription: TranscriptionTab,
+  'live-realtime': LiveRealtimeTab,
   export: ExportTab,
   'model-storage': ModelStorageTab,
   'system-info': SystemInfoTab,
