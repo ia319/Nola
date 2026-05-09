@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from functools import cache
 from typing import Literal, cast
 
 from nola.config.live_realtime.defaults import (
@@ -28,9 +29,15 @@ from nola.engines.faster_whisper_defaults import SerializedDefaultValue
 _WHISPER_STREAMING_ADAPTERS: list[LiveRealtimeAdapter] = ["whisper_streaming"]
 
 
+@cache
+def _schema_default_values() -> SerializedDefaultValue:
+    """Return built-in defaults once for schema field construction."""
+    return cast(SerializedDefaultValue, get_live_realtime_builtin_defaults())
+
+
 def _default_value(key: str) -> LiveRealtimeFieldDefaultValue:
     """Return one built-in default value by dotted field path."""
-    current: SerializedDefaultValue = get_live_realtime_builtin_defaults()
+    current = _schema_default_values()
     for part in key.split("."):
         if not isinstance(current, dict) or part not in current:
             raise KeyError(f"Unknown Live realtime default key: {key}")
@@ -467,7 +474,7 @@ def get_live_realtime_param_schema() -> list[LiveRealtimeOptionGroupSchema]:
                             field.model_copy(deep=True) for field in filtered_fields
                         ]
                     },
-                    deep=True,
+                    deep=False,
                 )
             )
     return filtered
