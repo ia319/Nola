@@ -175,7 +175,7 @@ def run_transcription(
                 app_config_db,
                 runtime_config=runtime_config,
             )
-        except ValueError as error:
+        except (KeyError, TypeError, ValueError) as error:
             task_db.fail(task_id, str(error), should_retry=False)
             return
 

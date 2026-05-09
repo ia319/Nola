@@ -39,6 +39,18 @@ def _filter_valid_options(raw_options: TaskOptions | ConfigMap | None) -> Config
     }
 
 
+def _require_complete_transcription_options(raw_options: ConfigMap) -> ConfigMap:
+    """Return valid snapshot options only when every option field is present."""
+    filtered_options = _filter_valid_options(raw_options)
+    missing_fields = _TRANSCRIBE_OPTION_FIELDS - set(filtered_options)
+    if missing_fields:
+        missing = ", ".join(sorted(missing_fields))
+        raise ValueError(
+            f"Task runtime config transcription_options missing fields: {missing}"
+        )
+    return filtered_options
+
+
 def _deserialize_special_values(value: Any, *, key: str | None = None) -> Any:
     """Convert API sentinel values back to runtime types.
 
@@ -136,7 +148,7 @@ def transcribe_options_from_runtime_config(
     if not isinstance(raw_options, dict):
         raise ValueError("Task runtime config is missing transcription_options")
 
-    filtered_options = _filter_valid_options(raw_options)
+    filtered_options = _require_complete_transcription_options(raw_options)
     # Convert API sentinel values (e.g. "inf") back to runtime types
     # before constructing the dataclass.
     runtime_values = _deserialize_special_values(filtered_options)

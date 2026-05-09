@@ -1,5 +1,6 @@
 """Pytest tests for worker module."""
 
+from dataclasses import asdict
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -29,6 +30,13 @@ class StubConfigStore:
         """Return persisted defaults for the requested prefix."""
         assert prefix == "transcription."
         return self.values
+
+
+def _runtime_transcription_options(**overrides: object) -> dict[str, object]:
+    """Build a complete stored runtime options snapshot."""
+    options: dict[str, object] = asdict(TranscribeOptions())
+    options.update(overrides)
+    return options
 
 
 class TestBuildTranscribeOptions:
@@ -112,11 +120,11 @@ class TestBuildTranscribeOptions:
                 "model_id": "small",
                 "engine_device": "cpu",
                 "engine_compute_type": "default",
-                "transcription_options": {
-                    "language": "en",
-                    "task": "transcribe",
-                    "beam_size": 1,
-                },
+                "transcription_options": _runtime_transcription_options(
+                    language="en",
+                    task="transcribe",
+                    beam_size=1,
+                ),
                 "request_options": None,
             },
         )
@@ -191,6 +199,24 @@ class TestBuildTranscribeOptions:
         options = build_transcribe_options({"hotwords": "inf"})
 
         assert options.hotwords == "inf"
+
+    def test_incomplete_runtime_config_snapshot_is_rejected(self):
+        """Stored runtime snapshots should not fall back to current defaults."""
+        with pytest.raises(ValueError, match="missing fields"):
+            build_transcribe_options(
+                None,
+                StubConfigStore({"beam_size": 3}),
+                runtime_config={
+                    "schema_version": 1,
+                    "model_id": "small",
+                    "engine_device": "cpu",
+                    "engine_compute_type": "default",
+                    "transcription_options": {
+                        "language": "en",
+                    },
+                    "request_options": None,
+                },
+            )
 
 
 def _raw_task(
