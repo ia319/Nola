@@ -22,6 +22,19 @@ from nola.common.types import JsonDict
 logger = logging.getLogger(__name__)
 
 
+def _serialize_runtime_config(runtime_config: JsonDict | None) -> str | None:
+    """Return a JSON snapshot string or reject unsafe runtime config."""
+    if runtime_config is None:
+        return None
+    try:
+        return json.dumps(runtime_config, allow_nan=False)
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            "runtime_config must be JSON-serializable and cannot contain "
+            f"NaN/Infinity: {error}"
+        ) from error
+
+
 class LiveDatabase:
     """Manage live transcription sessions, tracks, and segments in SQLite."""
 
@@ -105,11 +118,7 @@ class LiveDatabase:
                         model_id,
                         runtime,
                         audio_format,
-                        (
-                            json.dumps(runtime_config, allow_nan=False)
-                            if runtime_config is not None
-                            else None
-                        ),
+                        _serialize_runtime_config(runtime_config),
                         started_at,
                         created_at,
                         updated_at,

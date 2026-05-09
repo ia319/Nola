@@ -13,6 +13,23 @@ from nola.models.taskdb.types import TaskRowRaw, TaskStatus
 logger = logging.getLogger(__name__)
 
 
+def _serialize_json_field(
+    value: dict[str, Any] | JsonDict | None,
+    *,
+    field_name: str,
+) -> str | None:
+    """Return JSON for a stored task config field."""
+    if value is None:
+        return None
+    try:
+        return json.dumps(value, allow_nan=False)
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            f"{field_name} must be JSON-serializable and cannot contain "
+            f"NaN/Infinity: {error}"
+        ) from error
+
+
 class TaskQueueRepository(TaskRepositoryBase):
     """Handle queue lifecycle and worker-state updates."""
 
@@ -45,11 +62,10 @@ class TaskQueueRepository(TaskRepositoryBase):
                         TaskStatus.PENDING.value,
                         priority,
                         max_retries,
-                        json.dumps(options) if options else None,
-                        (
-                            json.dumps(runtime_config, allow_nan=False)
-                            if runtime_config is not None
-                            else None
+                        _serialize_json_field(options, field_name="options"),
+                        _serialize_json_field(
+                            runtime_config,
+                            field_name="runtime_config",
                         ),
                         model_id,
                         engine_device,
