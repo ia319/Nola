@@ -61,7 +61,7 @@ export interface LiveWorkbenchSessionSetupProps {
   onMicrophoneAction: () => void
   onSystemAudioEnabledChange: (enabled: boolean) => void
   onSystemAudioAction: () => void
-  onOpenSettings: () => void
+  onSettingsToggle: () => void
 }
 
 interface SetupSelectControlProps {
@@ -261,7 +261,7 @@ export function LiveWorkbenchSessionSetup({
   onMicrophoneAction,
   onSystemAudioEnabledChange,
   onSystemAudioAction,
-  onOpenSettings,
+  onSettingsToggle,
 }: LiveWorkbenchSessionSetupProps) {
   const { t } = useTranslation()
 
@@ -272,19 +272,22 @@ export function LiveWorkbenchSessionSetup({
           <h2 className="text-foreground text-base font-semibold tracking-tight">
             {t('live.workbench.sessionSetup.title')}
           </h2>
-          {!settingsOpen ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-foreground px-0"
-              disabled={settingsDisabled}
-              onClick={onOpenSettings}
-            >
-              <SlidersHorizontal className="size-4" />
-              {t('live.workbench.sessionSetup.settings')}
-            </Button>
-          ) : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-expanded={settingsOpen}
+            className={
+              settingsOpen
+                ? 'text-foreground px-0'
+                : 'text-muted-foreground hover:text-foreground px-0'
+            }
+            disabled={settingsDisabled}
+            onClick={onSettingsToggle}
+          >
+            <SlidersHorizontal className="size-4" />
+            {t('live.workbench.sessionSetup.settings')}
+          </Button>
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(13rem,1.25fr)_minmax(10rem,0.8fr)_minmax(10rem,0.8fr)_minmax(12rem,0.9fr)]">

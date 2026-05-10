@@ -413,13 +413,19 @@ describe('LiveWorkbenchPage', () => {
     ).toBeTruthy()
   })
 
-  it('opens the settings side panel from session setup and hides the duplicate entry', () => {
+  it('toggles the settings side panel from session setup', () => {
     render(<LiveWorkbenchPage />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Session settings' }))
+    const settingsButton = screen.getByRole('button', { name: 'Session settings' })
+    fireEvent.click(settingsButton)
 
     expect(screen.getByRole('heading', { level: 2, name: 'Runtime configuration' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Session settings' })).toBeNull()
+    expect(settingsButton).toHaveAttribute('aria-expanded', 'true')
+
+    fireEvent.click(settingsButton)
+
+    expect(screen.queryByRole('heading', { level: 2, name: 'Runtime configuration' })).toBeNull()
+    expect(settingsButton).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('starts source test capture only from explicit user actions', () => {

@@ -69,7 +69,7 @@ function renderSessionSetup(overrides: Partial<LiveWorkbenchSessionSetupProps> =
     onMicrophoneAction: vi.fn(),
     onSystemAudioEnabledChange: vi.fn(),
     onSystemAudioAction: vi.fn(),
-    onOpenSettings: vi.fn(),
+    onSettingsToggle: vi.fn(),
     ...overrides,
   }
 
@@ -98,19 +98,22 @@ describe('LiveWorkbenchSessionSetup', () => {
     expect(screen.getByRole('button', { name: 'Test capture' })).toBeDisabled()
   })
 
-  it('hides the settings entry while the settings panel is open', () => {
+  it('keeps the settings entry visible while the settings panel is open', () => {
     renderSessionSetup({ settingsOpen: true })
 
-    expect(screen.queryByRole('button', { name: 'Session settings' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Session settings' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
   })
 
-  it('opens settings from the setup card when closed', () => {
-    const onOpenSettings = vi.fn()
-    renderSessionSetup({ onOpenSettings })
+  it('toggles settings from the setup card', () => {
+    const onSettingsToggle = vi.fn()
+    renderSessionSetup({ onSettingsToggle })
 
     fireEvent.click(screen.getByRole('button', { name: 'Session settings' }))
 
-    expect(onOpenSettings).toHaveBeenCalledTimes(1)
+    expect(onSettingsToggle).toHaveBeenCalledTimes(1)
   })
 
   it('disables unavailable setup controls without removing their labels', () => {
