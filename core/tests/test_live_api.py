@@ -29,6 +29,7 @@ from nola.application.live.realtime import (
     LiveRealtimeTranscriberResult,
     LiveRealtimeTranscriptFinalCandidate,
     LiveRealtimeTranscriptPreview,
+    MockLiveRealtimeTranscriber,
 )
 from nola.application.live.types import LiveRuntimeConfig, LiveTrackSource
 from nola.config.settings import Settings
@@ -46,6 +47,9 @@ def client() -> TestClient:
     get_live_db.cache_clear()
     get_live_stream_connection_registry.cache_clear()
     get_task_db.cache_clear()
+    app.dependency_overrides[get_live_realtime_transcriber_factory] = (
+        lambda: lambda _snapshot: MockLiveRealtimeTranscriber()
+    )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)
@@ -76,18 +80,28 @@ def client() -> TestClient:
     get_live_db.cache_clear()
     get_live_stream_connection_registry.cache_clear()
     get_task_db.cache_clear()
+    app.dependency_overrides.pop(get_live_realtime_adapter, None)
+    app.dependency_overrides.pop(get_live_realtime_transcriber_factory, None)
+    app.dependency_overrides.pop(get_model_storage_provider, None)
 
 
 def _create_live_session(client: TestClient) -> dict[str, object]:
-    response = client.post(
-        "/api/live/sessions",
-        json={
-            "title": "Daily standup",
-            "mode": "streaming",
-            "language_hint": "en",
-            "model_id": "small",
-        },
+    app.dependency_overrides[get_model_storage_provider] = (
+        lambda: _model_storage_provider()
     )
+    try:
+        response = client.post(
+            "/api/live/sessions",
+            json={
+                "title": "Daily standup",
+                "mode": "streaming",
+                "language_hint": "en",
+                "model_id": "small",
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(get_model_storage_provider, None)
+
     assert response.status_code == 200
     return response.json()
 
@@ -273,6 +287,7 @@ def test_create_live_session_mock_runtime_does_not_resolve_model_storage(
     def _fail_provider() -> _DownloadedModelStorage:
         raise AssertionError("model storage provider should not be called")
 
+    app.dependency_overrides[get_live_realtime_adapter] = lambda: "mock"
     app.dependency_overrides[get_model_storage_provider] = lambda: _fail_provider
     try:
         response = client.post(
@@ -284,6 +299,7 @@ def test_create_live_session_mock_runtime_does_not_resolve_model_storage(
             },
         )
     finally:
+        app.dependency_overrides.pop(get_live_realtime_adapter, None)
         app.dependency_overrides.pop(get_model_storage_provider, None)
 
     assert response.status_code == 200
@@ -310,6 +326,8 @@ def test_create_live_session_accepts_runtime_overrides_without_persisting_defaul
                 "model_id": "small",
                 "runtime_overrides": {
                     "language": "en",
+                    "device": "cuda",
+                    "compute_type": "float16",
                     "context_prompt": None,
                     "beam_size": 3,
                     "vad_parameters": {"threshold": 0.6},
@@ -326,6 +344,10 @@ def test_create_live_session_accepts_runtime_overrides_without_persisting_defaul
     assert response.status_code == 200
     assert response.json()["language_hint"] == "zh"
     assert response.json()["runtime"] == "whisper_streaming"
+    assert response.json()["runtime_config"]["execution"] == {
+        "device": "cuda",
+        "compute_type": "float16",
+    }
     assert response.json()["runtime_config"]["language"] == "en"
     assert response.json()["runtime_config"]["context_prompt"] is None
     assert response.json()["runtime_config"]["faster_whisper"]["beam_size"] == 3
@@ -465,6 +487,7 @@ def test_create_live_session_runtime_overrides_reject_fuzzy_value_types() -> Non
             {
                 "mode": "streaming",
                 "runtime_overrides": {
+                    "device": True,
                     "beam_size": True,
                     "vad_filter": 1,
                     "vad_parameters": {"threshold": "0.6"},
