@@ -409,7 +409,7 @@ function buildLiveSessionDetail(overrides: Partial<LiveSessionDetail> = {}): Liv
 function createMockLiveSessionService() {
   let state: RealtimeFeature.LiveRealtimeRunState = 'idle'
   const session = buildLiveSessionDetail()
-  const start = vi.fn(async () => {
+  const start = vi.fn(async (_options: RealtimeFeature.LiveRealtimeSessionStartOptions = {}) => {
     state = 'active'
     useLiveRealtimeStore.getState().setLiveRealtimeStarting()
     useLiveRealtimeStore.getState().setLiveRealtimeSession(session)
