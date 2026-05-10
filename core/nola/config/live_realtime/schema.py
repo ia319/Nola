@@ -11,7 +11,6 @@ from nola.config.live_realtime.defaults import (
     get_live_realtime_vad_parameter_keys,
 )
 from nola.config.live_realtime.types import (
-    CONTEXT_PROMPT_MAX_CHARS,
     LiveRealtimeAdapter,
     LiveRealtimeFieldDefaultValue,
     LiveRealtimeNumberFieldSchema,
@@ -22,7 +21,6 @@ from nola.config.live_realtime.types import (
     LiveRealtimeSelectOptionSchema,
     LiveRealtimeSliderFieldSchema,
     LiveRealtimeSwitchFieldSchema,
-    LiveRealtimeTextareaFieldSchema,
 )
 from nola.engines.faster_whisper_defaults import SerializedDefaultValue
 
@@ -71,24 +69,6 @@ def _select(
         type="select",
         options=options,
         options_source=options_source,
-    )
-
-
-def _textarea(
-    *,
-    key: str,
-    label_key: str,
-    description_key: str,
-    max_length: int | None = None,
-) -> LiveRealtimeTextareaFieldSchema:
-    return LiveRealtimeTextareaFieldSchema(
-        key=key,
-        label_key=label_key,
-        description_key=description_key,
-        default_value=_default_value(key),
-        supported_adapters=list(_WHISPER_STREAMING_ADAPTERS),
-        type="textarea",
-        max_length=max_length,
     )
 
 
@@ -207,12 +187,6 @@ def _build_live_realtime_param_schema() -> list[LiveRealtimeOptionGroupSchema]:
                             label_key="liveRealtime.options.task.translate",
                         ),
                     ],
-                ),
-                _textarea(
-                    key="context_prompt",
-                    label_key="liveRealtime.options.field.contextPrompt",
-                    description_key="liveRealtime.options.description.contextPrompt",
-                    max_length=CONTEXT_PROMPT_MAX_CHARS,
                 ),
             ],
         ),

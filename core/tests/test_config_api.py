@@ -372,13 +372,7 @@ class TestConfigAPI:
         assert {"common", "whisperStreaming", "vad", "vadAdvanced"} <= groups
 
         fields = {field["key"]: field for group in schema for field in group["fields"]}
-        context_prompt = fields["context_prompt"]
-        assert context_prompt["type"] == "textarea"
-        assert context_prompt["label_key"] == "liveRealtime.options.field.contextPrompt"
-        assert context_prompt["description_key"] == (
-            "liveRealtime.options.description.contextPrompt"
-        )
-        assert context_prompt["supported_adapters"] == ["whisper_streaming"]
+        assert "context_prompt" not in fields
         assert fields["vad_parameters.max_speech_duration_s"]["special_values"] == [
             "inf"
         ]

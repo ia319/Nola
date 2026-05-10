@@ -146,7 +146,6 @@ class LiveRealtimeDefaultsUpdateRequest(_LiveRealtimeOptionsUpdateRequest):
             "example": {
                 "language": "en",
                 "beam_size": 3,
-                "context_prompt": "Domain terms and proper nouns",
                 "vad_parameters": {"threshold": 0.6},
             }
         },
