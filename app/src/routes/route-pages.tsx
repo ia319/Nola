@@ -8,7 +8,14 @@ import {
   normalizeHistorySearch,
   type HistoryRouteSearch,
 } from './history-search'
+import {
+  isSameLiveWorkbenchSearch,
+  normalizeLiveWorkbenchSearch,
+  type LiveWorkbenchRouteSearch,
+} from './live-workbench-search'
 
+const liveRouteApi = getRouteApi('/live')
+const localizedLiveRouteApi = getRouteApi('/$locale/live')
 const historyRouteApi = getRouteApi('/history')
 const localizedHistoryRouteApi = getRouteApi('/$locale/history')
 const settingsTabRouteApi = getRouteApi('/settings/$tab')
@@ -83,6 +90,20 @@ function createHistorySearchUpdater(
   }
 }
 
+function createLiveWorkbenchSearchUpdater(
+  navigate: ReturnType<typeof liveRouteApi.useNavigate>,
+): (patch: Partial<LiveWorkbenchRouteSearch>, replace: boolean) => void {
+  return (patch, replace) => {
+    void navigate({
+      replace,
+      search: (previous) => {
+        const next = normalizeLiveWorkbenchSearch({ ...previous, ...patch })
+        return isSameLiveWorkbenchSearch(previous, next) ? previous : next
+      },
+    })
+  }
+}
+
 export function TaskWorkbenchRoutePage() {
   return (
     <RouteSuspense labelKey="routes.loading.tasks">
@@ -92,9 +113,27 @@ export function TaskWorkbenchRoutePage() {
 }
 
 export function LiveWorkbenchRoutePage() {
+  const navigate = liveRouteApi.useNavigate()
+
   return (
     <RouteSuspense labelKey="routes.loading.live">
-      <LiveWorkbenchPage />
+      <LiveWorkbenchPage
+        search={liveRouteApi.useSearch()}
+        updateSearch={createLiveWorkbenchSearchUpdater(navigate)}
+      />
+    </RouteSuspense>
+  )
+}
+
+export function LocalizedLiveWorkbenchRoutePage() {
+  const navigate = localizedLiveRouteApi.useNavigate()
+
+  return (
+    <RouteSuspense labelKey="routes.loading.live">
+      <LiveWorkbenchPage
+        search={localizedLiveRouteApi.useSearch()}
+        updateSearch={createLiveWorkbenchSearchUpdater(navigate)}
+      />
     </RouteSuspense>
   )
 }
