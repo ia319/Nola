@@ -35,7 +35,7 @@ describe('formatApiError', () => {
   it('falls back for malformed structured details', () => {
     const error = { detail: null } as unknown as Parameters<typeof formatApiError>[0]
 
-    expect(formatApiError(error)).toBe('Unexpected API error')
+    expect(() => formatApiError(error)).toThrow('Invalid API error payload')
     expect(getApiErrorCode(error)).toBeUndefined()
   })
 })

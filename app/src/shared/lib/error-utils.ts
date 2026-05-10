@@ -12,7 +12,7 @@ export function formatApiError(data: ApiError): string {
     return data.detail.message
   }
 
-  return 'Unexpected API error'
+  throw new TypeError('Invalid API error payload')
 }
 
 /** Return a stable backend error code when the API includes one. */
