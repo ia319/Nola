@@ -40,6 +40,14 @@ describe('error factory helpers', () => {
     })
   })
 
+  it('preserves structured backend error codes', () => {
+    expect(createApiError(422, 'invalid runtime', 'runtime_config_invalid')).toMatchObject({
+      code: 'runtime_config_invalid',
+      params: { status: 422, detail: 'invalid runtime' },
+      retriable: false,
+    })
+  })
+
   it('checks the full AppError contract', () => {
     expect(
       isAppError({

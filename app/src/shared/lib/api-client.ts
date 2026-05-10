@@ -2,7 +2,7 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
 import env from '@/config/env'
 import logger from '@/config/logger'
-import { formatApiError } from '@/shared/lib/error-utils'
+import { formatApiError, getApiErrorCode } from '@/shared/lib/error-utils'
 import { createApiError, createNetworkError } from '@/shared/lib/error-factory'
 import type { ApiError } from '@/shared/types'
 
@@ -41,7 +41,8 @@ apiClient.interceptors.response.use(
     logger.error(`[API] ${status ?? 'NETWORK'} ${detail}`)
 
     if (status) {
-      return Promise.reject(createApiError(status, detail))
+      const backendCode = error.response?.data ? getApiErrorCode(error.response.data) : undefined
+      return Promise.reject(createApiError(status, detail, backendCode))
     }
 
     // No HTTP status means a network-level failure.
