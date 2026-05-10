@@ -2,6 +2,7 @@ import { createLiveSession as defaultCreateLiveSession } from '../api'
 import type { LiveAudioCaptureRepository } from '../capture/audio-capture-repository'
 import { createAudioCaptureRepository } from '../capture/audio-capture-repository'
 import { LiveCaptureError } from '../capture/errors'
+import { isReusableLiveCaptureSession } from '../capture/session-utils'
 import type {
   LiveCaptureErrorCode,
   LiveCaptureStateChange,
@@ -67,6 +68,11 @@ export interface LiveRealtimeSessionStartOptions {
   diagnosticsWav?: LiveRealtimeDiagnosticsWavStartOptions | true
 }
 
+interface ActiveCaptureSession {
+  session: LiveCaptureSession
+  ownedByService: boolean
+}
+
 export class LiveRealtimeSessionError extends Error implements LiveRealtimeRuntimeError {
   readonly code: LiveRealtimeRuntimeErrorCode
   readonly retryable: boolean
@@ -89,7 +95,7 @@ export class LiveRealtimeSessionService {
   private readonly createCaptureRepository: CreateAudioCaptureRepositoryFunction
   private readonly trackReadyTimeoutMs: LiveDurationMs
   private readonly sessionFinishTimeoutMs: LiveDurationMs
-  private readonly captureSessions = new Map<LiveAudioSourceKind, LiveCaptureSession>()
+  private readonly captureSessions = new Map<LiveAudioSourceKind, ActiveCaptureSession>()
   private readonly tracksBySource = new Map<LiveAudioSourceKind, LiveTrack>()
   private readonly captureUnsubscribers: LiveUnsubscribe[] = []
   private readonly transportUnsubscribers: LiveUnsubscribe[] = []
@@ -229,9 +235,12 @@ export class LiveRealtimeSessionService {
     transport: LiveRealtimeTransport,
     options: LiveRealtimeSessionStartOptions,
   ): Promise<void> {
-    const captureSession = await this.startCaptureSession(source, captureRepository, options)
-    this.captureSessions.set(source, captureSession)
-    this.bindCaptureSessionToDeviceStore(captureSession)
+    const activeCapture = await this.startCaptureSession(source, captureRepository, options)
+    const { session: captureSession } = activeCapture
+    this.captureSessions.set(source, activeCapture)
+    if (activeCapture.ownedByService) {
+      this.bindCaptureSessionToDeviceStore(captureSession)
+    }
     this.captureUnsubscribers.push(
       captureSession.onStateChange((change) => {
         if (change.state === 'failed') {
@@ -270,20 +279,26 @@ export class LiveRealtimeSessionService {
     source: LiveAudioSourceKind,
     captureRepository: LiveAudioCaptureRepository,
     options: LiveRealtimeSessionStartOptions,
-  ): Promise<LiveCaptureSession> {
+  ): Promise<ActiveCaptureSession> {
     const reusableSession = options.captureSessions?.[source]
-    if (isReusableCaptureSession(reusableSession, source)) {
-      return Promise.resolve(reusableSession)
+    if (isReusableLiveCaptureSession(reusableSession, source)) {
+      return Promise.resolve({ session: reusableSession, ownedByService: false })
     }
 
     this.setDeviceStoreCaptureStarting(source, options)
 
     try {
       if (source === 'microphone') {
-        return await captureRepository.startMicrophoneCapture(options.microphoneCapture)
+        return {
+          session: await captureRepository.startMicrophoneCapture(options.microphoneCapture),
+          ownedByService: true,
+        }
       }
 
-      return await captureRepository.startSystemAudioCapture(options.systemAudioCapture)
+      return {
+        session: await captureRepository.startSystemAudioCapture(options.systemAudioCapture),
+        ownedByService: true,
+      }
     } catch (error) {
       this.setDeviceStoreCaptureFailure(source, error)
       throw error
@@ -593,7 +608,9 @@ export class LiveRealtimeSessionService {
     this.captureSessions.clear()
 
     let firstError: unknown = null
-    for (const session of sessions) {
+    for (const { session, ownedByService } of sessions) {
+      if (!ownedByService) continue
+
       try {
         await session.stop()
         this.setDeviceStoreCaptureStopped(session)
@@ -676,13 +693,6 @@ export class LiveRealtimeSessionService {
       })
     }
   }
-}
-
-function isReusableCaptureSession(
-  session: LiveCaptureSession | undefined,
-  source: LiveAudioSourceKind,
-): session is LiveCaptureSession {
-  return session?.sourceKind === source && session.state === 'capturing'
 }
 
 function createStoppedCaptureStateChange(): LiveCaptureStateChange {

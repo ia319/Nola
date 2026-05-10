@@ -146,7 +146,15 @@ describe('LiveRealtimeSessionService', () => {
     })
 
     expect(setup.captureRepository.systemSessions).toHaveLength(0)
-    expect(useLiveDeviceStore.getState().systemAudioCapture.sessionId).toBe(systemSession.id)
+    expect(useLiveDeviceStore.getState().systemAudioCapture.sessionId).toBeNull()
+
+    systemSession.emitLevel({
+      level: 0.52,
+      peak: 0.6,
+      isMutedLike: false,
+      measuredAt: 1,
+    })
+    expect(useLiveDeviceStore.getState().systemAudioCapture.level).toBeNull()
 
     systemSession.emitFrame(audioFrame('system', 0))
 
@@ -155,6 +163,9 @@ describe('LiveRealtimeSessionService', () => {
       source: 'system',
       sequence: 0,
     })
+
+    await setup.service.stop()
+    expect(systemSession.stop).not.toHaveBeenCalled()
   })
 
   it('cleans up transport when capture permission fails after connect', async () => {
@@ -195,6 +206,28 @@ describe('LiveRealtimeSessionService', () => {
     const state = useLiveRealtimeStore.getState()
     expect(state.runState).toBe('failed')
     expect(state.lastError?.code).toBe('websocket_closed')
+  })
+
+  it('does not stop borrowed capture when the transport fails', async () => {
+    const setup = createServiceSetup()
+    const systemSession = new MockCaptureSession('system')
+
+    await setup.service.start({
+      sources: ['system'],
+      captureSessions: {
+        system: systemSession,
+      },
+    })
+    setup.transport.fail({
+      code: 'websocket_closed',
+      message: 'Realtime WebSocket closed unexpectedly',
+      retryable: false,
+    })
+    await flushAsyncWork()
+
+    expect(systemSession.stop).not.toHaveBeenCalled()
+    expect(setup.transport.closeCalls).toBe(1)
+    expect(useLiveRealtimeStore.getState().runState).toBe('failed')
   })
 
   it('stops active capture when the transport fails without an error payload', async () => {

@@ -4,8 +4,8 @@ import type { MutableRefObject } from 'react'
 import type { LiveAudioCaptureRepository } from '../capture/audio-capture-repository'
 import { createAudioCaptureRepository } from '../capture/audio-capture-repository'
 import { LiveCaptureError } from '../capture/errors'
+import { isReusableLiveCaptureSession } from '../capture/session-utils'
 import type {
-  LiveAudioSourceKind,
   LiveCaptureErrorCode,
   LiveCaptureSession,
   LiveCaptureStateChange,
@@ -95,13 +95,6 @@ function createStoppedCaptureStateChange(): LiveCaptureStateChange {
     changedAt: Date.now(),
     errorCode: null,
   }
-}
-
-function isReusableCaptureSession(
-  session: LiveCaptureSession | null,
-  sourceKind: LiveAudioSourceKind,
-): session is LiveCaptureSession {
-  return session?.sourceKind === sourceKind && session.state === 'capturing'
 }
 
 export function useLiveDeviceInventory(
@@ -494,12 +487,12 @@ export function useLiveDeviceInventory(
 
   const getActiveMicrophoneCaptureSession = useCallback((): LiveCaptureSession | null => {
     const session = microphoneSessionRef.current
-    return isReusableCaptureSession(session, 'microphone') ? session : null
+    return isReusableLiveCaptureSession(session, 'microphone') ? session : null
   }, [])
 
   const getActiveSystemAudioCaptureSession = useCallback((): LiveCaptureSession | null => {
     const session = systemAudioSessionRef.current
-    return isReusableCaptureSession(session, 'system') ? session : null
+    return isReusableLiveCaptureSession(session, 'system') ? session : null
   }, [])
 
   useEffect(() => {
