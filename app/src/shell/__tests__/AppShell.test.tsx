@@ -132,7 +132,13 @@ describe('AppShell', () => {
     expect(document.querySelector('[data-slot="mock-activity-data-bridge"]')).toBeTruthy()
     expect(screen.getByText('toaster')).toBeTruthy()
     expect(screen.getByText('topbar').closest('[data-slot="app-shell-workspace"]')).toHaveClass(
+      'h-dvh',
+      'overflow-hidden',
       'lg:ml-[var(--sidebar-width)]',
+    )
+    expect(screen.getByText('topbar').closest('[data-slot="app-shell"]')).toHaveClass(
+      'h-dvh',
+      'overflow-hidden',
     )
   })
 
