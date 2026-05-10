@@ -14,6 +14,13 @@ from nola.application.live.runtime_config import (
 from nola.application.live.types import LiveRuntimeConfig
 from nola.common.types import JsonDict, JsonValue
 from nola.config.live_realtime import CONTEXT_PROMPT_MAX_CHARS
+from nola.engines.base import (
+    ALLOWED_ENGINE_COMPUTE_TYPES,
+    ALLOWED_ENGINE_DEVICES,
+    EngineComputeType,
+    EngineConfig,
+    EngineDevice,
+)
 
 WHISPER_STREAMING_SAMPLE_RATE: Final = 16000
 WHISPER_STREAMING_CONTEXT_PROMPT_SEPARATOR: Final = "\n\n"
@@ -64,6 +71,8 @@ class WhisperStreamingRuntimeSnapshot:
     """Carry a validated session snapshot for WhisperStreaming runtime use."""
 
     model_id: str
+    device: EngineDevice
+    compute_type: EngineComputeType
     config: WhisperStreamingRuntimeConfig
 
 
@@ -139,6 +148,7 @@ def whisper_streaming_runtime_snapshot_from_live_snapshot(
     _require_equal(snapshot, "runtime", "whisper_streaming")
     _require_equal(snapshot, "audio_format", LIVE_REALTIME_AUDIO_FORMAT)
     model_id = _require_non_blank_string(snapshot, "model_id")
+    execution = _optional_execution(snapshot)
     whisper_streaming = _require_dict(snapshot, "whisper_streaming")
     silence = _require_dict(snapshot, "silence")
     faster_whisper = _require_dict(snapshot, "faster_whisper")
@@ -187,7 +197,12 @@ def whisper_streaming_runtime_snapshot_from_live_snapshot(
             ),
         )
     )
-    return WhisperStreamingRuntimeSnapshot(model_id=model_id, config=config)
+    return WhisperStreamingRuntimeSnapshot(
+        model_id=model_id,
+        device=execution.device,
+        compute_type=execution.compute_type,
+        config=config,
+    )
 
 
 def combine_initial_prompt(
@@ -263,6 +278,32 @@ def _require_task(values: JsonDict, key: str) -> WhisperStreamingTask:
     value = _require_key(values, key)
     if value in ("transcribe", "translate"):
         return cast(WhisperStreamingTask, value)
+    raise WhisperStreamingRuntimeConfigError(f"{key} is not supported")
+
+
+def _optional_execution(values: JsonDict) -> EngineConfig:
+    value = values.get("execution")
+    if value is None:
+        return EngineConfig()
+    if not isinstance(value, dict):
+        raise WhisperStreamingRuntimeConfigError("execution must be an object")
+    return EngineConfig(
+        device=_require_engine_device(value, "device"),
+        compute_type=_require_engine_compute_type(value, "compute_type"),
+    )
+
+
+def _require_engine_device(values: JsonDict, key: str) -> EngineDevice:
+    value = _require_key(values, key)
+    if isinstance(value, str) and value in ALLOWED_ENGINE_DEVICES:
+        return cast(EngineDevice, value)
+    raise WhisperStreamingRuntimeConfigError(f"{key} is not supported")
+
+
+def _require_engine_compute_type(values: JsonDict, key: str) -> EngineComputeType:
+    value = _require_key(values, key)
+    if isinstance(value, str) and value in ALLOWED_ENGINE_COMPUTE_TYPES:
+        return cast(EngineComputeType, value)
     raise WhisperStreamingRuntimeConfigError(f"{key} is not supported")
 
 
