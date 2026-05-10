@@ -8,7 +8,6 @@ import numpy.typing as npt
 import pytest
 
 from nola.application.live.realtime.whisper_streaming import (
-    WHISPER_STREAMING_CONTEXT_PROMPT_SEPARATOR,
     WhisperStreamingFasterWhisperBackend,
     WhisperStreamingRuntimeConfig,
     WhisperStreamingRuntimeError,
@@ -194,8 +193,8 @@ def test_backend_forwards_runtime_faster_whisper_config() -> None:
     assert model.calls[0].vad_parameters == vad_parameters
 
 
-def test_backend_combines_context_prompt_with_dynamic_prompt() -> None:
-    """Prefix the dynamic WhisperStreaming prompt with session context."""
+def test_backend_ignores_static_context_prompt() -> None:
+    """Keep user prompt text out of repeated realtime inference windows."""
     model = _FakeModel((_FakeSegment(end=0.1, no_speech_prob=0.0, words=None),))
     backend = WhisperStreamingFasterWhisperBackend(model)
 
@@ -205,9 +204,7 @@ def test_backend_combines_context_prompt_with_dynamic_prompt() -> None:
         config=WhisperStreamingRuntimeConfig(context_prompt="  Domain terms  "),
     )
 
-    assert model.calls[0].initial_prompt == (
-        f"Domain terms{WHISPER_STREAMING_CONTEXT_PROMPT_SEPARATOR}dynamic history"
-    )
+    assert model.calls[0].initial_prompt == "dynamic history"
 
 
 def test_backend_close_is_idempotent_and_rejects_later_transcribe() -> None:

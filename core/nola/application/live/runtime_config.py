@@ -206,6 +206,7 @@ def _build_session_overrides(
     if runtime_overrides:
         overrides = deep_merge(overrides, runtime_overrides)
 
+    overrides.pop("context_prompt", None)
     realtime_overrides = {
         key: value
         for key, value in overrides.items()
@@ -286,7 +287,7 @@ def _build_whisper_streaming_snapshot(
         },
         "language": resolved_defaults["language"],
         "task": resolved_defaults["task"],
-        "context_prompt": resolved_defaults["context_prompt"],
+        "context_prompt": None,
         "whisper_streaming": {
             "sample_rate": 16000,
             **_serialize_nested(resolved_defaults, _WHISPER_STREAMING_CONFIG_KEYS),

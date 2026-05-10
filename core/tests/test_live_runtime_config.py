@@ -72,7 +72,6 @@ def test_build_live_runtime_config_merges_three_layers() -> None:
             "device": "cuda",
             "compute_type": "float16",
             "beam_size": 3,
-            "context_prompt": None,
             "vad_parameters": {"threshold": 0.6},
         },
         config_store=config_store,
@@ -98,7 +97,6 @@ def test_build_live_runtime_config_merges_three_layers() -> None:
         "device": "cuda",
         "compute_type": "float16",
         "beam_size": 3,
-        "context_prompt": None,
         "vad_parameters": {"threshold": 0.6},
     }
 

@@ -13,7 +13,6 @@ from nola.application.live.runtime_config import (
 )
 from nola.application.live.types import LiveRuntimeConfig
 from nola.common.types import JsonDict, JsonValue
-from nola.config.live_realtime import CONTEXT_PROMPT_MAX_CHARS
 from nola.engines.base import (
     ALLOWED_ENGINE_COMPUTE_TYPES,
     ALLOWED_ENGINE_DEVICES,
@@ -23,7 +22,6 @@ from nola.engines.base import (
 )
 
 WHISPER_STREAMING_SAMPLE_RATE: Final = 16000
-WHISPER_STREAMING_CONTEXT_PROMPT_SEPARATOR: Final = "\n\n"
 WhisperStreamingTask: TypeAlias = Literal["transcribe", "translate"]
 WhisperStreamingTemperature: TypeAlias = float | list[float]
 
@@ -87,13 +85,6 @@ def validate_whisper_streaming_runtime_config(
 
     if config.task not in ("transcribe", "translate"):
         raise WhisperStreamingRuntimeConfigError("task is not supported")
-
-    if config.context_prompt is not None:
-        normalized_prompt = config.context_prompt.strip()
-        if not normalized_prompt:
-            raise WhisperStreamingRuntimeConfigError("context_prompt must not be blank")
-        if len(normalized_prompt) > CONTEXT_PROMPT_MAX_CHARS:
-            raise WhisperStreamingRuntimeConfigError("context_prompt is too long")
 
     positive_fields = {
         "min_chunk_ms": config.min_chunk_ms,
@@ -203,22 +194,6 @@ def whisper_streaming_runtime_snapshot_from_live_snapshot(
         compute_type=execution.compute_type,
         config=config,
     )
-
-
-def combine_initial_prompt(
-    *,
-    context_prompt: str | None,
-    dynamic_prompt: str,
-) -> str | None:
-    """Combine session-level context with WhisperStreaming dynamic prompt."""
-    parts: list[str] = []
-    if context_prompt is not None and context_prompt.strip():
-        parts.append(context_prompt.strip())
-    if dynamic_prompt.strip():
-        parts.append(dynamic_prompt.strip())
-    if not parts:
-        return None
-    return WHISPER_STREAMING_CONTEXT_PROMPT_SEPARATOR.join(parts)
 
 
 def _validate_temperature(temperature: WhisperStreamingTemperature) -> None:
@@ -402,14 +377,12 @@ def _require_vad_max_speech_duration(values: JsonDict, key: str) -> float:
 
 
 __all__ = [
-    "WHISPER_STREAMING_CONTEXT_PROMPT_SEPARATOR",
     "WHISPER_STREAMING_SAMPLE_RATE",
     "WhisperStreamingRuntimeSnapshot",
     "WhisperStreamingRuntimeConfig",
     "WhisperStreamingTask",
     "WhisperStreamingTemperature",
     "WhisperStreamingVadParameters",
-    "combine_initial_prompt",
     "validate_whisper_streaming_runtime_config",
     "whisper_streaming_runtime_snapshot_from_live_snapshot",
 ]
