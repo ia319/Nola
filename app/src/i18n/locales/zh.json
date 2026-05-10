@@ -608,13 +608,46 @@
     "workbench": {
       "title": "实时",
       "description": "实时显示麦克风和系统音频转录。",
+      "sessionTitle": "实时转录",
+      "actions": {
+        "start": "开始会话",
+        "starting": "启动中...",
+        "stop": "停止会话",
+        "stopping": "停止中..."
+      },
+      "sources": {
+        "microphone": "麦克风",
+        "system": "系统音频"
+      },
+      "runtime": {
+        "mock": "Mock",
+        "whisperStreaming": "WhisperStreaming"
+      },
       "statusBar": {
         "region": "实时转录状态",
+        "status": "状态",
         "session": "会话",
         "duration": "时长",
         "connection": "连接",
         "tracks": "来源",
-        "runtime": "运行环境"
+        "runtime": "实时引擎",
+        "runState": {
+          "idle": "待机",
+          "starting": "启动中",
+          "active": "录制中",
+          "finishing": "停止中",
+          "finished": "已结束",
+          "failed": "失败"
+        },
+        "connectionState": {
+          "idle": "待机",
+          "connecting": "连接中",
+          "ready": "就绪",
+          "streaming": "传输中",
+          "finishing": "结束中",
+          "closed": "已关闭",
+          "failed": "失败"
+        }
       },
       "sessionSetup": {
         "title": "会话启动设置",
@@ -632,9 +665,6 @@
         "language": {
           "label": "语言",
           "auto": "自动检测"
-        },
-        "runtime": {
-          "label": "运行环境"
         },
         "sources": {
           "level": "音量 {{percent}}%"
@@ -672,10 +702,10 @@
           "title": "系统音频",
           "description": "由用户明确触发浏览器系统音频采集。",
           "captureSource": {
-            "label": "采集来源",
-            "browserPrompt": "浏览器采集选择"
+            "label": "采集来源"
           },
           "actions": {
+            "start": "启动",
             "test": "测试采集",
             "stop": "停止采集"
           },
@@ -725,17 +755,129 @@
         "empty": {
           "title": "暂无可调整设置",
           "description": "当前会话没有可编辑的运行参数。"
+        },
+        "snapshot": {
+          "empty": {
+            "title": "暂无运行快照",
+            "description": "当前会话还没有返回 resolved runtime snapshot。"
+          }
         }
       },
       "transcript": {
         "title": "实时转录结果",
-        "empty": "暂无转录结果"
+        "kind": {
+          "final": "最终",
+          "committed_partial": "片段",
+          "preview": "预览"
+        },
+        "empty": {
+          "title": "暂无转录结果",
+          "description": "开始实时会话后，转录流会显示在这里。",
+          "noModelTitle": "没有已下载模型",
+          "noModelDescription": "先下载本地模型，再开始实时转录会话。",
+          "configuredModelUnavailableTitle": "默认模型不可用",
+          "configuredModelUnavailableDescription": "当前默认模型尚未下载。实时会话会使用已选择的已下载模型。"
+        }
       },
       "compact": {
         "title": "实时小窗",
+        "open": "打开实时小窗",
         "expand": "展开实时小窗",
         "close": "关闭实时小窗",
         "empty": "暂无实时转录结果"
+      },
+      "errors": {
+        "actions": {
+          "retry": "重试"
+        },
+        "generic": {
+          "title": "实时会话失败",
+          "description": "实时会话意外停止。检查模型和音频来源后重试。"
+        },
+        "liveSourceRequired": {
+          "title": "未选择音频来源",
+          "description": "先启用麦克风或系统音频，再开始实时会话。"
+        },
+        "runtimeModelNotConfigured": {
+          "title": "未选择模型",
+          "description": "先选择已下载模型，再开始实时会话。"
+        },
+        "runtimeModelNotRegistered": {
+          "title": "所选模型不可用",
+          "description": "请选择仍在本地注册且已下载的模型。"
+        },
+        "runtimeModelNotDownloaded": {
+          "title": "没有已下载模型",
+          "description": "先下载本地模型，再开始实时转录会话。"
+        },
+        "runtimeConfigInvalid": {
+          "title": "运行参数不可用",
+          "description": "刷新实时参数后再重试。"
+        },
+        "microphonePermissionRequired": {
+          "title": "需要麦克风权限",
+          "description": "在浏览器中允许麦克风访问后，再启动会话。"
+        },
+        "microphonePermissionDenied": {
+          "title": "麦克风权限被拒绝",
+          "description": "在浏览器站点设置中启用麦克风权限。"
+        },
+        "microphoneCaptureUnsupported": {
+          "title": "不支持麦克风采集",
+          "description": "当前环境无法采集麦克风音频。"
+        },
+        "microphoneCaptureFailed": {
+          "title": "麦克风采集失败",
+          "description": "检查输入设备后重试。"
+        },
+        "systemAudioUnsupported": {
+          "title": "不支持系统音频",
+          "description": "当前环境无法采集系统音频。"
+        },
+        "systemAudioPermissionDenied": {
+          "title": "系统音频权限被拒绝",
+          "description": "重新开始浏览器采集，并选择包含音频的来源。"
+        },
+        "systemAudioTrackMissing": {
+          "title": "没有系统音频轨道",
+          "description": "请选择暴露音频轨道的浏览器采集来源。"
+        },
+        "systemAudioCaptureFailed": {
+          "title": "系统音频采集失败",
+          "description": "重新开始浏览器系统音频采集。"
+        },
+        "websocketUnavailable": {
+          "title": "实时连接不可用",
+          "description": "当前浏览器环境无法建立实时连接。"
+        },
+        "websocketConnectFailed": {
+          "title": "实时连接失败",
+          "description": "确认后端正在运行后重试。"
+        },
+        "websocketClosed": {
+          "title": "实时连接已关闭",
+          "description": "实时连接在会话结束前关闭。"
+        },
+        "trackReadyTimeout": {
+          "title": "音频轨道未启动",
+          "description": "后端没有及时确认音频轨道。"
+        },
+        "sessionFinishTimeout": {
+          "title": "会话结束超时",
+          "description": "后端没有及时确认会话结束。"
+        },
+        "sessionStartFailed": {
+          "title": "会话启动失败",
+          "description": "实时会话无法启动。请检查模型和音频来源设置。"
+        },
+        "sessionStopFailed": {
+          "title": "会话停止失败",
+          "description": "实时会话未能正常停止。请检查连接状态。"
+        },
+        "sessionStateInvalid": {
+          "title": "会话状态已变化",
+          "description": "当前操作已经不符合实时会话状态。"
+        }
       }
     }
   },
