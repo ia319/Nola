@@ -66,12 +66,16 @@ export {
   areLiveRealtimeDraftValuesEqual,
   buildLiveRealtimeDefaultsPatchPayload,
   buildLiveRealtimeRuntimeOverrides,
+  clearLiveRealtimeDraftValue,
   isLiveRealtimeDraftValue,
   resolveLiveRealtimeDefaultValue,
   resolveLiveRealtimeEffectiveValue,
   updateLiveRealtimeDraft,
 } from './config/live-realtime-config-draft'
-export type { LiveRealtimeSchemaFormProps } from './config/LiveRealtimeSchemaForm'
+export type {
+  LiveRealtimeFormValueMode,
+  LiveRealtimeSchemaFormProps,
+} from './config/LiveRealtimeSchemaForm'
 export { LiveRealtimeSchemaForm } from './config/LiveRealtimeSchemaForm'
 
 export type {

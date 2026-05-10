@@ -81,6 +81,17 @@ export function updateLiveRealtimeDraft(
   return next
 }
 
+export function clearLiveRealtimeDraftValue(
+  current: LiveRealtimeDraft,
+  key: string,
+): LiveRealtimeDraft {
+  if (!Object.prototype.hasOwnProperty.call(current, key)) return current
+
+  const next = { ...current }
+  delete next[key]
+  return next
+}
+
 function buildLiveRealtimePayload(draft: LiveRealtimeDraft): Record<string, unknown> {
   const payload: Record<string, unknown> = {}
 

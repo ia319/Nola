@@ -3,11 +3,15 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import {
   DEFAULT_LIVE_REALTIME_ADAPTER,
+  isLiveRealtimeDraftValue,
+  resolveLiveRealtimeDefaultValue,
   resolveLiveRealtimeEffectiveValue,
   type LiveRealtimeAdapter,
   type LiveRealtimeDraft,
@@ -24,6 +28,8 @@ import type {
 
 type TranslationParams = Record<string, string | number | boolean | null | undefined>
 type Translate = (key: string, options?: TranslationParams) => string
+export type LiveRealtimeFormValueMode = 'effective' | 'override'
+type LiveRealtimeEmptyValue = null | undefined
 
 type NumberListParseErrorCode =
   | 'emptySegment'
@@ -47,9 +53,11 @@ export interface LiveRealtimeSchemaFormProps {
   languages: LanguageOption[]
   disabled?: boolean
   adapter?: LiveRealtimeAdapter
+  layout?: 'page' | 'panel'
+  valueMode?: LiveRealtimeFormValueMode
   domIdPrefix?: string
   className?: string
-  onChange: (key: string, value: LiveRealtimeDraftValue) => void
+  onChange: (key: string, value: LiveRealtimeDraftValue | undefined) => void
 }
 
 function fieldDomId(prefix: string, key: string): string {
@@ -135,6 +143,16 @@ function formatFieldValue(value: LiveRealtimeDraftValue | undefined, t: Translat
   return String(value)
 }
 
+function formatPlaceholderValue(value: unknown, t: Translate): string | undefined {
+  if (isLiveRealtimeDraftValue(value)) return formatFieldValue(value, t)
+
+  return undefined
+}
+
+function hasDraftValue(draft: LiveRealtimeDraft, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(draft, key)
+}
+
 function hasLanguageOption(options: LanguageOption[], value: string): boolean {
   return options.some((option) => option.code === value)
 }
@@ -144,10 +162,20 @@ interface NumberFieldProps {
   value: LiveRealtimeDraftValue | undefined
   inputId: string
   disabled: boolean
-  onChange: (value: string | number | null) => void
+  placeholder?: string
+  emptyValue: LiveRealtimeEmptyValue
+  onChange: (value: string | number | null | undefined) => void
 }
 
-function NumberField({ field, value, inputId, disabled, onChange }: NumberFieldProps) {
+function NumberField({
+  field,
+  value,
+  inputId,
+  disabled,
+  placeholder,
+  emptyValue,
+  onChange,
+}: NumberFieldProps) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState(() => (typeof value === 'number' ? String(value) : ''))
   const [error, setError] = useState<string | null>(null)
@@ -162,7 +190,7 @@ function NumberField({ field, value, inputId, disabled, onChange }: NumberFieldP
     const raw = draft.trim()
     if (raw === '') {
       setError(null)
-      onChange(null)
+      onChange(emptyValue)
       return
     }
 
@@ -181,7 +209,7 @@ function NumberField({ field, value, inputId, disabled, onChange }: NumberFieldP
     }
 
     setError(null)
-    setDraft(String(parsed))
+    setDraft(emptyValue === undefined && placeholder === String(parsed) ? '' : String(parsed))
     onChange(parsed)
   }
 
@@ -196,6 +224,7 @@ function NumberField({ field, value, inputId, disabled, onChange }: NumberFieldP
           max={field.max ?? undefined}
           step={field.step ?? undefined}
           value={draft}
+          placeholder={placeholder}
           aria-invalid={error ? true : undefined}
           onBlur={commitDraft}
           onChange={(event) => {
@@ -231,10 +260,20 @@ interface NumberListFieldProps {
   value: LiveRealtimeDraftValue | undefined
   inputId: string
   disabled: boolean
-  onChange: (value: number | number[] | null) => void
+  placeholder?: string
+  emptyValue: LiveRealtimeEmptyValue
+  onChange: (value: number | number[] | null | undefined) => void
 }
 
-function NumberListField({ field, value, inputId, disabled, onChange }: NumberListFieldProps) {
+function NumberListField({
+  field,
+  value,
+  inputId,
+  disabled,
+  placeholder,
+  emptyValue,
+  onChange,
+}: NumberListFieldProps) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState(() => serializeNumberListValue(value))
   const [error, setError] = useState<NumberListParseErrorCode | null>(null)
@@ -245,7 +284,7 @@ function NumberListField({ field, value, inputId, disabled, onChange }: NumberLi
     if (result.kind === 'empty') {
       setError(null)
       setDraft('')
-      onChange(null)
+      onChange(emptyValue)
       return
     }
 
@@ -255,7 +294,7 @@ function NumberListField({ field, value, inputId, disabled, onChange }: NumberLi
     }
 
     setError(null)
-    setDraft(result.canonical)
+    setDraft(emptyValue === undefined && placeholder === result.canonical ? '' : result.canonical)
     if (field.collapse_single_value && result.values.length === 1) {
       const [singleValue] = result.values
       if (singleValue !== undefined) {
@@ -272,6 +311,7 @@ function NumberListField({ field, value, inputId, disabled, onChange }: NumberLi
         id={inputId}
         disabled={disabled}
         value={draft}
+        placeholder={placeholder}
         aria-invalid={error ? true : undefined}
         onBlur={commitDraft}
         onChange={(event) => {
@@ -297,8 +337,10 @@ interface LiveRealtimeFieldRowProps {
   adapter: LiveRealtimeAdapter
   disabled: boolean
   isLast: boolean
+  layout: 'page' | 'panel'
+  valueMode: LiveRealtimeFormValueMode
   domIdPrefix: string
-  onChange: (key: string, value: LiveRealtimeDraftValue) => void
+  onChange: (key: string, value: LiveRealtimeDraftValue | undefined) => void
 }
 
 function LiveRealtimeFieldRow({
@@ -309,14 +351,22 @@ function LiveRealtimeFieldRow({
   adapter,
   disabled,
   isLast,
+  layout,
+  valueMode,
   domIdPrefix,
   onChange,
 }: LiveRealtimeFieldRowProps) {
   const { t } = useTranslation()
-  const value = resolveLiveRealtimeEffectiveValue(defaults, draft, field.key)
+  const hasExplicitValue = hasDraftValue(draft, field.key)
+  const draftValue = hasExplicitValue ? draft[field.key] : undefined
+  const effectiveValue = resolveLiveRealtimeEffectiveValue(defaults, draft, field.key)
+  const defaultValue = resolveLiveRealtimeDefaultValue(defaults, field.key)
+  const placeholder = valueMode === 'override' ? formatPlaceholderValue(defaultValue, t) : undefined
+  const value = valueMode === 'override' ? draftValue : effectiveValue
   const dependsOnValue = field.depends_on
     ? resolveLiveRealtimeEffectiveValue(defaults, draft, field.depends_on)
     : undefined
+  const emptyValue = valueMode === 'override' ? undefined : null
   const fieldDisabled =
     disabled ||
     !field.supported_adapters.includes(adapter) ||
@@ -334,6 +384,7 @@ function LiveRealtimeFieldRow({
             : typeof value === 'string'
               ? value
               : ''
+        const emptyOptionLabel = placeholder ?? t('settings.liveRealtime.values.empty')
 
         return (
           <select
@@ -342,12 +393,22 @@ function LiveRealtimeFieldRow({
             onChange={(event) =>
               onChange(
                 field.key,
-                event.target.value === AUTO_LANGUAGE_VALUE ? null : event.target.value,
+                event.target.value === '' && valueMode === 'override'
+                  ? undefined
+                  : event.target.value === AUTO_LANGUAGE_VALUE
+                    ? null
+                    : event.target.value,
               )
             }
             disabled={fieldDisabled}
-            className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] sm:max-w-60"
+            className={cn(
+              'border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50',
+              layout === 'page' ? 'sm:max-w-60' : 'sm:max-w-none',
+            )}
           >
+            {valueMode === 'override' && field.options_source !== 'effective_languages' ? (
+              <option value="">{emptyOptionLabel}</option>
+            ) : null}
             {field.options_source === 'effective_languages' ? (
               <>
                 <option value={AUTO_LANGUAGE_VALUE}>
@@ -382,9 +443,10 @@ function LiveRealtimeFieldRow({
             <Textarea
               id={inputId}
               value={textValue}
+              placeholder={placeholder}
               maxLength={maxLength}
               disabled={fieldDisabled}
-              onChange={(event) => onChange(field.key, event.target.value || null)}
+              onChange={(event) => onChange(field.key, event.target.value || emptyValue)}
             />
             {typeof maxLength === 'number' ? (
               <p className="text-muted-foreground text-xs">
@@ -402,7 +464,7 @@ function LiveRealtimeFieldRow({
         return (
           <Switch
             id={inputId}
-            checked={typeof value === 'boolean' ? value : false}
+            checked={typeof effectiveValue === 'boolean' ? effectiveValue : false}
             onCheckedChange={(checked) => onChange(field.key, checked)}
             disabled={fieldDisabled}
             aria-label={t(field.label_key)}
@@ -410,13 +472,14 @@ function LiveRealtimeFieldRow({
         )
 
       case 'slider': {
-        const numericValue = typeof value === 'number' ? value : field.min
+        const sliderValue = valueMode === 'override' ? effectiveValue : value
+        const numericValue = typeof sliderValue === 'number' ? sliderValue : field.min
         const rangeHint = formatRangeHint(field, t)
 
         return (
           <div className="space-y-2">
             <div className="text-muted-foreground text-right text-xs tabular-nums">
-              {formatFieldValue(value, t)}
+              {formatFieldValue(sliderValue, t)}
             </div>
             <Slider
               id={inputId}
@@ -442,6 +505,8 @@ function LiveRealtimeFieldRow({
             value={value}
             inputId={inputId}
             disabled={fieldDisabled}
+            placeholder={placeholder}
+            emptyValue={emptyValue}
             onChange={(nextValue) => onChange(field.key, nextValue)}
           />
         )
@@ -454,6 +519,8 @@ function LiveRealtimeFieldRow({
             value={value}
             inputId={inputId}
             disabled={fieldDisabled}
+            placeholder={placeholder}
+            emptyValue={emptyValue}
             onChange={(nextValue) => onChange(field.key, nextValue)}
           />
         )
@@ -463,13 +530,73 @@ function LiveRealtimeFieldRow({
     }
   }
 
+  if (layout === 'panel') {
+    if (field.type === 'slider') {
+      const sliderValue = valueMode === 'override' ? effectiveValue : value
+      const numericValue = typeof sliderValue === 'number' ? sliderValue : field.min
+      const rangeHint = formatRangeHint(field, t)
+
+      return (
+        <div className="min-w-0 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor={inputId} className="text-sm">
+              {t(field.label_key)}
+            </Label>
+            <span className="text-muted-foreground text-xs tabular-nums">
+              {formatFieldValue(sliderValue, t)}
+            </span>
+          </div>
+          <Slider
+            id={inputId}
+            min={field.min}
+            max={field.max}
+            step={field.step}
+            value={[numericValue]}
+            disabled={fieldDisabled}
+            onValueChange={([nextValue]) => {
+              if (nextValue !== undefined) onChange(field.key, nextValue)
+            }}
+          />
+          {rangeHint ? <p className="text-muted-foreground text-xs">{rangeHint}</p> : null}
+        </div>
+      )
+    }
+
+    const control = renderControl()
+
+    return (
+      <div
+        className={cn(
+          'min-w-0 space-y-1.5',
+          (field.type === 'textarea' || field.type === 'number_list') && 'sm:col-span-2',
+        )}
+      >
+        {field.type === 'switch' ? (
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor={inputId} className="text-sm">
+              {t(field.label_key)}
+            </Label>
+            {control}
+          </div>
+        ) : (
+          <>
+            <Label htmlFor={inputId} className="text-sm">
+              {t(field.label_key)}
+            </Label>
+            {control}
+          </>
+        )}
+      </div>
+    )
+  }
+
   return (
     <FormRow
       label={t(field.label_key)}
       description={t(field.description_key)}
       htmlFor={inputId}
       align={field.type === 'textarea' || field.type === 'number_list' ? 'start' : 'center'}
-      className={isLast ? 'border-b-0' : undefined}
+      className={cn(isLast && 'border-b-0')}
     >
       {renderControl()}
     </FormRow>
@@ -483,8 +610,11 @@ interface LiveRealtimeSchemaSectionProps {
   languages: LanguageOption[]
   adapter: LiveRealtimeAdapter
   disabled: boolean
+  layout: 'page' | 'panel'
+  valueMode: LiveRealtimeFormValueMode
   domIdPrefix: string
-  onChange: (key: string, value: LiveRealtimeDraftValue) => void
+  showTopSeparator: boolean
+  onChange: (key: string, value: LiveRealtimeDraftValue | undefined) => void
 }
 
 function LiveRealtimeSchemaSection({
@@ -494,10 +624,43 @@ function LiveRealtimeSchemaSection({
   languages,
   adapter,
   disabled,
+  layout,
+  valueMode,
   domIdPrefix,
+  showTopSeparator,
   onChange,
 }: LiveRealtimeSchemaSectionProps) {
   const { t } = useTranslation()
+
+  if (layout === 'panel') {
+    return (
+      <section>
+        {showTopSeparator ? <Separator className="mb-4" /> : null}
+        <h4 className="text-muted-foreground mb-3 text-xs font-medium tracking-wide uppercase">
+          {t(group.group_label_key)}
+        </h4>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {group.fields.map((field, index) => (
+            <LiveRealtimeFieldRow
+              key={field.key}
+              field={field}
+              defaults={defaults}
+              draft={draft}
+              languages={languages}
+              adapter={adapter}
+              disabled={disabled}
+              isLast={index === group.fields.length - 1}
+              layout={layout}
+              valueMode={valueMode}
+              domIdPrefix={domIdPrefix}
+              onChange={onChange}
+            />
+          ))}
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="space-y-3">
@@ -516,6 +679,8 @@ function LiveRealtimeSchemaSection({
             adapter={adapter}
             disabled={disabled}
             isLast={index === group.fields.length - 1}
+            layout={layout}
+            valueMode={valueMode}
             domIdPrefix={domIdPrefix}
             onChange={onChange}
           />
@@ -532,13 +697,22 @@ export function LiveRealtimeSchemaForm({
   languages,
   disabled = false,
   adapter = DEFAULT_LIVE_REALTIME_ADAPTER,
+  layout = 'page',
+  valueMode = 'effective',
   domIdPrefix = 'live-realtime',
   className,
   onChange,
 }: LiveRealtimeSchemaFormProps) {
   return (
-    <div className={cn('flex min-h-0 flex-1 flex-col gap-8', className)}>
-      {schema.map((group) => (
+    <div
+      className={cn(
+        layout === 'panel'
+          ? 'space-y-5 rounded-md border p-4'
+          : 'flex min-h-0 flex-1 flex-col gap-8',
+        className,
+      )}
+    >
+      {schema.map((group, index) => (
         <LiveRealtimeSchemaSection
           key={group.group}
           group={group}
@@ -547,7 +721,10 @@ export function LiveRealtimeSchemaForm({
           languages={languages}
           adapter={adapter}
           disabled={disabled}
+          layout={layout}
+          valueMode={valueMode}
           domIdPrefix={domIdPrefix}
+          showTopSeparator={layout === 'panel' && index > 0}
           onChange={onChange}
         />
       ))}
