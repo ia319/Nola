@@ -1,14 +1,15 @@
 import { getValueByPath, setValueByPath } from '@/shared/lib/object-path'
 import type {
   CreateLiveSessionRequest,
+  LiveRealtimeAdapter,
   LiveRealtimeDefaults,
   LiveRealtimeDefaultsUpdateRequest,
-  LiveRealtimeOptionField,
 } from '@/shared/types'
+
+export type { LiveRealtimeAdapter } from '@/shared/types'
 
 export type LiveRealtimeDraftValue = string | number | boolean | number[] | null
 export type LiveRealtimeDraft = Record<string, LiveRealtimeDraftValue>
-export type LiveRealtimeAdapter = LiveRealtimeOptionField['supported_adapters'][number]
 export type LiveRealtimeRuntimeOverrides = NonNullable<
   CreateLiveSessionRequest['runtime_overrides']
 >
