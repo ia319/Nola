@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { AlertCircle } from 'lucide-react'
@@ -10,6 +10,8 @@ import type {
   LiveWorkbenchErrorCopy,
   LiveWorkbenchTranscriptItem,
 } from './live-workbench-selectors'
+
+const TRANSCRIPT_AUTO_SCROLL_THRESHOLD_PX = 48
 
 export interface LiveWorkbenchTranscriptPanelProps {
   items: readonly LiveWorkbenchTranscriptItem[]
@@ -32,6 +34,7 @@ export function LiveWorkbenchTranscriptPanel({
 }: LiveWorkbenchTranscriptPanelProps) {
   const { t } = useTranslation()
   const streamRef = useRef<HTMLDivElement | null>(null)
+  const shouldAutoScrollRef = useRef(true)
   const hasTranscript = items.length > 0
   const latestItemId = items.at(-1)?.id ?? null
   const retryAction = useMemo(() => {
@@ -46,10 +49,18 @@ export function LiveWorkbenchTranscriptPanel({
 
   useEffect(() => {
     const stream = streamRef.current
-    if (!stream) return
+    if (!stream || !shouldAutoScrollRef.current) return
 
     stream.scrollTop = stream.scrollHeight
   }, [latestItemId])
+
+  const handleStreamScroll = useCallback(() => {
+    const stream = streamRef.current
+    if (!stream) return
+
+    const distanceFromBottom = stream.scrollHeight - stream.scrollTop - stream.clientHeight
+    shouldAutoScrollRef.current = distanceFromBottom <= TRANSCRIPT_AUTO_SCROLL_THRESHOLD_PX
+  }, [])
 
   return (
     <Card
@@ -63,26 +74,28 @@ export function LiveWorkbenchTranscriptPanel({
         {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
       </div>
 
+      {hasTranscript && errorCopy ? (
+        <div className="border-b px-5 py-3">
+          <TranscriptErrorBanner
+            title={t(errorCopy.titleKey)}
+            description={t(errorCopy.descriptionKey)}
+          />
+        </div>
+      ) : null}
+
       <CardContent className="flex min-h-0 flex-1 px-0 py-0">
         {hasTranscript ? (
           <div
             ref={streamRef}
             data-slot="live-workbench-transcript-stream"
             className="min-h-0 flex-1 overflow-y-auto px-5 py-4"
+            onScroll={handleStreamScroll}
           >
-            <div className="space-y-3">
-              {errorCopy ? (
-                <TranscriptErrorBanner
-                  title={t(errorCopy.titleKey)}
-                  description={t(errorCopy.descriptionKey)}
-                />
-              ) : null}
-              <ol className="space-y-2">
-                {items.map((item) => (
-                  <TranscriptRow key={item.id} item={item} />
-                ))}
-              </ol>
-            </div>
+            <ol className="space-y-2">
+              {items.map((item) => (
+                <TranscriptRow key={item.id} item={item} />
+              ))}
+            </ol>
           </div>
         ) : errorCopy ? (
           <EmptyState

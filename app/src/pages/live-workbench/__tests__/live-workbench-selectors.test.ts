@@ -122,6 +122,16 @@ describe('live workbench selectors', () => {
     ).toBe('small')
   })
 
+  it('returns null when no downloaded model is available', () => {
+    expect(
+      resolveLiveWorkbenchInitialModelId({
+        configuredModelId: 'small',
+        lastLoadedModelId: 'large-v3',
+        downloadedModels: [],
+      }),
+    ).toBeNull()
+  })
+
   it('finds select fields from the live realtime schema', () => {
     expect(selectLiveWorkbenchSelectField(liveSchema, 'task')?.key).toBe('task')
     expect(selectLiveWorkbenchSelectField(liveSchema, 'missing')).toBeNull()

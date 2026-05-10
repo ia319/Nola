@@ -4,6 +4,7 @@ import {
   formatLiveWorkbenchCount,
   formatLiveWorkbenchDuration,
   formatLiveWorkbenchEmptyValue,
+  formatLiveWorkbenchSessionId,
   formatLiveWorkbenchTranscriptTimeRange,
 } from '../live-workbench-formatters'
 
@@ -15,6 +16,14 @@ describe('live workbench formatters', () => {
   it('clamps count display at zero', () => {
     expect(formatLiveWorkbenchCount(3)).toBe('3')
     expect(formatLiveWorkbenchCount(-1)).toBe('0')
+  })
+
+  it('formats live session ids for compact display', () => {
+    expect(formatLiveWorkbenchSessionId(null)).toBe('-')
+    expect(formatLiveWorkbenchSessionId(undefined, 'empty')).toBe('empty')
+    expect(formatLiveWorkbenchSessionId('abc123')).toBe('abc123')
+    expect(formatLiveWorkbenchSessionId('123456789012')).toBe('123456789012')
+    expect(formatLiveWorkbenchSessionId('1234567890123')).toBe('12345678...')
   })
 
   it('formats live transcript time ranges with millisecond precision', () => {
@@ -42,5 +51,24 @@ describe('live workbench formatters', () => {
         Date.parse('2026-05-11T01:01:01.005Z'),
       ),
     ).toBe('01:01:01.005')
+  })
+
+  it('returns the empty value for invalid live session durations', () => {
+    expect(
+      formatLiveWorkbenchDuration(
+        'not-a-date',
+        '2026-05-11T00:00:47.789Z',
+        Date.parse('2026-05-11T00:00:47.789Z'),
+      ),
+    ).toBe('-')
+
+    expect(
+      formatLiveWorkbenchDuration(
+        '2026-05-11T00:00:47.789Z',
+        '2026-05-11T00:00:00.125Z',
+        Date.parse('2026-05-11T00:00:47.789Z'),
+        'empty',
+      ),
+    ).toBe('empty')
   })
 })
