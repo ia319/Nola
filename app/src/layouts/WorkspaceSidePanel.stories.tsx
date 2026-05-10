@@ -1,11 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { Mic2, Save, SlidersHorizontal } from 'lucide-react'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { FormRow } from './FormRow'
-import { WorkspaceSidePanel, type WorkspaceSidePanelSize } from './WorkspaceSidePanel'
+import {
+  WorkspaceSidePanel,
+  type WorkspaceSidePanelProps,
+  type WorkspaceSidePanelSize,
+} from './WorkspaceSidePanel'
 
 const meta = {
   title: 'Layouts/WorkspaceSidePanel',
@@ -30,6 +34,7 @@ interface WorkspacePreviewProps {
   initialOpen?: boolean
   panelSize?: WorkspaceSidePanelSize
   snapshotMode?: boolean
+  panelArgs?: Partial<WorkspaceSidePanelProps>
 }
 
 const transcriptLines = [
@@ -67,8 +72,15 @@ function WorkspacePreview({
   initialOpen = true,
   panelSize = 'default',
   snapshotMode = false,
+  panelArgs,
 }: WorkspacePreviewProps) {
-  const [isOpen, setIsOpen] = useState(initialOpen)
+  const panelRegionId = useId()
+  const [isOpen, setIsOpen] = useState(panelArgs?.open ?? initialOpen)
+
+  function handleOpenChange(open: boolean): void {
+    setIsOpen(open)
+    panelArgs?.onOpenChange?.(open)
+  }
 
   return (
     <div className="bg-muted/30 flex min-h-screen items-center justify-center p-6">
@@ -92,10 +104,11 @@ function WorkspacePreview({
               variant="ghost"
               size="sm"
               aria-expanded={isOpen}
+              aria-controls={panelRegionId}
               className={
                 isOpen ? 'text-foreground px-0' : 'text-muted-foreground hover:text-foreground px-0'
               }
-              onClick={() => setIsOpen((current) => !current)}
+              onClick={() => handleOpenChange(!isOpen)}
             >
               <SlidersHorizontal className="size-4" />
               Session settings
@@ -150,38 +163,55 @@ function WorkspacePreview({
             </div>
           </section>
 
-          <WorkspaceSidePanel
-            open={isOpen}
-            onOpenChange={setIsOpen}
-            size={panelSize}
-            eyebrow={snapshotMode ? 'Resolved snapshot' : 'Session settings'}
-            title={snapshotMode ? 'Runtime config' : 'Live runtime'}
-            description={
-              snapshotMode
-                ? 'Read-only values resolved when this session started.'
-                : 'Draft values apply to the next live session start.'
-            }
-            closeLabel="Close session settings"
-            className="shadow-none"
-            headerAdornment={
-              snapshotMode ? (
-                <span className="bg-muted rounded-md px-2 py-1 text-xs font-medium">Read only</span>
-              ) : null
-            }
-            footer={
-              <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
-                <Button type="button" variant="outline" className="gap-2" disabled={snapshotMode}>
-                  <Save className="size-4" />
-                  Save defaults
-                </Button>
-                <Button type="button" disabled={snapshotMode}>
-                  Apply to session
-                </Button>
-              </div>
-            }
-          >
-            {snapshotMode ? <SnapshotPanelBody /> : <EditableSettingsBody />}
-          </WorkspaceSidePanel>
+          <div id={panelRegionId} className="contents">
+            <WorkspaceSidePanel
+              open={isOpen}
+              onOpenChange={handleOpenChange}
+              size={panelArgs?.size ?? panelSize}
+              eyebrow={
+                panelArgs?.eyebrow ?? (snapshotMode ? 'Resolved snapshot' : 'Session settings')
+              }
+              title={panelArgs?.title ?? (snapshotMode ? 'Runtime config' : 'Live runtime')}
+              description={
+                panelArgs?.description ??
+                (snapshotMode
+                  ? 'Read-only values resolved when this session started.'
+                  : 'Draft values apply to the next live session start.')
+              }
+              closeLabel={panelArgs?.closeLabel ?? 'Close session settings'}
+              className={panelArgs?.className ?? 'shadow-none'}
+              bodyClassName={panelArgs?.bodyClassName}
+              footerClassName={panelArgs?.footerClassName}
+              headerAdornment={
+                panelArgs?.headerAdornment ??
+                (snapshotMode ? (
+                  <span className="bg-muted rounded-md px-2 py-1 text-xs font-medium">
+                    Read only
+                  </span>
+                ) : null)
+              }
+              footer={
+                panelArgs?.footer ?? (
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="gap-2"
+                      disabled={snapshotMode}
+                    >
+                      <Save className="size-4" />
+                      Save defaults
+                    </Button>
+                    <Button type="button" disabled={snapshotMode}>
+                      Apply to session
+                    </Button>
+                  </div>
+                )
+              }
+            >
+              {snapshotMode ? <SnapshotPanelBody /> : <EditableSettingsBody />}
+            </WorkspaceSidePanel>
+          </div>
         </div>
       </div>
     </div>
@@ -300,15 +330,24 @@ function SnapshotPanelBody() {
 
 export const LiveSessionSettings: Story = {
   args: baseArgs,
-  render: () => <WorkspacePreview />,
+  render: (args) => <WorkspacePreview key={String(args.open)} panelArgs={args} />,
 }
 
 export const ClosedByDefault: Story = {
-  args: baseArgs,
-  render: () => <WorkspacePreview initialOpen={false} />,
+  args: { ...baseArgs, open: false },
+  render: (args) => (
+    <WorkspacePreview key={String(args.open)} initialOpen={false} panelArgs={args} />
+  ),
 }
 
 export const WideResolvedSnapshot: Story = {
-  args: baseArgs,
-  render: () => <WorkspacePreview panelSize="wide" snapshotMode />,
+  args: { ...baseArgs, size: 'wide' },
+  render: (args) => (
+    <WorkspacePreview
+      key={`${args.open}-${args.size}`}
+      panelSize="wide"
+      snapshotMode
+      panelArgs={args}
+    />
+  ),
 }
