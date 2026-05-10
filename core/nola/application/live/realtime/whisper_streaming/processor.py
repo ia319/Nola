@@ -116,6 +116,9 @@ class WhisperStreamingOnlineProcessor:
             else:
                 update = self._process_iter()
 
+        # Keep boundary-close behavior explicit: long silent frames can mark the
+        # update processed before close/reset and skip the anchor check below.
+        # Add a hallucinated-tail regression before changing this experimental path.
         if silence_update.context_reset:
             update = self._process_boundary_if_needed(update)
             final = self._close_pending_segment(
