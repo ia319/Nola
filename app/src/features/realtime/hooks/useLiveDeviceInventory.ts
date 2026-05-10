@@ -331,9 +331,8 @@ export function useLiveDeviceInventory(
     const result = await stopMicrophoneSession(true)
     if (result === 'missing') {
       clearMicrophoneCapture()
-      void refreshDevices()
     }
-  }, [clearMicrophoneCapture, refreshDevices, stopMicrophoneSession])
+  }, [clearMicrophoneCapture, stopMicrophoneSession])
 
   const stopSystemAudioSession = useCallback(
     async (refreshAfterStop: boolean): Promise<StopCaptureSessionResult> => {
@@ -374,9 +373,8 @@ export function useLiveDeviceInventory(
     const result = await stopSystemAudioSession(true)
     if (result === 'missing') {
       clearSystemAudioCapture()
-      void refreshDevices()
     }
-  }, [clearSystemAudioCapture, refreshDevices, stopSystemAudioSession])
+  }, [clearSystemAudioCapture, stopSystemAudioSession])
 
   const releaseActiveCaptureSessions = useCallback((): void => {
     void stopMicrophoneSession(false)

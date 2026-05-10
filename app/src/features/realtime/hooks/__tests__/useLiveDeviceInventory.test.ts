@@ -362,7 +362,7 @@ describe('useLiveDeviceInventory', () => {
     expect(result.current.systemAudioCapture.state).toBe('stopped')
   })
 
-  it('refreshes devices when system audio stop has no active session', async () => {
+  it('treats stop without an active session as an idempotent local cleanup', async () => {
     const deviceRepository = createDeviceRepository(buildInventory())
     const captureRepository = createCaptureRepository()
 
@@ -374,14 +374,18 @@ describe('useLiveDeviceInventory', () => {
       }),
     )
 
+    act(() => {
+      result.current.selectMicrophone('mic-1')
+    })
     await act(async () => {
+      await result.current.stopMicrophoneCapture()
       await result.current.stopSystemAudioCapture()
     })
 
+    expect(result.current.selectedMicrophoneId).toBe('mic-1')
+    expect(result.current.microphoneCapture.state).toBe('idle')
     expect(result.current.systemAudioCapture.state).toBe('idle')
-    await waitFor(() => {
-      expect(deviceRepository.listDevices).toHaveBeenCalledTimes(1)
-    })
+    expect(deviceRepository.listDevices).not.toHaveBeenCalled()
   })
 
   it('requests microphone permission through the current selected microphone', async () => {
