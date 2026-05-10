@@ -228,10 +228,9 @@
       "field": {
         "language": "Language",
         "task": "Task",
-        "contextPrompt": "Context Prompt",
         "minChunkMs": "Minimum Chunk (ms)",
         "bufferTrimmingMs": "Buffer Trimming (ms)",
-        "promptMaxChars": "Prompt Window",
+        "promptMaxChars": "Context Window",
         "timestampToleranceMs": "Timestamp Tolerance (ms)",
         "maxDuplicateNgram": "Duplicate N-Gram Limit",
         "silenceRmsThreshold": "Silence RMS Threshold",
@@ -255,7 +254,6 @@
       "description": {
         "language": "Choose the language hint for new Live Realtime sessions.",
         "task": "Choose whether Live Realtime transcribes source audio or translates it to English.",
-        "contextPrompt": "Provide domain terms, names, or spelling hints for new Live Realtime sessions.",
         "minChunkMs": "Control the minimum audio window sent to the realtime transcriber.",
         "bufferTrimmingMs": "Control how much recent audio context remains in the streaming buffer.",
         "promptMaxChars": "Limit the text context carried forward between realtime decoding passes.",
@@ -612,6 +610,7 @@
       "sessionTitle": "Live transcription",
       "actions": {
         "start": "Start session",
+        "preparing": "Preparing capture...",
         "starting": "Starting...",
         "stop": "Stop session",
         "stopping": "Stopping..."
@@ -634,6 +633,7 @@
         "runtime": "Realtime engine",
         "runState": {
           "idle": "Idle",
+          "preparing": "Preparing capture",
           "starting": "Starting",
           "active": "Recording",
           "finishing": "Stopping",
@@ -672,7 +672,8 @@
         },
         "microphone": {
           "title": "Microphone",
-          "description": "Choose an input device and test the incoming level.",
+          "description": "Enable this source for the next live session, then choose an input device and test the level.",
+          "toggle": "Use microphone",
           "device": "Input device",
           "defaultDevice": "System default",
           "fallbackDevice": "Microphone {{index}}",
@@ -701,13 +702,15 @@
         },
         "systemAudio": {
           "title": "System audio",
-          "description": "Start browser system-audio capture explicitly.",
+          "description": "Enable this source for the next live session, then choose and test a browser capture source.",
+          "toggle": "Use system audio",
           "captureSource": {
             "label": "Capture source"
           },
           "actions": {
-            "start": "Start",
+            "start": "Choose source",
             "test": "Test capture",
+            "stopTest": "Stop test",
             "stop": "Stop capture"
           },
           "status": {
@@ -730,7 +733,7 @@
       },
       "settings": {
         "title": "Runtime configuration",
-        "description": "Review per-session runtime parameters.",
+        "description": "Adjust runtime parameters for live transcription sessions.",
         "state": {
           "idle": "Edit parameters before starting this session.",
           "starting": "Session startup is locking runtime parameters.",
@@ -771,6 +774,10 @@
           "committed_partial": "Partial",
           "preview": "Preview"
         },
+        "actions": {
+          "expand": "Expand transcript area",
+          "restore": "Restore setup area"
+        },
         "empty": {
           "title": "No transcript yet",
           "description": "Start a live session to stream transcript output here.",
@@ -785,7 +792,19 @@
         "open": "Open compact view",
         "expand": "Expand compact view",
         "close": "Close compact view",
-        "empty": "No live transcript yet"
+        "empty": "No live transcript yet",
+        "unsupported": {
+          "title": "Small window unavailable",
+          "description": "The current browser does not support Document Picture-in-Picture. Use a supported browser or the desktop app."
+        },
+        "desktopUnavailable": {
+          "title": "Desktop small window unavailable",
+          "description": "This build does not include the desktop window adapter yet."
+        },
+        "openFailed": {
+          "title": "Small window failed to open",
+          "description": "The browser blocked the small window request. Try again from the compact view button."
+        }
       },
       "errors": {
         "actions": {
@@ -797,7 +816,7 @@
         },
         "liveSourceRequired": {
           "title": "No audio source selected",
-          "description": "Enable Microphone or System audio before starting a live session."
+          "description": "Enable at least one audio source before starting a live session."
         },
         "runtimeModelNotConfigured": {
           "title": "No model selected",
