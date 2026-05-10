@@ -21,6 +21,7 @@ describe('object-path', () => {
 
     expect(getValueByPath(source, 'audio.language.name')).toBeUndefined()
     expect(getValueByPath(source, '')).toBeUndefined()
+    expect(getValueByPath(source, 'audio..code')).toBeUndefined()
     expect(getValueByPath(null, 'audio.language.code')).toBeUndefined()
   })
 
@@ -66,5 +67,14 @@ describe('object-path', () => {
 
     expect(target).toEqual({})
     expect(({} as { polluted?: unknown }).polluted).toBeUndefined()
+  })
+
+  it('does not write partial branches for malformed paths', () => {
+    const target: Record<string, unknown> = {}
+
+    setValueByPath(target, 'decoding..temperature', 0.3)
+    setValueByPath(target, 'audio.language.', 'en')
+
+    expect(target).toEqual({})
   })
 })

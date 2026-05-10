@@ -4,15 +4,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 const FORBIDDEN_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype'])
 
-function hasForbiddenPathSegment(segments: string[]): boolean {
-  return segments.some((segment) => FORBIDDEN_PATH_SEGMENTS.has(segment))
+function resolvePathSegments(path: string): string[] | null {
+  if (!path) return null
+
+  const segments = path.split('.')
+  if (segments.some((segment) => !segment || FORBIDDEN_PATH_SEGMENTS.has(segment))) {
+    return null
+  }
+
+  return segments
 }
 
 export function getValueByPath(source: unknown, path: string): unknown {
-  if (!path) return undefined
-
-  const segments = path.split('.')
-  if (hasForbiddenPathSegment(segments)) return undefined
+  const segments = resolvePathSegments(path)
+  if (!segments) return undefined
 
   let current: unknown = source
 
@@ -29,21 +34,22 @@ export function setValueByPath(
   path: string,
   value: unknown,
 ): void {
-  const segments = path.split('.')
-  if (hasForbiddenPathSegment(segments)) return
+  const segments = resolvePathSegments(path)
+  if (!segments) return
 
-  const [head, ...rest] = segments
-  if (!head) return
+  let current = target
 
-  if (rest.length === 0) {
-    target[head] = value
-    return
+  for (const [index, segment] of segments.entries()) {
+    if (index === segments.length - 1) {
+      current[segment] = value
+      return
+    }
+
+    const existing = current[segment]
+    if (!isRecord(existing)) {
+      current[segment] = {}
+    }
+
+    current = current[segment] as Record<string, unknown>
   }
-
-  const existing = target[head]
-  if (!isRecord(existing)) {
-    target[head] = {}
-  }
-
-  setValueByPath(target[head] as Record<string, unknown>, rest.join('.'), value)
 }

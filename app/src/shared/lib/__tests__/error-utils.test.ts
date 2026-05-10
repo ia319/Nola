@@ -31,4 +31,11 @@ describe('formatApiError', () => {
     )
     expect(getApiErrorCode(error)).toBe('runtime_config_invalid')
   })
+
+  it('falls back for malformed structured details', () => {
+    const error = { detail: null } as unknown as Parameters<typeof formatApiError>[0]
+
+    expect(formatApiError(error)).toBe('Unexpected API error')
+    expect(getApiErrorCode(error)).toBeUndefined()
+  })
 })
