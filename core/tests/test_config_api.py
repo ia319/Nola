@@ -90,6 +90,10 @@ class TestConfigAPI:
             "float16",
             "int8",
         ]
+        assert data["live_realtime"] == {
+            "runtime_adapter": "whisper_streaming",
+            "supports_runtime_overrides": True,
+        }
         assert data["transcription"]["defaults"]["beam_size"] == 5
         assert data["transcription"]["defaults"]["vad_parameters"]["threshold"] == 0.5
         assert (
@@ -502,16 +506,25 @@ class TestConfigAPI:
             "/api/config/live-realtime/defaults",
             json={"word_timestamps": True},
         )
+        execution = client.patch(
+            "/api/config/live-realtime/defaults",
+            json={"device": "cpu"},
+        )
         nested = client.patch(
             "/api/config/live-realtime/defaults",
             json={"vad_parameters": {"unknown_key": 1}},
         )
 
         assert top_level.status_code == 422
+        assert execution.status_code == 422
         assert nested.status_code == 422
         assert any(
             item.get("loc", [None])[-1] == "word_timestamps"
             for item in top_level.json()["detail"]
+        )
+        assert any(
+            item.get("loc", [None])[-1] == "device"
+            for item in execution.json()["detail"]
         )
         assert any(
             "unknown_key" in item.get("msg", "") for item in nested.json()["detail"]

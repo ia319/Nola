@@ -2,6 +2,12 @@ import type { components } from './openapi'
 
 type Schemas = components['schemas']
 
+/** Live realtime runtime adapter selected by the backend process. */
+export type LiveRealtimeAdapter = Schemas['LiveRealtimeConfigResponse']['runtime_adapter']
+
+/** Runtime mode metadata exposed by GET /api/config. */
+export type LiveRealtimeRuntimeConfig = Schemas['LiveRealtimeConfigResponse']
+
 /** GET /api/config response. */
 export type AppConfig = Schemas['AppConfigResponse']
 

@@ -52,6 +52,7 @@ from nola.config.transcription import (
     AppConfigResponse,
     EngineConfigResponse,
     EngineDefaultsResponse,
+    LiveRealtimeConfigResponse,
     ModelConfigResponse,
     TranscriptionConfigResponse,
     TranscriptionDefaultsPatchResponse,
@@ -249,6 +250,11 @@ def _build_app_config_response(config_db: AppConfigDatabase) -> AppConfigRespons
     runtime_model_id = _resolve_runtime_model_id(config_db)
     return AppConfigResponse(
         engine=_build_engine_config(runtime_model_id, worker_state),
+        live_realtime=LiveRealtimeConfigResponse(
+            runtime_adapter=settings.live_realtime_transcriber,
+            supports_runtime_overrides=settings.live_realtime_transcriber
+            == "whisper_streaming",
+        ),
         transcription=TranscriptionConfigResponse(
             defaults=_to_resolved_defaults(
                 get_effective_transcription_defaults(config_db)
