@@ -6,6 +6,8 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 import type { UseAppConfigReturn } from '@/config/use-app-config'
 import type { UseModelsResult } from '@/features/models'
+import type * as RealtimeFeature from '@/features/realtime'
+import type { UseLiveDeviceInventoryReturn } from '@/features/realtime'
 import type {
   AppConfig,
   LiveRealtimeDefaults,
@@ -31,6 +33,7 @@ type LiveWorkbenchQueryData = LiveRealtimeDefaultsResponse | LiveRealtimeSchemaR
 const liveWorkbenchPageMocks = vi.hoisted(() => ({
   useAppConfigMock: vi.fn<() => UseAppConfigReturn>(),
   useModelsMock: vi.fn<() => UseModelsResult>(),
+  useLiveDeviceInventoryMock: vi.fn<() => UseLiveDeviceInventoryReturn>(),
   useQueryMock:
     vi.fn<
       (options: LiveWorkbenchQueryOptions) => LiveWorkbenchQueryResult<LiveWorkbenchQueryData>
@@ -39,7 +42,7 @@ const liveWorkbenchPageMocks = vi.hoisted(() => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => {
+    t: (key: string, options?: { percent?: number }) => {
       const messages: Record<string, string> = {
         'live.workbench.title': 'Live',
         'live.workbench.description': 'Real-time transcription',
@@ -58,6 +61,22 @@ vi.mock('react-i18next', () => ({
         'live.workbench.sessionSetup.language.label': 'Language',
         'live.workbench.sessionSetup.language.auto': 'Auto detect',
         'live.workbench.sessionSetup.runtime.label': 'Runtime',
+        'live.workbench.sessionSetup.sources.level': `Level ${options?.percent ?? 0}%`,
+        'live.workbench.sessionSetup.microphone.title': 'Microphone',
+        'live.workbench.sessionSetup.microphone.description': 'Choose an input device.',
+        'live.workbench.sessionSetup.microphone.device': 'Input device',
+        'live.workbench.sessionSetup.microphone.defaultDevice': 'System default',
+        'live.workbench.sessionSetup.microphone.actions.test': 'Test microphone',
+        'live.workbench.sessionSetup.microphone.actions.stop': 'Stop test',
+        'live.workbench.sessionSetup.microphone.status.ready': 'Ready',
+        'live.workbench.sessionSetup.systemAudio.title': 'System audio',
+        'live.workbench.sessionSetup.systemAudio.description': 'Capture system audio explicitly.',
+        'live.workbench.sessionSetup.systemAudio.captureSource.label': 'Capture source',
+        'live.workbench.sessionSetup.systemAudio.captureSource.browserPrompt':
+          'Browser capture prompt',
+        'live.workbench.sessionSetup.systemAudio.actions.test': 'Test capture',
+        'live.workbench.sessionSetup.systemAudio.actions.stop': 'Stop capture',
+        'live.workbench.sessionSetup.systemAudio.status.limited': 'Browser capture available',
         'live.workbench.transcript.title': 'Live transcript',
         'live.workbench.transcript.empty': 'No transcript yet',
         'live.workbench.settings.eyebrow': 'Session settings',
@@ -96,6 +115,15 @@ vi.mock('@/features/models', () => ({
   },
   useModels: liveWorkbenchPageMocks.useModelsMock,
 }))
+
+vi.mock('@/features/realtime', async (importActual) => {
+  const actual = await importActual<typeof RealtimeFeature>()
+
+  return {
+    ...actual,
+    useLiveDeviceInventory: liveWorkbenchPageMocks.useLiveDeviceInventoryMock,
+  }
+})
 
 function buildLiveRealtimeDefaults(
   overrides: Partial<LiveRealtimeDefaults> = {},
@@ -236,6 +264,96 @@ function buildModelsReturn(overrides: Partial<UseModelsResult> = {}): UseModelsR
   }
 }
 
+function buildLiveDeviceInventoryReturn(
+  overrides: Partial<UseLiveDeviceInventoryReturn> = {},
+): UseLiveDeviceInventoryReturn {
+  return {
+    inventory: {
+      microphones: [
+        {
+          id: 'mic-1',
+          kind: 'microphone',
+          label: 'Studio USB microphone',
+          groupId: null,
+          isTemporary: false,
+          isDefault: false,
+          isSelected: true,
+          isActive: false,
+        },
+      ],
+      speakers: [],
+      current: {
+        microphone: {
+          selectedDeviceId: 'mic-1',
+          activeDeviceId: null,
+        },
+        speaker: {
+          selectedDeviceId: null,
+          activeDeviceId: null,
+        },
+      },
+      permissions: {
+        microphone: 'prompt',
+        speakerSelection: 'unsupported',
+      },
+      capabilities: {
+        microphoneCapture: 'available',
+        speakerSelection: 'unsupported',
+        systemAudioCapture: 'limited',
+      },
+      warnings: ['system_audio_capture_limited'],
+    },
+    inventoryStatus: 'ready',
+    inventoryError: null,
+    lastMicrophonePermission: null,
+    selectedMicrophoneId: 'mic-1',
+    selectedSpeakerId: null,
+    activeMicrophoneId: null,
+    activeSpeakerId: null,
+    microphoneCapture: {
+      sessionId: null,
+      sourceKind: 'microphone',
+      deviceId: null,
+      state: 'idle',
+      errorCode: null,
+      level: {
+        level: 0.42,
+        peak: 0.5,
+        isMutedLike: false,
+        measuredAt: 1,
+      },
+      startedAt: null,
+    },
+    systemAudioCapture: {
+      sessionId: null,
+      sourceKind: 'system',
+      deviceId: null,
+      state: 'idle',
+      errorCode: null,
+      level: null,
+      startedAt: null,
+    },
+    selectMicrophone: vi.fn(),
+    selectSpeaker: vi.fn(),
+    setActiveSpeaker: vi.fn(),
+    refreshDevices: vi.fn().mockResolvedValue(null),
+    requestMicrophonePermission: vi.fn().mockResolvedValue({
+      state: 'granted',
+      granted: true,
+      warning: null,
+    }),
+    startMicrophoneCapture: vi.fn().mockResolvedValue(undefined),
+    stopMicrophoneCapture: vi.fn().mockResolvedValue(undefined),
+    pauseMicrophoneCapture: vi.fn().mockResolvedValue(undefined),
+    resumeMicrophoneCapture: vi.fn().mockResolvedValue(undefined),
+    startSystemAudioCapture: vi.fn().mockResolvedValue(undefined),
+    stopSystemAudioCapture: vi.fn().mockResolvedValue(undefined),
+    pauseSystemAudioCapture: vi.fn().mockResolvedValue(undefined),
+    resumeSystemAudioCapture: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  }
+}
+
 function buildQueryResult<TData>(data: TData): LiveWorkbenchQueryResult<TData> {
   return {
     data,
@@ -248,6 +366,9 @@ describe('LiveWorkbenchPage', () => {
     vi.clearAllMocks()
     liveWorkbenchPageMocks.useAppConfigMock.mockReturnValue(buildAppConfigReturn())
     liveWorkbenchPageMocks.useModelsMock.mockReturnValue(buildModelsReturn())
+    liveWorkbenchPageMocks.useLiveDeviceInventoryMock.mockReturnValue(
+      buildLiveDeviceInventoryReturn(),
+    )
     liveWorkbenchPageMocks.useQueryMock.mockImplementation(({ queryKey }) => {
       if (queryKey.includes('defaults')) {
         return buildQueryResult<LiveRealtimeDefaultsResponse>({
@@ -278,6 +399,13 @@ describe('LiveWorkbenchPage', () => {
     expect(screen.getByLabelText('Language')).toBeTruthy()
     expect(screen.getByText('Auto detect')).toBeTruthy()
     expect(screen.getByText('auto / default')).toBeTruthy()
+    expect(screen.getByText('Microphone')).toBeTruthy()
+    expect(screen.getByText('Studio USB microphone')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Test microphone' })).toBeTruthy()
+    expect(screen.getByText('System audio')).toBeTruthy()
+    expect(screen.getByText('Capture source')).toBeTruthy()
+    expect(screen.getByText('Browser capture prompt')).toBeTruthy()
+    expect(screen.getByText('Browser capture available')).toBeTruthy()
     expect(screen.getByRole('heading', { level: 2, name: 'Live transcript' })).toBeTruthy()
     expect(screen.getByText('No transcript yet')).toBeTruthy()
     expect(
@@ -292,5 +420,32 @@ describe('LiveWorkbenchPage', () => {
 
     expect(screen.getByRole('heading', { level: 2, name: 'Runtime configuration' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Session settings' })).toBeNull()
+  })
+
+  it('starts source test capture only from explicit user actions', () => {
+    const liveDevices = buildLiveDeviceInventoryReturn()
+    liveWorkbenchPageMocks.useLiveDeviceInventoryMock.mockReturnValue(liveDevices)
+    render(<LiveWorkbenchPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Test microphone' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'System audio' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Test capture' }))
+
+    expect(liveDevices.startMicrophoneCapture).toHaveBeenCalledWith({ deviceId: 'mic-1' })
+    expect(liveDevices.startSystemAudioCapture).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not stop or refresh idle sources when their setup toggles turn off', () => {
+    const liveDevices = buildLiveDeviceInventoryReturn()
+    liveWorkbenchPageMocks.useLiveDeviceInventoryMock.mockReturnValue(liveDevices)
+    render(<LiveWorkbenchPage />)
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Microphone' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'System audio' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'System audio' }))
+
+    expect(liveDevices.stopMicrophoneCapture).not.toHaveBeenCalled()
+    expect(liveDevices.stopSystemAudioCapture).not.toHaveBeenCalled()
+    expect(liveDevices.refreshDevices).not.toHaveBeenCalled()
   })
 })

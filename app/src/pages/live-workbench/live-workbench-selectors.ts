@@ -3,6 +3,7 @@ import type {
   LiveRealtimeOptionGroup,
   ModelResponse,
 } from '@/shared/types'
+import type { LiveAudioLevel, LiveCaptureState } from '@/features/realtime'
 
 export interface LiveWorkbenchTranscriptCounts {
   finalCount: number
@@ -11,8 +12,11 @@ export interface LiveWorkbenchTranscriptCounts {
 }
 
 export const LIVE_WORKBENCH_AUTO_LANGUAGE_VALUE = '__auto__'
+export const LIVE_WORKBENCH_DEFAULT_MICROPHONE_VALUE = '__default_microphone__'
 export const LIVE_WORKBENCH_MODEL_EMPTY_VALUE = '__model_empty__'
 export const LIVE_WORKBENCH_MODEL_LOADING_VALUE = '__model_loading__'
+export const LIVE_WORKBENCH_MICROPHONE_EMPTY_VALUE = '__microphone_empty__'
+export const LIVE_WORKBENCH_MICROPHONE_LOADING_VALUE = '__microphone_loading__'
 export const LIVE_WORKBENCH_SELECT_UNAVAILABLE_VALUE = '__unavailable__'
 
 export const EMPTY_LIVE_WORKBENCH_TRANSCRIPT_COUNTS: LiveWorkbenchTranscriptCounts = {
@@ -72,4 +76,40 @@ export function selectLiveWorkbenchSelectField(
 
 export function selectLiveWorkbenchHasTranscript(counts: LiveWorkbenchTranscriptCounts): boolean {
   return counts.finalCount > 0 || counts.committedPartialCount > 0 || counts.previewCount > 0
+}
+
+export function selectLiveWorkbenchAudioLevelPercent(level: LiveAudioLevel | null): number {
+  if (!level || !Number.isFinite(level.level)) {
+    return 0
+  }
+
+  if (level.level <= 0) {
+    return 0
+  }
+
+  if (level.level >= 1) {
+    return 100
+  }
+
+  return Math.round(level.level * 100)
+}
+
+export function selectLiveWorkbenchDisplayedAudioLevelPercent({
+  enabled,
+  state,
+  level,
+}: {
+  enabled: boolean
+  state: LiveCaptureState
+  level: LiveAudioLevel | null
+}): number {
+  if (!enabled || state !== 'capturing') {
+    return 0
+  }
+
+  return selectLiveWorkbenchAudioLevelPercent(level)
+}
+
+export function selectLiveWorkbenchIsCaptureActive(state: LiveCaptureState): boolean {
+  return state === 'starting' || state === 'capturing' || state === 'paused' || state === 'stopping'
 }

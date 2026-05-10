@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest'
 import {
   EMPTY_LIVE_WORKBENCH_TRANSCRIPT_COUNTS,
   resolveLiveWorkbenchInitialModelId,
+  selectLiveWorkbenchAudioLevelPercent,
+  selectLiveWorkbenchDisplayedAudioLevelPercent,
   selectLiveWorkbenchDownloadedModels,
   selectLiveWorkbenchHasTranscript,
+  selectLiveWorkbenchIsCaptureActive,
   selectLiveWorkbenchSelectField,
 } from '../live-workbench-selectors'
 import type { LiveRealtimeOptionGroup, ModelResponse } from '@/shared/types'
@@ -114,5 +117,63 @@ describe('live workbench selectors', () => {
   it('finds select fields from the live realtime schema', () => {
     expect(selectLiveWorkbenchSelectField(liveSchema, 'task')?.key).toBe('task')
     expect(selectLiveWorkbenchSelectField(liveSchema, 'missing')).toBeNull()
+  })
+
+  it('normalizes live source level values for compact meters', () => {
+    expect(selectLiveWorkbenchAudioLevelPercent(null)).toBe(0)
+    expect(
+      selectLiveWorkbenchAudioLevelPercent({
+        level: 0.42,
+        peak: 0.5,
+        isMutedLike: false,
+        measuredAt: 1,
+      }),
+    ).toBe(42)
+    expect(
+      selectLiveWorkbenchAudioLevelPercent({
+        level: 2,
+        peak: 2,
+        isMutedLike: false,
+        measuredAt: 1,
+      }),
+    ).toBe(100)
+  })
+
+  it('shows live source levels only while the source is capturing', () => {
+    const level = {
+      level: 0.42,
+      peak: 0.5,
+      isMutedLike: false,
+      measuredAt: 1,
+    }
+
+    expect(
+      selectLiveWorkbenchDisplayedAudioLevelPercent({
+        enabled: true,
+        state: 'capturing',
+        level,
+      }),
+    ).toBe(42)
+    expect(
+      selectLiveWorkbenchDisplayedAudioLevelPercent({
+        enabled: true,
+        state: 'stopped',
+        level,
+      }),
+    ).toBe(0)
+    expect(
+      selectLiveWorkbenchDisplayedAudioLevelPercent({
+        enabled: false,
+        state: 'capturing',
+        level,
+      }),
+    ).toBe(0)
+  })
+
+  it('detects source capture states that should stop instead of start', () => {
+    expect(selectLiveWorkbenchIsCaptureActive('idle')).toBe(false)
+    expect(selectLiveWorkbenchIsCaptureActive('capturing')).toBe(true)
+    expect(selectLiveWorkbenchIsCaptureActive('stopping')).toBe(true)
+    expect(selectLiveWorkbenchIsCaptureActive('failed')).toBe(false)
   })
 })
