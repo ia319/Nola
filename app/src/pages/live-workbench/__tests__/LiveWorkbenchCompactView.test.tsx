@@ -44,10 +44,12 @@ function renderCompactView(overrides: Partial<LiveWorkbenchCompactViewProps> = {
 }
 
 describe('LiveWorkbenchCompactView', () => {
-  it('renders as a non-modal floating region when open', () => {
+  it('renders as browser compact window content when open', () => {
     renderCompactView()
 
-    expect(screen.getByRole('region', { name: 'Compact live view' })).toBeTruthy()
+    const compactView = screen.getByRole('region', { name: 'Compact live view' })
+    expect(compactView).toBeTruthy()
+    expect(compactView).toHaveClass('h-screen', 'w-screen')
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.getByText('Recording · 0:03')).toBeTruthy()
     expect(screen.getByText('Microphone')).toBeTruthy()
@@ -55,16 +57,23 @@ describe('LiveWorkbenchCompactView', () => {
     expect(screen.getByText('No live transcript yet')).toBeTruthy()
   })
 
-  it('closes from the close button and Escape key', () => {
+  it('focuses the close button and scopes Escape to the compact view', () => {
     const onOpenChange = vi.fn()
     renderCompactView({ onOpenChange })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close compact view' }))
-    fireEvent.keyDown(document, { key: 'Escape' })
+    const closeButton = screen.getByRole('button', { name: 'Close compact view' })
+    expect(closeButton).toHaveFocus()
 
-    expect(onOpenChange).toHaveBeenCalledTimes(2)
+    fireEvent.click(closeButton)
+    expect(onOpenChange).toHaveBeenCalledTimes(1)
     expect(onOpenChange).toHaveBeenNthCalledWith(1, false)
-    expect(onOpenChange).toHaveBeenNthCalledWith(2, false)
+
+    onOpenChange.mockClear()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(onOpenChange).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(closeButton, { key: 'Escape' })
+    expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
   it('expands through the callback without owning the close behavior', () => {

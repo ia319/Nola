@@ -9,7 +9,6 @@ import type { LiveWorkbenchTranscriptItem } from './live-workbench-selectors'
 
 export interface LiveWorkbenchCompactViewProps {
   open: boolean
-  surface?: 'overlay' | 'window'
   background?: 'solid' | 'transparent'
   status: string
   duration: string
@@ -26,7 +25,6 @@ export interface LiveWorkbenchCompactViewProps {
 
 export function LiveWorkbenchCompactView({
   open,
-  surface = 'overlay',
   background = 'solid',
   status,
   duration,
@@ -43,19 +41,41 @@ export function LiveWorkbenchCompactView({
   const { t } = useTranslation()
   const titleId = useId()
   const containerRef = useRef<HTMLElement | null>(null)
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (!open) return undefined
     const eventDocument = containerRef.current?.ownerDocument ?? document
+    const activeElement = eventDocument.activeElement
+    const htmlElementConstructor = eventDocument.defaultView?.HTMLElement
+    previouslyFocusedElementRef.current =
+      htmlElementConstructor && activeElement instanceof htmlElementConstructor
+        ? activeElement
+        : null
+    closeButtonRef.current?.focus()
 
     function handleKeyDown(event: KeyboardEvent): void {
-      if (event.key === 'Escape' || event.key === 'Esc') {
-        onOpenChange(false)
-      }
+      if (event.defaultPrevented || (event.key !== 'Escape' && event.key !== 'Esc')) return
+
+      const container = containerRef.current
+      if (!container || !isEventTargetInsideContainer(event.target, container)) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      onOpenChange(false)
     }
 
     eventDocument.addEventListener('keydown', handleKeyDown)
-    return () => eventDocument.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      eventDocument.removeEventListener('keydown', handleKeyDown)
+
+      const elementToRestore = previouslyFocusedElementRef.current
+      previouslyFocusedElementRef.current = null
+      if (elementToRestore?.isConnected) {
+        elementToRestore.focus()
+      }
+    }
   }, [onOpenChange, open])
 
   function handleExpand(): void {
@@ -71,10 +91,7 @@ export function LiveWorkbenchCompactView({
       aria-labelledby={titleId}
       data-slot="live-workbench-compact-view"
       className={cn(
-        'text-card-foreground flex flex-col overflow-hidden',
-        surface === 'window'
-          ? 'h-screen w-screen rounded-none border-0 shadow-none'
-          : 'fixed right-6 bottom-6 z-40 h-[420px] w-[360px] rounded-xl border shadow-lg',
+        'text-card-foreground flex h-screen w-screen flex-col overflow-hidden rounded-none border-0 shadow-none',
         background === 'transparent' ? 'bg-background/80 backdrop-blur-md' : 'bg-card',
       )}
     >
@@ -105,6 +122,7 @@ export function LiveWorkbenchCompactView({
             size="icon-sm"
             variant="ghost"
             aria-label={t('live.workbench.compact.close')}
+            ref={closeButtonRef}
             onClick={() => onOpenChange(false)}
           >
             <X className="size-4" />
@@ -167,6 +185,11 @@ export function LiveWorkbenchCompactView({
       </div>
     </aside>
   )
+}
+
+function isEventTargetInsideContainer(target: EventTarget | null, container: HTMLElement): boolean {
+  const nodeConstructor = container.ownerDocument.defaultView?.Node
+  return Boolean(nodeConstructor && target instanceof nodeConstructor && container.contains(target))
 }
 
 function SourceRow({
