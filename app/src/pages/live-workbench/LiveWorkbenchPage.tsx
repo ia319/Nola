@@ -526,6 +526,7 @@ export function LiveWorkbenchPage() {
       options.push({
         value: resolvedLanguage,
         label: resolvedLanguage,
+        disabled: true,
       })
     }
 
@@ -782,87 +783,92 @@ export function LiveWorkbenchPage() {
     >
       <div
         data-slot="live-workbench-body"
-        className="grid min-h-0 flex-1 grid-rows-[auto_auto_minmax(420px,1fr)] gap-4"
+        className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4"
       >
         <LiveWorkbenchStatusBar items={statusItems} />
-        <LiveWorkbenchSessionSetup
-          modelValue={modelValue}
-          modelOptions={modelOptions}
-          modelDisabled={isModelsLoading || downloadedModels.length === 0}
-          taskValue={taskValue}
-          taskOptions={taskOptions}
-          taskDisabled={
-            !hasDefaults || schemaQuery.isPending || !taskField || taskOptionValues.size === 0
-          }
-          taskLabel={
-            taskField ? t(taskField.label_key) : t('live.workbench.sessionSetup.task.label')
-          }
-          languageValue={languageValue}
-          languageOptions={languageOptions}
-          languageDisabled={
-            !hasDefaults ||
-            schemaQuery.isPending ||
-            isConfigLoading ||
-            !languageField ||
-            languageOptionValues.size === 0
-          }
-          languageLabel={
-            languageField
-              ? t(languageField.label_key)
-              : t('live.workbench.sessionSetup.language.label')
-          }
-          runtimeSummary={runtimeSummary}
-          microphoneEnabled={microphoneEnabled}
-          microphoneValue={microphoneValue}
-          microphoneOptions={microphoneOptions}
-          microphoneDisabled={microphoneDisabled}
-          microphoneStatus={t(microphoneStatus.i18nKey)}
-          microphoneStatusTone={microphoneStatus.tone}
-          microphoneLevelPercent={selectLiveWorkbenchDisplayedAudioLevelPercent({
-            enabled: microphoneEnabled,
-            state: liveDevices.microphoneCapture.state,
-            level: liveDevices.microphoneCapture.level,
-          })}
-          microphoneActionLabel={t(
-            microphoneActionMode === 'stop'
-              ? 'live.workbench.sessionSetup.microphone.actions.stop'
-              : 'live.workbench.sessionSetup.microphone.actions.test',
-          )}
-          microphoneActionDisabled={microphoneActionDisabled}
-          microphoneActionMode={microphoneActionMode}
-          systemAudioEnabled={systemAudioEnabled}
-          systemAudioDisabled={systemAudioDisabled}
-          systemAudioStatus={t(systemAudioStatus.i18nKey)}
-          systemAudioStatusTone={systemAudioStatus.tone}
-          systemAudioLevelPercent={selectLiveWorkbenchDisplayedAudioLevelPercent({
-            enabled: systemAudioEnabled,
-            state: liveDevices.systemAudioCapture.state,
-            level: liveDevices.systemAudioCapture.level,
-          })}
-          systemAudioCaptureSource={t(
-            'live.workbench.sessionSetup.systemAudio.captureSource.browserPrompt',
-          )}
-          systemAudioActionLabel={t(
-            systemAudioActionMode === 'stop'
-              ? 'live.workbench.sessionSetup.systemAudio.actions.stop'
-              : 'live.workbench.sessionSetup.systemAudio.actions.test',
-          )}
-          systemAudioActionDisabled={systemAudioActionDisabled}
-          systemAudioActionMode={systemAudioActionMode}
-          settingsOpen={settingsOpen}
-          onModelChange={handleModelChange}
-          onTaskChange={handleTaskChange}
-          onLanguageChange={handleLanguageChange}
-          onMicrophoneEnabledChange={handleMicrophoneEnabledChange}
-          onMicrophoneChange={handleMicrophoneChange}
-          onMicrophoneAction={handleMicrophoneAction}
-          onSystemAudioEnabledChange={handleSystemAudioEnabledChange}
-          onSystemAudioAction={handleSystemAudioAction}
-          onOpenSettings={() => setSettingsOpen(true)}
-        />
 
-        <div className="flex min-h-0 gap-4">
-          <LiveWorkbenchTranscriptPanel hasTranscript={hasTranscript} />
+        <div className="flex min-h-0 gap-4 max-lg:flex-col">
+          <div
+            data-slot="live-workbench-work-area"
+            className="grid min-h-0 flex-1 grid-rows-[auto_minmax(420px,1fr)] gap-4"
+          >
+            <LiveWorkbenchSessionSetup
+              modelValue={modelValue}
+              modelOptions={modelOptions}
+              modelDisabled={isModelsLoading || downloadedModels.length === 0}
+              taskValue={taskValue}
+              taskOptions={taskOptions}
+              taskDisabled={
+                !hasDefaults || schemaQuery.isPending || !taskField || taskOptionValues.size === 0
+              }
+              taskLabel={
+                taskField ? t(taskField.label_key) : t('live.workbench.sessionSetup.task.label')
+              }
+              languageValue={languageValue}
+              languageOptions={languageOptions}
+              languageDisabled={
+                !hasDefaults ||
+                schemaQuery.isPending ||
+                isConfigLoading ||
+                !languageField ||
+                languageOptionValues.size === 0
+              }
+              languageLabel={
+                languageField
+                  ? t(languageField.label_key)
+                  : t('live.workbench.sessionSetup.language.label')
+              }
+              runtimeSummary={runtimeSummary}
+              microphoneEnabled={microphoneEnabled}
+              microphoneValue={microphoneValue}
+              microphoneOptions={microphoneOptions}
+              microphoneDisabled={microphoneDisabled}
+              microphoneStatus={t(microphoneStatus.i18nKey)}
+              microphoneStatusTone={microphoneStatus.tone}
+              microphoneLevelPercent={selectLiveWorkbenchDisplayedAudioLevelPercent({
+                enabled: microphoneEnabled,
+                state: liveDevices.microphoneCapture.state,
+                level: liveDevices.microphoneCapture.level,
+              })}
+              microphoneActionLabel={t(
+                microphoneActionMode === 'stop'
+                  ? 'live.workbench.sessionSetup.microphone.actions.stop'
+                  : 'live.workbench.sessionSetup.microphone.actions.test',
+              )}
+              microphoneActionDisabled={microphoneActionDisabled}
+              microphoneActionMode={microphoneActionMode}
+              systemAudioEnabled={systemAudioEnabled}
+              systemAudioDisabled={systemAudioDisabled}
+              systemAudioStatus={t(systemAudioStatus.i18nKey)}
+              systemAudioStatusTone={systemAudioStatus.tone}
+              systemAudioLevelPercent={selectLiveWorkbenchDisplayedAudioLevelPercent({
+                enabled: systemAudioEnabled,
+                state: liveDevices.systemAudioCapture.state,
+                level: liveDevices.systemAudioCapture.level,
+              })}
+              systemAudioCaptureSource={t(
+                'live.workbench.sessionSetup.systemAudio.captureSource.browserPrompt',
+              )}
+              systemAudioActionLabel={t(
+                systemAudioActionMode === 'stop'
+                  ? 'live.workbench.sessionSetup.systemAudio.actions.stop'
+                  : 'live.workbench.sessionSetup.systemAudio.actions.test',
+              )}
+              systemAudioActionDisabled={systemAudioActionDisabled}
+              systemAudioActionMode={systemAudioActionMode}
+              settingsOpen={settingsOpen}
+              onModelChange={handleModelChange}
+              onTaskChange={handleTaskChange}
+              onLanguageChange={handleLanguageChange}
+              onMicrophoneEnabledChange={handleMicrophoneEnabledChange}
+              onMicrophoneChange={handleMicrophoneChange}
+              onMicrophoneAction={handleMicrophoneAction}
+              onSystemAudioEnabledChange={handleSystemAudioEnabledChange}
+              onSystemAudioAction={handleSystemAudioAction}
+              onSettingsToggle={() => setSettingsOpen((open) => !open)}
+            />
+            <LiveWorkbenchTranscriptPanel hasTranscript={hasTranscript} />
+          </div>
           <LiveWorkbenchSettingsPanel open={settingsOpen} onOpenChange={setSettingsOpen} />
         </div>
       </div>
