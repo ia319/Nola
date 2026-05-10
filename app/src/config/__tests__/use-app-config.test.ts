@@ -19,13 +19,17 @@ vi.mock('../logger', () => ({
 }))
 
 function buildConfig(overrides?: Partial<AppConfig>): AppConfig {
-  return {
+  const config: AppConfig = {
     engine: {
       model_size: 'small',
       device: 'cpu',
       compute_type: 'default',
       is_multilingual: true,
       schema: TEST_ENGINE_SCHEMA,
+    },
+    live_realtime: {
+      runtime_adapter: 'whisper_streaming',
+      supports_runtime_overrides: true,
     },
     transcription: {
       defaults: {
@@ -81,6 +85,11 @@ function buildConfig(overrides?: Partial<AppConfig>): AppConfig {
     },
     effective_languages: [{ code: 'en', label_key: 'options.language.en' }],
     ...overrides,
+  }
+
+  return {
+    ...config,
+    live_realtime: overrides?.live_realtime ?? config.live_realtime,
   }
 }
 

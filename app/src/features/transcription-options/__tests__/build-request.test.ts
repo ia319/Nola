@@ -26,6 +26,10 @@ function buildAppConfigReturn(overrides: Partial<TranscriptionDefaults> = {}): U
         is_multilingual: true,
         schema: TEST_ENGINE_SCHEMA,
       },
+      live_realtime: {
+        runtime_adapter: 'whisper_streaming',
+        supports_runtime_overrides: true,
+      },
       transcription: { defaults, schema: [] },
       file: { allowed_extensions: [], allowed_mime_types: [], max_file_size: 0 },
       effective_languages: [],

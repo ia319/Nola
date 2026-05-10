@@ -172,6 +172,10 @@ function buildAppConfigReturn(
       file: { allowed_extensions: [], allowed_mime_types: [], max_file_size: 0 },
       effective_languages: [{ code: 'en', label_key: 'options.language.en' }],
       ...overrides,
+      live_realtime: overrides.live_realtime ?? {
+        runtime_adapter: 'whisper_streaming',
+        supports_runtime_overrides: true,
+      },
     },
     fileValidationConfig: { allowedExtensions: [], allowedMimeTypes: [], maxFileSize: 0 },
     isLoading: false,
