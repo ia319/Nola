@@ -101,8 +101,8 @@ export function LiveRealtimeTab() {
     saveMutation.isPending ||
     resetMutation.isPending
 
-  function handleFieldChange(key: string, value: LiveRealtimeDraftValue): void {
-    if (!defaults) return
+  function handleFieldChange(key: string, value: LiveRealtimeDraftValue | undefined): void {
+    if (!defaults || value === undefined) return
 
     setDraft((current) => {
       return updateLiveRealtimeDraft(current, defaults, key, value)

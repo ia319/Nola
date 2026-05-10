@@ -1,15 +1,26 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
-import { fetchLiveRealtimeDefaults, fetchLiveRealtimeSchema } from '@/config/api'
+import {
+  deleteLiveRealtimeDefaults,
+  fetchLiveRealtimeDefaults,
+  fetchLiveRealtimeSchema,
+  patchLiveRealtimeDefaults,
+} from '@/config/api'
+import logger from '@/config/logger'
 import { useAppConfig } from '@/config/use-app-config'
 import { DEFAULT_MODEL_LIST_QUERY, useModels, type ModelListQuery } from '@/features/models'
 import {
+  areLiveRealtimeDraftValuesEqual,
+  buildLiveRealtimeDefaultsPatchPayload,
+  clearLiveRealtimeDraftValue,
   isTemporaryLiveDeviceId,
   resolveLiveRealtimeEffectiveValue,
   updateLiveRealtimeDraft,
   useLiveDeviceInventory,
+  useLiveRealtimeStore,
   type LiveAudioDevice,
   type LiveCaptureSlotState,
   type LiveDeviceCapabilityState,
@@ -17,9 +28,18 @@ import {
   type LiveDeviceInventoryStatus,
   type LiveDeviceWarningCode,
   type LiveRealtimeDraft,
+  type LiveRealtimeDraftValue,
+  type LiveRealtimeRunState,
 } from '@/features/realtime'
 import { ContentCanvas } from '@/layouts'
+import { isAppError } from '@/shared/lib/error-factory'
 import { queryKeys } from '@/shared/lib/query-keys'
+import type {
+  AppError,
+  LiveRealtimeDefaultsResponse,
+  LiveRealtimeDefaultsUpdateRequest,
+  LiveRealtimeOptionGroup,
+} from '@/shared/types'
 import {
   formatLiveWorkbenchCount,
   formatLiveWorkbenchEmptyValue,
@@ -57,6 +77,8 @@ const LIVE_WORKBENCH_MODEL_QUERY = {
 
 const EMPTY_LIVE_AUDIO_DEVICES: readonly LiveAudioDevice[] = []
 const EMPTY_LIVE_DEVICE_WARNINGS: readonly LiveDeviceWarningCode[] = []
+const EMPTY_LIVE_REALTIME_SCHEMA: LiveRealtimeOptionGroup[] = []
+const LIVE_WORKBENCH_MAIN_SETTING_KEYS: ReadonlySet<string> = new Set(['task', 'language'])
 
 interface LiveWorkbenchSourceStatus {
   i18nKey: string
@@ -65,6 +87,80 @@ interface LiveWorkbenchSourceStatus {
 
 function ignoreOpenChange() {
   return undefined
+}
+
+function toAppError(error: unknown): AppError {
+  if (isAppError(error)) return error
+  return {
+    code: 'API_SERVER_UNKNOWN',
+    i18nKey: 'error.api.serverError',
+    retriable: true,
+  }
+}
+
+function canEditLiveWorkbenchSettings(runState: LiveRealtimeRunState): boolean {
+  return runState === 'idle' || runState === 'failed'
+}
+
+function buildLiveWorkbenchSettingsSchema(
+  schema: LiveRealtimeOptionGroup[],
+): LiveRealtimeOptionGroup[] {
+  return schema
+    .map((group) => ({
+      ...group,
+      fields: group.fields.filter((field) => !LIVE_WORKBENCH_MAIN_SETTING_KEYS.has(field.key)),
+    }))
+    .filter((group) => group.fields.length > 0)
+}
+
+function buildLiveWorkbenchSettingsKeySet(schema: LiveRealtimeOptionGroup[]): ReadonlySet<string> {
+  return new Set(schema.flatMap((group) => group.fields.map((field) => field.key)))
+}
+
+function pickLiveWorkbenchSettingsDraft(
+  draft: LiveRealtimeDraft,
+  settingKeys: ReadonlySet<string>,
+): LiveRealtimeDraft {
+  const next: LiveRealtimeDraft = {}
+
+  for (const [key, value] of Object.entries(draft)) {
+    if (settingKeys.has(key)) {
+      next[key] = value
+    }
+  }
+
+  return next
+}
+
+function mergeLiveWorkbenchSettingsDraft(
+  current: LiveRealtimeDraft,
+  settingsDraft: LiveRealtimeDraft,
+  settingKeys: ReadonlySet<string>,
+): LiveRealtimeDraft {
+  const next: LiveRealtimeDraft = {}
+
+  for (const [key, value] of Object.entries(current)) {
+    if (!settingKeys.has(key)) {
+      next[key] = value
+    }
+  }
+
+  return {
+    ...next,
+    ...settingsDraft,
+  }
+}
+
+function areLiveRealtimeDraftsEqual(left: LiveRealtimeDraft, right: LiveRealtimeDraft): boolean {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)])
+
+  for (const key of keys) {
+    if (!areLiveRealtimeDraftValuesEqual(left[key], right[key])) {
+      return false
+    }
+  }
+
+  return true
 }
 
 function hasDeviceWarning(
@@ -324,7 +420,9 @@ function canStartSystemAudioCapture({
 
 export function LiveWorkbenchPage() {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
   const { config, isLoading: isConfigLoading } = useAppConfig()
+  const liveRunState = useLiveRealtimeStore((state) => state.runState)
   const {
     models,
     configuredModelId,
@@ -341,6 +439,7 @@ export function LiveWorkbenchPage() {
   })
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [draft, setDraft] = useState<LiveRealtimeDraft>({})
+  const [settingsDraft, setSettingsDraft] = useState<LiveRealtimeDraft>({})
   const [selectedModelOverrideId, setSelectedModelOverrideId] = useState<string | null>(null)
   const [microphoneEnabled, setMicrophoneEnabled] = useState(true)
   const [systemAudioEnabled, setSystemAudioEnabled] = useState(false)
@@ -348,8 +447,71 @@ export function LiveWorkbenchPage() {
   const emptyValue = formatLiveWorkbenchEmptyValue()
   const hasTranscript = selectLiveWorkbenchHasTranscript(EMPTY_LIVE_WORKBENCH_TRANSCRIPT_COUNTS)
   const defaults = defaultsQuery.data?.defaults ?? null
-  const schema = schemaQuery.data?.schema ?? []
+  const schema = schemaQuery.data?.schema ?? EMPTY_LIVE_REALTIME_SCHEMA
+  const settingsSchema = useMemo(() => buildLiveWorkbenchSettingsSchema(schema), [schema])
+  const settingsFieldKeys = useMemo(
+    () => buildLiveWorkbenchSettingsKeySet(settingsSchema),
+    [settingsSchema],
+  )
   const hasDefaults = defaults !== null
+  const settingsEditable = canEditLiveWorkbenchSettings(liveRunState)
+  const settingsDraftHasChanges = Object.keys(settingsDraft).length > 0
+  const settingsDraftMatchesSession = areLiveRealtimeDraftsEqual(
+    settingsDraft,
+    pickLiveWorkbenchSettingsDraft(draft, settingsFieldKeys),
+  )
+  const saveDefaultsMutation = useMutation({
+    mutationFn: (payload: LiveRealtimeDefaultsUpdateRequest) => patchLiveRealtimeDefaults(payload),
+    onSuccess: (response) => {
+      queryClient.setQueryData<LiveRealtimeDefaultsResponse>(
+        queryKeys.config.liveRealtimeDefaults(),
+        { defaults: response.defaults },
+      )
+      void queryClient
+        .invalidateQueries({ queryKey: queryKeys.config.liveRealtimeDefaults() })
+        .catch((error: unknown) => {
+          logger.warn('live.workbench.settings.refreshDefaultsFailed', { error })
+          toast.warning(t('live.workbench.settings.toast.refreshWarning'))
+        })
+      setDraft((current) => mergeLiveWorkbenchSettingsDraft(current, {}, settingsFieldKeys))
+      setSettingsDraft({})
+      toast.success(t('live.workbench.settings.toast.defaultsSaved'))
+    },
+    onError: (error) => {
+      logger.error('live.workbench.settings.saveDefaultsFailed', { error })
+      const appError = toAppError(error)
+      toast.error(t(appError.i18nKey, appError.params ?? {}))
+    },
+  })
+  const resetDefaultsMutation = useMutation({
+    mutationFn: async () => {
+      await deleteLiveRealtimeDefaults()
+      return fetchLiveRealtimeDefaults()
+    },
+    onSuccess: (response) => {
+      queryClient.setQueryData<LiveRealtimeDefaultsResponse>(
+        queryKeys.config.liveRealtimeDefaults(),
+        response,
+      )
+      void queryClient
+        .invalidateQueries({ queryKey: queryKeys.config.liveRealtimeDefaults() })
+        .catch((error: unknown) => {
+          logger.warn('live.workbench.settings.refreshDefaultsFailed', { error })
+          toast.warning(t('live.workbench.settings.toast.refreshWarning'))
+        })
+      setDraft((current) => mergeLiveWorkbenchSettingsDraft(current, {}, settingsFieldKeys))
+      setSettingsDraft({})
+      toast.success(t('live.workbench.settings.toast.defaultsReset'))
+    },
+    onError: (error) => {
+      logger.error('live.workbench.settings.resetDefaultsFailed', { error })
+      const appError = toAppError(error)
+      toast.error(t(appError.i18nKey, appError.params ?? {}))
+    },
+  })
+  const settingsMutationPending = saveDefaultsMutation.isPending || resetDefaultsMutation.isPending
+  const settingsControlsDisabled =
+    !settingsEditable || defaultsQuery.isPending || schemaQuery.isPending || settingsMutationPending
   const downloadedModels = useMemo(() => selectLiveWorkbenchDownloadedModels(models), [models])
   const downloadedModelIds = useMemo(
     () => new Set(downloadedModels.map((model) => model.model_id)),
@@ -719,14 +881,8 @@ export function LiveWorkbenchPage() {
   function handleLanguageChange(value: string): void {
     if (!defaults || !languageOptionValues.has(value)) return
 
-    setDraft((current) =>
-      updateLiveRealtimeDraft(
-        current,
-        defaults,
-        'language',
-        value === LIVE_WORKBENCH_AUTO_LANGUAGE_VALUE ? null : value,
-      ),
-    )
+    const nextValue = value === LIVE_WORKBENCH_AUTO_LANGUAGE_VALUE ? null : value
+    setDraft((current) => updateLiveRealtimeDraft(current, defaults, 'language', nextValue))
   }
 
   function handleMicrophoneEnabledChange(enabled: boolean): void {
@@ -773,24 +929,75 @@ export function LiveWorkbenchPage() {
     void liveDevices.startSystemAudioCapture()
   }
 
+  function handleSettingsToggle(): void {
+    if (settingsOpen) {
+      setSettingsOpen(false)
+      return
+    }
+
+    setSettingsDraft(pickLiveWorkbenchSettingsDraft(draft, settingsFieldKeys))
+    setSettingsOpen(true)
+  }
+
+  function handleSettingsDraftChange(key: string, value: LiveRealtimeDraftValue | undefined): void {
+    if (!defaults || !settingsEditable) return
+
+    setSettingsDraft((current) =>
+      value === undefined
+        ? clearLiveRealtimeDraftValue(current, key)
+        : updateLiveRealtimeDraft(current, defaults, key, value),
+    )
+  }
+
+  function handleApplySettingsDraft(): void {
+    if (!settingsEditable || settingsDraftMatchesSession) return
+
+    setDraft((current) =>
+      mergeLiveWorkbenchSettingsDraft(current, settingsDraft, settingsFieldKeys),
+    )
+  }
+
+  function handleResetSettingsDraft(): void {
+    if (!settingsEditable) return
+
+    setSettingsDraft({})
+  }
+
+  function handleSaveSettingsDefaults(): void {
+    if (!settingsEditable || !settingsDraftHasChanges || settingsMutationPending) return
+
+    saveDefaultsMutation.mutate(buildLiveRealtimeDefaultsPatchPayload(settingsDraft))
+  }
+
+  function handleResetSavedDefaults(): void {
+    if (!settingsEditable || settingsMutationPending) return
+
+    resetDefaultsMutation.mutate()
+  }
+
+  function handleSettingsRetry(): void {
+    void defaultsQuery.refetch()
+    void schemaQuery.refetch()
+  }
+
   return (
     <ContentCanvas
       as="main"
       width="full"
       height="fill"
-      className="gap-5 px-0 py-0"
+      className="gap-5 overflow-hidden px-0 py-0"
       data-slot="live-workbench-page"
     >
       <div
         data-slot="live-workbench-body"
-        className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4"
+        className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden"
       >
         <LiveWorkbenchStatusBar items={statusItems} />
 
-        <div className="flex min-h-0 gap-4 max-lg:flex-col">
+        <div className="flex min-h-0 gap-4 overflow-hidden max-lg:flex-col max-lg:overflow-y-auto lg:h-full">
           <div
             data-slot="live-workbench-work-area"
-            className="grid min-h-0 flex-1 grid-rows-[auto_minmax(420px,1fr)] gap-4"
+            className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden lg:h-full"
           >
             <LiveWorkbenchSessionSetup
               modelValue={modelValue}
@@ -865,11 +1072,40 @@ export function LiveWorkbenchPage() {
               onMicrophoneAction={handleMicrophoneAction}
               onSystemAudioEnabledChange={handleSystemAudioEnabledChange}
               onSystemAudioAction={handleSystemAudioAction}
-              onSettingsToggle={() => setSettingsOpen((open) => !open)}
+              onSettingsToggle={handleSettingsToggle}
             />
             <LiveWorkbenchTranscriptPanel hasTranscript={hasTranscript} />
           </div>
-          <LiveWorkbenchSettingsPanel open={settingsOpen} onOpenChange={setSettingsOpen} />
+          <LiveWorkbenchSettingsPanel
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
+            runState={liveRunState}
+            defaults={defaults}
+            schema={settingsSchema}
+            draft={settingsDraft}
+            languages={config?.effective_languages ?? []}
+            loading={defaultsQuery.isPending || schemaQuery.isPending}
+            unavailable={Boolean(defaultsQuery.error || schemaQuery.error)}
+            controlsDisabled={settingsControlsDisabled}
+            applyDisabled={
+              !settingsEditable || settingsDraftMatchesSession || settingsMutationPending
+            }
+            resetDraftDisabled={
+              !settingsEditable || !settingsDraftHasChanges || settingsMutationPending
+            }
+            saveDefaultsDisabled={
+              !settingsEditable || !settingsDraftHasChanges || settingsMutationPending
+            }
+            resetSavedDefaultsDisabled={!settingsEditable || settingsMutationPending}
+            savingDefaults={saveDefaultsMutation.isPending}
+            resettingDefaults={resetDefaultsMutation.isPending}
+            onDraftChange={handleSettingsDraftChange}
+            onApplyDraft={handleApplySettingsDraft}
+            onResetDraft={handleResetSettingsDraft}
+            onSaveDefaults={handleSaveSettingsDefaults}
+            onResetSavedDefaults={handleResetSavedDefaults}
+            onRetry={handleSettingsRetry}
+          />
         </div>
       </div>
 

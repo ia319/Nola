@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { QueryKey } from '@tanstack/react-query'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
@@ -26,9 +26,16 @@ type LiveWorkbenchQueryOptions = {
 type LiveWorkbenchQueryResult<TData> = {
   data: TData
   isPending: false
+  error?: null
+  refetch: () => void
 }
 
 type LiveWorkbenchQueryData = LiveRealtimeDefaultsResponse | LiveRealtimeSchemaResponse
+type LiveWorkbenchMutationOptions = {
+  mutationFn: (payload?: unknown) => Promise<unknown>
+  onSuccess?: (data: unknown) => void
+  onError?: (error: unknown) => void
+}
 
 const liveWorkbenchPageMocks = vi.hoisted(() => ({
   useAppConfigMock: vi.fn<() => UseAppConfigReturn>(),
@@ -38,6 +45,18 @@ const liveWorkbenchPageMocks = vi.hoisted(() => ({
     vi.fn<
       (options: LiveWorkbenchQueryOptions) => LiveWorkbenchQueryResult<LiveWorkbenchQueryData>
     >(),
+  useMutationMock: vi.fn<(options: LiveWorkbenchMutationOptions) => unknown>(),
+  queryClientMock: {
+    setQueryData: vi.fn(),
+    invalidateQueries: vi.fn(),
+  },
+  fetchLiveRealtimeDefaultsMock: vi.fn(),
+  fetchLiveRealtimeSchemaMock: vi.fn(),
+  patchLiveRealtimeDefaultsMock: vi.fn(),
+  deleteLiveRealtimeDefaultsMock: vi.fn(),
+  toastSuccessMock: vi.fn(),
+  toastWarningMock: vi.fn(),
+  toastErrorMock: vi.fn(),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -79,16 +98,41 @@ vi.mock('react-i18next', () => ({
         'live.workbench.sessionSetup.systemAudio.status.limited': 'Browser capture available',
         'live.workbench.transcript.title': 'Live transcript',
         'live.workbench.transcript.empty': 'No transcript yet',
-        'live.workbench.settings.eyebrow': 'Session settings',
         'live.workbench.settings.title': 'Runtime configuration',
         'live.workbench.settings.description': 'Review per-session runtime parameters.',
+        'live.workbench.settings.state.idle': 'Edit parameters before starting this session.',
+        'live.workbench.settings.state.starting': 'Session startup is locking runtime parameters.',
+        'live.workbench.settings.state.active':
+          'Session is running. Runtime parameters are read-only.',
+        'live.workbench.settings.state.finishing':
+          'Session shutdown is locking runtime parameters.',
+        'live.workbench.settings.state.finished':
+          'Session is finished. Runtime parameters are read-only.',
+        'live.workbench.settings.state.failed': 'Adjust parameters before retrying this session.',
+        'live.workbench.settings.actions.apply': 'Apply',
+        'live.workbench.settings.actions.resetDraft': 'Reset draft',
+        'live.workbench.settings.actions.saveDefaults': 'Save as defaults',
+        'live.workbench.settings.actions.savingDefaults': 'Saving defaults...',
+        'live.workbench.settings.actions.resetSavedDefaults': 'Reset saved defaults',
+        'live.workbench.settings.actions.resettingDefaults': 'Resetting defaults...',
+        'live.workbench.settings.actions.retry': 'Retry',
+        'live.workbench.settings.toast.defaultsSaved': 'Live defaults saved',
+        'live.workbench.settings.toast.defaultsReset': 'Live defaults reset',
+        'live.workbench.settings.toast.refreshWarning': 'Defaults saved, but refresh failed',
         'live.workbench.settings.empty.title': 'No adjustable settings',
         'live.workbench.settings.empty.description':
           'This session currently has no editable runtime settings.',
+        'settings.liveRealtime.groups.recognition': 'Recognition',
         'settings.liveRealtime.fields.task.label': 'Task',
+        'settings.liveRealtime.fields.task.description': 'Task mode',
         'settings.liveRealtime.fields.language.label': 'Language',
+        'settings.liveRealtime.fields.language.description': 'Language hint',
+        'settings.liveRealtime.fields.beamSize.label': 'Beam size',
+        'settings.liveRealtime.fields.beamSize.description': 'Beam size hint',
         'settings.liveRealtime.values.task.transcribe': 'Transcribe',
         'settings.liveRealtime.values.task.translate': 'Translate',
+        'settings.liveRealtime.values.auto': 'Auto detect',
+        'settings.liveRealtime.values.empty': 'Not set',
         'options.language.en': 'English',
         'components.workspaceSidePanel.close': 'Close',
       }
@@ -100,6 +144,15 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: liveWorkbenchPageMocks.useQueryMock,
+  useMutation: liveWorkbenchPageMocks.useMutationMock,
+  useQueryClient: () => liveWorkbenchPageMocks.queryClientMock,
+}))
+
+vi.mock('@/config/api', () => ({
+  fetchLiveRealtimeDefaults: liveWorkbenchPageMocks.fetchLiveRealtimeDefaultsMock,
+  fetchLiveRealtimeSchema: liveWorkbenchPageMocks.fetchLiveRealtimeSchemaMock,
+  patchLiveRealtimeDefaults: liveWorkbenchPageMocks.patchLiveRealtimeDefaultsMock,
+  deleteLiveRealtimeDefaults: liveWorkbenchPageMocks.deleteLiveRealtimeDefaultsMock,
 }))
 
 vi.mock('@/config/use-app-config', () => ({
@@ -124,6 +177,14 @@ vi.mock('@/features/realtime', async (importActual) => {
     useLiveDeviceInventory: liveWorkbenchPageMocks.useLiveDeviceInventoryMock,
   }
 })
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: liveWorkbenchPageMocks.toastSuccessMock,
+    warning: liveWorkbenchPageMocks.toastWarningMock,
+    error: liveWorkbenchPageMocks.toastErrorMock,
+  },
+}))
 
 function buildLiveRealtimeDefaults(
   overrides: Partial<LiveRealtimeDefaults> = {},
@@ -196,6 +257,19 @@ function buildLiveRealtimeSchema(): LiveRealtimeOptionGroup[] {
           type: 'select',
           options: null,
           options_source: 'effective_languages',
+        },
+        {
+          key: 'beam_size',
+          label_key: 'settings.liveRealtime.fields.beamSize.label',
+          description_key: 'settings.liveRealtime.fields.beamSize.description',
+          default_value: 5,
+          supported_adapters: ['whisper_streaming'],
+          depends_on: null,
+          type: 'number',
+          min: 1,
+          max: 10,
+          step: 1,
+          special_values: null,
         },
       ],
     },
@@ -358,12 +432,47 @@ function buildQueryResult<TData>(data: TData): LiveWorkbenchQueryResult<TData> {
   return {
     data,
     isPending: false,
+    error: null,
+    refetch: vi.fn(),
   }
+}
+
+function queryPanelTaskSelect(): HTMLSelectElement | undefined {
+  return screen
+    .getAllByLabelText('Task')
+    .find((element): element is HTMLSelectElement => element instanceof HTMLSelectElement)
+}
+
+function getPanelBeamSizeInput(): HTMLInputElement {
+  const input = screen.getByLabelText('Beam size')
+
+  if (!(input instanceof HTMLInputElement)) {
+    throw new Error('Panel beam size input was not found')
+  }
+
+  return input
 }
 
 describe('LiveWorkbenchPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    liveWorkbenchPageMocks.queryClientMock.invalidateQueries.mockResolvedValue(undefined)
+    liveWorkbenchPageMocks.patchLiveRealtimeDefaultsMock.mockResolvedValue({
+      defaults: buildLiveRealtimeDefaults({ task: 'translate' }),
+    })
+    liveWorkbenchPageMocks.deleteLiveRealtimeDefaultsMock.mockResolvedValue(undefined)
+    liveWorkbenchPageMocks.fetchLiveRealtimeDefaultsMock.mockResolvedValue({
+      defaults: buildLiveRealtimeDefaults(),
+    })
+    liveWorkbenchPageMocks.useMutationMock.mockImplementation((options) => ({
+      isPending: false,
+      mutate: (payload?: unknown) => {
+        void options
+          .mutationFn(payload)
+          .then((data) => options.onSuccess?.(data))
+          .catch((error: unknown) => options.onError?.(error))
+      },
+    }))
     liveWorkbenchPageMocks.useAppConfigMock.mockReturnValue(buildAppConfigReturn())
     liveWorkbenchPageMocks.useModelsMock.mockReturnValue(buildModelsReturn())
     liveWorkbenchPageMocks.useLiveDeviceInventoryMock.mockReturnValue(
@@ -383,7 +492,7 @@ describe('LiveWorkbenchPage', () => {
   })
 
   it('renders the live workbench scaffold and setup controls', async () => {
-    render(<LiveWorkbenchPage />)
+    const { container } = render(<LiveWorkbenchPage />)
 
     expect(screen.getByRole('heading', { level: 1, name: 'Live' })).toBeTruthy()
     expect(screen.getByText('Real-time transcription')).toBeTruthy()
@@ -411,6 +520,16 @@ describe('LiveWorkbenchPage', () => {
     expect(
       screen.getByText('Live transcript').closest('[data-slot="live-workbench-page"]'),
     ).toBeTruthy()
+    expect(container.querySelector('[data-slot="live-workbench-page"]')).toHaveClass(
+      'overflow-hidden',
+    )
+    expect(container.querySelector('[data-slot="live-workbench-body"]')).toHaveClass(
+      'overflow-hidden',
+    )
+    expect(container.querySelector('[data-slot="live-workbench-work-area"]')).toHaveClass(
+      'grid-rows-[auto_minmax(0,1fr)]',
+      'overflow-hidden',
+    )
   })
 
   it('toggles the settings side panel from session setup', () => {
@@ -421,11 +540,60 @@ describe('LiveWorkbenchPage', () => {
 
     expect(screen.getByRole('heading', { level: 2, name: 'Runtime configuration' })).toBeTruthy()
     expect(settingsButton).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getAllByText('Session settings')).toHaveLength(1)
 
     fireEvent.click(settingsButton)
 
     expect(screen.queryByRole('heading', { level: 2, name: 'Runtime configuration' })).toBeNull()
     expect(settingsButton).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('applies settings panel draft only after explicit apply', () => {
+    render(<LiveWorkbenchPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Session settings' }))
+    expect(queryPanelTaskSelect()).toBeUndefined()
+
+    const beamSizeInput = getPanelBeamSizeInput()
+    expect(beamSizeInput).toHaveValue(null)
+    expect(beamSizeInput).toHaveAttribute('placeholder', '5')
+
+    fireEvent.change(beamSizeInput, { target: { value: '7' } })
+    fireEvent.blur(beamSizeInput)
+
+    const applyButton = screen.getByRole('button', { name: 'Apply' })
+    expect(applyButton).not.toBeDisabled()
+
+    fireEvent.click(applyButton)
+
+    expect(applyButton).toBeDisabled()
+  })
+
+  it('saves settings panel draft as future Live defaults', async () => {
+    render(<LiveWorkbenchPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Session settings' }))
+    fireEvent.change(getPanelBeamSizeInput(), { target: { value: '7' } })
+    fireEvent.blur(getPanelBeamSizeInput())
+    fireEvent.click(screen.getByRole('button', { name: 'Save as defaults' }))
+
+    await waitFor(() => {
+      expect(liveWorkbenchPageMocks.patchLiveRealtimeDefaultsMock).toHaveBeenCalledWith({
+        beam_size: 7,
+      })
+    })
+  })
+
+  it('resets saved Live defaults from the settings panel', async () => {
+    render(<LiveWorkbenchPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Session settings' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reset saved defaults' }))
+
+    await waitFor(() => {
+      expect(liveWorkbenchPageMocks.deleteLiveRealtimeDefaultsMock).toHaveBeenCalledTimes(1)
+      expect(liveWorkbenchPageMocks.fetchLiveRealtimeDefaultsMock).toHaveBeenCalledTimes(1)
+    })
   })
 
   it('starts source test capture only from explicit user actions', () => {
