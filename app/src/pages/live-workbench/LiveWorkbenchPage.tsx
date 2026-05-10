@@ -121,6 +121,11 @@ interface LiveWorkbenchSourceStatus {
   tone: LiveWorkbenchSourceTone
 }
 
+interface PreparedLiveCaptureSessions {
+  sessions: Partial<Record<LiveAudioSourceKind, LiveCaptureSession>>
+  ownedByStart: Partial<Record<LiveAudioSourceKind, LiveCaptureSession>>
+}
+
 interface DocumentPictureInPictureOptions {
   width?: number
   height?: number
@@ -1270,7 +1275,10 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
   function handleMicrophoneEnabledChange(enabled: boolean): void {
     setMicrophoneEnabled(enabled)
     if (!enabled && microphoneCaptureActive) {
-      void liveDevices.stopMicrophoneCapture()
+      runLiveDeviceAction(
+        liveDevices.stopMicrophoneCapture(),
+        'stop microphone capture after source disable',
+      )
     }
   }
 
@@ -1286,31 +1294,37 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
 
   function handleMicrophoneAction(): void {
     if (microphoneCaptureActive) {
-      void liveDevices.stopMicrophoneCapture()
+      runLiveDeviceAction(liveDevices.stopMicrophoneCapture(), 'stop microphone test capture')
       return
     }
 
-    void liveDevices.startMicrophoneCapture({
-      deviceId: liveDevices.selectedMicrophoneId,
-    })
+    runLiveDeviceAction(
+      liveDevices.startMicrophoneCapture({
+        deviceId: liveDevices.selectedMicrophoneId,
+      }),
+      'start microphone test capture',
+    )
   }
 
   function handleSystemAudioEnabledChange(enabled: boolean): void {
     setSystemAudioEnabled(enabled)
     if (!enabled && systemAudioCaptureActive) {
       setSystemAudioTestSessionId(null)
-      void liveDevices.stopSystemAudioCapture()
+      runLiveDeviceAction(
+        liveDevices.stopSystemAudioCapture(),
+        'stop system audio capture after source disable',
+      )
     }
   }
 
   function handleSystemAudioCaptureSourceAction(): void {
     if (systemAudioCaptureActive) {
       setSystemAudioTestSessionId(null)
-      void liveDevices.stopSystemAudioCapture()
+      runLiveDeviceAction(liveDevices.stopSystemAudioCapture(), 'stop system audio capture')
       return
     }
 
-    void liveDevices.startSystemAudioCapture()
+    runLiveDeviceAction(liveDevices.startSystemAudioCapture(), 'start system audio capture')
   }
 
   function handleSystemAudioTestAction(): void {
@@ -1482,32 +1496,38 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
     toast.error(t(copy?.descriptionKey ?? 'live.workbench.errors.generic.description'))
   }
 
-  function setRuntimeError(code: LiveRealtimeRuntimeErrorCode): LiveRealtimeRuntimeError {
+  function runLiveDeviceAction(action: Promise<unknown> | undefined, actionName: string): void {
+    void Promise.resolve(action).catch((error: unknown) => {
+      logger.warn(`Live device action failed: ${actionName}`, error)
+    })
+  }
+
+  function reportRuntimeError(code: LiveRealtimeRuntimeErrorCode): LiveRealtimeRuntimeError {
     const error = buildLiveWorkbenchRuntimeError(code)
     useLiveRealtimeStore.getState().setLiveRealtimeFailure(error)
     showRuntimeErrorToast(error)
     return error
   }
 
-  function validateSessionStart(): LiveRealtimeRuntimeError | null {
+  function getSessionStartErrorCode(): LiveRealtimeRuntimeErrorCode | null {
     if (selectedSources.length === 0) {
-      return setRuntimeError('live_source_required')
+      return 'live_source_required'
     }
 
     if (!hasDefaults || defaultsQuery.error || schemaQuery.error) {
-      return setRuntimeError('runtime_config_invalid')
+      return 'runtime_config_invalid'
     }
 
     if (downloadedModels.length === 0) {
-      return setRuntimeError('runtime_model_not_downloaded')
+      return 'runtime_model_not_downloaded'
     }
 
     if (!selectedModelId) {
-      return setRuntimeError('runtime_model_not_configured')
+      return 'runtime_model_not_configured'
     }
 
     if (!downloadedModelIds.has(selectedModelId)) {
-      return setRuntimeError('runtime_model_not_registered')
+      return 'runtime_model_not_registered'
     }
 
     if (
@@ -1518,11 +1538,9 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
         microphoneCount: microphoneDevices.length,
       })
     ) {
-      return setRuntimeError(
-        microphoneCapability === 'unsupported'
-          ? 'microphone_capture_unsupported'
-          : 'microphone_capture_failed',
-      )
+      return microphoneCapability === 'unsupported'
+        ? 'microphone_capture_unsupported'
+        : 'microphone_capture_failed'
     }
 
     if (
@@ -1532,7 +1550,7 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
         capability: systemAudioCapability,
       })
     ) {
-      return setRuntimeError('system_audio_capture_unsupported')
+      return 'system_audio_capture_unsupported'
     }
 
     return null
@@ -1554,7 +1572,7 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
     }
   }
 
-  async function stopPreparedCapturesAfterStartFailure(
+  async function stopOwnedPreparedCapturesAfterStartFailure(
     captureSessions: Partial<Record<LiveAudioSourceKind, LiveCaptureSession>>,
   ): Promise<void> {
     if (
@@ -1572,20 +1590,22 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
     }
   }
 
-  async function prepareCaptureSessionsForSession(): Promise<Partial<
-    Record<LiveAudioSourceKind, LiveCaptureSession>
-  > | null> {
-    const captureSessions: Partial<Record<LiveAudioSourceKind, LiveCaptureSession>> = {}
+  async function prepareCaptureSessionsForSession(): Promise<PreparedLiveCaptureSessions | null> {
+    const prepared: PreparedLiveCaptureSessions = {
+      sessions: {},
+      ownedByStart: {},
+    }
 
     if (microphoneEnabled) {
+      const existingMicrophone = liveDevices.getActiveMicrophoneCaptureSession()
       const microphone =
-        liveDevices.getActiveMicrophoneCaptureSession() ??
+        existingMicrophone ??
         (await liveDevices.startMicrophoneCapture({
           deviceId: liveDevices.selectedMicrophoneId,
         }))
 
       if (!microphone) {
-        setRuntimeError(
+        reportRuntimeError(
           microphoneCapability === 'unsupported'
             ? 'microphone_capture_unsupported'
             : 'microphone_capture_failed',
@@ -1593,17 +1613,19 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
         return null
       }
 
-      captureSessions.microphone = microphone
+      prepared.sessions.microphone = microphone
+      if (!existingMicrophone) {
+        prepared.ownedByStart.microphone = microphone
+      }
     }
 
     if (systemAudioEnabled) {
-      const system =
-        liveDevices.getActiveSystemAudioCaptureSession() ??
-        (await liveDevices.startSystemAudioCapture())
+      const existingSystem = liveDevices.getActiveSystemAudioCaptureSession()
+      const system = existingSystem ?? (await liveDevices.startSystemAudioCapture())
 
       if (!system) {
-        await stopPreparedCapturesAfterStartFailure(captureSessions)
-        setRuntimeError(
+        await stopOwnedPreparedCapturesAfterStartFailure(prepared.ownedByStart)
+        reportRuntimeError(
           systemAudioCapability === 'unsupported'
             ? 'system_audio_capture_unsupported'
             : 'system_audio_capture_failed',
@@ -1611,10 +1633,13 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
         return null
       }
 
-      captureSessions.system = system
+      prepared.sessions.system = system
+      if (!existingSystem) {
+        prepared.ownedByStart.system = system
+      }
     }
 
-    return captureSessions
+    return prepared
   }
 
   function buildSessionRuntimeDraft(): LiveRealtimeDraft {
@@ -1638,18 +1663,24 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
   async function handleStartSession(): Promise<void> {
     if (sessionPreparing) return
     if (!selectLiveWorkbenchCanStartSession(liveRunState)) return
-    if (validateSessionStart()) return
+    const sessionStartErrorCode = getSessionStartErrorCode()
+    if (sessionStartErrorCode) {
+      reportRuntimeError(sessionStartErrorCode)
+      return
+    }
 
     setSessionPreparing(true)
+    let ownedCaptureSessions: Partial<Record<LiveAudioSourceKind, LiveCaptureSession>> = {}
 
     try {
       setSystemAudioTestSessionId(null)
-      const captureSessions = await prepareCaptureSessionsForSession()
-      if (!captureSessions) return
+      const preparedCaptures = await prepareCaptureSessionsForSession()
+      if (!preparedCaptures) return
+      ownedCaptureSessions = preparedCaptures.ownedByStart
 
       await stopUnreusedSetupCapturesBeforeSession({
-        microphone: captureSessions.microphone ?? null,
-        system: captureSessions.system ?? null,
+        microphone: preparedCaptures.sessions.microphone ?? null,
+        system: preparedCaptures.sessions.system ?? null,
       })
 
       const service = createLiveRealtimeSessionService()
@@ -1658,26 +1689,22 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
         title: t('live.workbench.sessionTitle'),
         modelId: selectedModelId,
         languageHint: typeof resolvedLanguage === 'string' ? resolvedLanguage : null,
-        runtimeOverrides:
-          Object.keys(runtimeDraft).length > 0
-            ? buildLiveRealtimeRuntimeOverrides(runtimeDraft)
-            : undefined,
         sources: selectedSources,
         microphoneCapture: {
           deviceId: liveDevices.selectedMicrophoneId,
         },
-        captureSessions,
+        captureSessions: preparedCaptures.sessions,
+      }
+      if (Object.keys(runtimeDraft).length > 0) {
+        startOptions.runtimeOverrides = buildLiveRealtimeRuntimeOverrides(runtimeDraft)
       }
       sessionServiceRef.current = service
       await service.start(startOptions)
     } catch (error) {
       const runtimeError = normalizeLiveWorkbenchCaughtError(error, 'live_session_start_failed')
+      useLiveRealtimeStore.getState().setLiveRealtimeFailure(runtimeError)
       showRuntimeErrorToast(runtimeError)
-      const captureSessions = {
-        microphone: liveDevices.getActiveMicrophoneCaptureSession() ?? undefined,
-        system: liveDevices.getActiveSystemAudioCaptureSession() ?? undefined,
-      }
-      await stopPreparedCapturesAfterStartFailure(captureSessions)
+      await stopOwnedPreparedCapturesAfterStartFailure(ownedCaptureSessions)
     } finally {
       setSessionPreparing(false)
     }
@@ -1952,7 +1979,6 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
         ? createPortal(
             <LiveWorkbenchCompactView
               open
-              surface="window"
               background="transparent"
               status={sessionStatusLabel}
               duration={durationLabel}

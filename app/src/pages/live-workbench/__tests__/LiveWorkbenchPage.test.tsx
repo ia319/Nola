@@ -608,12 +608,6 @@ function buildQueryResult<TData>(data: TData): LiveWorkbenchQueryResult<TData> {
   }
 }
 
-function queryPanelTaskSelect(): HTMLSelectElement | undefined {
-  return screen
-    .getAllByLabelText('Task')
-    .find((element): element is HTMLSelectElement => element instanceof HTMLSelectElement)
-}
-
 function getPanelBeamSizeInput(): HTMLInputElement {
   const input = screen.getByLabelText('Beam size')
 
@@ -900,16 +894,15 @@ describe('LiveWorkbenchPage', () => {
     await waitFor(() => {
       expect(liveWorkbenchPageMocks.createLiveRealtimeSessionServiceMock).toHaveBeenCalledTimes(1)
     })
-    expect(getCreatedSessionService().start).toHaveBeenCalledWith(
-      expect.objectContaining({ runtimeOverrides: undefined }),
-    )
+    const startOptions = getCreatedSessionService().start.mock.calls[0]?.[0]
+    expect(startOptions).toEqual(expect.objectContaining({ sources: ['microphone'] }))
+    expect(startOptions).not.toHaveProperty('runtimeOverrides')
   })
 
   it('applies settings panel draft only after explicit apply', () => {
     render(<LiveWorkbenchPage />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Session settings' }))
-    expect(queryPanelTaskSelect()).toBeUndefined()
 
     const beamSizeInput = getPanelBeamSizeInput()
     expect(beamSizeInput).toHaveValue(null)
@@ -972,13 +965,13 @@ describe('LiveWorkbenchPage', () => {
       title: 'Live transcription',
       modelId: 'small',
       languageHint: null,
-      runtimeOverrides: undefined,
       sources: ['microphone'],
       microphoneCapture: {
         deviceId: 'mic-1',
       },
       captureSessions: { microphone: microphoneCaptureSession },
     })
+    expect(service.start.mock.calls[0]?.[0]).not.toHaveProperty('runtimeOverrides')
     expect(await screen.findByText('Recording')).toBeTruthy()
     expect(screen.getByRole('switch', { name: 'Use microphone' })).toBeDisabled()
     expect(screen.getByRole('switch', { name: 'Use system audio' })).toBeDisabled()
@@ -1054,7 +1047,11 @@ describe('LiveWorkbenchPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Test capture' }))
 
     expect(liveDevices.startMicrophoneCapture).toHaveBeenCalledWith({ deviceId: 'mic-1' })
+    expect(liveDevices.startMicrophoneCapture).toHaveBeenCalledTimes(1)
     expect(liveDevices.startSystemAudioCapture).toHaveBeenCalledTimes(1)
+    expect(liveDevices.stopMicrophoneCapture).not.toHaveBeenCalled()
+    expect(liveDevices.stopSystemAudioCapture).not.toHaveBeenCalled()
+    expect(liveDevices.refreshDevices).not.toHaveBeenCalled()
   })
 
   it('keeps system source selection separate from test mode', () => {
@@ -1119,6 +1116,40 @@ describe('LiveWorkbenchPage', () => {
       }),
     )
     expect(liveDevices.stopSystemAudioCapture).not.toHaveBeenCalled()
+  })
+
+  it('keeps reused setup captures when session start fails', async () => {
+    const systemCaptureSession = buildReusableCaptureSession('system')
+    const failingService = createMockLiveSessionService()
+    failingService.start.mockRejectedValue(new Error('connect failed'))
+    liveWorkbenchPageMocks.createLiveRealtimeSessionServiceMock.mockReturnValue(failingService)
+    const liveDevices = buildLiveDeviceInventoryReturn({
+      systemAudioCapture: {
+        sessionId: systemCaptureSession.id,
+        sourceKind: 'system',
+        deviceId: null,
+        state: 'capturing',
+        errorCode: null,
+        level: null,
+        startedAt: systemCaptureSession.startedAt,
+      },
+      getActiveSystemAudioCaptureSession: vi.fn(() => systemCaptureSession),
+    })
+    liveWorkbenchPageMocks.useLiveDeviceInventoryMock.mockReturnValue(liveDevices)
+    render(<LiveWorkbenchPage />)
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Use system audio' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start session' }))
+
+    await waitFor(() => {
+      expect(failingService.start).toHaveBeenCalledTimes(1)
+    })
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Start session' })).not.toBeDisabled()
+    })
+
+    expect(liveDevices.stopSystemAudioCapture).not.toHaveBeenCalled()
+    expect(systemCaptureSession.stop).not.toHaveBeenCalled()
   })
 
   it('does not stop or refresh idle sources when their setup toggles turn off', () => {
