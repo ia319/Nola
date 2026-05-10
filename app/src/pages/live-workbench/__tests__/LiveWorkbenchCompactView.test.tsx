@@ -95,4 +95,10 @@ describe('LiveWorkbenchCompactView', () => {
 
     expect(onStop).toHaveBeenCalledTimes(1)
   })
+
+  it('disables stop when no stop handler is available', () => {
+    renderCompactView()
+
+    expect(screen.getByRole('button', { name: 'Stop session' })).toBeDisabled()
+  })
 })

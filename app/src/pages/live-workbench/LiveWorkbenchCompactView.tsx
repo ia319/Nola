@@ -178,7 +178,13 @@ export function LiveWorkbenchCompactView({
 
       <div className="flex items-center justify-between gap-3 border-t px-5 py-3">
         <span className="text-muted-foreground truncate text-xs">{status}</span>
-        <Button type="button" variant="outline" size="sm" disabled={stopDisabled} onClick={onStop}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={stopDisabled || !onStop}
+          onClick={onStop}
+        >
           <Square className="size-4" />
           {t('live.workbench.actions.stop')}
         </Button>
