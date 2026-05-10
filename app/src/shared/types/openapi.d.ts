@@ -1352,7 +1352,6 @@ export interface components {
      * @description Partial update payload for application-level Live realtime defaults.
      * @example {
      *       "beam_size": 3,
-     *       "context_prompt": "Domain terms and proper nouns",
      *       "language": "en",
      *       "vad_parameters": {
      *         "threshold": 0.6

@@ -424,7 +424,9 @@ function LiveRealtimeFieldRow({
                     {t(option.label_key)}
                   </option>
                 ))}
-                {typeof value === 'string' && !hasLanguageOption(languages, value) ? (
+                {typeof value === 'string' &&
+                value.trim() !== '' &&
+                !hasLanguageOption(languages, value) ? (
                   <option value={value}>{value}</option>
                 ) : null}
               </>
