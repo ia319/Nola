@@ -31,7 +31,14 @@ export interface LiveWorkbenchSessionSetupProps {
   languageOptions: readonly LiveWorkbenchSessionSetupOption[]
   languageDisabled?: boolean
   languageLabel: string
-  runtimeSummary: string
+  engineDeviceValue: string
+  engineDeviceOptions: readonly LiveWorkbenchSessionSetupOption[]
+  engineDeviceDisabled?: boolean
+  engineDeviceLabel: string
+  engineComputeTypeValue: string
+  engineComputeTypeOptions: readonly LiveWorkbenchSessionSetupOption[]
+  engineComputeTypeDisabled?: boolean
+  engineComputeTypeLabel: string
   microphoneEnabled: boolean
   microphoneValue: string
   microphoneOptions: readonly LiveWorkbenchSessionSetupOption[]
@@ -47,7 +54,7 @@ export interface LiveWorkbenchSessionSetupProps {
   systemAudioStatus: string
   systemAudioStatusTone: LiveWorkbenchSourceTone
   systemAudioLevelPercent: number
-  systemAudioCaptureSource: string
+  systemAudioCaptureSourceActionLabel: string
   systemAudioActionLabel: string
   systemAudioActionDisabled?: boolean
   systemAudioActionMode: 'test' | 'stop'
@@ -56,6 +63,8 @@ export interface LiveWorkbenchSessionSetupProps {
   onModelChange: (value: string) => void
   onTaskChange: (value: string) => void
   onLanguageChange: (value: string) => void
+  onEngineDeviceChange: (value: string) => void
+  onEngineComputeTypeChange: (value: string) => void
   onMicrophoneEnabledChange: (enabled: boolean) => void
   onMicrophoneChange: (value: string) => void
   onMicrophoneAction: () => void
@@ -71,12 +80,6 @@ interface SetupSelectControlProps {
   options: readonly LiveWorkbenchSessionSetupOption[]
   disabled?: boolean
   onValueChange: (value: string) => void
-}
-
-interface SetupReadonlyControlProps {
-  id: string
-  label: string
-  value: string
 }
 
 function SetupSelectControl({
@@ -106,18 +109,42 @@ function SetupSelectControl({
   )
 }
 
-function SetupReadonlyControl({ id, label, value }: SetupReadonlyControlProps) {
+interface SetupActionControlProps {
+  id: string
+  label: string
+  actionLabel: string
+  disabled?: boolean
+  actionMode: 'test' | 'stop'
+  onAction: () => void
+}
+
+function SetupActionControl({
+  id,
+  label,
+  actionLabel,
+  disabled,
+  actionMode,
+  onAction,
+}: SetupActionControlProps) {
+  const ActionIcon = actionMode === 'stop' ? Square : Monitor
+
   return (
     <div className="min-w-0 space-y-1.5">
       <p id={id} className="text-sm leading-none font-medium">
         {label}
       </p>
-      <div
-        aria-labelledby={id}
-        className="border-input bg-muted/30 text-muted-foreground flex h-9 w-full items-center rounded-md border px-3 text-sm shadow-xs"
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-describedby={id}
+        className="w-full justify-center"
+        disabled={disabled}
+        onClick={onAction}
       >
-        <span className="min-w-0 truncate">{value}</span>
-      </div>
+        <ActionIcon className="size-4" />
+        <span className="min-w-0 truncate">{actionLabel}</span>
+      </Button>
     </div>
   )
 }
@@ -144,6 +171,7 @@ interface AudioSourcePanelProps {
   actionDisabled?: boolean
   actionMode: 'test' | 'stop'
   icon: 'microphone' | 'system'
+  showAction?: boolean
   children?: ReactNode
   onEnabledChange: (enabled: boolean) => void
   onAction: () => void
@@ -163,6 +191,7 @@ function AudioSourcePanel({
   actionDisabled,
   actionMode,
   icon,
+  showAction = true,
   children,
   onEnabledChange,
   onAction,
@@ -193,19 +222,25 @@ function AudioSourcePanel({
         />
       </div>
 
-      <div className={children ? 'mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]' : 'mt-3 flex'}>
+      <div
+        className={
+          children && showAction ? 'mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]' : 'mt-3 flex'
+        }
+      >
         {children ? <div className="min-w-0">{children}</div> : null}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="md:self-end"
-          disabled={actionDisabled}
-          onClick={onAction}
-        >
-          <ActionIcon className="size-4" />
-          {actionLabel}
-        </Button>
+        {showAction ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="md:self-end"
+            disabled={actionDisabled}
+            onClick={onAction}
+          >
+            <ActionIcon className="size-4" />
+            {actionLabel}
+          </Button>
+        ) : null}
       </div>
 
       <div className="mt-3 space-y-2">
@@ -231,7 +266,14 @@ export function LiveWorkbenchSessionSetup({
   languageOptions,
   languageDisabled,
   languageLabel,
-  runtimeSummary,
+  engineDeviceValue,
+  engineDeviceOptions,
+  engineDeviceDisabled,
+  engineDeviceLabel,
+  engineComputeTypeValue,
+  engineComputeTypeOptions,
+  engineComputeTypeDisabled,
+  engineComputeTypeLabel,
   microphoneEnabled,
   microphoneValue,
   microphoneOptions,
@@ -247,7 +289,7 @@ export function LiveWorkbenchSessionSetup({
   systemAudioStatus,
   systemAudioStatusTone,
   systemAudioLevelPercent,
-  systemAudioCaptureSource,
+  systemAudioCaptureSourceActionLabel,
   systemAudioActionLabel,
   systemAudioActionDisabled,
   systemAudioActionMode,
@@ -256,6 +298,8 @@ export function LiveWorkbenchSessionSetup({
   onModelChange,
   onTaskChange,
   onLanguageChange,
+  onEngineDeviceChange,
+  onEngineComputeTypeChange,
   onMicrophoneEnabledChange,
   onMicrophoneChange,
   onMicrophoneAction,
@@ -290,7 +334,7 @@ export function LiveWorkbenchSessionSetup({
           </Button>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(13rem,1.25fr)_minmax(10rem,0.8fr)_minmax(10rem,0.8fr)_minmax(12rem,0.9fr)]">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(13rem,1.2fr)_repeat(4,minmax(9rem,0.8fr))]">
           <SetupSelectControl
             id="live-workbench-model-select"
             label={t('live.workbench.sessionSetup.model.label')}
@@ -315,10 +359,21 @@ export function LiveWorkbenchSessionSetup({
             disabled={languageDisabled}
             onValueChange={onLanguageChange}
           />
-          <SetupReadonlyControl
-            id="live-workbench-runtime-summary"
-            label={t('live.workbench.sessionSetup.runtime.label')}
-            value={runtimeSummary}
+          <SetupSelectControl
+            id="live-workbench-engine-device-select"
+            label={engineDeviceLabel}
+            value={engineDeviceValue}
+            options={engineDeviceOptions}
+            disabled={engineDeviceDisabled}
+            onValueChange={onEngineDeviceChange}
+          />
+          <SetupSelectControl
+            id="live-workbench-engine-compute-type-select"
+            label={engineComputeTypeLabel}
+            value={engineComputeTypeValue}
+            options={engineComputeTypeOptions}
+            disabled={engineComputeTypeDisabled}
+            onValueChange={onEngineComputeTypeChange}
           />
         </div>
 
@@ -371,10 +426,13 @@ export function LiveWorkbenchSessionSetup({
             onEnabledChange={onSystemAudioEnabledChange}
             onAction={onSystemAudioAction}
           >
-            <SetupReadonlyControl
+            <SetupActionControl
               id="live-workbench-system-audio-capture-source"
               label={t('live.workbench.sessionSetup.systemAudio.captureSource.label')}
-              value={systemAudioCaptureSource}
+              actionLabel={systemAudioCaptureSourceActionLabel}
+              disabled={systemAudioActionDisabled}
+              actionMode={systemAudioActionMode}
+              onAction={onSystemAudioAction}
             />
           </AudioSourcePanel>
         </div>

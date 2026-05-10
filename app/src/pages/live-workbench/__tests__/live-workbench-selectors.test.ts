@@ -3,14 +3,22 @@ import { describe, expect, it } from 'vitest'
 import {
   EMPTY_LIVE_WORKBENCH_TRANSCRIPT_COUNTS,
   resolveLiveWorkbenchInitialModelId,
+  selectLiveWorkbenchErrorCopy,
   selectLiveWorkbenchAudioLevelPercent,
   selectLiveWorkbenchDisplayedAudioLevelPercent,
   selectLiveWorkbenchDownloadedModels,
   selectLiveWorkbenchHasTranscript,
   selectLiveWorkbenchIsCaptureActive,
   selectLiveWorkbenchSelectField,
+  selectLiveWorkbenchTranscriptCounts,
+  selectLiveWorkbenchTranscriptItems,
 } from '../live-workbench-selectors'
 import type { LiveRealtimeOptionGroup, ModelResponse } from '@/shared/types'
+import type {
+  LiveRealtimeTranscriptCommittedPartialPayload,
+  LiveRealtimeTranscriptFinalPayload,
+  LiveRealtimeTranscriptPreviewPayload,
+} from '@/features/realtime'
 
 function buildModel(overrides: Partial<ModelResponse> = {}): ModelResponse {
   return {
@@ -176,4 +184,99 @@ describe('live workbench selectors', () => {
     expect(selectLiveWorkbenchIsCaptureActive('stopping')).toBe(true)
     expect(selectLiveWorkbenchIsCaptureActive('failed')).toBe(false)
   })
+
+  it('combines transcript streams in chronological order', () => {
+    const items = selectLiveWorkbenchTranscriptItems({
+      finalTranscripts: [finalTranscript('track-1', 20)],
+      committedPartials: {
+        'track-1': committedPartialTranscript('track-1', 10),
+      },
+      previews: {
+        'track-2': previewTranscript('track-2', 30),
+      },
+    })
+
+    expect(items.map((item) => item.kind)).toEqual(['committed_partial', 'final', 'preview'])
+    expect(
+      selectLiveWorkbenchTranscriptCounts({
+        finalTranscripts: [finalTranscript('track-1', 20)],
+        committedPartials: {
+          'track-1': committedPartialTranscript('track-1', 10),
+        },
+        previews: {
+          'track-2': previewTranscript('track-2', 30),
+        },
+      }),
+    ).toEqual({
+      finalCount: 1,
+      committedPartialCount: 1,
+      previewCount: 1,
+    })
+  })
+
+  it('maps runtime errors to user-facing copy keys without raw messages', () => {
+    expect(
+      selectLiveWorkbenchErrorCopy({
+        code: 'runtime_model_not_downloaded',
+        message: 'raw backend message',
+        retryable: false,
+      }),
+    ).toEqual({
+      titleKey: 'live.workbench.errors.runtimeModelNotDownloaded.title',
+      descriptionKey: 'live.workbench.errors.runtimeModelNotDownloaded.description',
+    })
+  })
 })
+
+function previewTranscript(trackId: string, startMs: number): LiveRealtimeTranscriptPreviewPayload {
+  return {
+    result_kind: 'preview',
+    session_id: 'session-1',
+    track_id: trackId,
+    source: 'microphone',
+    start_ms: startMs,
+    end_ms: startMs + 1000,
+    text: 'preview',
+    language: null,
+    confidence: null,
+    is_final: false,
+    preview_index: 1,
+  }
+}
+
+function committedPartialTranscript(
+  trackId: string,
+  startMs: number,
+): LiveRealtimeTranscriptCommittedPartialPayload {
+  return {
+    result_kind: 'committed_partial',
+    session_id: 'session-1',
+    track_id: trackId,
+    source: 'microphone',
+    start_ms: startMs,
+    end_ms: startMs + 1000,
+    text: 'partial',
+    language: null,
+    confidence: null,
+    is_final: false,
+    committed_index: 1,
+  }
+}
+
+function finalTranscript(trackId: string, startMs: number): LiveRealtimeTranscriptFinalPayload {
+  return {
+    result_kind: 'final',
+    segment_id: `segment-${trackId}`,
+    session_id: 'session-1',
+    track_id: trackId,
+    source: 'microphone',
+    sequence: 1,
+    start_ms: startMs,
+    end_ms: startMs + 1000,
+    text: 'final',
+    language: null,
+    confidence: null,
+    is_final: true,
+    created_at: '2026-05-10T00:00:00.000Z',
+  }
+}

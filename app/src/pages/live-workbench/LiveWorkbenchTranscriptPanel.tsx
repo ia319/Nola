@@ -1,21 +1,55 @@
-import type { ReactNode } from 'react'
+import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { Card, CardContent, EmptyState } from '@/components/ui'
+import { AlertCircle } from 'lucide-react'
+
+import { Button, Card, CardContent, EmptyState } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { formatLiveWorkbenchTranscriptTimeRange } from './live-workbench-formatters'
+import type {
+  LiveWorkbenchErrorCopy,
+  LiveWorkbenchTranscriptItem,
+} from './live-workbench-selectors'
 
 export interface LiveWorkbenchTranscriptPanelProps {
-  hasTranscript: boolean
+  items: readonly LiveWorkbenchTranscriptItem[]
+  emptyTitle?: string
+  emptyDescription?: string
+  errorCopy?: LiveWorkbenchErrorCopy | null
   actions?: ReactNode
   className?: string
+  onRetry?: () => void
 }
 
 export function LiveWorkbenchTranscriptPanel({
-  hasTranscript,
+  items,
+  emptyTitle,
+  emptyDescription,
+  errorCopy,
   actions,
   className,
+  onRetry,
 }: LiveWorkbenchTranscriptPanelProps) {
   const { t } = useTranslation()
+  const streamRef = useRef<HTMLDivElement | null>(null)
+  const hasTranscript = items.length > 0
+  const latestItemId = items.at(-1)?.id ?? null
+  const retryAction = useMemo(() => {
+    if (!onRetry) return null
+
+    return (
+      <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+        {t('live.workbench.errors.actions.retry')}
+      </Button>
+    )
+  }, [onRetry, t])
+
+  useEffect(() => {
+    const stream = streamRef.current
+    if (!stream) return
+
+    stream.scrollTop = stream.scrollHeight
+  }, [latestItemId])
 
   return (
     <Card
@@ -29,16 +63,93 @@ export function LiveWorkbenchTranscriptPanel({
         {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
       </div>
 
-      <CardContent className="min-h-0 flex-1 px-0 py-0">
+      <CardContent className="flex min-h-0 flex-1 px-0 py-0">
         {hasTranscript ? (
-          <div data-slot="live-workbench-transcript-stream" className="min-h-full px-5 py-4" />
+          <div
+            ref={streamRef}
+            data-slot="live-workbench-transcript-stream"
+            className="min-h-0 flex-1 overflow-y-auto px-5 py-4"
+          >
+            <div className="space-y-3">
+              {errorCopy ? (
+                <TranscriptErrorBanner
+                  title={t(errorCopy.titleKey)}
+                  description={t(errorCopy.descriptionKey)}
+                />
+              ) : null}
+              <ol className="space-y-2">
+                {items.map((item) => (
+                  <TranscriptRow key={item.id} item={item} />
+                ))}
+              </ol>
+            </div>
+          </div>
+        ) : errorCopy ? (
+          <EmptyState
+            icon={<AlertCircle className="size-6" />}
+            title={t(errorCopy.titleKey)}
+            description={t(errorCopy.descriptionKey)}
+            action={retryAction}
+            className="min-h-full flex-1 justify-center rounded-none border-0 bg-transparent px-5 py-10"
+          />
         ) : (
           <EmptyState
-            title={t('live.workbench.transcript.empty')}
-            className="min-h-full rounded-none border-0 bg-transparent px-5 py-10"
+            title={emptyTitle ?? t('live.workbench.transcript.empty.title')}
+            description={emptyDescription}
+            className="min-h-full flex-1 justify-center rounded-none border-0 bg-transparent px-5 py-10"
           />
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function TranscriptRow({ item }: { item: LiveWorkbenchTranscriptItem }) {
+  const { t } = useTranslation()
+
+  return (
+    <li
+      data-kind={item.kind}
+      className={cn(
+        'border-border/70 rounded-md border px-3 py-2.5',
+        item.kind === 'final' && 'bg-background',
+        item.kind === 'committed_partial' && 'bg-muted/30',
+        item.kind === 'preview' && 'bg-muted/20',
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        <span className="text-muted-foreground tabular-nums">
+          {formatLiveWorkbenchTranscriptTimeRange(item.startMs, item.endMs)}
+        </span>
+        <span className="text-muted-foreground">{t(`live.workbench.sources.${item.source}`)}</span>
+        <span
+          className={cn(
+            'font-medium',
+            item.kind === 'final' ? 'text-foreground' : 'text-muted-foreground',
+          )}
+        >
+          {t(`live.workbench.transcript.kind.${item.kind}`)}
+        </span>
+      </div>
+      <p
+        className={cn(
+          'mt-1.5 text-sm leading-6',
+          item.kind === 'final' && 'text-foreground',
+          item.kind === 'committed_partial' && 'text-muted-foreground',
+          item.kind === 'preview' && 'text-muted-foreground italic',
+        )}
+      >
+        {item.text}
+      </p>
+    </li>
+  )
+}
+
+function TranscriptErrorBanner({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-sm">
+      <p className="font-medium">{title}</p>
+      <p className="mt-1 text-xs leading-5">{description}</p>
+    </div>
   )
 }

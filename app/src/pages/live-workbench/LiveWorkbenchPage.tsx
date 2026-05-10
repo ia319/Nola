@@ -1,26 +1,33 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { Maximize2, Play, Square } from 'lucide-react'
 
+import { Button } from '@/components/ui'
 import {
   deleteLiveRealtimeDefaults,
   fetchLiveRealtimeDefaults,
   fetchLiveRealtimeSchema,
   patchLiveRealtimeDefaults,
 } from '@/config/api'
+import { buildEngineComputeTypeOptions, buildEngineDeviceOptions } from '@/config/engine-options'
 import logger from '@/config/logger'
 import { useAppConfig } from '@/config/use-app-config'
-import { DEFAULT_MODEL_LIST_QUERY, useModels, type ModelListQuery } from '@/features/models'
+import { useModels } from '@/features/models'
 import {
   areLiveRealtimeDraftValuesEqual,
   buildLiveRealtimeDefaultsPatchPayload,
+  buildLiveRealtimeRuntimeOverrides,
   clearLiveRealtimeDraftValue,
+  createLiveRealtimeSessionService,
   isTemporaryLiveDeviceId,
+  isLiveRealtimeSessionError,
   resolveLiveRealtimeEffectiveValue,
   updateLiveRealtimeDraft,
   useLiveDeviceInventory,
   useLiveRealtimeStore,
+  type LiveAudioSourceKind,
   type LiveAudioDevice,
   type LiveCaptureSlotState,
   type LiveDeviceCapabilityState,
@@ -29,23 +36,30 @@ import {
   type LiveDeviceWarningCode,
   type LiveRealtimeDraft,
   type LiveRealtimeDraftValue,
+  type LiveRealtimeAdapter,
   type LiveRealtimeRunState,
+  type LiveRealtimeRuntimeError,
+  type LiveRealtimeRuntimeErrorCode,
+  type LiveRealtimeSessionService,
 } from '@/features/realtime'
 import { ContentCanvas } from '@/layouts'
 import { isAppError } from '@/shared/lib/error-factory'
 import { queryKeys } from '@/shared/lib/query-keys'
 import type {
   AppError,
+  EngineComputeType,
+  EngineDevice,
   LiveRealtimeDefaultsResponse,
   LiveRealtimeDefaultsUpdateRequest,
   LiveRealtimeOptionGroup,
 } from '@/shared/types'
 import {
   formatLiveWorkbenchCount,
+  formatLiveWorkbenchDuration,
   formatLiveWorkbenchEmptyValue,
+  formatLiveWorkbenchSessionId,
 } from './live-workbench-formatters'
 import {
-  EMPTY_LIVE_WORKBENCH_TRANSCRIPT_COUNTS,
   LIVE_WORKBENCH_AUTO_LANGUAGE_VALUE,
   LIVE_WORKBENCH_DEFAULT_MICROPHONE_VALUE,
   LIVE_WORKBENCH_MODEL_EMPTY_VALUE,
@@ -53,12 +67,18 @@ import {
   LIVE_WORKBENCH_MICROPHONE_EMPTY_VALUE,
   LIVE_WORKBENCH_MICROPHONE_LOADING_VALUE,
   LIVE_WORKBENCH_SELECT_UNAVAILABLE_VALUE,
+  hasLiveWorkbenchErrorCopy,
   selectLiveWorkbenchDisplayedAudioLevelPercent,
   resolveLiveWorkbenchInitialModelId,
+  selectLiveWorkbenchCanStartSession,
+  selectLiveWorkbenchCanStopSession,
+  selectLiveWorkbenchErrorCopy,
   selectLiveWorkbenchIsCaptureActive,
   selectLiveWorkbenchDownloadedModels,
   selectLiveWorkbenchHasTranscript,
   selectLiveWorkbenchSelectField,
+  selectLiveWorkbenchTranscriptCounts,
+  selectLiveWorkbenchTranscriptItems,
 } from './live-workbench-selectors'
 import { LiveWorkbenchCompactView } from './LiveWorkbenchCompactView'
 import {
@@ -69,11 +89,6 @@ import {
 import { LiveWorkbenchSettingsPanel } from './LiveWorkbenchSettingsPanel'
 import { LiveWorkbenchStatusBar, type LiveWorkbenchStatusItem } from './LiveWorkbenchStatusBar'
 import { LiveWorkbenchTranscriptPanel } from './LiveWorkbenchTranscriptPanel'
-
-const LIVE_WORKBENCH_MODEL_QUERY = {
-  ...DEFAULT_MODEL_LIST_QUERY,
-  status: 'downloaded',
-} satisfies ModelListQuery
 
 const EMPTY_LIVE_AUDIO_DEVICES: readonly LiveAudioDevice[] = []
 const EMPTY_LIVE_DEVICE_WARNINGS: readonly LiveDeviceWarningCode[] = []
@@ -396,6 +411,16 @@ function buildMicrophoneOption(
   }
 }
 
+function buildEngineSetupOption<TValue extends EngineDevice | EngineComputeType>(
+  option: { value: TValue; labelKey: string | null },
+  t: (key: string) => string,
+): LiveWorkbenchSessionSetupOption {
+  return {
+    value: option.value,
+    label: option.labelKey ? t(option.labelKey) : option.value,
+  }
+}
+
 function canStartMicrophoneCapture({
   enabled,
   capability,
@@ -418,17 +443,87 @@ function canStartSystemAudioCapture({
   return enabled && (capability === 'available' || capability === 'limited')
 }
 
+function isLiveWorkbenchSessionBusy(runState: LiveRealtimeRunState): boolean {
+  return runState === 'starting' || runState === 'active' || runState === 'finishing'
+}
+
+function buildLiveWorkbenchRuntimeError(
+  code: LiveRealtimeRuntimeErrorCode,
+): LiveRealtimeRuntimeError {
+  return {
+    code,
+    message: code,
+    retryable: false,
+  }
+}
+
+function formatLiveRealtimeAdapter(
+  adapter: LiveRealtimeAdapter | string | null | undefined,
+  t: (key: string) => string,
+  emptyValue: string,
+): string {
+  if (adapter === 'mock') return t('live.workbench.runtime.mock')
+  if (adapter === 'whisper_streaming') return t('live.workbench.runtime.whisperStreaming')
+  return adapter || emptyValue
+}
+
+function resolveLiveRealtimeSchemaAdapter(
+  adapter: LiveRealtimeAdapter | string | null | undefined,
+): LiveRealtimeAdapter {
+  return adapter === 'whisper_streaming' ? 'whisper_streaming' : 'mock'
+}
+
+function resolveLiveWorkbenchStartButtonKey(runState: LiveRealtimeRunState): string {
+  if (runState === 'starting') return 'live.workbench.actions.starting'
+  if (runState === 'finishing') return 'live.workbench.actions.stopping'
+  if (runState === 'active') return 'live.workbench.actions.stop'
+  return 'live.workbench.actions.start'
+}
+
+function normalizeLiveWorkbenchCaughtError(
+  error: unknown,
+  fallbackCode: LiveRealtimeRuntimeErrorCode,
+): LiveRealtimeRuntimeError {
+  if (isLiveRealtimeSessionError(error)) {
+    return {
+      code: error.code,
+      message: error.message,
+      retryable: error.retryable,
+    }
+  }
+
+  if (isAppError(error) && hasLiveWorkbenchErrorCopy(error.code)) {
+    const detail =
+      error.params && typeof error.params.detail === 'string' ? error.params.detail : error.code
+    return {
+      code: error.code,
+      message: detail,
+      retryable: error.retriable,
+    }
+  }
+
+  const storeError = useLiveRealtimeStore.getState().lastError
+  if (storeError) return storeError
+
+  return buildLiveWorkbenchRuntimeError(fallbackCode)
+}
+
 export function LiveWorkbenchPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const sessionServiceRef = useRef<LiveRealtimeSessionService | null>(null)
   const { config, isLoading: isConfigLoading } = useAppConfig()
   const liveRunState = useLiveRealtimeStore((state) => state.runState)
-  const {
-    models,
-    configuredModelId,
-    lastLoadedModelId,
-    isLoading: isModelsLoading,
-  } = useModels(LIVE_WORKBENCH_MODEL_QUERY)
+  const liveSession = useLiveRealtimeStore((state) => state.session)
+  const liveConnectionState = useLiveRealtimeStore((state) => state.connectionState)
+  const liveTracksBySource = useLiveRealtimeStore((state) => state.tracksBySource)
+  const livePreviewsByTrackId = useLiveRealtimeStore((state) => state.currentPreviewsByTrackId)
+  const liveCommittedPartialsByTrackId = useLiveRealtimeStore(
+    (state) => state.latestCommittedPartialsByTrackId,
+  )
+  const liveFinalTranscripts = useLiveRealtimeStore((state) => state.finalTranscripts)
+  const liveLastError = useLiveRealtimeStore((state) => state.lastError)
+  const { models, configuredModelId, lastLoadedModelId, isLoading: isModelsLoading } = useModels()
   const defaultsQuery = useQuery({
     queryKey: queryKeys.config.liveRealtimeDefaults(),
     queryFn: ({ signal }) => fetchLiveRealtimeDefaults(signal),
@@ -441,11 +536,42 @@ export function LiveWorkbenchPage() {
   const [draft, setDraft] = useState<LiveRealtimeDraft>({})
   const [settingsDraft, setSettingsDraft] = useState<LiveRealtimeDraft>({})
   const [selectedModelOverrideId, setSelectedModelOverrideId] = useState<string | null>(null)
+  const [selectedEngineDeviceOverride, setSelectedEngineDeviceOverride] =
+    useState<EngineDevice | null>(null)
+  const [selectedEngineComputeTypeOverride, setSelectedEngineComputeTypeOverride] =
+    useState<EngineComputeType | null>(null)
   const [microphoneEnabled, setMicrophoneEnabled] = useState(true)
   const [systemAudioEnabled, setSystemAudioEnabled] = useState(false)
+  const [compactOpen, setCompactOpen] = useState(false)
+  const [durationNowMs, setDurationNowMs] = useState(() => Date.now())
   const liveDevices = useLiveDeviceInventory()
   const emptyValue = formatLiveWorkbenchEmptyValue()
-  const hasTranscript = selectLiveWorkbenchHasTranscript(EMPTY_LIVE_WORKBENCH_TRANSCRIPT_COUNTS)
+  const liveRuntimeAdapter = config?.live_realtime?.runtime_adapter ?? null
+  const supportsSessionRuntimeOverrides =
+    liveRuntimeAdapter === 'whisper_streaming' &&
+    config?.live_realtime?.supports_runtime_overrides === true
+
+  useEffect(() => {
+    return () => {
+      const service = sessionServiceRef.current
+      if (!service || service.state === 'idle' || service.state === 'finished') return
+
+      void service.stop().catch((error: unknown) => {
+        logger.warn('live.workbench.session.cleanupFailed', { error })
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isLiveWorkbenchSessionBusy(liveRunState)) return undefined
+
+    const intervalId = window.setInterval(() => {
+      setDurationNowMs(Date.now())
+    }, 1000)
+
+    return () => window.clearInterval(intervalId)
+  }, [liveRunState])
+
   const defaults = defaultsQuery.data?.defaults ?? null
   const schema = schemaQuery.data?.schema ?? EMPTY_LIVE_REALTIME_SCHEMA
   const settingsSchema = useMemo(() => buildLiveWorkbenchSettingsSchema(schema), [schema])
@@ -530,6 +656,9 @@ export function LiveWorkbenchPage() {
     selectedModelOverrideId && downloadedModelIds.has(selectedModelOverrideId)
       ? selectedModelOverrideId
       : initialModelId
+  const configuredModelUnavailable = Boolean(
+    configuredModelId && !downloadedModelIds.has(configuredModelId),
+  )
   const modelOptions = useMemo<LiveWorkbenchSessionSetupOption[]>(() => {
     if (isModelsLoading) {
       return [
@@ -716,16 +845,71 @@ export function LiveWorkbenchPage() {
       : schemaQuery.isPending || isConfigLoading
         ? LIVE_WORKBENCH_SELECT_UNAVAILABLE_VALUE
         : LIVE_WORKBENCH_AUTO_LANGUAGE_VALUE
-  const runtimeSummary = useMemo(() => {
-    const device = config?.engine.device ?? null
-    const computeType = config?.engine.compute_type ?? null
+  const engineDeviceOptions = useMemo<LiveWorkbenchSessionSetupOption[]>(() => {
+    const options = buildEngineDeviceOptions(
+      config?.engine.schema ?? [],
+      config?.engine.device ?? null,
+    )
 
-    if (!device && !computeType) {
-      return emptyValue
+    if (options.length === 0) {
+      return [
+        {
+          value: LIVE_WORKBENCH_SELECT_UNAVAILABLE_VALUE,
+          label: t('live.workbench.sessionSetup.unavailable'),
+          disabled: true,
+        },
+      ]
     }
 
-    return [device, computeType].filter(Boolean).join(' / ')
-  }, [config?.engine.compute_type, config?.engine.device, emptyValue])
+    return options.map((option) => buildEngineSetupOption(option, t))
+  }, [config?.engine.device, config?.engine.schema, t])
+  const engineDeviceOptionValues = useMemo(
+    () =>
+      new Set(
+        engineDeviceOptions.filter((option) => !option.disabled).map((option) => option.value),
+      ),
+    [engineDeviceOptions],
+  )
+  const selectedEngineDevice = supportsSessionRuntimeOverrides
+    ? (selectedEngineDeviceOverride ?? config?.engine.device ?? null)
+    : (config?.engine.device ?? null)
+  const engineDeviceValue =
+    selectedEngineDevice && engineDeviceOptionValues.has(selectedEngineDevice)
+      ? selectedEngineDevice
+      : LIVE_WORKBENCH_SELECT_UNAVAILABLE_VALUE
+  const engineComputeTypeOptions = useMemo<LiveWorkbenchSessionSetupOption[]>(() => {
+    const options = buildEngineComputeTypeOptions(
+      config?.engine.schema ?? [],
+      config?.engine.compute_type ?? null,
+    )
+
+    if (options.length === 0) {
+      return [
+        {
+          value: LIVE_WORKBENCH_SELECT_UNAVAILABLE_VALUE,
+          label: t('live.workbench.sessionSetup.unavailable'),
+          disabled: true,
+        },
+      ]
+    }
+
+    return options.map((option) => buildEngineSetupOption(option, t))
+  }, [config?.engine.compute_type, config?.engine.schema, t])
+  const engineComputeTypeOptionValues = useMemo(
+    () =>
+      new Set(
+        engineComputeTypeOptions.filter((option) => !option.disabled).map((option) => option.value),
+      ),
+    [engineComputeTypeOptions],
+  )
+  const selectedEngineComputeType = supportsSessionRuntimeOverrides
+    ? (selectedEngineComputeTypeOverride ?? config?.engine.compute_type ?? null)
+    : (config?.engine.compute_type ?? null)
+  const engineComputeTypeValue =
+    selectedEngineComputeType && engineComputeTypeOptionValues.has(selectedEngineComputeType)
+      ? selectedEngineComputeType
+      : LIVE_WORKBENCH_SELECT_UNAVAILABLE_VALUE
+  const runtimeSummary = formatLiveRealtimeAdapter(liveRuntimeAdapter, t, emptyValue)
   const inventory = liveDevices.inventory
   const deviceWarnings = inventory?.warnings ?? EMPTY_LIVE_DEVICE_WARNINGS
   const microphoneCapability = inventory?.capabilities.microphoneCapture ?? null
@@ -838,33 +1022,93 @@ export function LiveWorkbenchPage() {
         enabled: systemAudioEnabled,
         capability: systemAudioCapability,
       }))
+  const selectedSources = useMemo<LiveAudioSourceKind[]>(() => {
+    const sources: LiveAudioSourceKind[] = []
+    if (microphoneEnabled) sources.push('microphone')
+    if (systemAudioEnabled) sources.push('system')
+    return sources
+  }, [microphoneEnabled, systemAudioEnabled])
+  const transcriptCounts = useMemo(
+    () =>
+      selectLiveWorkbenchTranscriptCounts({
+        finalTranscripts: liveFinalTranscripts,
+        committedPartials: liveCommittedPartialsByTrackId,
+        previews: livePreviewsByTrackId,
+      }),
+    [liveCommittedPartialsByTrackId, liveFinalTranscripts, livePreviewsByTrackId],
+  )
+  const transcriptItems = useMemo(
+    () =>
+      selectLiveWorkbenchTranscriptItems({
+        finalTranscripts: liveFinalTranscripts,
+        committedPartials: liveCommittedPartialsByTrackId,
+        previews: livePreviewsByTrackId,
+      }),
+    [liveCommittedPartialsByTrackId, liveFinalTranscripts, livePreviewsByTrackId],
+  )
+  const hasTranscript = selectLiveWorkbenchHasTranscript(transcriptCounts)
+  const errorCopy = selectLiveWorkbenchErrorCopy(liveLastError)
+  const sessionStatusLabel = t(`live.workbench.statusBar.runState.${liveRunState}`)
+  const connectionStatusLabel = t(`live.workbench.statusBar.connectionState.${liveConnectionState}`)
+  const durationLabel = formatLiveWorkbenchDuration(
+    liveSession?.started_at,
+    liveSession?.ended_at,
+    durationNowMs,
+    emptyValue,
+  )
+  const activeTrackCount = Object.keys(liveTracksBySource).length
+  const startButtonDisabled =
+    !selectLiveWorkbenchCanStartSession(liveRunState) ||
+    isModelsLoading ||
+    defaultsQuery.isPending ||
+    schemaQuery.isPending
+  const stopButtonDisabled = !selectLiveWorkbenchCanStopSession(liveRunState)
   const statusItems: readonly LiveWorkbenchStatusItem[] = [
+    {
+      id: 'status',
+      label: t('live.workbench.statusBar.status'),
+      value: sessionStatusLabel,
+    },
     {
       id: 'session',
       label: t('live.workbench.statusBar.session'),
-      value: emptyValue,
+      value: formatLiveWorkbenchSessionId(liveSession?.session_id, emptyValue),
     },
     {
       id: 'duration',
       label: t('live.workbench.statusBar.duration'),
-      value: emptyValue,
+      value: durationLabel,
     },
     {
       id: 'connection',
       label: t('live.workbench.statusBar.connection'),
-      value: emptyValue,
+      value: connectionStatusLabel,
     },
     {
       id: 'tracks',
       label: t('live.workbench.statusBar.tracks'),
-      value: formatLiveWorkbenchCount(0),
+      value: formatLiveWorkbenchCount(activeTrackCount),
     },
     {
       id: 'runtime',
       label: t('live.workbench.statusBar.runtime'),
-      value: emptyValue,
+      value: liveSession
+        ? formatLiveRealtimeAdapter(liveSession.runtime, t, emptyValue)
+        : runtimeSummary,
     },
   ]
+  const transcriptEmptyTitle =
+    downloadedModels.length === 0 && !isModelsLoading
+      ? t('live.workbench.transcript.empty.noModelTitle')
+      : configuredModelUnavailable
+        ? t('live.workbench.transcript.empty.configuredModelUnavailableTitle')
+        : t('live.workbench.transcript.empty.title')
+  const transcriptEmptyDescription =
+    downloadedModels.length === 0 && !isModelsLoading
+      ? t('live.workbench.transcript.empty.noModelDescription')
+      : configuredModelUnavailable
+        ? t('live.workbench.transcript.empty.configuredModelUnavailableDescription')
+        : t('live.workbench.transcript.empty.description')
 
   function handleModelChange(value: string): void {
     if (downloadedModelIds.has(value)) {
@@ -873,16 +1117,28 @@ export function LiveWorkbenchPage() {
   }
 
   function handleTaskChange(value: string): void {
-    if (!defaults || !taskOptionValues.has(value)) return
+    if (!defaults || !supportsSessionRuntimeOverrides || !taskOptionValues.has(value)) return
 
     setDraft((current) => updateLiveRealtimeDraft(current, defaults, 'task', value))
   }
 
   function handleLanguageChange(value: string): void {
-    if (!defaults || !languageOptionValues.has(value)) return
+    if (!defaults || !supportsSessionRuntimeOverrides || !languageOptionValues.has(value)) return
 
     const nextValue = value === LIVE_WORKBENCH_AUTO_LANGUAGE_VALUE ? null : value
     setDraft((current) => updateLiveRealtimeDraft(current, defaults, 'language', nextValue))
+  }
+
+  function handleEngineDeviceChange(value: string): void {
+    if (!supportsSessionRuntimeOverrides || !engineDeviceOptionValues.has(value)) return
+
+    setSelectedEngineDeviceOverride(value as EngineDevice)
+  }
+
+  function handleEngineComputeTypeChange(value: string): void {
+    if (!supportsSessionRuntimeOverrides || !engineComputeTypeOptionValues.has(value)) return
+
+    setSelectedEngineComputeTypeOverride(value as EngineComputeType)
   }
 
   function handleMicrophoneEnabledChange(enabled: boolean): void {
@@ -940,7 +1196,7 @@ export function LiveWorkbenchPage() {
   }
 
   function handleSettingsDraftChange(key: string, value: LiveRealtimeDraftValue | undefined): void {
-    if (!defaults || !settingsEditable) return
+    if (!defaults || !settingsEditable || !supportsSessionRuntimeOverrides) return
 
     setSettingsDraft((current) =>
       value === undefined
@@ -950,7 +1206,7 @@ export function LiveWorkbenchPage() {
   }
 
   function handleApplySettingsDraft(): void {
-    if (!settingsEditable || settingsDraftMatchesSession) return
+    if (!settingsEditable || !supportsSessionRuntimeOverrides || settingsDraftMatchesSession) return
 
     setDraft((current) =>
       mergeLiveWorkbenchSettingsDraft(current, settingsDraft, settingsFieldKeys),
@@ -964,13 +1220,20 @@ export function LiveWorkbenchPage() {
   }
 
   function handleSaveSettingsDefaults(): void {
-    if (!settingsEditable || !settingsDraftHasChanges || settingsMutationPending) return
+    if (
+      !settingsEditable ||
+      !supportsSessionRuntimeOverrides ||
+      !settingsDraftHasChanges ||
+      settingsMutationPending
+    ) {
+      return
+    }
 
     saveDefaultsMutation.mutate(buildLiveRealtimeDefaultsPatchPayload(settingsDraft))
   }
 
   function handleResetSavedDefaults(): void {
-    if (!settingsEditable || settingsMutationPending) return
+    if (!settingsEditable || !supportsSessionRuntimeOverrides || settingsMutationPending) return
 
     resetDefaultsMutation.mutate()
   }
@@ -978,6 +1241,145 @@ export function LiveWorkbenchPage() {
   function handleSettingsRetry(): void {
     void defaultsQuery.refetch()
     void schemaQuery.refetch()
+  }
+
+  function showRuntimeErrorToast(error: LiveRealtimeRuntimeError): void {
+    const copy = selectLiveWorkbenchErrorCopy(error)
+    toast.error(t(copy?.descriptionKey ?? 'live.workbench.errors.generic.description'))
+  }
+
+  function setRuntimeError(code: LiveRealtimeRuntimeErrorCode): LiveRealtimeRuntimeError {
+    const error = buildLiveWorkbenchRuntimeError(code)
+    useLiveRealtimeStore.getState().setLiveRealtimeFailure(error)
+    showRuntimeErrorToast(error)
+    return error
+  }
+
+  function validateSessionStart(): LiveRealtimeRuntimeError | null {
+    if (selectedSources.length === 0) {
+      return setRuntimeError('live_source_required')
+    }
+
+    if (!hasDefaults || defaultsQuery.error || schemaQuery.error) {
+      return setRuntimeError('runtime_config_invalid')
+    }
+
+    if (downloadedModels.length === 0) {
+      return setRuntimeError('runtime_model_not_downloaded')
+    }
+
+    if (!selectedModelId) {
+      return setRuntimeError('runtime_model_not_configured')
+    }
+
+    if (!downloadedModelIds.has(selectedModelId)) {
+      return setRuntimeError('runtime_model_not_registered')
+    }
+
+    if (
+      microphoneEnabled &&
+      !canStartMicrophoneCapture({
+        enabled: true,
+        capability: microphoneCapability,
+        microphoneCount: microphoneDevices.length,
+      })
+    ) {
+      return setRuntimeError(
+        microphoneCapability === 'unsupported'
+          ? 'microphone_capture_unsupported'
+          : 'microphone_capture_failed',
+      )
+    }
+
+    if (
+      systemAudioEnabled &&
+      !canStartSystemAudioCapture({
+        enabled: true,
+        capability: systemAudioCapability,
+      })
+    ) {
+      return setRuntimeError('system_audio_capture_unsupported')
+    }
+
+    return null
+  }
+
+  async function stopSourceTestsBeforeSession(): Promise<void> {
+    if (microphoneCaptureActive) {
+      await liveDevices.stopMicrophoneCapture()
+    }
+
+    if (systemAudioCaptureActive) {
+      await liveDevices.stopSystemAudioCapture()
+    }
+  }
+
+  function buildSessionRuntimeDraft(): LiveRealtimeDraft {
+    if (!supportsSessionRuntimeOverrides) {
+      return {}
+    }
+
+    const runtimeDraft: LiveRealtimeDraft = { ...draft }
+
+    if (selectedEngineDevice && selectedEngineDevice !== config?.engine.device) {
+      runtimeDraft.device = selectedEngineDevice
+    }
+
+    if (selectedEngineComputeType && selectedEngineComputeType !== config?.engine.compute_type) {
+      runtimeDraft.compute_type = selectedEngineComputeType
+    }
+
+    return runtimeDraft
+  }
+
+  async function handleStartSession(): Promise<void> {
+    if (!selectLiveWorkbenchCanStartSession(liveRunState)) return
+    if (validateSessionStart()) return
+
+    const service = createLiveRealtimeSessionService()
+    const runtimeDraft = buildSessionRuntimeDraft()
+    sessionServiceRef.current = service
+
+    try {
+      await stopSourceTestsBeforeSession()
+      await service.start({
+        title: t('live.workbench.sessionTitle'),
+        modelId: selectedModelId,
+        languageHint: typeof resolvedLanguage === 'string' ? resolvedLanguage : null,
+        runtimeOverrides:
+          Object.keys(runtimeDraft).length > 0
+            ? buildLiveRealtimeRuntimeOverrides(runtimeDraft)
+            : undefined,
+        sources: selectedSources,
+        microphoneCapture: {
+          deviceId: liveDevices.selectedMicrophoneId,
+        },
+      })
+    } catch (error) {
+      const runtimeError = normalizeLiveWorkbenchCaughtError(error, 'live_session_start_failed')
+      showRuntimeErrorToast(runtimeError)
+    }
+  }
+
+  async function handleStopSession(): Promise<void> {
+    const service = sessionServiceRef.current
+    if (!service || !selectLiveWorkbenchCanStopSession(liveRunState)) return
+
+    try {
+      await service.stop()
+    } catch (error) {
+      const runtimeError = normalizeLiveWorkbenchCaughtError(error, 'live_session_stop_failed')
+      showRuntimeErrorToast(runtimeError)
+    }
+  }
+
+  function handleSessionAction(): void {
+    if (liveRunState === 'active') {
+      void handleStopSession()
+      return
+    }
+
+    void handleStartSession()
   }
 
   return (
@@ -992,7 +1394,25 @@ export function LiveWorkbenchPage() {
         data-slot="live-workbench-body"
         className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden"
       >
-        <LiveWorkbenchStatusBar items={statusItems} />
+        <LiveWorkbenchStatusBar
+          items={statusItems}
+          actions={
+            <Button
+              type="button"
+              size="sm"
+              variant={liveRunState === 'active' ? 'outline' : 'default'}
+              disabled={liveRunState === 'active' ? stopButtonDisabled : startButtonDisabled}
+              onClick={handleSessionAction}
+            >
+              {liveRunState === 'active' || liveRunState === 'finishing' ? (
+                <Square className="size-4" />
+              ) : (
+                <Play className="size-4" />
+              )}
+              {t(resolveLiveWorkbenchStartButtonKey(liveRunState))}
+            </Button>
+          }
+        />
 
         <div className="flex min-h-0 gap-4 overflow-hidden max-lg:flex-col max-lg:overflow-y-auto lg:h-full">
           <div
@@ -1006,7 +1426,11 @@ export function LiveWorkbenchPage() {
               taskValue={taskValue}
               taskOptions={taskOptions}
               taskDisabled={
-                !hasDefaults || schemaQuery.isPending || !taskField || taskOptionValues.size === 0
+                !hasDefaults ||
+                !supportsSessionRuntimeOverrides ||
+                schemaQuery.isPending ||
+                !taskField ||
+                taskOptionValues.size === 0
               }
               taskLabel={
                 taskField ? t(taskField.label_key) : t('live.workbench.sessionSetup.task.label')
@@ -1015,6 +1439,7 @@ export function LiveWorkbenchPage() {
               languageOptions={languageOptions}
               languageDisabled={
                 !hasDefaults ||
+                !supportsSessionRuntimeOverrides ||
                 schemaQuery.isPending ||
                 isConfigLoading ||
                 !languageField ||
@@ -1025,7 +1450,22 @@ export function LiveWorkbenchPage() {
                   ? t(languageField.label_key)
                   : t('live.workbench.sessionSetup.language.label')
               }
-              runtimeSummary={runtimeSummary}
+              engineDeviceValue={engineDeviceValue}
+              engineDeviceOptions={engineDeviceOptions}
+              engineDeviceDisabled={
+                isConfigLoading ||
+                !supportsSessionRuntimeOverrides ||
+                engineDeviceOptionValues.size === 0
+              }
+              engineDeviceLabel={t('tasks.workbench.sessionConfig.device.label')}
+              engineComputeTypeValue={engineComputeTypeValue}
+              engineComputeTypeOptions={engineComputeTypeOptions}
+              engineComputeTypeDisabled={
+                isConfigLoading ||
+                !supportsSessionRuntimeOverrides ||
+                engineComputeTypeOptionValues.size === 0
+              }
+              engineComputeTypeLabel={t('tasks.workbench.sessionConfig.computeType.label')}
               microphoneEnabled={microphoneEnabled}
               microphoneValue={microphoneValue}
               microphoneOptions={microphoneOptions}
@@ -1053,8 +1493,10 @@ export function LiveWorkbenchPage() {
                 state: liveDevices.systemAudioCapture.state,
                 level: liveDevices.systemAudioCapture.level,
               })}
-              systemAudioCaptureSource={t(
-                'live.workbench.sessionSetup.systemAudio.captureSource.browserPrompt',
+              systemAudioCaptureSourceActionLabel={t(
+                systemAudioActionMode === 'stop'
+                  ? 'live.workbench.sessionSetup.systemAudio.actions.stop'
+                  : 'live.workbench.sessionSetup.systemAudio.actions.start',
               )}
               systemAudioActionLabel={t(
                 systemAudioActionMode === 'stop'
@@ -1067,6 +1509,8 @@ export function LiveWorkbenchPage() {
               onModelChange={handleModelChange}
               onTaskChange={handleTaskChange}
               onLanguageChange={handleLanguageChange}
+              onEngineDeviceChange={handleEngineDeviceChange}
+              onEngineComputeTypeChange={handleEngineComputeTypeChange}
               onMicrophoneEnabledChange={handleMicrophoneEnabledChange}
               onMicrophoneChange={handleMicrophoneChange}
               onMicrophoneAction={handleMicrophoneAction}
@@ -1074,29 +1518,57 @@ export function LiveWorkbenchPage() {
               onSystemAudioAction={handleSystemAudioAction}
               onSettingsToggle={handleSettingsToggle}
             />
-            <LiveWorkbenchTranscriptPanel hasTranscript={hasTranscript} />
+            <LiveWorkbenchTranscriptPanel
+              items={transcriptItems}
+              emptyTitle={transcriptEmptyTitle}
+              emptyDescription={transcriptEmptyDescription}
+              errorCopy={errorCopy}
+              onRetry={liveLastError?.retryable ? handleStartSession : undefined}
+              actions={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t('live.workbench.compact.open')}
+                  disabled={!hasTranscript && liveRunState !== 'active'}
+                  onClick={() => setCompactOpen(true)}
+                >
+                  <Maximize2 className="size-4" />
+                </Button>
+              }
+            />
           </div>
           <LiveWorkbenchSettingsPanel
             open={settingsOpen}
             onOpenChange={setSettingsOpen}
             runState={liveRunState}
+            resolvedSnapshot={liveSession?.runtime_config ?? null}
             defaults={defaults}
             schema={settingsSchema}
+            adapter={resolveLiveRealtimeSchemaAdapter(liveSession?.runtime ?? liveRuntimeAdapter)}
             draft={settingsDraft}
             languages={config?.effective_languages ?? []}
             loading={defaultsQuery.isPending || schemaQuery.isPending}
             unavailable={Boolean(defaultsQuery.error || schemaQuery.error)}
-            controlsDisabled={settingsControlsDisabled}
+            controlsDisabled={settingsControlsDisabled || !supportsSessionRuntimeOverrides}
             applyDisabled={
-              !settingsEditable || settingsDraftMatchesSession || settingsMutationPending
+              !supportsSessionRuntimeOverrides ||
+              !settingsEditable ||
+              settingsDraftMatchesSession ||
+              settingsMutationPending
             }
             resetDraftDisabled={
               !settingsEditable || !settingsDraftHasChanges || settingsMutationPending
             }
             saveDefaultsDisabled={
-              !settingsEditable || !settingsDraftHasChanges || settingsMutationPending
+              !supportsSessionRuntimeOverrides ||
+              !settingsEditable ||
+              !settingsDraftHasChanges ||
+              settingsMutationPending
             }
-            resetSavedDefaultsDisabled={!settingsEditable || settingsMutationPending}
+            resetSavedDefaultsDisabled={
+              !supportsSessionRuntimeOverrides || !settingsEditable || settingsMutationPending
+            }
             savingDefaults={saveDefaultsMutation.isPending}
             resettingDefaults={resetDefaultsMutation.isPending}
             onDraftChange={handleSettingsDraftChange}
@@ -1109,7 +1581,20 @@ export function LiveWorkbenchPage() {
         </div>
       </div>
 
-      <LiveWorkbenchCompactView open={false} onOpenChange={ignoreOpenChange} />
+      <LiveWorkbenchCompactView
+        open={compactOpen}
+        status={sessionStatusLabel}
+        duration={durationLabel}
+        items={transcriptItems}
+        microphoneEnabled={microphoneEnabled}
+        microphoneStatus={t(microphoneStatus.i18nKey)}
+        systemAudioEnabled={systemAudioEnabled}
+        systemAudioStatus={t(systemAudioStatus.i18nKey)}
+        stopDisabled={stopButtonDisabled}
+        onOpenChange={setCompactOpen}
+        onExpand={ignoreOpenChange}
+        onStop={handleStopSession}
+      />
     </ContentCanvas>
   )
 }

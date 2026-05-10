@@ -15,7 +15,6 @@ vi.mock('react-i18next', () => ({
         'live.workbench.sessionSetup.title': 'Session setup',
         'live.workbench.sessionSetup.settings': 'Session settings',
         'live.workbench.sessionSetup.model.label': 'Model',
-        'live.workbench.sessionSetup.runtime.label': 'Runtime',
         'live.workbench.sessionSetup.sources.level': `Level ${options?.percent ?? 0}%`,
         'live.workbench.sessionSetup.microphone.title': 'Microphone',
         'live.workbench.sessionSetup.microphone.description': 'Choose an input device.',
@@ -23,6 +22,8 @@ vi.mock('react-i18next', () => ({
         'live.workbench.sessionSetup.systemAudio.title': 'System audio',
         'live.workbench.sessionSetup.systemAudio.description': 'Capture system audio explicitly.',
         'live.workbench.sessionSetup.systemAudio.captureSource.label': 'Capture source',
+        'live.workbench.sessionSetup.systemAudio.actions.start': 'Start',
+        'live.workbench.sessionSetup.systemAudio.actions.test': 'Test capture',
       }
 
       return messages[key] ?? key
@@ -40,7 +41,12 @@ function renderSessionSetup(overrides: Partial<LiveWorkbenchSessionSetupProps> =
     languageValue: '__auto__',
     languageOptions: [{ value: '__auto__', label: 'Auto detect' }],
     languageLabel: 'Language',
-    runtimeSummary: 'auto / default',
+    engineDeviceValue: 'auto',
+    engineDeviceOptions: [{ value: 'auto', label: 'Auto' }],
+    engineDeviceLabel: 'Device',
+    engineComputeTypeValue: 'default',
+    engineComputeTypeOptions: [{ value: 'default', label: 'Default' }],
+    engineComputeTypeLabel: 'Compute Type',
     microphoneEnabled: true,
     microphoneValue: '__default_microphone__',
     microphoneOptions: [
@@ -56,7 +62,7 @@ function renderSessionSetup(overrides: Partial<LiveWorkbenchSessionSetupProps> =
     systemAudioStatus: 'Browser capture available',
     systemAudioStatusTone: 'warning',
     systemAudioLevelPercent: 0,
-    systemAudioCaptureSource: 'Browser capture prompt',
+    systemAudioCaptureSourceActionLabel: 'Start',
     systemAudioActionLabel: 'Test capture',
     systemAudioActionDisabled: true,
     systemAudioActionMode: 'test',
@@ -64,6 +70,8 @@ function renderSessionSetup(overrides: Partial<LiveWorkbenchSessionSetupProps> =
     onModelChange: vi.fn(),
     onTaskChange: vi.fn(),
     onLanguageChange: vi.fn(),
+    onEngineDeviceChange: vi.fn(),
+    onEngineComputeTypeChange: vi.fn(),
     onMicrophoneEnabledChange: vi.fn(),
     onMicrophoneChange: vi.fn(),
     onMicrophoneAction: vi.fn(),
@@ -87,14 +95,16 @@ describe('LiveWorkbenchSessionSetup', () => {
     expect(screen.getByLabelText('Model')).toBeTruthy()
     expect(screen.getByLabelText('Task')).toBeTruthy()
     expect(screen.getByLabelText('Language')).toBeTruthy()
-    expect(screen.getByText('Runtime')).toBeTruthy()
-    expect(screen.getByText('auto / default')).toBeTruthy()
+    expect(screen.getByLabelText('Device')).toBeTruthy()
+    expect(screen.getByText('Auto')).toBeTruthy()
+    expect(screen.getByLabelText('Compute Type')).toBeTruthy()
+    expect(screen.getByText('Default')).toBeTruthy()
     expect(screen.getByText('Microphone')).toBeTruthy()
     expect(screen.getByLabelText('Input device')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Test microphone' })).toBeTruthy()
     expect(screen.getByText('System audio')).toBeTruthy()
     expect(screen.getByText('Capture source')).toBeTruthy()
-    expect(screen.getByText('Browser capture prompt')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Start' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Test capture' })).toBeDisabled()
   })
 
@@ -121,6 +131,8 @@ describe('LiveWorkbenchSessionSetup', () => {
       modelDisabled: true,
       taskDisabled: true,
       languageDisabled: true,
+      engineDeviceDisabled: true,
+      engineComputeTypeDisabled: true,
       microphoneDisabled: true,
       systemAudioDisabled: true,
     })
@@ -128,6 +140,8 @@ describe('LiveWorkbenchSessionSetup', () => {
     expect(screen.getByLabelText('Model')).toBeDisabled()
     expect(screen.getByLabelText('Task')).toBeDisabled()
     expect(screen.getByLabelText('Language')).toBeDisabled()
+    expect(screen.getByLabelText('Device')).toBeDisabled()
+    expect(screen.getByLabelText('Compute Type')).toBeDisabled()
     expect(screen.getByLabelText('Input device')).toBeDisabled()
     expect(screen.getByRole('switch', { name: 'Microphone' })).toBeDisabled()
     expect(screen.getByRole('switch', { name: 'System audio' })).toBeDisabled()

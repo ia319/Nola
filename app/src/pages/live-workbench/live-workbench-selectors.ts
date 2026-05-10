@@ -3,12 +3,42 @@ import type {
   LiveRealtimeOptionGroup,
   ModelResponse,
 } from '@/shared/types'
-import type { LiveAudioLevel, LiveCaptureState } from '@/features/realtime'
+import type {
+  LiveAudioLevel,
+  LiveAudioSourceKind,
+  LiveCaptureState,
+  LiveRealtimeRuntimeError,
+  LiveRealtimeRuntimeErrorCode,
+  LiveRealtimeRunState,
+  LiveRealtimeTranscriptCommittedPartialPayload,
+  LiveRealtimeTranscriptFinalPayload,
+  LiveRealtimeTranscriptPreviewPayload,
+} from '@/features/realtime'
 
 export interface LiveWorkbenchTranscriptCounts {
   finalCount: number
   committedPartialCount: number
   previewCount: number
+}
+
+export type LiveWorkbenchTranscriptItemKind = 'final' | 'committed_partial' | 'preview'
+
+export interface LiveWorkbenchTranscriptItem {
+  id: string
+  kind: LiveWorkbenchTranscriptItemKind
+  source: LiveAudioSourceKind
+  trackId: string
+  startMs: number
+  endMs: number
+  text: string
+  language: string | null
+  confidence: number | null
+  sequence: number
+}
+
+export interface LiveWorkbenchErrorCopy {
+  titleKey: string
+  descriptionKey: string
 }
 
 export const LIVE_WORKBENCH_AUTO_LANGUAGE_VALUE = '__auto__'
@@ -78,6 +108,38 @@ export function selectLiveWorkbenchHasTranscript(counts: LiveWorkbenchTranscript
   return counts.finalCount > 0 || counts.committedPartialCount > 0 || counts.previewCount > 0
 }
 
+export function selectLiveWorkbenchTranscriptCounts({
+  finalTranscripts,
+  committedPartials,
+  previews,
+}: {
+  finalTranscripts: readonly LiveRealtimeTranscriptFinalPayload[]
+  committedPartials: Record<string, LiveRealtimeTranscriptCommittedPartialPayload>
+  previews: Record<string, LiveRealtimeTranscriptPreviewPayload>
+}): LiveWorkbenchTranscriptCounts {
+  return {
+    finalCount: finalTranscripts.length,
+    committedPartialCount: Object.keys(committedPartials).length,
+    previewCount: Object.keys(previews).length,
+  }
+}
+
+export function selectLiveWorkbenchTranscriptItems({
+  finalTranscripts,
+  committedPartials,
+  previews,
+}: {
+  finalTranscripts: readonly LiveRealtimeTranscriptFinalPayload[]
+  committedPartials: Record<string, LiveRealtimeTranscriptCommittedPartialPayload>
+  previews: Record<string, LiveRealtimeTranscriptPreviewPayload>
+}): LiveWorkbenchTranscriptItem[] {
+  return [
+    ...finalTranscripts.map(toFinalTranscriptItem),
+    ...Object.values(committedPartials).map(toCommittedPartialTranscriptItem),
+    ...Object.values(previews).map(toPreviewTranscriptItem),
+  ].sort(compareTranscriptItems)
+}
+
 export function selectLiveWorkbenchAudioLevelPercent(level: LiveAudioLevel | null): number {
   if (!level || !Number.isFinite(level.level)) {
     return 0
@@ -112,4 +174,188 @@ export function selectLiveWorkbenchDisplayedAudioLevelPercent({
 
 export function selectLiveWorkbenchIsCaptureActive(state: LiveCaptureState): boolean {
   return state === 'starting' || state === 'capturing' || state === 'paused' || state === 'stopping'
+}
+
+export function selectLiveWorkbenchCanStopSession(runState: LiveRealtimeRunState): boolean {
+  return runState === 'active'
+}
+
+export function selectLiveWorkbenchCanStartSession(runState: LiveRealtimeRunState): boolean {
+  return runState === 'idle' || runState === 'failed' || runState === 'finished'
+}
+
+export function selectLiveWorkbenchErrorCopy(
+  error: LiveRealtimeRuntimeError | null,
+): LiveWorkbenchErrorCopy | null {
+  if (!error) return null
+
+  return (
+    LIVE_WORKBENCH_ERROR_COPY[error.code] ?? {
+      titleKey: 'live.workbench.errors.generic.title',
+      descriptionKey: 'live.workbench.errors.generic.description',
+    }
+  )
+}
+
+export function hasLiveWorkbenchErrorCopy(code: string): code is LiveRealtimeRuntimeErrorCode {
+  return Object.prototype.hasOwnProperty.call(LIVE_WORKBENCH_ERROR_COPY, code)
+}
+
+function toFinalTranscriptItem(
+  transcript: LiveRealtimeTranscriptFinalPayload,
+): LiveWorkbenchTranscriptItem {
+  return {
+    id: `final:${transcript.segment_id}`,
+    kind: 'final',
+    source: transcript.source,
+    trackId: transcript.track_id,
+    startMs: transcript.start_ms,
+    endMs: transcript.end_ms,
+    text: transcript.text,
+    language: transcript.language,
+    confidence: transcript.confidence,
+    sequence: transcript.sequence,
+  }
+}
+
+function toCommittedPartialTranscriptItem(
+  transcript: LiveRealtimeTranscriptCommittedPartialPayload,
+): LiveWorkbenchTranscriptItem {
+  return {
+    id: `committed:${transcript.track_id}:${transcript.committed_index}`,
+    kind: 'committed_partial',
+    source: transcript.source,
+    trackId: transcript.track_id,
+    startMs: transcript.start_ms,
+    endMs: transcript.end_ms,
+    text: transcript.text,
+    language: transcript.language,
+    confidence: transcript.confidence,
+    sequence: transcript.committed_index,
+  }
+}
+
+function toPreviewTranscriptItem(
+  transcript: LiveRealtimeTranscriptPreviewPayload,
+): LiveWorkbenchTranscriptItem {
+  return {
+    id: `preview:${transcript.track_id}:${transcript.preview_index}`,
+    kind: 'preview',
+    source: transcript.source,
+    trackId: transcript.track_id,
+    startMs: transcript.start_ms,
+    endMs: transcript.end_ms,
+    text: transcript.text,
+    language: transcript.language,
+    confidence: transcript.confidence,
+    sequence: transcript.preview_index,
+  }
+}
+
+function compareTranscriptItems(
+  left: LiveWorkbenchTranscriptItem,
+  right: LiveWorkbenchTranscriptItem,
+): number {
+  return (
+    left.startMs - right.startMs ||
+    left.endMs - right.endMs ||
+    compareTranscriptKind(left.kind) - compareTranscriptKind(right.kind) ||
+    left.source.localeCompare(right.source) ||
+    left.sequence - right.sequence
+  )
+}
+
+function compareTranscriptKind(kind: LiveWorkbenchTranscriptItemKind): number {
+  if (kind === 'final') return 0
+  if (kind === 'committed_partial') return 1
+  return 2
+}
+
+const LIVE_WORKBENCH_ERROR_COPY: Partial<
+  Record<LiveRealtimeRuntimeErrorCode, LiveWorkbenchErrorCopy>
+> = {
+  live_source_required: {
+    titleKey: 'live.workbench.errors.liveSourceRequired.title',
+    descriptionKey: 'live.workbench.errors.liveSourceRequired.description',
+  },
+  runtime_model_not_configured: {
+    titleKey: 'live.workbench.errors.runtimeModelNotConfigured.title',
+    descriptionKey: 'live.workbench.errors.runtimeModelNotConfigured.description',
+  },
+  runtime_model_not_registered: {
+    titleKey: 'live.workbench.errors.runtimeModelNotRegistered.title',
+    descriptionKey: 'live.workbench.errors.runtimeModelNotRegistered.description',
+  },
+  runtime_model_not_downloaded: {
+    titleKey: 'live.workbench.errors.runtimeModelNotDownloaded.title',
+    descriptionKey: 'live.workbench.errors.runtimeModelNotDownloaded.description',
+  },
+  runtime_config_invalid: {
+    titleKey: 'live.workbench.errors.runtimeConfigInvalid.title',
+    descriptionKey: 'live.workbench.errors.runtimeConfigInvalid.description',
+  },
+  microphone_permission_required: {
+    titleKey: 'live.workbench.errors.microphonePermissionRequired.title',
+    descriptionKey: 'live.workbench.errors.microphonePermissionRequired.description',
+  },
+  microphone_permission_denied: {
+    titleKey: 'live.workbench.errors.microphonePermissionDenied.title',
+    descriptionKey: 'live.workbench.errors.microphonePermissionDenied.description',
+  },
+  microphone_capture_unsupported: {
+    titleKey: 'live.workbench.errors.microphoneCaptureUnsupported.title',
+    descriptionKey: 'live.workbench.errors.microphoneCaptureUnsupported.description',
+  },
+  microphone_capture_failed: {
+    titleKey: 'live.workbench.errors.microphoneCaptureFailed.title',
+    descriptionKey: 'live.workbench.errors.microphoneCaptureFailed.description',
+  },
+  system_audio_capture_unsupported: {
+    titleKey: 'live.workbench.errors.systemAudioUnsupported.title',
+    descriptionKey: 'live.workbench.errors.systemAudioUnsupported.description',
+  },
+  system_audio_permission_denied: {
+    titleKey: 'live.workbench.errors.systemAudioPermissionDenied.title',
+    descriptionKey: 'live.workbench.errors.systemAudioPermissionDenied.description',
+  },
+  system_audio_track_missing: {
+    titleKey: 'live.workbench.errors.systemAudioTrackMissing.title',
+    descriptionKey: 'live.workbench.errors.systemAudioTrackMissing.description',
+  },
+  system_audio_capture_failed: {
+    titleKey: 'live.workbench.errors.systemAudioCaptureFailed.title',
+    descriptionKey: 'live.workbench.errors.systemAudioCaptureFailed.description',
+  },
+  websocket_unavailable: {
+    titleKey: 'live.workbench.errors.websocketUnavailable.title',
+    descriptionKey: 'live.workbench.errors.websocketUnavailable.description',
+  },
+  websocket_connect_failed: {
+    titleKey: 'live.workbench.errors.websocketConnectFailed.title',
+    descriptionKey: 'live.workbench.errors.websocketConnectFailed.description',
+  },
+  websocket_closed: {
+    titleKey: 'live.workbench.errors.websocketClosed.title',
+    descriptionKey: 'live.workbench.errors.websocketClosed.description',
+  },
+  live_track_ready_timeout: {
+    titleKey: 'live.workbench.errors.trackReadyTimeout.title',
+    descriptionKey: 'live.workbench.errors.trackReadyTimeout.description',
+  },
+  live_session_finish_timeout: {
+    titleKey: 'live.workbench.errors.sessionFinishTimeout.title',
+    descriptionKey: 'live.workbench.errors.sessionFinishTimeout.description',
+  },
+  live_session_start_failed: {
+    titleKey: 'live.workbench.errors.sessionStartFailed.title',
+    descriptionKey: 'live.workbench.errors.sessionStartFailed.description',
+  },
+  live_session_stop_failed: {
+    titleKey: 'live.workbench.errors.sessionStopFailed.title',
+    descriptionKey: 'live.workbench.errors.sessionStopFailed.description',
+  },
+  live_session_state_invalid: {
+    titleKey: 'live.workbench.errors.sessionStateInvalid.title',
+    descriptionKey: 'live.workbench.errors.sessionStateInvalid.description',
+  },
 }
