@@ -123,7 +123,7 @@ export function LiveWorkbenchSettingsPanel({
 
   function renderBody() {
     if (loading) {
-      return <p className="text-muted-foreground text-sm">{t('settings.liveRealtime.loading')}</p>
+      return <p className="text-muted-foreground text-sm">{t('live.workbench.settings.loading')}</p>
     }
 
     if (unavailable || !defaults || schema.length === 0) {

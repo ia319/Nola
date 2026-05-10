@@ -734,6 +734,7 @@
       "settings": {
         "title": "Runtime configuration",
         "description": "Adjust runtime parameters for live transcription sessions.",
+        "loading": "Loading runtime parameters...",
         "state": {
           "idle": "Edit parameters before starting this session.",
           "starting": "Session startup is locking runtime parameters.",
