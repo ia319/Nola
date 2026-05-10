@@ -5,6 +5,7 @@ import type { LiveAudioCaptureRepository } from '../capture/audio-capture-reposi
 import { createAudioCaptureRepository } from '../capture/audio-capture-repository'
 import { LiveCaptureError } from '../capture/errors'
 import type {
+  LiveAudioSourceKind,
   LiveCaptureErrorCode,
   LiveCaptureSession,
   LiveCaptureStateChange,
@@ -48,14 +49,20 @@ export interface UseLiveDeviceInventoryReturn {
   setActiveSpeaker: (deviceId: string | null) => void
   refreshDevices: () => Promise<LiveDeviceInventory | null>
   requestMicrophonePermission: (deviceId?: string | null) => Promise<LiveDevicePermissionResult>
-  startMicrophoneCapture: (options?: LiveMicrophoneCaptureOptions) => Promise<void>
+  startMicrophoneCapture: (
+    options?: LiveMicrophoneCaptureOptions,
+  ) => Promise<LiveCaptureSession | null>
   stopMicrophoneCapture: () => Promise<void>
   pauseMicrophoneCapture: () => Promise<void>
   resumeMicrophoneCapture: () => Promise<void>
-  startSystemAudioCapture: (options?: LiveSystemAudioCaptureOptions) => Promise<void>
+  startSystemAudioCapture: (
+    options?: LiveSystemAudioCaptureOptions,
+  ) => Promise<LiveCaptureSession | null>
   stopSystemAudioCapture: () => Promise<void>
   pauseSystemAudioCapture: () => Promise<void>
   resumeSystemAudioCapture: () => Promise<void>
+  getActiveMicrophoneCaptureSession: () => LiveCaptureSession | null
+  getActiveSystemAudioCaptureSession: () => LiveCaptureSession | null
 }
 
 type CaptureSlotKind = 'microphone' | 'system'
@@ -88,6 +95,13 @@ function createStoppedCaptureStateChange(): LiveCaptureStateChange {
     changedAt: Date.now(),
     errorCode: null,
   }
+}
+
+function isReusableCaptureSession(
+  session: LiveCaptureSession | null,
+  sourceKind: LiveAudioSourceKind,
+): session is LiveCaptureSession {
+  return session?.sourceKind === sourceKind && session.state === 'capturing'
 }
 
 export function useLiveDeviceInventory(
@@ -254,9 +268,11 @@ export function useLiveDeviceInventory(
           session.onLevel(setMicrophoneLevel),
           session.onStateChange((change) => {
             setMicrophoneCaptureState(change)
-            if (change.state === 'failed') {
+            if (change.state === 'failed' || change.state === 'stopped') {
               detachCaptureSession('microphone')
-              void refreshDevices()
+              if (change.state === 'failed') {
+                void refreshDevices()
+              }
             }
           }),
         ]
@@ -273,9 +289,11 @@ export function useLiveDeviceInventory(
         session.onLevel(setSystemAudioLevel),
         session.onStateChange((change) => {
           setSystemAudioCaptureState(change)
-          if (change.state === 'failed') {
+          if (change.state === 'failed' || change.state === 'stopped') {
             detachCaptureSession('system')
-            void refreshDevices()
+            if (change.state === 'failed') {
+              void refreshDevices()
+            }
           }
         }),
       ]
@@ -386,10 +404,12 @@ export function useLiveDeviceInventory(
   }, [releaseActiveCaptureSessions])
 
   const startMicrophoneCapture = useCallback(
-    async (captureOptions: LiveMicrophoneCaptureOptions = {}): Promise<void> => {
+    async (
+      captureOptions: LiveMicrophoneCaptureOptions = {},
+    ): Promise<LiveCaptureSession | null> => {
       const stopResult = await stopMicrophoneSession(false)
       if (stopResult === 'failed') {
-        return
+        return null
       }
 
       const state = useLiveDeviceStore.getState()
@@ -406,9 +426,11 @@ export function useLiveDeviceInventory(
         })
         bindCaptureSession('microphone', session)
         void refreshDevices()
+        return session
       } catch (error) {
         const errorCode = getCaptureErrorCode(error, 'microphone_capture_failed')
         setMicrophoneCaptureFailure(errorCode)
+        return null
       }
     },
     [
@@ -422,10 +444,12 @@ export function useLiveDeviceInventory(
   )
 
   const startSystemAudioCapture = useCallback(
-    async (captureOptions: LiveSystemAudioCaptureOptions = {}): Promise<void> => {
+    async (
+      captureOptions: LiveSystemAudioCaptureOptions = {},
+    ): Promise<LiveCaptureSession | null> => {
       const stopResult = await stopSystemAudioSession(false)
       if (stopResult === 'failed') {
-        return
+        return null
       }
 
       setSystemAudioCaptureStarting()
@@ -435,9 +459,11 @@ export function useLiveDeviceInventory(
         const session = await repository.startSystemAudioCapture(captureOptions)
         bindCaptureSession('system', session)
         void refreshDevices()
+        return session
       } catch (error) {
         const errorCode = getCaptureErrorCode(error, 'system_audio_capture_failed')
         setSystemAudioCaptureFailure(errorCode)
+        return null
       }
     },
     [
@@ -464,6 +490,16 @@ export function useLiveDeviceInventory(
 
   const resumeSystemAudioCapture = useCallback(async (): Promise<void> => {
     await systemAudioSessionRef.current?.resume()
+  }, [])
+
+  const getActiveMicrophoneCaptureSession = useCallback((): LiveCaptureSession | null => {
+    const session = microphoneSessionRef.current
+    return isReusableCaptureSession(session, 'microphone') ? session : null
+  }, [])
+
+  const getActiveSystemAudioCaptureSession = useCallback((): LiveCaptureSession | null => {
+    const session = systemAudioSessionRef.current
+    return isReusableCaptureSession(session, 'system') ? session : null
   }, [])
 
   useEffect(() => {
@@ -520,5 +556,7 @@ export function useLiveDeviceInventory(
     stopSystemAudioCapture,
     pauseSystemAudioCapture,
     resumeSystemAudioCapture,
+    getActiveMicrophoneCaptureSession,
+    getActiveSystemAudioCaptureSession,
   }
 }
