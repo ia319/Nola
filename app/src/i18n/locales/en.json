@@ -636,6 +636,66 @@
         },
         "runtime": {
           "label": "Runtime"
+        },
+        "sources": {
+          "level": "Level {{percent}}%"
+        },
+        "microphone": {
+          "title": "Microphone",
+          "description": "Choose an input device and test the incoming level.",
+          "device": "Input device",
+          "defaultDevice": "System default",
+          "fallbackDevice": "Microphone {{index}}",
+          "loading": "Loading devices",
+          "noDevice": "No microphone available",
+          "actions": {
+            "test": "Test microphone",
+            "stop": "Stop test"
+          },
+          "status": {
+            "loading": "Loading devices",
+            "inventoryError": "Device inventory failed",
+            "permissionRequired": "Permission required",
+            "permissionDenied": "Permission denied",
+            "noDevice": "No microphone available",
+            "unsupported": "Microphone capture unsupported",
+            "notImplemented": "Desktop capture not implemented",
+            "ready": "Ready",
+            "starting": "Starting",
+            "capturing": "Capturing",
+            "paused": "Paused",
+            "stopping": "Stopping",
+            "stopped": "Stopped",
+            "failed": "Capture failed"
+          }
+        },
+        "systemAudio": {
+          "title": "System audio",
+          "description": "Start browser system-audio capture explicitly.",
+          "captureSource": {
+            "label": "Capture source",
+            "browserPrompt": "Browser capture prompt"
+          },
+          "actions": {
+            "test": "Test capture",
+            "stop": "Stop capture"
+          },
+          "status": {
+            "loading": "Loading devices",
+            "inventoryError": "Device inventory failed",
+            "limited": "Browser capture available",
+            "unsupported": "System audio unsupported",
+            "notImplemented": "Desktop capture not implemented",
+            "ready": "Ready",
+            "starting": "Starting",
+            "capturing": "Capturing",
+            "paused": "Paused",
+            "stopping": "Stopping",
+            "stopped": "Stopped",
+            "permissionDenied": "Permission denied",
+            "trackMissing": "No audio track selected",
+            "failed": "Capture failed"
+          }
         }
       },
       "settings": {
