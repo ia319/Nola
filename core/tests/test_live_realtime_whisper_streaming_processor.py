@@ -170,6 +170,257 @@ def test_online_processor_closes_committed_text_on_silence() -> None:
     assert reset.final.is_empty is True
 
 
+def test_online_processor_confirms_segment_boundary_before_final() -> None:
+    """Validate trailing silence can confirm the final word before closing."""
+    backend = _FakeBackend(
+        (
+            _output(
+                (
+                    _word(0, 400, "need"),
+                    _word(400, 800, "twenty"),
+                ),
+                (800,),
+            ),
+            _output(
+                (
+                    _word(0, 400, "need"),
+                    _word(400, 800, "twenty"),
+                    _word(800, 1200, "seconds"),
+                ),
+                (1200,),
+            ),
+            _output(
+                (
+                    _word(0, 400, "need"),
+                    _word(400, 800, "twenty"),
+                    _word(800, 1200, "seconds"),
+                    _word(1200, 1600, "around"),
+                ),
+                (1600,),
+            ),
+        )
+    )
+    processor = WhisperStreamingOnlineProcessor(
+        backend=backend,
+        config=WhisperStreamingRuntimeConfig(segment_close_silence_ms=500),
+    )
+
+    processor.accept_waveform(_waveform(1000), start_ms=0, end_ms=1000)
+    processor.accept_waveform(_waveform(1000), start_ms=1000, end_ms=2000)
+    closed = processor.accept_waveform(
+        _waveform(500, amplitude=0.0),
+        start_ms=2000,
+        end_ms=2500,
+    )
+
+    assert closed.processed is True
+    assert closed.final.text == "need twenty seconds around"
+    assert backend.waveform_lengths == [16000, 32000, 40000]
+    assert backend.prompts == ["", "", ""]
+
+
+def test_online_processor_confirms_boundary_on_long_silence_frame() -> None:
+    """Validate long silent frames still confirm pending transcript boundaries."""
+    backend = _FakeBackend(
+        (
+            _output(
+                (
+                    _word(0, 400, "need"),
+                    _word(400, 800, "twenty"),
+                ),
+                (800,),
+            ),
+            _output(
+                (
+                    _word(0, 400, "need"),
+                    _word(400, 800, "twenty"),
+                    _word(800, 1200, "seconds"),
+                ),
+                (1200,),
+            ),
+            _output(
+                (
+                    _word(0, 400, "need"),
+                    _word(400, 800, "twenty"),
+                    _word(800, 1200, "seconds"),
+                    _word(1200, 1600, "around"),
+                ),
+                (1600,),
+            ),
+        )
+    )
+    processor = WhisperStreamingOnlineProcessor(
+        backend=backend,
+        config=WhisperStreamingRuntimeConfig(
+            min_chunk_ms=500,
+            segment_close_silence_ms=500,
+        ),
+    )
+
+    processor.accept_waveform(_waveform(1000), start_ms=0, end_ms=1000)
+    processor.accept_waveform(_waveform(1000), start_ms=1000, end_ms=2000)
+    closed = processor.accept_waveform(
+        _waveform(1000, amplitude=0.0),
+        start_ms=2000,
+        end_ms=3000,
+    )
+
+    assert closed.processed is True
+    assert closed.final.text == "need twenty seconds around"
+    assert backend.waveform_lengths == [16000, 32000, 48000]
+
+
+def test_online_processor_uses_tail_anchor_for_boundary_confirmation() -> None:
+    """Validate boundary confirmation tolerates earlier wording corrections."""
+    backend = _FakeBackend(
+        (
+            _output(
+                (
+                    _word(0, 200, "reading"),
+                    _word(200, 400, "under"),
+                    _word(400, 600, "ordinary"),
+                    _word(600, 800, "speed"),
+                ),
+                (800,),
+            ),
+            _output(
+                (
+                    _word(0, 200, "reading"),
+                    _word(200, 400, "under"),
+                    _word(400, 600, "ordinary"),
+                    _word(600, 800, "speed"),
+                    _word(800, 1000, "and"),
+                    _word(1000, 1200, "stable"),
+                    _word(1200, 1400, "pacing"),
+                    _word(1400, 1600, "needs"),
+                    _word(1600, 1800, "20"),
+                ),
+                (1800,),
+            ),
+            _output(
+                (
+                    _word(0, 200, "reading"),
+                    _word(200, 400, "with"),
+                    _word(400, 600, "changed"),
+                    _word(600, 800, "rhythm"),
+                    _word(800, 1000, "needs"),
+                    _word(1000, 1200, "20"),
+                    _word(1200, 1400, "seconds"),
+                ),
+                (1400,),
+            ),
+        )
+    )
+    processor = WhisperStreamingOnlineProcessor(
+        backend=backend,
+        config=WhisperStreamingRuntimeConfig(segment_close_silence_ms=500),
+    )
+
+    processor.accept_waveform(_waveform(1000), start_ms=0, end_ms=1000)
+    processor.accept_waveform(_waveform(1000), start_ms=1000, end_ms=2000)
+    closed = processor.accept_waveform(
+        _waveform(500, amplitude=0.0),
+        start_ms=2000,
+        end_ms=2500,
+    )
+
+    assert (
+        closed.final.text
+        == "reading under ordinary speed and stable pacing needs 20 seconds"
+    )
+    assert backend.waveform_lengths == [16000, 32000, 40000]
+
+
+def test_online_processor_trims_repeated_sentence_after_boundary_tail() -> None:
+    """Validate boundary confirmation keeps only the anchored tail extension."""
+    backend = _FakeBackend(
+        (
+            _output(
+                (
+                    _word(0, 400, "alpha"),
+                    _word(400, 800, "beta"),
+                ),
+                (800,),
+            ),
+            _output(
+                (
+                    _word(0, 400, "alpha"),
+                    _word(400, 800, "beta"),
+                    _word(800, 1200, "gamma."),
+                ),
+                (1200,),
+            ),
+            _output(
+                (
+                    _word(0, 400, "alpha"),
+                    _word(400, 800, "beta"),
+                    _word(800, 1200, "gamma"),
+                    _word(1200, 1600, "delta"),
+                    _word(1600, 2000, "alpha"),
+                    _word(2000, 2400, "beta"),
+                    _word(2400, 2800, "gamma"),
+                    _word(2800, 3200, "delta"),
+                ),
+                (3200,),
+            ),
+        )
+    )
+    processor = WhisperStreamingOnlineProcessor(
+        backend=backend,
+        config=WhisperStreamingRuntimeConfig(segment_close_silence_ms=500),
+    )
+
+    processor.accept_waveform(_waveform(1000), start_ms=0, end_ms=1000)
+    processor.accept_waveform(_waveform(1000), start_ms=1000, end_ms=2000)
+    closed = processor.accept_waveform(
+        _waveform(500, amplitude=0.0),
+        start_ms=2000,
+        end_ms=2500,
+    )
+
+    assert closed.final.text == "alpha beta gamma delta"
+    assert backend.waveform_lengths == [16000, 32000, 40000]
+
+
+def test_online_processor_rejects_unanchored_boundary_confirmation() -> None:
+    """Validate boundary confirmation cannot rewrite or append unrelated text."""
+    backend = _FakeBackend(
+        (
+            _output((_word(0, 500, "current"),), (500,)),
+            _output(
+                (
+                    _word(0, 500, "current"),
+                    _word(500, 1000, "phrase."),
+                ),
+                (1000,),
+            ),
+            _output(
+                (
+                    _word(0, 500, "previous"),
+                    _word(500, 1000, "context"),
+                    _word(1000, 1500, "noise"),
+                ),
+                (1500,),
+            ),
+        )
+    )
+    processor = WhisperStreamingOnlineProcessor(
+        backend=backend,
+        config=WhisperStreamingRuntimeConfig(segment_close_silence_ms=500),
+    )
+
+    processor.accept_waveform(_waveform(1000), start_ms=0, end_ms=1000)
+    processor.accept_waveform(_waveform(1000), start_ms=1000, end_ms=2000)
+    closed = processor.accept_waveform(
+        _waveform(500, amplitude=0.0),
+        start_ms=2000,
+        end_ms=2500,
+    )
+
+    assert closed.final.text == "current phrase."
+    assert backend.waveform_lengths == [16000, 32000, 40000]
+
+
 def test_online_processor_suppresses_empty_silence_final() -> None:
     """Validate blank silence does not create a final chunk."""
     backend = _FakeBackend(())
@@ -186,6 +437,58 @@ def test_online_processor_suppresses_empty_silence_final() -> None:
 
     assert update.final.is_empty is True
     assert backend.waveform_lengths == []
+
+
+def test_online_processor_skips_initial_silence_window() -> None:
+    """Validate initial silence does not enter model inference."""
+    backend = _FakeBackend(())
+    processor = WhisperStreamingOnlineProcessor(
+        backend=backend,
+        config=WhisperStreamingRuntimeConfig(segment_close_silence_ms=500),
+    )
+
+    update = processor.accept_waveform(
+        _waveform(1000, amplitude=0.0),
+        start_ms=0,
+        end_ms=1000,
+    )
+
+    assert update.processed is False
+    assert update.preview.is_empty is True
+    assert update.final.is_empty is True
+    assert backend.waveform_lengths == []
+
+
+def test_online_processor_skips_silent_tail_without_new_speech() -> None:
+    """Validate silence after a final chunk does not re-enter inference."""
+    backend = _FakeBackend(
+        (
+            _output((_word(0, 500, "wait"),), (500,)),
+            _output((_word(0, 500, "hallucination"),), (500,)),
+        )
+    )
+    processor = WhisperStreamingOnlineProcessor(
+        backend=backend,
+        config=WhisperStreamingRuntimeConfig(segment_close_silence_ms=500),
+    )
+
+    preview = processor.accept_waveform(_waveform(1000), start_ms=0, end_ms=1000)
+    closed = processor.accept_waveform(
+        _waveform(500, amplitude=0.0),
+        start_ms=1000,
+        end_ms=1500,
+    )
+    tail = processor.accept_waveform(
+        _waveform(1000, amplitude=0.0),
+        start_ms=1500,
+        end_ms=2500,
+    )
+
+    assert preview.preview.text == "wait"
+    assert closed.final.text == "wait"
+    assert tail.processed is False
+    assert tail.final.is_empty is True
+    assert backend.waveform_lengths == [16000]
 
 
 def test_online_processor_rejects_zero_duration_frames() -> None:
