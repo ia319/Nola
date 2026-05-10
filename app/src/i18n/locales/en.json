@@ -699,9 +699,30 @@
         }
       },
       "settings": {
-        "eyebrow": "Session settings",
         "title": "Runtime configuration",
         "description": "Review per-session runtime parameters.",
+        "state": {
+          "idle": "Edit parameters before starting this session.",
+          "starting": "Session startup is locking runtime parameters.",
+          "active": "Session is running. Runtime parameters are read-only.",
+          "finishing": "Session shutdown is locking runtime parameters.",
+          "finished": "Session is finished. Runtime parameters are read-only.",
+          "failed": "Adjust parameters before retrying this session."
+        },
+        "actions": {
+          "apply": "Apply",
+          "resetDraft": "Reset draft",
+          "saveDefaults": "Save as defaults",
+          "savingDefaults": "Saving defaults...",
+          "resetSavedDefaults": "Reset saved defaults",
+          "resettingDefaults": "Resetting defaults...",
+          "retry": "Retry"
+        },
+        "toast": {
+          "defaultsSaved": "Live defaults saved",
+          "defaultsReset": "Live defaults reset",
+          "refreshWarning": "Defaults saved, but refresh failed"
+        },
         "empty": {
           "title": "No adjustable settings",
           "description": "This session currently has no editable runtime settings."

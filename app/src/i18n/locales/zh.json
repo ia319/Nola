@@ -698,9 +698,30 @@
         }
       },
       "settings": {
-        "eyebrow": "会话设置",
         "title": "运行参数",
         "description": "查看本次会话的运行参数。",
+        "state": {
+          "idle": "在启动本次会话前调整运行参数。",
+          "starting": "会话正在启动，运行参数已锁定。",
+          "active": "会话正在运行，运行参数为只读。",
+          "finishing": "会话正在结束，运行参数已锁定。",
+          "finished": "会话已结束，运行参数为只读。",
+          "failed": "可在重试本次会话前调整运行参数。"
+        },
+        "actions": {
+          "apply": "应用",
+          "resetDraft": "重置草稿",
+          "saveDefaults": "保存为默认值",
+          "savingDefaults": "保存默认值中...",
+          "resetSavedDefaults": "重置已保存默认值",
+          "resettingDefaults": "重置默认值中...",
+          "retry": "重试"
+        },
+        "toast": {
+          "defaultsSaved": "实时默认值已保存",
+          "defaultsReset": "实时默认值已重置",
+          "refreshWarning": "默认值已保存，但刷新失败"
+        },
         "empty": {
           "title": "暂无可调整设置",
           "description": "当前会话没有可编辑的运行参数。"
