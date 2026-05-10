@@ -87,22 +87,19 @@ function WorkspacePreview({
         <section className="border-b px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-sm font-semibold tracking-tight">Session setup</h2>
-            {!isOpen ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-foreground px-0"
-                onClick={() => setIsOpen(true)}
-              >
-                <SlidersHorizontal className="size-4" />
-                Session settings
-              </Button>
-            ) : (
-              <span className="text-muted-foreground text-[10px] font-semibold tracking-[0.18em] uppercase">
-                Session override
-              </span>
-            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-expanded={isOpen}
+              className={
+                isOpen ? 'text-foreground px-0' : 'text-muted-foreground hover:text-foreground px-0'
+              }
+              onClick={() => setIsOpen((current) => !current)}
+            >
+              <SlidersHorizontal className="size-4" />
+              Session settings
+            </Button>
           </div>
 
           <div className="mt-4 overflow-hidden rounded-md border">

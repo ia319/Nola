@@ -201,9 +201,15 @@ describe('WorkspaceSidePanel', () => {
     const body = screen
       .getByText('Runtime controls')
       .closest('[data-slot="workspace-side-panel-body"]')
+    const footer = screen
+      .getByRole('button', { name: 'Apply' })
+      .closest('[data-slot="workspace-side-panel-footer"]')
 
     expect(panel).toHaveClass('side-panel-shell')
+    expect(panel).toHaveClass('h-full')
     expect(body).toHaveClass('side-panel-body')
+    expect(body).toHaveClass('overflow-y-auto')
+    expect(footer).toHaveClass('shrink-0')
     expect(body).not.toHaveClass('side-panel-shell')
     expect(screen.getByRole('button', { name: 'Apply' })).toBeTruthy()
   })

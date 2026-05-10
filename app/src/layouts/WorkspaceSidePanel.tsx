@@ -99,12 +99,12 @@ export function WorkspaceSidePanel({
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
       className={cn(
-        'bg-background flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-md border shadow-sm lg:h-full',
+        'bg-background flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-md border shadow-sm',
         SIDE_PANEL_SIZE_CLASSES[size],
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
+      <div className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4">
         <div className="min-w-0 space-y-2">
           {eyebrow ? (
             <p className="text-muted-foreground text-[11px] font-semibold tracking-[0.24em] uppercase">
@@ -140,12 +140,19 @@ export function WorkspaceSidePanel({
 
       <div
         data-slot="workspace-side-panel-body"
-        className={cn('min-h-0 flex-1 overflow-y-auto px-5 py-4', bodyClassName)}
+        className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4', bodyClassName)}
       >
         {children}
       </div>
 
-      {footer ? <div className={cn('border-t px-5 py-4', footerClassName)}>{footer}</div> : null}
+      {footer ? (
+        <div
+          data-slot="workspace-side-panel-footer"
+          className={cn('bg-background shrink-0 border-t px-5 py-4', footerClassName)}
+        >
+          {footer}
+        </div>
+      ) : null}
     </aside>
   )
 }
