@@ -6,9 +6,11 @@ import {
   type LiveRealtimeDraft,
   type LiveRealtimeDraftValue,
   type LiveRealtimeRunState,
+  type LiveRealtimeDefaultsSource,
+  isLiveRealtimeDraftValue,
 } from '@/features/realtime'
 import { WorkspaceSidePanel } from '@/layouts'
-import { getValueByPath } from '@/shared/lib/object-path'
+import { getValueByPath, setValueByPath } from '@/shared/lib/object-path'
 import type {
   LanguageOption,
   LiveRealtimeAdapter,
@@ -72,7 +74,7 @@ export function LiveWorkbenchSettingsPanel({
   const { t } = useTranslation()
   const canRenderControls = !loading && !unavailable && defaults !== null && schema.length > 0
   const editable = runState === 'idle' || runState === 'failed'
-  const snapshotEntries = buildRuntimeSnapshotEntries(schema, resolvedSnapshot, t)
+  const runtimeSnapshotForm = buildRuntimeSnapshotForm(schema, resolvedSnapshot)
 
   const footer =
     canRenderControls && editable ? (
@@ -145,15 +147,19 @@ export function LiveWorkbenchSettingsPanel({
           <p className="text-muted-foreground text-xs leading-5">
             {t(`live.workbench.settings.state.${runState}`)}
           </p>
-          {snapshotEntries.length > 0 ? (
-            <dl className="space-y-3 rounded-md border p-4">
-              {snapshotEntries.map((entry) => (
-                <div key={entry.key} className="grid gap-1">
-                  <dt className="text-foreground text-sm font-medium">{t(entry.labelKey)}</dt>
-                  <dd className="text-muted-foreground text-sm break-words">{entry.value}</dd>
-                </div>
-              ))}
-            </dl>
+          {runtimeSnapshotForm ? (
+            <LiveRealtimeSchemaForm
+              schema={runtimeSnapshotForm.schema}
+              defaults={runtimeSnapshotForm.defaults}
+              draft={{}}
+              languages={languages}
+              adapter={adapter}
+              disabled
+              layout="panel"
+              valueMode="effective"
+              domIdPrefix="live-workbench-settings-snapshot"
+              onChange={ignoreRuntimeSnapshotChange}
+            />
           ) : (
             <EmptyState
               title={t('live.workbench.settings.snapshot.empty.title')}
@@ -192,45 +198,70 @@ export function LiveWorkbenchSettingsPanel({
       onOpenChange={onOpenChange}
       title={t('live.workbench.settings.title')}
       description={t('live.workbench.settings.description')}
+      className="bg-card text-card-foreground"
       footer={footer}
+      footerClassName="bg-card"
     >
       {renderBody()}
     </WorkspaceSidePanel>
   )
 }
 
-function buildRuntimeSnapshotEntries(
-  schema: LiveRealtimeOptionGroup[],
-  snapshot: Record<string, unknown> | null | undefined,
-  t: (key: string) => string,
-): { key: string; labelKey: string; value: string }[] {
-  if (!snapshot) return []
-
-  return schema.flatMap((group) =>
-    group.fields.flatMap((field) => {
-      const value = getValueByPath(snapshot, field.key)
-      if (value === undefined) return []
-
-      return [
-        {
-          key: field.key,
-          labelKey: field.label_key,
-          value: formatRuntimeSnapshotValue(value, t),
-        },
-      ]
-    }),
-  )
+const RUNTIME_SNAPSHOT_GROUP_PATHS: Partial<Record<string, string>> = {
+  whisperStreaming: 'whisper_streaming',
+  silence: 'silence',
+  fasterWhisper: 'faster_whisper',
+  vad: 'vad',
+  vadAdvanced: 'vad',
 }
 
-function formatRuntimeSnapshotValue(value: unknown, t: (key: string) => string): string {
-  if (value === null) return t('settings.liveRealtime.values.empty')
-  if (Array.isArray(value)) return value.join(', ')
-  if (typeof value === 'boolean') {
-    return value
-      ? t('settings.liveRealtime.values.enabled')
-      : t('settings.liveRealtime.values.disabled')
-  }
-  if (typeof value === 'string' || typeof value === 'number') return String(value)
+function ignoreRuntimeSnapshotChange(): void {
+  // Read-only snapshot controls keep the shared form contract without mutating state.
+}
 
-  return JSON.stringify(value)
+interface RuntimeSnapshotForm {
+  schema: LiveRealtimeOptionGroup[]
+  defaults: LiveRealtimeDefaultsSource
+}
+
+function buildRuntimeSnapshotForm(
+  schema: LiveRealtimeOptionGroup[],
+  snapshot: Record<string, unknown> | null | undefined,
+): RuntimeSnapshotForm | null {
+  if (!snapshot) return null
+
+  const defaults: Record<string, unknown> = {}
+  const resolvedSchema: LiveRealtimeOptionGroup[] = []
+
+  for (const group of schema) {
+    const fields: LiveRealtimeOptionGroup['fields'] = []
+
+    for (const field of group.fields) {
+      const value = getRuntimeSnapshotFieldValue(snapshot, group.group, field.key)
+      if (!isLiveRealtimeDraftValue(value)) continue
+
+      setValueByPath(defaults, field.key, value)
+      fields.push(field)
+    }
+
+    if (fields.length > 0) {
+      resolvedSchema.push({ ...group, fields })
+    }
+  }
+
+  return resolvedSchema.length > 0 ? { schema: resolvedSchema, defaults } : null
+}
+
+function getRuntimeSnapshotFieldValue(
+  snapshot: Record<string, unknown>,
+  group: string,
+  fieldKey: string,
+): unknown {
+  const groupPath = RUNTIME_SNAPSHOT_GROUP_PATHS[group]
+  if (groupPath) {
+    const groupedValue = getValueByPath(snapshot, `${groupPath}.${fieldKey}`)
+    if (groupedValue !== undefined) return groupedValue
+  }
+
+  return getValueByPath(snapshot, fieldKey)
 }

@@ -1,13 +1,17 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { QueryKey } from '@tanstack/react-query'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 import type { UseAppConfigReturn } from '@/config/use-app-config'
 import type { UseModelsResult } from '@/features/models'
 import type * as RealtimeFeature from '@/features/realtime'
-import { useLiveRealtimeStore, type UseLiveDeviceInventoryReturn } from '@/features/realtime'
+import {
+  useLiveRealtimeStore,
+  type LiveCaptureSession,
+  type UseLiveDeviceInventoryReturn,
+} from '@/features/realtime'
 import type {
   AppConfig,
   LiveRealtimeDefaults,
@@ -69,6 +73,7 @@ vi.mock('react-i18next', () => ({
         'live.workbench.description': 'Real-time transcription',
         'live.workbench.sessionTitle': 'Live transcription',
         'live.workbench.actions.start': 'Start session',
+        'live.workbench.actions.preparing': 'Preparing capture...',
         'live.workbench.actions.starting': 'Starting...',
         'live.workbench.actions.stop': 'Stop session',
         'live.workbench.actions.stopping': 'Stopping...',
@@ -84,6 +89,7 @@ vi.mock('react-i18next', () => ({
         'live.workbench.statusBar.tracks': 'Tracks',
         'live.workbench.statusBar.runtime': 'Realtime engine',
         'live.workbench.statusBar.runState.idle': 'Idle',
+        'live.workbench.statusBar.runState.preparing': 'Preparing capture',
         'live.workbench.statusBar.runState.starting': 'Starting',
         'live.workbench.statusBar.runState.active': 'Recording',
         'live.workbench.statusBar.runState.finishing': 'Stopping',
@@ -109,6 +115,7 @@ vi.mock('react-i18next', () => ({
         'live.workbench.sessionSetup.sources.level': `Level ${options?.percent ?? 0}%`,
         'live.workbench.sessionSetup.microphone.title': 'Microphone',
         'live.workbench.sessionSetup.microphone.description': 'Choose an input device.',
+        'live.workbench.sessionSetup.microphone.toggle': 'Use microphone',
         'live.workbench.sessionSetup.microphone.device': 'Input device',
         'live.workbench.sessionSetup.microphone.defaultDevice': 'System default',
         'live.workbench.sessionSetup.microphone.actions.test': 'Test microphone',
@@ -116,15 +123,19 @@ vi.mock('react-i18next', () => ({
         'live.workbench.sessionSetup.microphone.status.ready': 'Ready',
         'live.workbench.sessionSetup.systemAudio.title': 'System audio',
         'live.workbench.sessionSetup.systemAudio.description': 'Capture system audio explicitly.',
+        'live.workbench.sessionSetup.systemAudio.toggle': 'Use system audio',
         'live.workbench.sessionSetup.systemAudio.captureSource.label': 'Capture source',
-        'live.workbench.sessionSetup.systemAudio.actions.start': 'Start',
+        'live.workbench.sessionSetup.systemAudio.actions.start': 'Choose source',
         'live.workbench.sessionSetup.systemAudio.actions.test': 'Test capture',
+        'live.workbench.sessionSetup.systemAudio.actions.stopTest': 'Stop test',
         'live.workbench.sessionSetup.systemAudio.actions.stop': 'Stop capture',
         'live.workbench.sessionSetup.systemAudio.status.limited': 'Browser capture available',
         'live.workbench.transcript.title': 'Live transcript',
         'live.workbench.transcript.kind.final': 'Final',
         'live.workbench.transcript.kind.committed_partial': 'Partial',
         'live.workbench.transcript.kind.preview': 'Preview',
+        'live.workbench.transcript.actions.expand': 'Expand transcript area',
+        'live.workbench.transcript.actions.restore': 'Restore setup area',
         'live.workbench.transcript.empty.title': 'No transcript yet',
         'live.workbench.transcript.empty.description':
           'Start a live session to stream transcript output here.',
@@ -136,7 +147,8 @@ vi.mock('react-i18next', () => ({
         'live.workbench.transcript.empty.configuredModelUnavailableDescription':
           'The configured default model is not downloaded. The live session will use the selected downloaded model.',
         'live.workbench.settings.title': 'Runtime configuration',
-        'live.workbench.settings.description': 'Review per-session runtime parameters.',
+        'live.workbench.settings.description':
+          'Adjust runtime parameters for live transcription sessions.',
         'live.workbench.settings.state.idle': 'Edit parameters before starting this session.',
         'live.workbench.settings.state.starting': 'Session startup is locking runtime parameters.',
         'live.workbench.settings.state.active':
@@ -163,6 +175,7 @@ vi.mock('react-i18next', () => ({
         'live.workbench.settings.snapshot.empty.description':
           'The active session has not returned a resolved runtime snapshot yet.',
         'settings.liveRealtime.groups.recognition': 'Recognition',
+        'settings.liveRealtime.groups.fasterWhisper': 'Faster Whisper',
         'settings.liveRealtime.fields.task.label': 'Task',
         'settings.liveRealtime.fields.task.description': 'Task mode',
         'settings.liveRealtime.fields.language.label': 'Language',
@@ -182,10 +195,16 @@ vi.mock('react-i18next', () => ({
         'live.workbench.errors.actions.retry': 'Retry',
         'live.workbench.errors.liveSourceRequired.title': 'No audio source selected',
         'live.workbench.errors.liveSourceRequired.description':
-          'Enable Microphone or System audio before starting a live session.',
+          'Enable at least one audio source before starting a live session.',
         'live.workbench.errors.runtimeModelNotDownloaded.title': 'No downloaded model',
         'live.workbench.errors.runtimeModelNotDownloaded.description':
           'Download a local model before starting a live transcription session.',
+        'live.workbench.errors.microphoneCaptureFailed.title': 'Microphone capture failed',
+        'live.workbench.errors.microphoneCaptureFailed.description':
+          'Check the selected input device and try again.',
+        'live.workbench.errors.systemAudioCaptureFailed.title': 'System audio capture failed',
+        'live.workbench.errors.systemAudioCaptureFailed.description':
+          'Start browser system-audio capture again.',
         'live.workbench.errors.generic.title': 'Live session failed',
         'live.workbench.errors.generic.description':
           'The live session stopped unexpectedly. Check the selected model and audio sources, then try again.',
@@ -314,6 +333,12 @@ function buildLiveRealtimeSchema(): LiveRealtimeOptionGroup[] {
           options: null,
           options_source: 'effective_languages',
         },
+      ],
+    },
+    {
+      group: 'fasterWhisper',
+      group_label_key: 'settings.liveRealtime.groups.fasterWhisper',
+      fields: [
         {
           key: 'beam_size',
           label_key: 'settings.liveRealtime.fields.beamSize.label',
@@ -368,7 +393,9 @@ function buildLiveSessionDetail(overrides: Partial<LiveSessionDetail> = {}): Liv
     created_at: '2026-05-10T00:00:00.000Z',
     updated_at: '2026-05-10T00:00:00.000Z',
     runtime_config: {
-      beam_size: 5,
+      faster_whisper: {
+        beam_size: 6,
+      },
     },
     tracks: [],
     segments: [],
@@ -462,6 +489,24 @@ function buildModelsReturn(overrides: Partial<UseModelsResult> = {}): UseModelsR
   }
 }
 
+function buildReusableCaptureSession(
+  sourceKind: LiveCaptureSession['sourceKind'],
+): LiveCaptureSession {
+  return {
+    id: `capture-${sourceKind}`,
+    sourceKind,
+    deviceId: sourceKind === 'microphone' ? 'mic-1' : null,
+    state: 'capturing',
+    startedAt: 1,
+    stop: vi.fn().mockResolvedValue(undefined),
+    pause: vi.fn().mockResolvedValue(undefined),
+    resume: vi.fn().mockResolvedValue(undefined),
+    onLevel: vi.fn(() => () => undefined),
+    onAudioFrame: vi.fn(() => () => undefined),
+    onStateChange: vi.fn(() => () => undefined),
+  }
+}
+
 function buildLiveDeviceInventoryReturn(
   overrides: Partial<UseLiveDeviceInventoryReturn> = {},
 ): UseLiveDeviceInventoryReturn {
@@ -540,14 +585,16 @@ function buildLiveDeviceInventoryReturn(
       granted: true,
       warning: null,
     }),
-    startMicrophoneCapture: vi.fn().mockResolvedValue(undefined),
+    startMicrophoneCapture: vi.fn().mockResolvedValue(null),
     stopMicrophoneCapture: vi.fn().mockResolvedValue(undefined),
     pauseMicrophoneCapture: vi.fn().mockResolvedValue(undefined),
     resumeMicrophoneCapture: vi.fn().mockResolvedValue(undefined),
-    startSystemAudioCapture: vi.fn().mockResolvedValue(undefined),
+    startSystemAudioCapture: vi.fn().mockResolvedValue(null),
     stopSystemAudioCapture: vi.fn().mockResolvedValue(undefined),
     pauseSystemAudioCapture: vi.fn().mockResolvedValue(undefined),
     resumeSystemAudioCapture: vi.fn().mockResolvedValue(undefined),
+    getActiveMicrophoneCaptureSession: vi.fn(() => null),
+    getActiveSystemAudioCaptureSession: vi.fn(() => null),
     ...overrides,
   }
 }
@@ -577,9 +624,82 @@ function getPanelBeamSizeInput(): HTMLInputElement {
   return input
 }
 
+function appendFinalTranscript(): void {
+  useLiveRealtimeStore.getState().appendLiveRealtimeFinal({
+    result_kind: 'final',
+    segment_id: 'segment-1',
+    session_id: 'session-1',
+    track_id: 'track-1',
+    source: 'microphone',
+    sequence: 1,
+    start_ms: 0,
+    end_ms: 1000,
+    text: 'hello',
+    language: 'en',
+    confidence: null,
+    is_final: true,
+    created_at: '2026-05-10T00:00:01.000Z',
+  })
+}
+
+function installDocumentPictureInPictureMock(): {
+  compactDocument: Document
+  compactWindow: Window
+  requestWindow: ReturnType<typeof vi.fn>
+} {
+  const compactDocument = document.implementation.createHTMLDocument('Compact')
+  Object.defineProperty(compactDocument, 'defaultView', {
+    configurable: true,
+    value: window,
+  })
+  const pagehideListeners = new Set<EventListener>()
+  let closed = false
+  const compactWindow = {
+    document: compactDocument,
+    get closed() {
+      return closed
+    },
+    close: vi.fn(() => {
+      closed = true
+      for (const listener of pagehideListeners) {
+        listener(new Event('pagehide'))
+      }
+    }),
+    focus: vi.fn(),
+    addEventListener: vi.fn((type: string, listener: EventListener) => {
+      if (type === 'pagehide') {
+        pagehideListeners.add(listener)
+      }
+    }),
+    removeEventListener: vi.fn((type: string, listener: EventListener) => {
+      if (type === 'pagehide') {
+        pagehideListeners.delete(listener)
+      }
+    }),
+  } as unknown as Window
+  const requestWindow = vi.fn().mockResolvedValue(compactWindow)
+
+  Object.defineProperty(window, 'documentPictureInPicture', {
+    configurable: true,
+    value: {
+      requestWindow,
+    },
+  })
+
+  return {
+    compactDocument,
+    compactWindow,
+    requestWindow,
+  }
+}
+
 describe('LiveWorkbenchPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    Object.defineProperty(window, 'documentPictureInPicture', {
+      configurable: true,
+      value: undefined,
+    })
     useLiveRealtimeStore.getState().resetLiveRealtimeRuntimeState()
     liveWorkbenchPageMocks.queryClientMock.invalidateQueries.mockResolvedValue(undefined)
     liveWorkbenchPageMocks.patchLiveRealtimeDefaultsMock.mockResolvedValue({
@@ -642,10 +762,10 @@ describe('LiveWorkbenchPage', () => {
     expect(screen.getByText('WhisperStreaming')).toBeTruthy()
     expect(screen.getByText('Microphone')).toBeTruthy()
     expect(screen.getByText('Studio USB microphone')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Test microphone' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Test microphone' })).toBeDisabled()
     expect(screen.getByText('System audio')).toBeTruthy()
     expect(screen.getByText('Capture source')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Start' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Choose source' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Test capture' })).toBeDisabled()
     expect(screen.getByText('Browser capture available')).toBeTruthy()
     expect(screen.getByRole('heading', { level: 2, name: 'Live transcript' })).toBeTruthy()
@@ -665,6 +785,76 @@ describe('LiveWorkbenchPage', () => {
     )
   })
 
+  it('expands the transcript area without unmounting session setup', () => {
+    const { container } = render(<LiveWorkbenchPage />)
+    const workArea = container.querySelector('[data-slot="live-workbench-work-area"]')
+    const setupRegion = container.querySelector('[data-slot="live-workbench-session-setup-region"]')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand transcript area' }))
+
+    expect(workArea).toHaveClass('grid-rows-[0_minmax(0,1fr)]', 'gap-0')
+    expect(setupRegion).toHaveAttribute('aria-hidden', 'true')
+    expect(setupRegion).toHaveAttribute('inert')
+    expect(screen.getByText('Session setup')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Restore setup area' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore setup area' }))
+
+    expect(workArea).toHaveClass('grid-rows-[auto_minmax(0,1fr)]', 'gap-4')
+    expect(setupRegion).toHaveAttribute('aria-hidden', 'false')
+    expect(setupRegion).not.toHaveAttribute('inert')
+  })
+
+  it('uses route search as the transcript focus source of truth', () => {
+    const updateSearch = vi.fn()
+    const { container } = render(
+      <LiveWorkbenchPage search={{ view: 'transcript-focus' }} updateSearch={updateSearch} />,
+    )
+    const workArea = container.querySelector('[data-slot="live-workbench-work-area"]')
+
+    expect(workArea).toHaveClass('grid-rows-[0_minmax(0,1fr)]')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore setup area' }))
+
+    expect(updateSearch).toHaveBeenCalledWith({ view: undefined }, false)
+  })
+
+  it('keeps transcript focus when expanding from the browser compact window', async () => {
+    appendFinalTranscript()
+    const updateSearch = vi.fn()
+    const { compactDocument, compactWindow } = installDocumentPictureInPictureMock()
+
+    render(<LiveWorkbenchPage search={{}} updateSearch={updateSearch} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open compact view' }))
+    const compactControls = within(compactDocument.body)
+    fireEvent.click(await compactControls.findByRole('button', { name: 'Expand compact view' }))
+
+    expect(updateSearch).toHaveBeenCalledTimes(1)
+    expect(updateSearch).toHaveBeenCalledWith({ view: 'transcript-focus' }, false)
+    expect(compactWindow.close).toHaveBeenCalledTimes(1)
+    expect(compactWindow.removeEventListener).toHaveBeenCalledWith('pagehide', expect.any(Function))
+  })
+
+  it('closes the browser compact window without changing the current route view', async () => {
+    appendFinalTranscript()
+    const updateSearch = vi.fn()
+    const { compactDocument, compactWindow } = installDocumentPictureInPictureMock()
+
+    render(<LiveWorkbenchPage search={{ view: 'transcript-focus' }} updateSearch={updateSearch} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open compact view' }))
+    const compactControls = within(compactDocument.body)
+    fireEvent.click(await compactControls.findByRole('button', { name: 'Close compact view' }))
+
+    expect(updateSearch).not.toHaveBeenCalled()
+    expect(compactWindow.close).toHaveBeenCalledTimes(1)
+    expect(compactWindow.removeEventListener).toHaveBeenCalledWith('pagehide', expect.any(Function))
+  })
+
   it('toggles the settings side panel from session setup', () => {
     render(<LiveWorkbenchPage />)
 
@@ -682,6 +872,11 @@ describe('LiveWorkbenchPage', () => {
   })
 
   it('reflects mock runtime and disables per-session runtime overrides', async () => {
+    const microphoneCaptureSession = buildReusableCaptureSession('microphone')
+    const liveDevices = buildLiveDeviceInventoryReturn({
+      startMicrophoneCapture: vi.fn().mockResolvedValue(microphoneCaptureSession),
+    })
+    liveWorkbenchPageMocks.useLiveDeviceInventoryMock.mockReturnValue(liveDevices)
     liveWorkbenchPageMocks.useAppConfigMock.mockReturnValue(
       buildAppConfigReturn({
         live_realtime: {
@@ -699,6 +894,7 @@ describe('LiveWorkbenchPage', () => {
     expect(screen.getByLabelText('Device')).toBeDisabled()
     expect(screen.getByLabelText('Compute Type')).toBeDisabled()
 
+    fireEvent.click(screen.getByRole('switch', { name: 'Use microphone' }))
     fireEvent.click(screen.getByRole('button', { name: 'Start session' }))
 
     await waitFor(() => {
@@ -758,8 +954,14 @@ describe('LiveWorkbenchPage', () => {
   })
 
   it('starts and stops a live session through the shared service', async () => {
+    const microphoneCaptureSession = buildReusableCaptureSession('microphone')
+    const liveDevices = buildLiveDeviceInventoryReturn({
+      startMicrophoneCapture: vi.fn().mockResolvedValue(microphoneCaptureSession),
+    })
+    liveWorkbenchPageMocks.useLiveDeviceInventoryMock.mockReturnValue(liveDevices)
     render(<LiveWorkbenchPage />)
 
+    fireEvent.click(screen.getByRole('switch', { name: 'Use microphone' }))
     fireEvent.click(screen.getByRole('button', { name: 'Start session' }))
 
     await waitFor(() => {
@@ -775,8 +977,16 @@ describe('LiveWorkbenchPage', () => {
       microphoneCapture: {
         deviceId: 'mic-1',
       },
+      captureSessions: { microphone: microphoneCaptureSession },
     })
     expect(await screen.findByText('Recording')).toBeTruthy()
+    expect(screen.getByRole('switch', { name: 'Use microphone' })).toBeDisabled()
+    expect(screen.getByRole('switch', { name: 'Use system audio' })).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Session settings' }))
+    expect(screen.getByText('Session is running. Runtime parameters are read-only.')).toBeTruthy()
+    expect(getPanelBeamSizeInput()).toBeDisabled()
+    expect(getPanelBeamSizeInput()).toHaveValue(6)
 
     fireEvent.click(screen.getByRole('button', { name: 'Stop session' }))
 
@@ -788,14 +998,30 @@ describe('LiveWorkbenchPage', () => {
   it('shows a readable validation error when no source is selected', async () => {
     render(<LiveWorkbenchPage />)
 
-    fireEvent.click(screen.getByRole('switch', { name: 'Microphone' }))
     fireEvent.click(screen.getByRole('button', { name: 'Start session' }))
 
     expect(await screen.findByText('No audio source selected')).toBeTruthy()
     expect(
-      screen.getByText('Enable Microphone or System audio before starting a live session.'),
+      screen.getByText('Enable at least one audio source before starting a live session.'),
     ).toBeTruthy()
     expect(liveWorkbenchPageMocks.createLiveRealtimeSessionServiceMock).not.toHaveBeenCalled()
+  })
+
+  it('does not create a live session when source capture preparation fails', async () => {
+    const liveDevices = buildLiveDeviceInventoryReturn({
+      startMicrophoneCapture: vi.fn().mockResolvedValue(null),
+    })
+    liveWorkbenchPageMocks.useLiveDeviceInventoryMock.mockReturnValue(liveDevices)
+    render(<LiveWorkbenchPage />)
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Use microphone' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start session' }))
+
+    await waitFor(() => {
+      expect(liveDevices.startMicrophoneCapture).toHaveBeenCalledWith({ deviceId: 'mic-1' })
+    })
+    expect(liveWorkbenchPageMocks.createLiveRealtimeSessionServiceMock).not.toHaveBeenCalled()
+    expect(screen.getByText('Microphone capture failed')).toBeTruthy()
   })
 
   it('shows when the configured default model is not downloaded', () => {
@@ -816,18 +1042,83 @@ describe('LiveWorkbenchPage', () => {
     ).toBeTruthy()
   })
 
-  it('starts source test capture only from explicit user actions', () => {
+  it('starts setup captures only from explicit source actions', () => {
     const liveDevices = buildLiveDeviceInventoryReturn()
     liveWorkbenchPageMocks.useLiveDeviceInventoryMock.mockReturnValue(liveDevices)
     render(<LiveWorkbenchPage />)
 
+    fireEvent.click(screen.getByRole('switch', { name: 'Use microphone' }))
     fireEvent.click(screen.getByRole('button', { name: 'Test microphone' }))
-    fireEvent.click(screen.getByRole('switch', { name: 'System audio' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Use system audio' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Choose source' }))
     fireEvent.click(screen.getByRole('button', { name: 'Test capture' }))
 
     expect(liveDevices.startMicrophoneCapture).toHaveBeenCalledWith({ deviceId: 'mic-1' })
-    expect(liveDevices.startSystemAudioCapture).toHaveBeenCalledTimes(2)
+    expect(liveDevices.startSystemAudioCapture).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps system source selection separate from test mode', () => {
+    const liveDevices = buildLiveDeviceInventoryReturn({
+      systemAudioCapture: {
+        sessionId: 'system-session-1',
+        sourceKind: 'system',
+        deviceId: null,
+        state: 'capturing',
+        errorCode: null,
+        level: {
+          level: 0.5,
+          peak: 0.6,
+          isMutedLike: false,
+          measuredAt: 1,
+        },
+        startedAt: 1,
+      },
+    })
+    liveWorkbenchPageMocks.useLiveDeviceInventoryMock.mockReturnValue(liveDevices)
+    render(<LiveWorkbenchPage />)
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Use system audio' }))
+
+    expect(screen.getByRole('button', { name: 'Stop capture' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Test capture' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Test capture' }))
+
+    expect(screen.getByRole('button', { name: 'Stop capture' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Stop test' })).toBeTruthy()
+    expect(liveDevices.startSystemAudioCapture).not.toHaveBeenCalled()
+  })
+
+  it('reuses a selected system audio source when starting a session', async () => {
+    const systemCaptureSession = buildReusableCaptureSession('system')
+    const liveDevices = buildLiveDeviceInventoryReturn({
+      systemAudioCapture: {
+        sessionId: systemCaptureSession.id,
+        sourceKind: 'system',
+        deviceId: null,
+        state: 'capturing',
+        errorCode: null,
+        level: null,
+        startedAt: systemCaptureSession.startedAt,
+      },
+      getActiveSystemAudioCaptureSession: vi.fn(() => systemCaptureSession),
+    })
+    liveWorkbenchPageMocks.useLiveDeviceInventoryMock.mockReturnValue(liveDevices)
+    render(<LiveWorkbenchPage />)
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Use system audio' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start session' }))
+
+    await waitFor(() => {
+      expect(liveWorkbenchPageMocks.createLiveRealtimeSessionServiceMock).toHaveBeenCalledTimes(1)
+    })
+    expect(getCreatedSessionService().start).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sources: ['system'],
+        captureSessions: { system: systemCaptureSession },
+      }),
+    )
+    expect(liveDevices.stopSystemAudioCapture).not.toHaveBeenCalled()
   })
 
   it('does not stop or refresh idle sources when their setup toggles turn off', () => {
@@ -835,9 +1126,10 @@ describe('LiveWorkbenchPage', () => {
     liveWorkbenchPageMocks.useLiveDeviceInventoryMock.mockReturnValue(liveDevices)
     render(<LiveWorkbenchPage />)
 
-    fireEvent.click(screen.getByRole('switch', { name: 'Microphone' }))
-    fireEvent.click(screen.getByRole('switch', { name: 'System audio' }))
-    fireEvent.click(screen.getByRole('switch', { name: 'System audio' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Use microphone' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Use microphone' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Use system audio' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Use system audio' }))
 
     expect(liveDevices.stopMicrophoneCapture).not.toHaveBeenCalled()
     expect(liveDevices.stopSystemAudioCapture).not.toHaveBeenCalled()

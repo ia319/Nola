@@ -18,11 +18,13 @@ vi.mock('react-i18next', () => ({
         'live.workbench.sessionSetup.sources.level': `Level ${options?.percent ?? 0}%`,
         'live.workbench.sessionSetup.microphone.title': 'Microphone',
         'live.workbench.sessionSetup.microphone.description': 'Choose an input device.',
+        'live.workbench.sessionSetup.microphone.toggle': 'Use microphone',
         'live.workbench.sessionSetup.microphone.device': 'Input device',
         'live.workbench.sessionSetup.systemAudio.title': 'System audio',
         'live.workbench.sessionSetup.systemAudio.description': 'Capture system audio explicitly.',
+        'live.workbench.sessionSetup.systemAudio.toggle': 'Use system audio',
         'live.workbench.sessionSetup.systemAudio.captureSource.label': 'Capture source',
-        'live.workbench.sessionSetup.systemAudio.actions.start': 'Start',
+        'live.workbench.sessionSetup.systemAudio.actions.start': 'Choose source',
         'live.workbench.sessionSetup.systemAudio.actions.test': 'Test capture',
       }
 
@@ -58,14 +60,18 @@ function renderSessionSetup(overrides: Partial<LiveWorkbenchSessionSetupProps> =
     microphoneLevelPercent: 42,
     microphoneActionLabel: 'Test microphone',
     microphoneActionMode: 'test',
+    microphoneToggleLabel: 'Use microphone',
     systemAudioEnabled: false,
     systemAudioStatus: 'Browser capture available',
     systemAudioStatusTone: 'warning',
     systemAudioLevelPercent: 0,
-    systemAudioCaptureSourceActionLabel: 'Start',
+    systemAudioCaptureSourceActionLabel: 'Choose source',
+    systemAudioCaptureSourceActionDisabled: true,
+    systemAudioCaptureSourceActionMode: 'test',
     systemAudioActionLabel: 'Test capture',
     systemAudioActionDisabled: true,
     systemAudioActionMode: 'test',
+    systemAudioToggleLabel: 'Use system audio',
     settingsOpen: false,
     onModelChange: vi.fn(),
     onTaskChange: vi.fn(),
@@ -76,7 +82,8 @@ function renderSessionSetup(overrides: Partial<LiveWorkbenchSessionSetupProps> =
     onMicrophoneChange: vi.fn(),
     onMicrophoneAction: vi.fn(),
     onSystemAudioEnabledChange: vi.fn(),
-    onSystemAudioAction: vi.fn(),
+    onSystemAudioCaptureSourceAction: vi.fn(),
+    onSystemAudioTestAction: vi.fn(),
     onSettingsToggle: vi.fn(),
     ...overrides,
   }
@@ -104,7 +111,7 @@ describe('LiveWorkbenchSessionSetup', () => {
     expect(screen.getByRole('button', { name: 'Test microphone' })).toBeTruthy()
     expect(screen.getByText('System audio')).toBeTruthy()
     expect(screen.getByText('Capture source')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Start' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Choose source' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Test capture' })).toBeDisabled()
   })
 
@@ -143,22 +150,33 @@ describe('LiveWorkbenchSessionSetup', () => {
     expect(screen.getByLabelText('Device')).toBeDisabled()
     expect(screen.getByLabelText('Compute Type')).toBeDisabled()
     expect(screen.getByLabelText('Input device')).toBeDisabled()
-    expect(screen.getByRole('switch', { name: 'Microphone' })).toBeDisabled()
-    expect(screen.getByRole('switch', { name: 'System audio' })).toBeDisabled()
+    expect(screen.getByRole('switch', { name: 'Use microphone' })).toBeDisabled()
+    expect(screen.getByRole('switch', { name: 'Use system audio' })).toBeDisabled()
   })
 
   it('emits source control actions', () => {
     const onMicrophoneAction = vi.fn()
     const onSystemAudioEnabledChange = vi.fn()
+    const onSystemAudioCaptureSourceAction = vi.fn()
+    const onSystemAudioTestAction = vi.fn()
     renderSessionSetup({
+      systemAudioEnabled: true,
+      systemAudioCaptureSourceActionDisabled: false,
+      systemAudioActionDisabled: false,
       onMicrophoneAction,
       onSystemAudioEnabledChange,
+      onSystemAudioCaptureSourceAction,
+      onSystemAudioTestAction,
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Test microphone' }))
-    fireEvent.click(screen.getByRole('switch', { name: 'System audio' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Use system audio' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Choose source' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Test capture' }))
 
     expect(onMicrophoneAction).toHaveBeenCalledTimes(1)
-    expect(onSystemAudioEnabledChange).toHaveBeenCalledWith(true)
+    expect(onSystemAudioEnabledChange).toHaveBeenCalledWith(false)
+    expect(onSystemAudioCaptureSourceAction).toHaveBeenCalledTimes(1)
+    expect(onSystemAudioTestAction).toHaveBeenCalledTimes(1)
   })
 })

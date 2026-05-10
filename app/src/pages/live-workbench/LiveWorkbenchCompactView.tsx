@@ -1,4 +1,4 @@
-import { useEffect, useId } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Maximize2, Square, X } from 'lucide-react'
 
@@ -9,6 +9,8 @@ import type { LiveWorkbenchTranscriptItem } from './live-workbench-selectors'
 
 export interface LiveWorkbenchCompactViewProps {
   open: boolean
+  surface?: 'overlay' | 'window'
+  background?: 'solid' | 'transparent'
   status: string
   duration: string
   items: readonly LiveWorkbenchTranscriptItem[]
@@ -24,6 +26,8 @@ export interface LiveWorkbenchCompactViewProps {
 
 export function LiveWorkbenchCompactView({
   open,
+  surface = 'overlay',
+  background = 'solid',
   status,
   duration,
   items,
@@ -38,9 +42,11 @@ export function LiveWorkbenchCompactView({
 }: LiveWorkbenchCompactViewProps) {
   const { t } = useTranslation()
   const titleId = useId()
+  const containerRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (!open) return undefined
+    const eventDocument = containerRef.current?.ownerDocument ?? document
 
     function handleKeyDown(event: KeyboardEvent): void {
       if (event.key === 'Escape' || event.key === 'Esc') {
@@ -48,23 +54,29 @@ export function LiveWorkbenchCompactView({
       }
     }
 
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    eventDocument.addEventListener('keydown', handleKeyDown)
+    return () => eventDocument.removeEventListener('keydown', handleKeyDown)
   }, [onOpenChange, open])
 
   function handleExpand(): void {
     onExpand?.()
-    onOpenChange(false)
   }
 
   if (!open) return null
 
   return (
     <aside
+      ref={containerRef}
       role="region"
       aria-labelledby={titleId}
       data-slot="live-workbench-compact-view"
-      className="bg-card text-card-foreground fixed right-6 bottom-6 z-40 flex h-[420px] w-[360px] flex-col overflow-hidden rounded-xl border shadow-lg"
+      className={cn(
+        'text-card-foreground flex flex-col overflow-hidden',
+        surface === 'window'
+          ? 'h-screen w-screen rounded-none border-0 shadow-none'
+          : 'fixed right-6 bottom-6 z-40 h-[420px] w-[360px] rounded-xl border shadow-lg',
+        background === 'transparent' ? 'bg-background/80 backdrop-blur-md' : 'bg-card',
+      )}
     >
       <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
         <div className="min-w-0">

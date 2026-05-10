@@ -1,3 +1,5 @@
+import { formatMillisecondsClock, formatMillisecondsClockRange } from '@/shared/lib/time-format'
+
 const EMPTY_DISPLAY_VALUE = '-'
 
 export function formatLiveWorkbenchEmptyValue(): string {
@@ -32,31 +34,9 @@ export function formatLiveWorkbenchDuration(
     return emptyValue
   }
 
-  const totalSeconds = Math.floor((endMs - startMs) / 1000)
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
-
-  if (hours > 0) {
-    return `${hours}:${padTimeUnit(minutes)}:${padTimeUnit(seconds)}`
-  }
-
-  return `${minutes}:${padTimeUnit(seconds)}`
+  return formatMillisecondsClock(endMs - startMs)
 }
 
 export function formatLiveWorkbenchTranscriptTimeRange(startMs: number, endMs: number): string {
-  return `${formatTranscriptTime(startMs)} - ${formatTranscriptTime(endMs)}`
-}
-
-function formatTranscriptTime(valueMs: number): string {
-  const totalMs = Math.max(0, Number.isFinite(valueMs) ? valueMs : 0)
-  const totalSeconds = Math.floor(totalMs / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-
-  return `${minutes}:${padTimeUnit(seconds)}`
-}
-
-function padTimeUnit(value: number): string {
-  return String(value).padStart(2, '0')
+  return formatMillisecondsClockRange(startMs, endMs)
 }

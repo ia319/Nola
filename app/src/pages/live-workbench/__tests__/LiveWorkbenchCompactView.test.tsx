@@ -67,7 +67,7 @@ describe('LiveWorkbenchCompactView', () => {
     expect(onOpenChange).toHaveBeenNthCalledWith(2, false)
   })
 
-  it('expands through the callback and closes the compact view', () => {
+  it('expands through the callback without owning the close behavior', () => {
     const onExpand = vi.fn()
     const onOpenChange = vi.fn()
     renderCompactView({ onExpand, onOpenChange })
@@ -75,7 +75,7 @@ describe('LiveWorkbenchCompactView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Expand compact view' }))
 
     expect(onExpand).toHaveBeenCalledTimes(1)
-    expect(onOpenChange).toHaveBeenCalledWith(false)
+    expect(onOpenChange).not.toHaveBeenCalled()
   })
 
   it('uses the shared stop action', () => {

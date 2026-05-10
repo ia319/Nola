@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Maximize2, Play, Square } from 'lucide-react'
+import { Maximize2, Minimize2, PictureInPicture2, Play, Square } from 'lucide-react'
 
 import { Button } from '@/components/ui'
 import {
@@ -29,6 +30,7 @@ import {
   useLiveRealtimeStore,
   type LiveAudioSourceKind,
   type LiveAudioDevice,
+  type LiveCaptureSession,
   type LiveCaptureSlotState,
   type LiveDeviceCapabilityState,
   type LiveDeviceInventoryErrorCode,
@@ -40,9 +42,19 @@ import {
   type LiveRealtimeRunState,
   type LiveRealtimeRuntimeError,
   type LiveRealtimeRuntimeErrorCode,
+  type LiveRealtimeSessionStartOptions,
   type LiveRealtimeSessionService,
 } from '@/features/realtime'
+import { getRuntimeEnvironment } from '@/lib/runtime-environment'
+import { cn } from '@/lib/utils'
 import { ContentCanvas } from '@/layouts'
+import {
+  LIVE_WORKBENCH_DEFAULT_VIEW,
+  LIVE_WORKBENCH_TRANSCRIPT_FOCUS_VIEW,
+  resolveLiveWorkbenchView,
+  type LiveWorkbenchRouteSearch,
+  type LiveWorkbenchView,
+} from '@/routes/live-workbench-search'
 import { isAppError } from '@/shared/lib/error-factory'
 import { queryKeys } from '@/shared/lib/query-keys'
 import type {
@@ -83,6 +95,7 @@ import {
 import { LiveWorkbenchCompactView } from './LiveWorkbenchCompactView'
 import {
   LiveWorkbenchSessionSetup,
+  type LiveWorkbenchSourceActionMode,
   type LiveWorkbenchSourceTone,
   type LiveWorkbenchSessionSetupOption,
 } from './LiveWorkbenchSessionSetup'
@@ -94,14 +107,67 @@ const EMPTY_LIVE_AUDIO_DEVICES: readonly LiveAudioDevice[] = []
 const EMPTY_LIVE_DEVICE_WARNINGS: readonly LiveDeviceWarningCode[] = []
 const EMPTY_LIVE_REALTIME_SCHEMA: LiveRealtimeOptionGroup[] = []
 const LIVE_WORKBENCH_MAIN_SETTING_KEYS: ReadonlySet<string> = new Set(['task', 'language'])
+const LIVE_WORKBENCH_COMPACT_WINDOW_WIDTH = 380
+const LIVE_WORKBENCH_COMPACT_WINDOW_HEIGHT = 460
+const LIVE_WORKBENCH_DURATION_TICK_MS = 100
+
+export interface LiveWorkbenchPageProps {
+  search?: LiveWorkbenchRouteSearch
+  updateSearch?: (patch: Partial<LiveWorkbenchRouteSearch>, replace: boolean) => void
+}
 
 interface LiveWorkbenchSourceStatus {
   i18nKey: string
   tone: LiveWorkbenchSourceTone
 }
 
-function ignoreOpenChange() {
-  return undefined
+interface DocumentPictureInPictureOptions {
+  width?: number
+  height?: number
+}
+
+interface DocumentPictureInPictureApi {
+  requestWindow: (options?: DocumentPictureInPictureOptions) => Promise<Window>
+}
+
+type DocumentPictureInPictureWindow = Window & {
+  documentPictureInPicture?: DocumentPictureInPictureApi
+}
+
+function getDocumentPictureInPictureApi(): DocumentPictureInPictureApi | null {
+  if (typeof window === 'undefined') return null
+
+  const api = (window as DocumentPictureInPictureWindow).documentPictureInPicture
+  return typeof api?.requestWindow === 'function' ? api : null
+}
+
+function copyCompactWindowStyles(targetDocument: Document): void {
+  for (const styleSheet of Array.from(document.styleSheets)) {
+    try {
+      const cssText = Array.from(styleSheet.cssRules)
+        .map((rule) => rule.cssText)
+        .join('\n')
+      const style = targetDocument.createElement('style')
+      style.textContent = cssText
+      targetDocument.head.append(style)
+    } catch {
+      if (!styleSheet.href) continue
+
+      const link = targetDocument.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = styleSheet.href
+      targetDocument.head.append(link)
+    }
+  }
+}
+
+function prepareCompactWindow(compactWindow: Window): void {
+  const targetDocument = compactWindow.document
+  targetDocument.title = document.title
+  targetDocument.body.style.margin = '0'
+  targetDocument.body.style.minWidth = '0'
+  targetDocument.body.style.overflow = 'hidden'
+  copyCompactWindowStyles(targetDocument)
 }
 
 function toAppError(error: unknown): AppError {
@@ -115,6 +181,10 @@ function toAppError(error: unknown): AppError {
 
 function canEditLiveWorkbenchSettings(runState: LiveRealtimeRunState): boolean {
   return runState === 'idle' || runState === 'failed'
+}
+
+function canEditLiveWorkbenchSources(runState: LiveRealtimeRunState): boolean {
+  return runState === 'idle' || runState === 'failed' || runState === 'finished'
 }
 
 function buildLiveWorkbenchSettingsSchema(
@@ -508,7 +578,7 @@ function normalizeLiveWorkbenchCaughtError(
   return buildLiveWorkbenchRuntimeError(fallbackCode)
 }
 
-export function LiveWorkbenchPage() {
+export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPageProps = {}) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const sessionServiceRef = useRef<LiveRealtimeSessionService | null>(null)
@@ -540,16 +610,32 @@ export function LiveWorkbenchPage() {
     useState<EngineDevice | null>(null)
   const [selectedEngineComputeTypeOverride, setSelectedEngineComputeTypeOverride] =
     useState<EngineComputeType | null>(null)
-  const [microphoneEnabled, setMicrophoneEnabled] = useState(true)
+  const [microphoneEnabled, setMicrophoneEnabled] = useState(false)
   const [systemAudioEnabled, setSystemAudioEnabled] = useState(false)
+  const [systemAudioTestSessionId, setSystemAudioTestSessionId] = useState<string | null>(null)
+  const [sessionPreparing, setSessionPreparing] = useState(false)
   const [compactOpen, setCompactOpen] = useState(false)
+  const [compactWindow, setCompactWindow] = useState<Window | null>(null)
+  const [fallbackView, setFallbackView] = useState<LiveWorkbenchView>(LIVE_WORKBENCH_DEFAULT_VIEW)
   const [durationNowMs, setDurationNowMs] = useState(() => Date.now())
+  const compactWindowRef = useRef<Window | null>(null)
+  const compactWindowPagehideListenerRef = useRef<EventListener | null>(null)
   const liveDevices = useLiveDeviceInventory()
   const emptyValue = formatLiveWorkbenchEmptyValue()
   const liveRuntimeAdapter = config?.live_realtime?.runtime_adapter ?? null
   const supportsSessionRuntimeOverrides =
     liveRuntimeAdapter === 'whisper_streaming' &&
     config?.live_realtime?.supports_runtime_overrides === true
+  const liveWorkbenchView = search ? resolveLiveWorkbenchView(search) : fallbackView
+  const transcriptExpanded = liveWorkbenchView === LIVE_WORKBENCH_TRANSCRIPT_FOCUS_VIEW
+
+  function detachCompactWindowPagehideListener(activeCompactWindow: Window): void {
+    const pagehideListener = compactWindowPagehideListenerRef.current
+    if (!pagehideListener) return
+
+    activeCompactWindow.removeEventListener('pagehide', pagehideListener)
+    compactWindowPagehideListenerRef.current = null
+  }
 
   useEffect(() => {
     return () => {
@@ -563,11 +649,23 @@ export function LiveWorkbenchPage() {
   }, [])
 
   useEffect(() => {
+    return () => {
+      const activeCompactWindow = compactWindowRef.current
+      compactWindowRef.current = null
+
+      if (activeCompactWindow && !activeCompactWindow.closed) {
+        detachCompactWindowPagehideListener(activeCompactWindow)
+        activeCompactWindow.close()
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     if (!isLiveWorkbenchSessionBusy(liveRunState)) return undefined
 
     const intervalId = window.setInterval(() => {
       setDurationNowMs(Date.now())
-    }, 1000)
+    }, LIVE_WORKBENCH_DURATION_TICK_MS)
 
     return () => window.clearInterval(intervalId)
   }, [liveRunState])
@@ -580,7 +678,7 @@ export function LiveWorkbenchPage() {
     [settingsSchema],
   )
   const hasDefaults = defaults !== null
-  const settingsEditable = canEditLiveWorkbenchSettings(liveRunState)
+  const settingsEditable = !sessionPreparing && canEditLiveWorkbenchSettings(liveRunState)
   const settingsDraftHasChanges = Object.keys(settingsDraft).length > 0
   const settingsDraftMatchesSession = areLiveRealtimeDraftsEqual(
     settingsDraft,
@@ -921,6 +1019,11 @@ export function LiveWorkbenchPage() {
   const systemAudioCaptureActive = selectLiveWorkbenchIsCaptureActive(
     liveDevices.systemAudioCapture.state,
   )
+  const systemAudioTestVisible =
+    systemAudioCaptureActive &&
+    systemAudioTestSessionId !== null &&
+    systemAudioTestSessionId === liveDevices.systemAudioCapture.sessionId
+  const sessionAudioLevelVisible = sessionPreparing || isLiveWorkbenchSessionBusy(liveRunState)
   const microphoneOptions = useMemo<LiveWorkbenchSessionSetupOption[]>(() => {
     if (liveDevices.inventoryStatus === 'loading') {
       return [
@@ -988,8 +1091,16 @@ export function LiveWorkbenchPage() {
     capability: systemAudioCapability,
     capture: liveDevices.systemAudioCapture,
   })
-  const microphoneActionMode = microphoneCaptureActive ? 'stop' : 'test'
-  const systemAudioActionMode = systemAudioCaptureActive ? 'stop' : 'test'
+  const microphoneActionMode: LiveWorkbenchSourceActionMode = microphoneCaptureActive
+    ? 'stop'
+    : 'test'
+  const systemAudioCaptureSourceActionMode: LiveWorkbenchSourceActionMode = systemAudioCaptureActive
+    ? 'stop'
+    : 'start'
+  const systemAudioTestActionMode: LiveWorkbenchSourceActionMode = systemAudioTestVisible
+    ? 'stop'
+    : 'test'
+  const sourceControlsDisabled = sessionPreparing || !canEditLiveWorkbenchSources(liveRunState)
   const microphoneBusy =
     liveDevices.microphoneCapture.state === 'starting' ||
     liveDevices.microphoneCapture.state === 'stopping'
@@ -997,17 +1108,20 @@ export function LiveWorkbenchPage() {
     liveDevices.systemAudioCapture.state === 'starting' ||
     liveDevices.systemAudioCapture.state === 'stopping'
   const microphoneDisabled =
+    sourceControlsDisabled ||
     liveDevices.inventoryStatus === 'loading' ||
     microphoneCapability === 'unsupported' ||
     microphoneCapability === 'not_implemented' ||
     microphoneDevices.length === 0 ||
     Boolean(liveDevices.inventoryError)
   const systemAudioDisabled =
+    sourceControlsDisabled ||
     liveDevices.inventoryStatus === 'loading' ||
     systemAudioCapability === 'unsupported' ||
     systemAudioCapability === 'not_implemented' ||
     Boolean(liveDevices.inventoryError)
   const microphoneActionDisabled =
+    sourceControlsDisabled ||
     microphoneBusy ||
     (!microphoneCaptureActive &&
       !canStartMicrophoneCapture({
@@ -1015,13 +1129,19 @@ export function LiveWorkbenchPage() {
         capability: microphoneCapability,
         microphoneCount: microphoneDevices.length,
       }))
-  const systemAudioActionDisabled =
+  const systemAudioCaptureSourceActionDisabled =
+    sourceControlsDisabled ||
     systemAudioBusy ||
     (!systemAudioCaptureActive &&
       !canStartSystemAudioCapture({
         enabled: systemAudioEnabled,
         capability: systemAudioCapability,
       }))
+  const systemAudioTestActionDisabled =
+    sourceControlsDisabled ||
+    systemAudioBusy ||
+    !systemAudioCaptureActive ||
+    !liveDevices.systemAudioCapture.sessionId
   const selectedSources = useMemo<LiveAudioSourceKind[]>(() => {
     const sources: LiveAudioSourceKind[] = []
     if (microphoneEnabled) sources.push('microphone')
@@ -1048,7 +1168,9 @@ export function LiveWorkbenchPage() {
   )
   const hasTranscript = selectLiveWorkbenchHasTranscript(transcriptCounts)
   const errorCopy = selectLiveWorkbenchErrorCopy(liveLastError)
-  const sessionStatusLabel = t(`live.workbench.statusBar.runState.${liveRunState}`)
+  const sessionStatusLabel = sessionPreparing
+    ? t('live.workbench.statusBar.runState.preparing')
+    : t(`live.workbench.statusBar.runState.${liveRunState}`)
   const connectionStatusLabel = t(`live.workbench.statusBar.connectionState.${liveConnectionState}`)
   const durationLabel = formatLiveWorkbenchDuration(
     liveSession?.started_at,
@@ -1058,11 +1180,15 @@ export function LiveWorkbenchPage() {
   )
   const activeTrackCount = Object.keys(liveTracksBySource).length
   const startButtonDisabled =
+    sessionPreparing ||
     !selectLiveWorkbenchCanStartSession(liveRunState) ||
     isModelsLoading ||
     defaultsQuery.isPending ||
     schemaQuery.isPending
   const stopButtonDisabled = !selectLiveWorkbenchCanStopSession(liveRunState)
+  const sessionActionLabel = sessionPreparing
+    ? t('live.workbench.actions.preparing')
+    : t(resolveLiveWorkbenchStartButtonKey(liveRunState))
   const statusItems: readonly LiveWorkbenchStatusItem[] = [
     {
       id: 'status',
@@ -1172,17 +1298,125 @@ export function LiveWorkbenchPage() {
   function handleSystemAudioEnabledChange(enabled: boolean): void {
     setSystemAudioEnabled(enabled)
     if (!enabled && systemAudioCaptureActive) {
+      setSystemAudioTestSessionId(null)
       void liveDevices.stopSystemAudioCapture()
     }
   }
 
-  function handleSystemAudioAction(): void {
+  function handleSystemAudioCaptureSourceAction(): void {
     if (systemAudioCaptureActive) {
+      setSystemAudioTestSessionId(null)
       void liveDevices.stopSystemAudioCapture()
       return
     }
 
     void liveDevices.startSystemAudioCapture()
+  }
+
+  function handleSystemAudioTestAction(): void {
+    const sessionId = liveDevices.systemAudioCapture.sessionId
+    if (!systemAudioCaptureActive || !sessionId) return
+
+    setSystemAudioTestSessionId((current) => (current === sessionId ? null : sessionId))
+  }
+
+  function setLiveWorkbenchView(view: LiveWorkbenchView, replace: boolean): void {
+    if (updateSearch) {
+      updateSearch(
+        view === LIVE_WORKBENCH_TRANSCRIPT_FOCUS_VIEW
+          ? { view: LIVE_WORKBENCH_TRANSCRIPT_FOCUS_VIEW }
+          : { view: undefined },
+        replace,
+      )
+      return
+    }
+
+    setFallbackView(view)
+  }
+
+  function setActiveCompactWindow(nextWindow: Window | null): void {
+    compactWindowRef.current = nextWindow
+    setCompactWindow(nextWindow)
+  }
+
+  function closeActiveCompactWindow(): void {
+    const activeCompactWindow = compactWindowRef.current
+    setActiveCompactWindow(null)
+
+    if (activeCompactWindow && !activeCompactWindow.closed) {
+      detachCompactWindowPagehideListener(activeCompactWindow)
+      activeCompactWindow.close()
+    }
+  }
+
+  function handleTranscriptFocusToggle(): void {
+    setLiveWorkbenchView(
+      transcriptExpanded ? LIVE_WORKBENCH_DEFAULT_VIEW : LIVE_WORKBENCH_TRANSCRIPT_FOCUS_VIEW,
+      false,
+    )
+  }
+
+  function handleCompactOpenChange(open: boolean): void {
+    setCompactOpen(open)
+    if (!open) {
+      closeActiveCompactWindow()
+    }
+  }
+
+  function handleCompactExpand(): void {
+    setLiveWorkbenchView(LIVE_WORKBENCH_TRANSCRIPT_FOCUS_VIEW, false)
+    closeActiveCompactWindow()
+    setCompactOpen(false)
+  }
+
+  function handleCompactWindowClosed(): void {
+    compactWindowPagehideListenerRef.current = null
+    setActiveCompactWindow(null)
+    setCompactOpen(false)
+  }
+
+  async function handleOpenCompactView(): Promise<void> {
+    const runtimeEnvironment = getRuntimeEnvironment()
+
+    if (runtimeEnvironment === 'tauri') {
+      toast.warning(t('live.workbench.compact.desktopUnavailable.title'), {
+        description: t('live.workbench.compact.desktopUnavailable.description'),
+      })
+      return
+    }
+
+    const documentPictureInPicture = getDocumentPictureInPictureApi()
+    if (!documentPictureInPicture) {
+      toast.warning(t('live.workbench.compact.unsupported.title'), {
+        description: t('live.workbench.compact.unsupported.description'),
+      })
+      return
+    }
+
+    const activeCompactWindow = compactWindowRef.current
+    if (activeCompactWindow && !activeCompactWindow.closed) {
+      activeCompactWindow.focus()
+      setCompactOpen(true)
+      return
+    }
+
+    try {
+      const nextWindow = await documentPictureInPicture.requestWindow({
+        width: LIVE_WORKBENCH_COMPACT_WINDOW_WIDTH,
+        height: LIVE_WORKBENCH_COMPACT_WINDOW_HEIGHT,
+      })
+      prepareCompactWindow(nextWindow)
+      const pagehideListener: EventListener = () => handleCompactWindowClosed()
+      compactWindowPagehideListenerRef.current = pagehideListener
+      nextWindow.addEventListener('pagehide', pagehideListener, { once: true })
+      setActiveCompactWindow(nextWindow)
+      setCompactOpen(true)
+    } catch (error) {
+      logger.warn('live.workbench.compact.openFailed', { error })
+      toast.error(t('live.workbench.compact.openFailed.title'), {
+        description: t('live.workbench.compact.openFailed.description'),
+      })
+    }
   }
 
   function handleSettingsToggle(): void {
@@ -1304,14 +1538,83 @@ export function LiveWorkbenchPage() {
     return null
   }
 
-  async function stopSourceTestsBeforeSession(): Promise<void> {
-    if (microphoneCaptureActive) {
+  async function stopUnreusedSetupCapturesBeforeSession({
+    microphone,
+    system,
+  }: {
+    microphone: LiveCaptureSession | null
+    system: LiveCaptureSession | null
+  }): Promise<void> {
+    if (microphoneCaptureActive && !microphone) {
       await liveDevices.stopMicrophoneCapture()
     }
 
-    if (systemAudioCaptureActive) {
+    if (systemAudioCaptureActive && !system) {
       await liveDevices.stopSystemAudioCapture()
     }
+  }
+
+  async function stopPreparedCapturesAfterStartFailure(
+    captureSessions: Partial<Record<LiveAudioSourceKind, LiveCaptureSession>>,
+  ): Promise<void> {
+    if (
+      captureSessions.microphone &&
+      liveDevices.getActiveMicrophoneCaptureSession()?.id === captureSessions.microphone.id
+    ) {
+      await liveDevices.stopMicrophoneCapture()
+    }
+
+    if (
+      captureSessions.system &&
+      liveDevices.getActiveSystemAudioCaptureSession()?.id === captureSessions.system.id
+    ) {
+      await liveDevices.stopSystemAudioCapture()
+    }
+  }
+
+  async function prepareCaptureSessionsForSession(): Promise<Partial<
+    Record<LiveAudioSourceKind, LiveCaptureSession>
+  > | null> {
+    const captureSessions: Partial<Record<LiveAudioSourceKind, LiveCaptureSession>> = {}
+
+    if (microphoneEnabled) {
+      const microphone =
+        liveDevices.getActiveMicrophoneCaptureSession() ??
+        (await liveDevices.startMicrophoneCapture({
+          deviceId: liveDevices.selectedMicrophoneId,
+        }))
+
+      if (!microphone) {
+        setRuntimeError(
+          microphoneCapability === 'unsupported'
+            ? 'microphone_capture_unsupported'
+            : 'microphone_capture_failed',
+        )
+        return null
+      }
+
+      captureSessions.microphone = microphone
+    }
+
+    if (systemAudioEnabled) {
+      const system =
+        liveDevices.getActiveSystemAudioCaptureSession() ??
+        (await liveDevices.startSystemAudioCapture())
+
+      if (!system) {
+        await stopPreparedCapturesAfterStartFailure(captureSessions)
+        setRuntimeError(
+          systemAudioCapability === 'unsupported'
+            ? 'system_audio_capture_unsupported'
+            : 'system_audio_capture_failed',
+        )
+        return null
+      }
+
+      captureSessions.system = system
+    }
+
+    return captureSessions
   }
 
   function buildSessionRuntimeDraft(): LiveRealtimeDraft {
@@ -1333,16 +1636,25 @@ export function LiveWorkbenchPage() {
   }
 
   async function handleStartSession(): Promise<void> {
+    if (sessionPreparing) return
     if (!selectLiveWorkbenchCanStartSession(liveRunState)) return
     if (validateSessionStart()) return
 
-    const service = createLiveRealtimeSessionService()
-    const runtimeDraft = buildSessionRuntimeDraft()
-    sessionServiceRef.current = service
+    setSessionPreparing(true)
 
     try {
-      await stopSourceTestsBeforeSession()
-      await service.start({
+      setSystemAudioTestSessionId(null)
+      const captureSessions = await prepareCaptureSessionsForSession()
+      if (!captureSessions) return
+
+      await stopUnreusedSetupCapturesBeforeSession({
+        microphone: captureSessions.microphone ?? null,
+        system: captureSessions.system ?? null,
+      })
+
+      const service = createLiveRealtimeSessionService()
+      const runtimeDraft = buildSessionRuntimeDraft()
+      const startOptions: LiveRealtimeSessionStartOptions = {
         title: t('live.workbench.sessionTitle'),
         modelId: selectedModelId,
         languageHint: typeof resolvedLanguage === 'string' ? resolvedLanguage : null,
@@ -1354,10 +1666,20 @@ export function LiveWorkbenchPage() {
         microphoneCapture: {
           deviceId: liveDevices.selectedMicrophoneId,
         },
-      })
+        captureSessions,
+      }
+      sessionServiceRef.current = service
+      await service.start(startOptions)
     } catch (error) {
       const runtimeError = normalizeLiveWorkbenchCaughtError(error, 'live_session_start_failed')
       showRuntimeErrorToast(runtimeError)
+      const captureSessions = {
+        microphone: liveDevices.getActiveMicrophoneCaptureSession() ?? undefined,
+        system: liveDevices.getActiveSystemAudioCaptureSession() ?? undefined,
+      }
+      await stopPreparedCapturesAfterStartFailure(captureSessions)
+    } finally {
+      setSessionPreparing(false)
     }
   }
 
@@ -1374,6 +1696,8 @@ export function LiveWorkbenchPage() {
   }
 
   function handleSessionAction(): void {
+    if (sessionPreparing) return
+
     if (liveRunState === 'active') {
       void handleStopSession()
       return
@@ -1409,7 +1733,7 @@ export function LiveWorkbenchPage() {
               ) : (
                 <Play className="size-4" />
               )}
-              {t(resolveLiveWorkbenchStartButtonKey(liveRunState))}
+              {sessionActionLabel}
             </Button>
           }
         />
@@ -1417,107 +1741,128 @@ export function LiveWorkbenchPage() {
         <div className="flex min-h-0 gap-4 overflow-hidden max-lg:flex-col max-lg:overflow-y-auto lg:h-full">
           <div
             data-slot="live-workbench-work-area"
-            className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden lg:h-full"
+            className={cn(
+              'grid min-h-0 flex-1 overflow-hidden lg:h-full',
+              transcriptExpanded
+                ? 'grid-rows-[0_minmax(0,1fr)] gap-0'
+                : 'grid-rows-[auto_minmax(0,1fr)] gap-4',
+            )}
           >
-            <LiveWorkbenchSessionSetup
-              modelValue={modelValue}
-              modelOptions={modelOptions}
-              modelDisabled={isModelsLoading || downloadedModels.length === 0}
-              taskValue={taskValue}
-              taskOptions={taskOptions}
-              taskDisabled={
-                !hasDefaults ||
-                !supportsSessionRuntimeOverrides ||
-                schemaQuery.isPending ||
-                !taskField ||
-                taskOptionValues.size === 0
-              }
-              taskLabel={
-                taskField ? t(taskField.label_key) : t('live.workbench.sessionSetup.task.label')
-              }
-              languageValue={languageValue}
-              languageOptions={languageOptions}
-              languageDisabled={
-                !hasDefaults ||
-                !supportsSessionRuntimeOverrides ||
-                schemaQuery.isPending ||
-                isConfigLoading ||
-                !languageField ||
-                languageOptionValues.size === 0
-              }
-              languageLabel={
-                languageField
-                  ? t(languageField.label_key)
-                  : t('live.workbench.sessionSetup.language.label')
-              }
-              engineDeviceValue={engineDeviceValue}
-              engineDeviceOptions={engineDeviceOptions}
-              engineDeviceDisabled={
-                isConfigLoading ||
-                !supportsSessionRuntimeOverrides ||
-                engineDeviceOptionValues.size === 0
-              }
-              engineDeviceLabel={t('tasks.workbench.sessionConfig.device.label')}
-              engineComputeTypeValue={engineComputeTypeValue}
-              engineComputeTypeOptions={engineComputeTypeOptions}
-              engineComputeTypeDisabled={
-                isConfigLoading ||
-                !supportsSessionRuntimeOverrides ||
-                engineComputeTypeOptionValues.size === 0
-              }
-              engineComputeTypeLabel={t('tasks.workbench.sessionConfig.computeType.label')}
-              microphoneEnabled={microphoneEnabled}
-              microphoneValue={microphoneValue}
-              microphoneOptions={microphoneOptions}
-              microphoneDisabled={microphoneDisabled}
-              microphoneStatus={t(microphoneStatus.i18nKey)}
-              microphoneStatusTone={microphoneStatus.tone}
-              microphoneLevelPercent={selectLiveWorkbenchDisplayedAudioLevelPercent({
-                enabled: microphoneEnabled,
-                state: liveDevices.microphoneCapture.state,
-                level: liveDevices.microphoneCapture.level,
-              })}
-              microphoneActionLabel={t(
-                microphoneActionMode === 'stop'
-                  ? 'live.workbench.sessionSetup.microphone.actions.stop'
-                  : 'live.workbench.sessionSetup.microphone.actions.test',
+            <div
+              data-slot="live-workbench-session-setup-region"
+              aria-hidden={transcriptExpanded}
+              inert={transcriptExpanded || undefined}
+              className={cn(
+                'min-h-0 overflow-hidden transition-opacity duration-150',
+                transcriptExpanded ? 'pointer-events-none opacity-0' : 'opacity-100',
               )}
-              microphoneActionDisabled={microphoneActionDisabled}
-              microphoneActionMode={microphoneActionMode}
-              systemAudioEnabled={systemAudioEnabled}
-              systemAudioDisabled={systemAudioDisabled}
-              systemAudioStatus={t(systemAudioStatus.i18nKey)}
-              systemAudioStatusTone={systemAudioStatus.tone}
-              systemAudioLevelPercent={selectLiveWorkbenchDisplayedAudioLevelPercent({
-                enabled: systemAudioEnabled,
-                state: liveDevices.systemAudioCapture.state,
-                level: liveDevices.systemAudioCapture.level,
-              })}
-              systemAudioCaptureSourceActionLabel={t(
-                systemAudioActionMode === 'stop'
-                  ? 'live.workbench.sessionSetup.systemAudio.actions.stop'
-                  : 'live.workbench.sessionSetup.systemAudio.actions.start',
-              )}
-              systemAudioActionLabel={t(
-                systemAudioActionMode === 'stop'
-                  ? 'live.workbench.sessionSetup.systemAudio.actions.stop'
-                  : 'live.workbench.sessionSetup.systemAudio.actions.test',
-              )}
-              systemAudioActionDisabled={systemAudioActionDisabled}
-              systemAudioActionMode={systemAudioActionMode}
-              settingsOpen={settingsOpen}
-              onModelChange={handleModelChange}
-              onTaskChange={handleTaskChange}
-              onLanguageChange={handleLanguageChange}
-              onEngineDeviceChange={handleEngineDeviceChange}
-              onEngineComputeTypeChange={handleEngineComputeTypeChange}
-              onMicrophoneEnabledChange={handleMicrophoneEnabledChange}
-              onMicrophoneChange={handleMicrophoneChange}
-              onMicrophoneAction={handleMicrophoneAction}
-              onSystemAudioEnabledChange={handleSystemAudioEnabledChange}
-              onSystemAudioAction={handleSystemAudioAction}
-              onSettingsToggle={handleSettingsToggle}
-            />
+            >
+              <LiveWorkbenchSessionSetup
+                modelValue={modelValue}
+                modelOptions={modelOptions}
+                modelDisabled={isModelsLoading || downloadedModels.length === 0}
+                taskValue={taskValue}
+                taskOptions={taskOptions}
+                taskDisabled={
+                  !hasDefaults ||
+                  !supportsSessionRuntimeOverrides ||
+                  schemaQuery.isPending ||
+                  !taskField ||
+                  taskOptionValues.size === 0
+                }
+                taskLabel={
+                  taskField ? t(taskField.label_key) : t('live.workbench.sessionSetup.task.label')
+                }
+                languageValue={languageValue}
+                languageOptions={languageOptions}
+                languageDisabled={
+                  !hasDefaults ||
+                  !supportsSessionRuntimeOverrides ||
+                  schemaQuery.isPending ||
+                  isConfigLoading ||
+                  !languageField ||
+                  languageOptionValues.size === 0
+                }
+                languageLabel={
+                  languageField
+                    ? t(languageField.label_key)
+                    : t('live.workbench.sessionSetup.language.label')
+                }
+                engineDeviceValue={engineDeviceValue}
+                engineDeviceOptions={engineDeviceOptions}
+                engineDeviceDisabled={
+                  isConfigLoading ||
+                  !supportsSessionRuntimeOverrides ||
+                  engineDeviceOptionValues.size === 0
+                }
+                engineDeviceLabel={t('tasks.workbench.sessionConfig.device.label')}
+                engineComputeTypeValue={engineComputeTypeValue}
+                engineComputeTypeOptions={engineComputeTypeOptions}
+                engineComputeTypeDisabled={
+                  isConfigLoading ||
+                  !supportsSessionRuntimeOverrides ||
+                  engineComputeTypeOptionValues.size === 0
+                }
+                engineComputeTypeLabel={t('tasks.workbench.sessionConfig.computeType.label')}
+                microphoneEnabled={microphoneEnabled}
+                microphoneValue={microphoneValue}
+                microphoneOptions={microphoneOptions}
+                microphoneDisabled={microphoneDisabled}
+                microphoneStatus={t(microphoneStatus.i18nKey)}
+                microphoneStatusTone={microphoneStatus.tone}
+                microphoneLevelPercent={selectLiveWorkbenchDisplayedAudioLevelPercent({
+                  enabled: microphoneEnabled,
+                  state: liveDevices.microphoneCapture.state,
+                  level: liveDevices.microphoneCapture.level,
+                })}
+                microphoneActionLabel={t(
+                  microphoneActionMode === 'stop'
+                    ? 'live.workbench.sessionSetup.microphone.actions.stop'
+                    : 'live.workbench.sessionSetup.microphone.actions.test',
+                )}
+                microphoneActionDisabled={microphoneActionDisabled}
+                microphoneActionMode={microphoneActionMode}
+                microphoneToggleLabel={t('live.workbench.sessionSetup.microphone.toggle')}
+                systemAudioEnabled={systemAudioEnabled}
+                systemAudioDisabled={systemAudioDisabled}
+                systemAudioStatus={t(systemAudioStatus.i18nKey)}
+                systemAudioStatusTone={systemAudioStatus.tone}
+                systemAudioLevelPercent={selectLiveWorkbenchDisplayedAudioLevelPercent({
+                  enabled:
+                    systemAudioEnabled && (systemAudioTestVisible || sessionAudioLevelVisible),
+                  state: liveDevices.systemAudioCapture.state,
+                  level: liveDevices.systemAudioCapture.level,
+                })}
+                systemAudioCaptureSourceActionLabel={t(
+                  systemAudioCaptureSourceActionMode === 'stop'
+                    ? 'live.workbench.sessionSetup.systemAudio.actions.stop'
+                    : 'live.workbench.sessionSetup.systemAudio.actions.start',
+                )}
+                systemAudioCaptureSourceActionDisabled={systemAudioCaptureSourceActionDisabled}
+                systemAudioCaptureSourceActionMode={systemAudioCaptureSourceActionMode}
+                systemAudioActionLabel={t(
+                  systemAudioTestActionMode === 'stop'
+                    ? 'live.workbench.sessionSetup.systemAudio.actions.stopTest'
+                    : 'live.workbench.sessionSetup.systemAudio.actions.test',
+                )}
+                systemAudioActionDisabled={systemAudioTestActionDisabled}
+                systemAudioActionMode={systemAudioTestActionMode}
+                systemAudioToggleLabel={t('live.workbench.sessionSetup.systemAudio.toggle')}
+                settingsOpen={settingsOpen}
+                onModelChange={handleModelChange}
+                onTaskChange={handleTaskChange}
+                onLanguageChange={handleLanguageChange}
+                onEngineDeviceChange={handleEngineDeviceChange}
+                onEngineComputeTypeChange={handleEngineComputeTypeChange}
+                onMicrophoneEnabledChange={handleMicrophoneEnabledChange}
+                onMicrophoneChange={handleMicrophoneChange}
+                onMicrophoneAction={handleMicrophoneAction}
+                onSystemAudioEnabledChange={handleSystemAudioEnabledChange}
+                onSystemAudioCaptureSourceAction={handleSystemAudioCaptureSourceAction}
+                onSystemAudioTestAction={handleSystemAudioTestAction}
+                onSettingsToggle={handleSettingsToggle}
+              />
+            </div>
             <LiveWorkbenchTranscriptPanel
               items={transcriptItems}
               emptyTitle={transcriptEmptyTitle}
@@ -1525,16 +1870,38 @@ export function LiveWorkbenchPage() {
               errorCopy={errorCopy}
               onRetry={liveLastError?.retryable ? handleStartSession : undefined}
               actions={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('live.workbench.compact.open')}
-                  disabled={!hasTranscript && liveRunState !== 'active'}
-                  onClick={() => setCompactOpen(true)}
-                >
-                  <Maximize2 className="size-4" />
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t(
+                      transcriptExpanded
+                        ? 'live.workbench.transcript.actions.restore'
+                        : 'live.workbench.transcript.actions.expand',
+                    )}
+                    aria-pressed={transcriptExpanded}
+                    onClick={handleTranscriptFocusToggle}
+                  >
+                    {transcriptExpanded ? (
+                      <Minimize2 className="size-4" />
+                    ) : (
+                      <Maximize2 className="size-4" />
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t('live.workbench.compact.open')}
+                    disabled={!hasTranscript && liveRunState !== 'active'}
+                    onClick={() => {
+                      void handleOpenCompactView()
+                    }}
+                  >
+                    <PictureInPicture2 className="size-4" />
+                  </Button>
+                </>
               }
             />
           </div>
@@ -1581,20 +1948,27 @@ export function LiveWorkbenchPage() {
         </div>
       </div>
 
-      <LiveWorkbenchCompactView
-        open={compactOpen}
-        status={sessionStatusLabel}
-        duration={durationLabel}
-        items={transcriptItems}
-        microphoneEnabled={microphoneEnabled}
-        microphoneStatus={t(microphoneStatus.i18nKey)}
-        systemAudioEnabled={systemAudioEnabled}
-        systemAudioStatus={t(systemAudioStatus.i18nKey)}
-        stopDisabled={stopButtonDisabled}
-        onOpenChange={setCompactOpen}
-        onExpand={ignoreOpenChange}
-        onStop={handleStopSession}
-      />
+      {compactOpen && compactWindow
+        ? createPortal(
+            <LiveWorkbenchCompactView
+              open
+              surface="window"
+              background="transparent"
+              status={sessionStatusLabel}
+              duration={durationLabel}
+              items={transcriptItems}
+              microphoneEnabled={microphoneEnabled}
+              microphoneStatus={t(microphoneStatus.i18nKey)}
+              systemAudioEnabled={systemAudioEnabled}
+              systemAudioStatus={t(systemAudioStatus.i18nKey)}
+              stopDisabled={stopButtonDisabled}
+              onOpenChange={handleCompactOpenChange}
+              onExpand={handleCompactExpand}
+              onStop={handleStopSession}
+            />,
+            compactWindow.document.body,
+          )
+        : null}
     </ContentCanvas>
   )
 }

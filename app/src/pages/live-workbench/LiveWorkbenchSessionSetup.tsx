@@ -18,6 +18,7 @@ export interface LiveWorkbenchSessionSetupOption {
 }
 
 export type LiveWorkbenchSourceTone = 'muted' | 'normal' | 'success' | 'warning' | 'danger'
+export type LiveWorkbenchSourceActionMode = 'start' | 'test' | 'stop'
 
 export interface LiveWorkbenchSessionSetupProps {
   modelValue: string
@@ -48,16 +49,20 @@ export interface LiveWorkbenchSessionSetupProps {
   microphoneLevelPercent: number
   microphoneActionLabel: string
   microphoneActionDisabled?: boolean
-  microphoneActionMode: 'test' | 'stop'
+  microphoneActionMode: LiveWorkbenchSourceActionMode
+  microphoneToggleLabel: string
   systemAudioEnabled: boolean
   systemAudioDisabled?: boolean
   systemAudioStatus: string
   systemAudioStatusTone: LiveWorkbenchSourceTone
   systemAudioLevelPercent: number
   systemAudioCaptureSourceActionLabel: string
+  systemAudioCaptureSourceActionDisabled?: boolean
+  systemAudioCaptureSourceActionMode: LiveWorkbenchSourceActionMode
   systemAudioActionLabel: string
   systemAudioActionDisabled?: boolean
-  systemAudioActionMode: 'test' | 'stop'
+  systemAudioActionMode: LiveWorkbenchSourceActionMode
+  systemAudioToggleLabel: string
   settingsOpen: boolean
   settingsDisabled?: boolean
   onModelChange: (value: string) => void
@@ -69,7 +74,8 @@ export interface LiveWorkbenchSessionSetupProps {
   onMicrophoneChange: (value: string) => void
   onMicrophoneAction: () => void
   onSystemAudioEnabledChange: (enabled: boolean) => void
-  onSystemAudioAction: () => void
+  onSystemAudioCaptureSourceAction: () => void
+  onSystemAudioTestAction: () => void
   onSettingsToggle: () => void
 }
 
@@ -114,7 +120,7 @@ interface SetupActionControlProps {
   label: string
   actionLabel: string
   disabled?: boolean
-  actionMode: 'test' | 'stop'
+  actionMode: LiveWorkbenchSourceActionMode
   onAction: () => void
 }
 
@@ -169,8 +175,9 @@ interface AudioSourcePanelProps {
   levelPercent: number
   actionLabel: string
   actionDisabled?: boolean
-  actionMode: 'test' | 'stop'
+  actionMode: LiveWorkbenchSourceActionMode
   icon: 'microphone' | 'system'
+  toggleLabel: string
   showAction?: boolean
   children?: ReactNode
   onEnabledChange: (enabled: boolean) => void
@@ -191,6 +198,7 @@ function AudioSourcePanel({
   actionDisabled,
   actionMode,
   icon,
+  toggleLabel,
   showAction = true,
   children,
   onEnabledChange,
@@ -217,7 +225,7 @@ function AudioSourcePanel({
           size="sm"
           checked={enabled}
           disabled={disabled}
-          aria-label={title}
+          aria-label={toggleLabel}
           onCheckedChange={onEnabledChange}
         />
       </div>
@@ -284,15 +292,19 @@ export function LiveWorkbenchSessionSetup({
   microphoneActionLabel,
   microphoneActionDisabled,
   microphoneActionMode,
+  microphoneToggleLabel,
   systemAudioEnabled,
   systemAudioDisabled,
   systemAudioStatus,
   systemAudioStatusTone,
   systemAudioLevelPercent,
   systemAudioCaptureSourceActionLabel,
+  systemAudioCaptureSourceActionDisabled,
+  systemAudioCaptureSourceActionMode,
   systemAudioActionLabel,
   systemAudioActionDisabled,
   systemAudioActionMode,
+  systemAudioToggleLabel,
   settingsOpen,
   settingsDisabled,
   onModelChange,
@@ -304,7 +316,8 @@ export function LiveWorkbenchSessionSetup({
   onMicrophoneChange,
   onMicrophoneAction,
   onSystemAudioEnabledChange,
-  onSystemAudioAction,
+  onSystemAudioCaptureSourceAction,
+  onSystemAudioTestAction,
   onSettingsToggle,
 }: LiveWorkbenchSessionSetupProps) {
   const { t } = useTranslation()
@@ -394,6 +407,7 @@ export function LiveWorkbenchSessionSetup({
             actionDisabled={microphoneActionDisabled}
             actionMode={microphoneActionMode}
             icon="microphone"
+            toggleLabel={microphoneToggleLabel}
             onEnabledChange={onMicrophoneEnabledChange}
             onAction={onMicrophoneAction}
           >
@@ -423,16 +437,17 @@ export function LiveWorkbenchSessionSetup({
             actionDisabled={systemAudioActionDisabled}
             actionMode={systemAudioActionMode}
             icon="system"
+            toggleLabel={systemAudioToggleLabel}
             onEnabledChange={onSystemAudioEnabledChange}
-            onAction={onSystemAudioAction}
+            onAction={onSystemAudioTestAction}
           >
             <SetupActionControl
               id="live-workbench-system-audio-capture-source"
               label={t('live.workbench.sessionSetup.systemAudio.captureSource.label')}
               actionLabel={systemAudioCaptureSourceActionLabel}
-              disabled={systemAudioActionDisabled}
-              actionMode={systemAudioActionMode}
-              onAction={onSystemAudioAction}
+              disabled={systemAudioCaptureSourceActionDisabled}
+              actionMode={systemAudioCaptureSourceActionMode}
+              onAction={onSystemAudioCaptureSourceAction}
             />
           </AudioSourcePanel>
         </div>
