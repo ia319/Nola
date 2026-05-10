@@ -14,6 +14,7 @@ import {
   resolveLiveRealtimeDefaultValue,
   resolveLiveRealtimeEffectiveValue,
   type LiveRealtimeAdapter,
+  type LiveRealtimeDefaultsSource,
   type LiveRealtimeDraft,
   type LiveRealtimeDraftValue,
 } from './live-realtime-config-draft'
@@ -21,7 +22,6 @@ import { cn } from '@/lib/utils'
 import { FormRow } from '@/layouts'
 import type {
   LanguageOption,
-  LiveRealtimeDefaults,
   LiveRealtimeOptionField,
   LiveRealtimeOptionGroup,
 } from '@/shared/types'
@@ -48,7 +48,7 @@ const NUMBER_LIST_TOKEN_RE = /^-?(?:\d+(?:\.\d*)?|\.\d+)$/
 
 export interface LiveRealtimeSchemaFormProps {
   schema: LiveRealtimeOptionGroup[]
-  defaults: LiveRealtimeDefaults
+  defaults: LiveRealtimeDefaultsSource
   draft: LiveRealtimeDraft
   languages: LanguageOption[]
   disabled?: boolean
@@ -331,7 +331,7 @@ function NumberListField({
 
 interface LiveRealtimeFieldRowProps {
   field: LiveRealtimeOptionField
-  defaults: LiveRealtimeDefaults
+  defaults: LiveRealtimeDefaultsSource
   draft: LiveRealtimeDraft
   languages: LanguageOption[]
   adapter: LiveRealtimeAdapter
@@ -361,7 +361,12 @@ function LiveRealtimeFieldRow({
   const draftValue = hasExplicitValue ? draft[field.key] : undefined
   const effectiveValue = resolveLiveRealtimeEffectiveValue(defaults, draft, field.key)
   const defaultValue = resolveLiveRealtimeDefaultValue(defaults, field.key)
-  const placeholder = valueMode === 'override' ? formatPlaceholderValue(defaultValue, t) : undefined
+  const placeholder =
+    valueMode === 'override'
+      ? formatPlaceholderValue(defaultValue, t)
+      : disabled
+        ? formatPlaceholderValue(effectiveValue, t)
+        : undefined
   const value = valueMode === 'override' ? draftValue : effectiveValue
   const dependsOnValue = field.depends_on
     ? resolveLiveRealtimeEffectiveValue(defaults, draft, field.depends_on)
@@ -605,7 +610,7 @@ function LiveRealtimeFieldRow({
 
 interface LiveRealtimeSchemaSectionProps {
   group: LiveRealtimeOptionGroup
-  defaults: LiveRealtimeDefaults
+  defaults: LiveRealtimeDefaultsSource
   draft: LiveRealtimeDraft
   languages: LanguageOption[]
   adapter: LiveRealtimeAdapter

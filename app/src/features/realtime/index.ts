@@ -57,6 +57,7 @@ export { createLiveSession, finishLiveSession, getLiveSession } from './api'
 
 export type {
   LiveRealtimeAdapter,
+  LiveRealtimeDefaultsSource,
   LiveRealtimeDraft,
   LiveRealtimeDraftValue,
   LiveRealtimeRuntimeOverrides,

@@ -10,6 +10,7 @@ export type { LiveRealtimeAdapter } from '@/shared/types'
 
 export type LiveRealtimeDraftValue = string | number | boolean | number[] | null
 export type LiveRealtimeDraft = Record<string, LiveRealtimeDraftValue>
+export type LiveRealtimeDefaultsSource = LiveRealtimeDefaults | Record<string, unknown>
 export type LiveRealtimeRuntimeOverrides = NonNullable<
   CreateLiveSessionRequest['runtime_overrides']
 >
@@ -45,14 +46,14 @@ export function areLiveRealtimeDraftValuesEqual(left: unknown, right: unknown): 
 }
 
 export function resolveLiveRealtimeDefaultValue(
-  defaults: LiveRealtimeDefaults,
+  defaults: LiveRealtimeDefaultsSource,
   key: string,
 ): unknown {
   return getValueByPath(defaults, key)
 }
 
 export function resolveLiveRealtimeEffectiveValue(
-  defaults: LiveRealtimeDefaults,
+  defaults: LiveRealtimeDefaultsSource,
   draft: LiveRealtimeDraft,
   key: string,
 ): LiveRealtimeDraftValue | undefined {
@@ -66,7 +67,7 @@ export function resolveLiveRealtimeEffectiveValue(
 
 export function updateLiveRealtimeDraft(
   current: LiveRealtimeDraft,
-  defaults: LiveRealtimeDefaults,
+  defaults: LiveRealtimeDefaultsSource,
   key: string,
   value: LiveRealtimeDraftValue,
 ): LiveRealtimeDraft {
