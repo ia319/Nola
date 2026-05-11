@@ -608,6 +608,18 @@ function buildQueryResult<TData>(data: TData): LiveWorkbenchQueryResult<TData> {
   }
 }
 
+function installPointerCapturePolyfill(): void {
+  if (!HTMLElement.prototype.hasPointerCapture) {
+    HTMLElement.prototype.hasPointerCapture = vi.fn(() => false)
+  }
+  if (!HTMLElement.prototype.setPointerCapture) {
+    HTMLElement.prototype.setPointerCapture = vi.fn()
+  }
+  if (!HTMLElement.prototype.releasePointerCapture) {
+    HTMLElement.prototype.releasePointerCapture = vi.fn()
+  }
+}
+
 function getPanelBeamSizeInput(): HTMLInputElement {
   const input = screen.getByLabelText('Beam size')
 
@@ -899,7 +911,7 @@ describe('LiveWorkbenchPage', () => {
     expect(startOptions).not.toHaveProperty('runtimeOverrides')
   })
 
-  it('applies settings panel draft only after explicit apply', () => {
+  it('applies settings panel draft only after explicit apply', async () => {
     render(<LiveWorkbenchPage />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Session settings' }))
@@ -917,6 +929,22 @@ describe('LiveWorkbenchPage', () => {
     fireEvent.click(applyButton)
 
     expect(applyButton).toBeDisabled()
+
+    const resetDraftButton = screen.getByRole('button', { name: 'Reset draft' })
+    expect(resetDraftButton).toBeDisabled()
+
+    const editedBeamSizeInput = getPanelBeamSizeInput()
+    fireEvent.change(editedBeamSizeInput, { target: { value: '9' } })
+    fireEvent.blur(editedBeamSizeInput)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Reset draft' })).not.toBeDisabled()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset draft' }))
+
+    expect(getPanelBeamSizeInput()).toHaveValue(7)
+    expect(screen.getByRole('button', { name: 'Reset draft' })).toBeDisabled()
   })
 
   it('saves settings panel draft as future Live defaults', async () => {
@@ -1052,6 +1080,56 @@ describe('LiveWorkbenchPage', () => {
     expect(liveDevices.stopMicrophoneCapture).not.toHaveBeenCalled()
     expect(liveDevices.stopSystemAudioCapture).not.toHaveBeenCalled()
     expect(liveDevices.refreshDevices).not.toHaveBeenCalled()
+  })
+
+  it('restarts active microphone capture after input device changes', async () => {
+    const baseDevices = buildLiveDeviceInventoryReturn()
+    const nextSession = buildReusableCaptureSession('microphone')
+    nextSession.deviceId = 'mic-2'
+    const liveDevices = buildLiveDeviceInventoryReturn({
+      inventory: {
+        ...baseDevices.inventory,
+        microphones: [
+          ...baseDevices.inventory.microphones,
+          {
+            id: 'mic-2',
+            kind: 'microphone',
+            label: 'Backup USB microphone',
+            groupId: null,
+            isTemporary: false,
+            isDefault: false,
+            isSelected: false,
+            isActive: false,
+          },
+        ],
+      },
+      microphoneCapture: {
+        ...baseDevices.microphoneCapture,
+        sessionId: 'capture-microphone',
+        deviceId: 'mic-1',
+        state: 'capturing',
+        startedAt: 1,
+      },
+      startMicrophoneCapture: vi.fn().mockResolvedValue(nextSession),
+    })
+    liveWorkbenchPageMocks.useLiveDeviceInventoryMock.mockReturnValue(liveDevices)
+    render(<LiveWorkbenchPage />)
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Use microphone' }))
+    installPointerCapturePolyfill()
+    fireEvent.pointerDown(screen.getByLabelText('Input device'), {
+      button: 0,
+      ctrlKey: false,
+      pointerId: 1,
+      pointerType: 'mouse',
+    })
+    fireEvent.click(await screen.findByRole('option', { name: 'Backup USB microphone' }))
+
+    await waitFor(() => {
+      expect(liveDevices.stopMicrophoneCapture).toHaveBeenCalledTimes(1)
+      expect(liveDevices.selectMicrophone).toHaveBeenCalledWith('mic-2')
+      expect(liveDevices.startMicrophoneCapture).toHaveBeenCalledWith({ deviceId: 'mic-2' })
+    })
   })
 
   it('keeps system source selection separate from test mode', () => {

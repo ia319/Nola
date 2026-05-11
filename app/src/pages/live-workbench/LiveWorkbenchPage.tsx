@@ -1285,11 +1285,28 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
   function handleMicrophoneChange(value: string): void {
     if (!microphoneOptionValues.has(value)) return
 
-    liveDevices.selectMicrophone(
+    const selectedDeviceId =
       value === LIVE_WORKBENCH_DEFAULT_MICROPHONE_VALUE || isTemporaryLiveDeviceId(value)
         ? null
-        : value,
-    )
+        : value
+
+    if (microphoneBusy) return
+
+    if (microphoneCaptureActive) {
+      runLiveDeviceAction(
+        restartMicrophoneCapture(selectedDeviceId),
+        'restart microphone test capture after device change',
+      )
+      return
+    }
+
+    liveDevices.selectMicrophone(selectedDeviceId)
+  }
+
+  async function restartMicrophoneCapture(deviceId: string | null): Promise<void> {
+    await liveDevices.stopMicrophoneCapture()
+    liveDevices.selectMicrophone(deviceId)
+    await liveDevices.startMicrophoneCapture({ deviceId })
   }
 
   function handleMicrophoneAction(): void {
@@ -1464,7 +1481,7 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
   function handleResetSettingsDraft(): void {
     if (!settingsEditable) return
 
-    setSettingsDraft({})
+    setSettingsDraft(pickLiveWorkbenchSettingsDraft(draft, settingsFieldKeys))
   }
 
   function handleSaveSettingsDefaults(): void {
@@ -1952,7 +1969,7 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
               settingsMutationPending
             }
             resetDraftDisabled={
-              !settingsEditable || !settingsDraftHasChanges || settingsMutationPending
+              !settingsEditable || settingsDraftMatchesSession || settingsMutationPending
             }
             saveDefaultsDisabled={
               !supportsSessionRuntimeOverrides ||
