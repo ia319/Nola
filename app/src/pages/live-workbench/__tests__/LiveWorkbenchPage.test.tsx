@@ -1084,13 +1084,18 @@ describe('LiveWorkbenchPage', () => {
 
   it('restarts active microphone capture after input device changes', async () => {
     const baseDevices = buildLiveDeviceInventoryReturn()
+    const baseInventory = baseDevices.inventory
+    if (!baseInventory) {
+      throw new Error('Live device inventory was not built')
+    }
+
     const nextSession = buildReusableCaptureSession('microphone')
     nextSession.deviceId = 'mic-2'
     const liveDevices = buildLiveDeviceInventoryReturn({
       inventory: {
-        ...baseDevices.inventory,
+        ...baseInventory,
         microphones: [
-          ...baseDevices.inventory.microphones,
+          ...baseInventory.microphones,
           {
             id: 'mic-2',
             kind: 'microphone',
