@@ -18,6 +18,7 @@ from nola.config.live_realtime import (
     CONTEXT_PROMPT_MAX_CHARS,
     get_live_realtime_vad_parameter_keys,
 )
+from nola.engines.base import EngineComputeType, EngineDevice
 from nola.engines.faster_whisper_defaults import FASTER_WHISPER_TASK_VALUES
 
 
@@ -145,7 +146,6 @@ class LiveRealtimeDefaultsUpdateRequest(_LiveRealtimeOptionsUpdateRequest):
             "example": {
                 "language": "en",
                 "beam_size": 3,
-                "context_prompt": "Domain terms and proper nouns",
                 "vad_parameters": {"threshold": 0.6},
             }
         },
@@ -154,6 +154,9 @@ class LiveRealtimeDefaultsUpdateRequest(_LiveRealtimeOptionsUpdateRequest):
 
 class LiveRealtimeRuntimeOverridesRequest(_LiveRealtimeOptionsUpdateRequest):
     """Partial Live realtime option payload for one session create request."""
+
+    device: EngineDevice | None = None
+    compute_type: EngineComputeType | None = None
 
     @model_validator(mode="after")
     def reject_unsupported_null_overrides(

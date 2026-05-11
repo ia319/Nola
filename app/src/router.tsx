@@ -6,13 +6,16 @@ import { DEFAULT_SETTINGS_TAB, isSettingsTabKey } from '@/pages/settings/setting
 import {
   HistoryRoutePage,
   LocalizedHistoryRoutePage,
+  LocalizedLiveWorkbenchRoutePage,
   LocalizedSettingsTabRoutePage,
+  LiveWorkbenchRoutePage,
   ModelsRoutePage,
   SettingsRoutePage,
   SettingsTabRoutePage,
   TaskWorkbenchRoutePage,
 } from '@/routes/route-pages'
 import { normalizeHistorySearch } from '@/routes/history-search'
+import { normalizeLiveWorkbenchSearch } from '@/routes/live-workbench-search'
 import { AppShell } from '@/shell/AppShell'
 
 const rootRoute = createRootRoute({
@@ -30,6 +33,13 @@ const historyRoute = createRoute({
   path: '/history',
   validateSearch: normalizeHistorySearch,
   component: HistoryRoutePage,
+})
+
+const liveRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/live',
+  validateSearch: normalizeLiveWorkbenchSearch,
+  component: LiveWorkbenchRoutePage,
 })
 
 const modelsRoute = createRoute({
@@ -80,6 +90,21 @@ const localizedHistoryRoute = createRoute({
     }
   },
   component: LocalizedHistoryRoutePage,
+})
+
+const localizedLiveRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/$locale/live',
+  validateSearch: normalizeLiveWorkbenchSearch,
+  beforeLoad: ({ location, params }) => {
+    if (!isUiLanguage(params.locale)) {
+      throw redirect({
+        to: stripLocalePrefix(location.pathname),
+        replace: true,
+      })
+    }
+  },
+  component: LocalizedLiveWorkbenchRoutePage,
 })
 
 const localizedModelsRoute = createRoute({
@@ -150,10 +175,12 @@ const localizedSettingsTabRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   homeRoute,
+  liveRoute,
   historyRoute,
   modelsRoute,
   settingsRoute.addChildren([settingsTabRoute]),
   localizedHomeRoute,
+  localizedLiveRoute,
   localizedHistoryRoute,
   localizedModelsRoute,
   localizedSettingsRoute.addChildren([localizedSettingsTabRoute]),

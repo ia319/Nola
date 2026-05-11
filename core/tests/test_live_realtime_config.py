@@ -191,6 +191,7 @@ class TestLiveRealtimeSchema:
         schema_keys = _schema_field_keys()
         expected = set(get_live_realtime_builtin_defaults())
         expected.remove("vad_parameters")
+        expected.remove("context_prompt")
         expected |= {
             f"vad_parameters.{key}" for key in get_live_realtime_vad_parameter_keys()
         }
@@ -211,7 +212,6 @@ class TestLiveRealtimeSchema:
                 assert field.supported_adapters == ["whisper_streaming"]
                 assert field.default_value is not None or field.key in {
                     "language",
-                    "context_prompt",
                     "vad_parameters.neg_threshold",
                 }
 

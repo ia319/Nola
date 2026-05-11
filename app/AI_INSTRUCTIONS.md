@@ -47,7 +47,6 @@ app/                          # Frontend workspace root
 ├── vite.config.ts            # Vite 7 + proxy to backend + Vitest config (default node env)
 ├── src/                      # Frontend source code; colocate future *.stories.tsx beside owners
 │   ├── App.css               # App-level styles
-│   ├── App.tsx               # Deprecated wrapper around TaskWorkbenchPage
 │   ├── index.css             # Tailwind v4 entry + shadcn variables
 │   ├── main.tsx              # Hydrate preferences/i18n and mount ThemeProvider + QueryClient + router
 │   ├── router.tsx            # TanStack Router tree with localized and default routes
@@ -256,6 +255,7 @@ app/                          # Frontend workspace root
 │   │   │   │   ├── capture-session.ts # Capture session state, cleanup, and subscriptions
 │   │   │   │   ├── errors.ts # Structured capture errors
 │   │   │   │   ├── pcm.ts # PCM16LE/downmix/resample pure helpers
+│   │   │   │   ├── session-utils.ts # Shared capture session predicates
 │   │   │   │   ├── tauri-audio-capture-repository.ts # Tauri capture placeholder adapter
 │   │   │   │   ├── types.ts # Capture source, state, level, frame, and option contracts
 │   │   │   │   ├── web-audio-capture-repository.ts # Web capture adapter composition
@@ -267,6 +267,11 @@ app/                          # Frontend workspace root
 │   │   │   │       ├── pcm.test.ts # Verify PCM conversion helpers
 │   │   │   │       ├── web-microphone-capture.test.ts # Verify microphone capture behavior
 │   │   │   │       └── web-system-audio-capture.test.ts # Verify system audio capture behavior
+│   │   │   ├── config/       # Schema-driven Live realtime form and draft helpers
+│   │   │   │   ├── LiveRealtimeSchemaForm.tsx # Render editable and read-only runtime option controls
+│   │   │   │   ├── live-realtime-config-draft.ts # Manage override draft values and default comparison
+│   │   │   │   └── __tests__/
+│   │   │   │       └── live-realtime-config-draft.test.ts # Verify draft comparison and reset semantics
 │   │   │   ├── devices/      # Device inventory repositories and diagnostics
 │   │   │   │   ├── audio-device-repository.ts # Runtime factory and selection contracts
 │   │   │   │   ├── diagnostics.ts # Dev-only inventory logging helpers
@@ -383,6 +388,7 @@ app/                          # Frontend workspace root
 │   │   │   ├── sse-client.ts       # Shared EventSource wrapper for typed SSE streams
 │   │   │   ├── task-query-options.ts # Task query option constants and guards
 │   │   │   ├── task-status.ts      # Task status groups derived from OpenAPI types
+│   │   │   ├── time-format.ts      # Millisecond clock format helpers
 │   │   │   ├── utils.ts            # downloadBlob helper
 │   │   │   └── __tests__/          # Unit tests (Vitest)
 │   │   │       ├── api-client.test.ts # Interceptor error mapping tests
@@ -393,7 +399,8 @@ app/                          # Frontend workspace root
 │   │   │       ├── query-client.test.ts # Query client default tests
 │   │   │       ├── query-fetcher.test.ts # Query fetch wrapper tests
 │   │   │       ├── query-keys.test.ts # Query key factory tests
-│   │   │       └── sse-client.test.ts # SSE connection wiring tests
+│   │   │       ├── sse-client.test.ts # SSE connection wiring tests
+│   │   │       └── time-format.test.ts # Millisecond clock formatting tests
 │   │   ├── responsive/       # Breakpoints and view-mode hooks
 │   │   │   ├── breakpoints.ts # Shared responsive breakpoint constants
 │   │   │   ├── index.ts      # Responsive helper public exports
@@ -457,6 +464,21 @@ app/                          # Frontend workspace root
 │   │   │   ├── ModelsPage.tsx # Compose model management page
 │   │   │   └── __tests__/    # Model management page tests
 │   │   │       └── ModelsPage.test.tsx # Verify model page rendering and actions
+│   │   ├── live-workbench/   # Live realtime session workspace
+│   │   │   ├── LiveWorkbenchCompactView.tsx # Render browser compact transcript view
+│   │   │   ├── LiveWorkbenchPage.tsx # Compose Live setup, session orchestration, transcript, settings, and compact view
+│   │   │   ├── LiveWorkbenchSessionSetup.tsx # Render model/runtime/source setup controls
+│   │   │   ├── LiveWorkbenchSettingsPanel.tsx # Render editable or read-only runtime parameter panel
+│   │   │   ├── LiveWorkbenchStatusBar.tsx # Render Live session summary state
+│   │   │   ├── LiveWorkbenchTranscriptPanel.tsx # Render transcript stream and focus/compact actions
+│   │   │   ├── live-workbench-formatters.ts # Wrap Live display formatting over shared helpers
+│   │   │   ├── live-workbench-selectors.ts # Select Live page display state from stores
+│   │   │   └── __tests__/    # Live Workbench page and helper tests
+│   │   │       ├── LiveWorkbenchCompactView.test.tsx # Verify compact view controls
+│   │   │       ├── LiveWorkbenchPage.test.tsx # Verify page orchestration and compact routing
+│   │   │       ├── LiveWorkbenchSessionSetup.test.tsx # Verify setup controls
+│   │   │       ├── live-workbench-formatters.test.ts # Verify Live display formatting
+│   │   │       └── live-workbench-selectors.test.ts # Verify Live selectors
 │   │   ├── settings/         # General, Transcription, Live Realtime, Export, Model Storage, System Info
 │   │   │   ├── ExportTab.tsx # Render export defaults settings
 │   │   │   ├── GeneralTab.tsx # Render language/theme/unit settings
@@ -464,7 +486,7 @@ app/                          # Frontend workspace root
 │   │   │   ├── ModelStorageTab.tsx # Render model storage settings
 │   │   │   ├── settings-tabs.ts # Define settings tab registry
 │   │   │   ├── SettingsPage.tsx # Compose settings route shell
-│   │   │   ├── SettingsPlaceholder.tsx # Render planned settings placeholder
+│   │   │   ├── SettingsPlaceholder.tsx # Render settings placeholder
 │   │   │   ├── SettingsTabPage.tsx # Select settings tab content
 │   │   │   ├── SystemInfoTab.tsx # Render system info and maintenance actions
 │   │   │   ├── TranscriptionTab.tsx # Render transcription defaults settings
@@ -501,14 +523,14 @@ app/                          # Frontend workspace root
 │   │   ├── transcription-defaults.ts # Build config-driven transcription defaults fixtures
 │   │   └── transcription-defaults.test.ts # Verify fixture merge semantics
 │   │
-│   └── routes/               # Route wrappers and URL query contracts
-│       ├── AppShell.tsx      # Deprecated wrapper around shell/AppShell
-│       ├── HistoryPage.tsx   # Deprecated wrapper around pages/history-center
-│       ├── ModelsPage.tsx    # Deprecated wrapper around pages/models-management
+│   └── routes/               # Route page adapters and URL query contracts
 │       ├── route-pages.tsx   # Lazy-loaded route page composition
 │       ├── history-search.ts # History URL query normalize/build helpers
+│       ├── live-workbench-search.ts # Live Workbench URL view-state helpers
 │       └── __tests__/        # Route helper tests
-│           └── history-search.test.ts # Verify history search normalization
+│           ├── history-search.test.ts # Verify history search normalization
+│           ├── live-workbench-search.test.ts # Verify Live Workbench search normalization
+│           └── router.test.ts # Verify route tree behavior
 ```
 
 Keep generated or local-runtime directories such as `node_modules/`, `dist/`, and `.idea/` out of this tree.
@@ -522,6 +544,9 @@ Keep future Storybook stories colocated under `src` beside the component or page
 - `src/pages/`: Keep route page implementations outside `features/*`.
 - `src/features/activity/`: Aggregate task and model-download activity into `needsAttention`, `inProgress`, and `recent`.
 - `src/features/realtime/`: Provide UI-less Live device inventory, Web/Tauri adapter factories, capture sessions, PCM frame output, WebSocket transport, diagnostics, preview/committed/final transcript handling, runtime store, and session-service orchestration.
+- `src/pages/live-workbench/`: Compose the Live route UI, source setup, runtime settings panel, transcript focus mode, browser compact view, and session orchestration.
+- `src/routes/live-workbench-search.ts`: Keep Live route search state focused on `view=transcript-focus`.
+- `src/shared/lib/time-format.ts`: Format shared millisecond clock values for Live duration and transcript ranges.
 - `src/pages/settings/LiveRealtimeTab.tsx`: Render schema-driven Live realtime defaults beside Transcription as a separate Settings tab.
 - `src/config/api.ts`: Provide Live realtime defaults and schema helpers alongside transcription/session/export config helpers.
 - `src/lib/runtime-environment.ts`: Centralize Web/Tauri runtime detection for app-level and realtime platform selection.
@@ -560,8 +585,20 @@ Keep future Storybook stories colocated under `src` beside the component or page
 - Drive sorting through API for remote queries, server pagination, or incomplete client datasets. Use local full-set sorting only for temporary client-held lists such as Upload Queue.
 - Keep History-only query/action hooks in `src/pages/history-center/hooks`; do not restore `src/features/tasks/history`.
 - Keep Upload Queue row clicks as selection toggles. Start transcription only from selected successful uploads.
-- Keep Live as an independent `features/realtime` runtime foundation until an approved Live UI phase adds pages/routes.
+- Keep Live page UI in `src/pages/live-workbench`; keep `features/realtime` UI-less and reusable.
 - Pass Live session `runtime_overrides` through generated OpenAPI DTO aliases; do not hand-maintain override field shapes in feature code.
+- Send Live `runtime_overrides` only when the backend Live runtime adapter supports them; keep `mock` out of user-selectable runtime controls.
+- Keep Live session source toggles as “include this source in the next session” controls. Do not make toggles start listening by themselves.
+- Start microphone capture only from explicit test/session preparation actions. Start system audio capture only from explicit source selection/session preparation actions.
+- Keep system audio source selection separate from local test mode. Do not make the test button re-open display-capture selection.
+- Prepare and reuse enabled capture sessions before creating a Live session. Do not let browser permission waiting time enter Live `started_at`.
+- Treat `captureSessions` passed into `LiveRealtimeSessionService` as borrowed setup captures. Do not attach duplicate device-store listeners or stop borrowed captures during service cleanup.
+- Do not create a backend Live session when source authorization or capture preparation fails; use a distinct attempt/audit model if failed attempts need persistence.
+- Keep Live Workbench runtime settings for advanced schema fields only. Do not duplicate model, task, language, device, compute type, microphone, or system audio inside the side panel.
+- Do not expose or submit `context_prompt` from Live Workbench. Keep static prompt text out of Live realtime user controls.
+- Use `src/shared/lib/time-format.ts` for Live duration and transcript time ranges. Do not duplicate millisecond clock formatting in page code.
+- Use Live route search only for main-page view state such as `view=transcript-focus`. Do not use compact-window close actions to mutate route search.
+- Use Web Document Picture-in-Picture only when the browser supports it. Do not fake an OS-level compact window inside the page or hide browser security chrome.
 - Keep realtime device detection in the client runtime. Do not add backend APIs that enumerate the user's browser or desktop devices.
 - Keep microphones and speakers as separate inventory lists. Treat speakers as output devices, not as system-audio transcription input.
 - Treat system audio as a capture source. In Web runtime, use explicit user-triggered capture and return structured unsupported/limited states when the browser cannot provide audio.
@@ -644,7 +681,7 @@ Keep future Storybook stories colocated under `src` beside the component or page
 >     - Use `/settings/live-realtime` as the Settings tab for Live realtime defaults.
 >     - Keep it adjacent to Transcription and outside the Transcription tab content.
 >     - Use backend schema `label_key`, `description_key`, `group_label_key`, default values, adapter support, and range metadata for controls.
->     - Keep `context_prompt` user-facing; do not expose faster-whisper `initial_prompt`.
+>     - Keep static prompt context hidden from Live realtime controls; do not expose faster-whisper `initial_prompt`.
 >
 > [!IMPORTANT]
 > Use `GET /api/config`, `GET /api/config/transcription/engine-defaults`, `GET /api/config/session-defaults`, and `/api/config/live-realtime/*` as the config/default sources.
@@ -653,7 +690,6 @@ Keep future Storybook stories colocated under `src` beside the component or page
 > [!NOTE]
 > Use `router.tsx` and `src/routes/route-pages.tsx` as the active route composition entry.
 > Keep `src/shell/AppShell.tsx` mounted to share navigation, task polling, ActivityDataBridge, and Toaster across routes.
-> Keep `App.tsx` and `src/routes/AppShell.tsx` as deprecated compatibility wrappers only.
 > Use `components/ui/sonner.tsx` through the app-owned theme context.
 
 ### API Type Strategy
@@ -807,6 +843,8 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `index.ts`: Expose the public realtime foundation surface: REST API helpers, primitive types, device repository factory, capture repository factory, transport factory, session service, diagnostics, transcript event contracts, stores, hook, and runtime adapter helpers.
   - `api.ts`: Create and fetch Live sessions through `/api/live/*` REST endpoints using shared Live DTO aliases, including `runtime_overrides`.
   - `types.ts`: Keep shared realtime primitive aliases (`LiveTimestampMs`, `LiveDurationMs`, `LiveUnsubscribe`) and runtime capability states.
+  - `config/LiveRealtimeSchemaForm.tsx`: Render backend-schema controls for editable defaults, per-session overrides, and read-only resolved snapshots.
+  - `config/live-realtime-config-draft.ts`: Keep Live realtime draft comparison, default resolution, override clearing, and runtime override serialization.
   - `platform/runtime-environment.ts`: Wrap app-level runtime detection and choose Web/Tauri realtime adapters through explicit factories.
   - `devices/types.ts`: Keep microphone/speaker inventory, permission, capability, temporary-device, and warning code contracts.
   - `devices/audio-device-repository.ts`: Define the device repository contract and dynamically load Web or Tauri implementations.
@@ -819,6 +857,7 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `capture/web-microphone-capture.ts`: Start explicit Web microphone capture and expose audio level plus PCM frame events.
   - `capture/web-system-audio-capture.ts`: Start explicit Web display/system-audio capture and expose system-source level plus PCM frame events when an audio track exists.
   - `capture/capture-session.ts`: Own capture state transitions, listener cleanup, frame subscriptions, track stopping, and level/frame emitter cleanup.
+  - `capture/session-utils.ts`: Keep reusable capture-session predicates shared across inventory and session orchestration.
   - `capture/audio-frame-emitter.ts`: Emit PCM16LE, 16 kHz, mono frames and isolate listener failures.
   - `capture/audio-level-meter.ts`: Measure Web Audio level and peak values.
   - `capture/pcm.ts`: Keep downmix, resample, PCM sizing, and float-to-PCM conversion pure and tested.
@@ -826,8 +865,8 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `capture/tauri-audio-capture-repository.ts`: Return structured placeholder errors for desktop capture until native adapters exist.
   - `store/live-device-store.ts`: Store serializable inventory, selected/active devices, capture states, and latest level snapshots; normalize `temp-*` device IDs to `null`.
   - `store/live-realtime-store.ts`: Store current Live session, connection state, active tracks, current previews, latest committed partials, capped final transcripts, diagnostics state, and last runtime error.
-  - `hooks/useLiveDeviceInventory.ts`: Own repository creation, `devicechange` subscriptions, capture session lifecycle, cleanup on teardown, and store updates.
-  - `session/live-realtime-session-service.ts`: Compose Live REST creation, optional runtime overrides, WebSocket transport, capture sessions, diagnostics controls, transcript event store updates, track routing, stop/failure cleanup, closed-transport wait rejection, and server-finished cleanup without adding UI.
+  - `hooks/useLiveDeviceInventory.ts`: Own repository creation, `devicechange` subscriptions, reusable capture session lookup, capture lifecycle, cleanup on teardown, and store updates.
+  - `session/live-realtime-session-service.ts`: Compose Live REST creation, optional runtime overrides, reusable capture sessions, WebSocket transport, diagnostics controls, transcript event store updates, track routing, stop/failure cleanup, closed-transport wait rejection, and server-finished cleanup without adding UI.
   - `transport/types.ts`: Keep hand-maintained Live WebSocket event, transcript, audio frame, diagnostics, and state contracts.
   - `transport/protocol.ts`: Validate server events, including preview/committed/final transcript payloads, build WebSocket URLs from origins, and keep protocol constants.
   - `transport/web-realtime-transport.ts`: Implement browser WebSocket handshake, control event sending, JSON metadata plus binary payload audio frames, and state changes.
@@ -871,6 +910,7 @@ Route page implementations.
 - **task-workbench/**: Compose upload queue, session config, Advanced side sheet, and current-batch task table. Let session config create task-level execution payloads with `model_id` and schema-derived `engine` values.
 - **history-center/**: Compose Task ID and Filename modes, URL search state, pagination, detail dialogs, export dialog loading, and page-local history hooks.
 - **models-management/**: Compose model overview, model table, detail sheet, mutation de-duplication, canonical `configured_model_id` handling, Default/Running display, model refresh, and restart-free model selection feedback.
+- **live-workbench/**: Compose Live source setup, explicit capture preparation, session start/stop orchestration, runtime settings side panel, transcript focus mode, browser compact view, millisecond timing, and runtime error feedback.
 - **settings/**: Compose General, Transcription, Live Realtime, Export, Model Storage, and System Info tabs. Keep subpage titles removed; show settings content directly. Keep engine resources read-only and use task-boundary reload language instead of restart-required language.
 - **settings/LiveRealtimeTab.tsx**: Render Live realtime defaults from backend schema metadata, persist patches through config API helpers, and keep special-value token state consistent with local validation.
 
@@ -913,6 +953,7 @@ Cross-feature shared code, split into `lib/` and `types/`.
 - **lib/__tests__/sse-client.test.ts**: Verify SSE connection wiring, event parsing, and cleanup.
 - **lib/task-query-options.ts**: Centralize task filter/sort/order option constants and guards.
 - **lib/task-status.ts**: Centralize task status groups derived from OpenAPI `TaskStatus`.
+- **lib/time-format.ts**: Format millisecond clock values and ranges as `HH:MM:SS.mmm`.
 - **lib/utils.ts**: `downloadBlob()` triggers browser file download from Blob (appends `<a>` to DOM, defers `URL.revokeObjectURL`).
 - **lib/__tests__/**: Vitest unit tests for API-client mapping plus pure helpers (`error-factory`, `error-utils`, `file-validation`, `format`).
 - **types/openapi.d.ts**: Auto-generated by `pnpm gen:types`. Never edit manually.
@@ -930,11 +971,10 @@ Cross-feature shared code, split into `lib/` and `types/`.
 
 Keep route adapters and search-model helpers in this directory. Keep page implementations in `src/pages/*`.
 
-- **AppShell.tsx**: Keep deprecated wrapper around `src/shell/AppShell`.
-- **HistoryPage.tsx**: Keep deprecated wrapper around `src/pages/history-center/HistoryPage`.
-- **ModelsPage.tsx**: Keep deprecated wrapper around `src/pages/models-management/ModelsPage`.
 - **route-pages.tsx**: Lazy-load primary pages, Settings tabs including Live Realtime, and route loading fallbacks.
 - **history-search.ts**: Normalize route search params and build task query model.
+- **live-workbench-search.ts**: Normalize Live Workbench view search params and omit the default view from URLs.
+- **__tests__/router.test.ts**: Verify route tree behavior.
 
 ### src/lib/
 
@@ -1062,3 +1102,5 @@ Frontend (Vite/React) ───[ HTTP Proxy /api/* ]───▶ Backend (FastAP
 | Live Transcript Events | `preview` and `committed_partial` stay WebSocket-only; `final` enters capped runtime output and backend history |
 | Live Diagnostics | Explicit WebSocket control only; frontend receives `capture_id`, `manifest_name`, and `file_name`, not server absolute paths |
 | Live Realtime Settings | Separate Settings tab after Transcription; render persisted defaults from backend schema and i18n keys |
+| Live Timing | Display session duration and transcript ranges with shared millisecond clock formatting |
+| Live Compact View | Use Web Document Picture-in-Picture when supported; keep close independent from route search and session stop |

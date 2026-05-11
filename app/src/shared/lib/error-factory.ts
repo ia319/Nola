@@ -15,10 +15,10 @@ export function createNetworkError(code: string, i18nKey: string): AppError {
 }
 
 /** Map HTTP status into stable frontend categories for presentation logic. */
-export function createApiError(status: number, detail: string): AppError {
+export function createApiError(status: number, detail: string, backendCode?: string): AppError {
   if (status >= 500) {
     return {
-      code: `API_SERVER_${status}`,
+      code: backendCode ?? `API_SERVER_${status}`,
       i18nKey: 'error.api.serverError',
       params: { status, detail },
       retriable: true,
@@ -29,7 +29,7 @@ export function createApiError(status: number, detail: string): AppError {
   const retriable = status === 408 || status === 429
 
   return {
-    code: `API_CLIENT_${status}`,
+    code: backendCode ?? `API_CLIENT_${status}`,
     i18nKey: 'error.api.clientError',
     params: { status, detail },
     retriable,

@@ -18,11 +18,22 @@ type AppTopBarProps = {
   settingsTabs?: ReactNode
 }
 
-function getTopBarTitleKey(pathname: string): string {
+type TopBarTitleKey =
+  | 'shell.navigation.tasks'
+  | 'shell.navigation.live'
+  | 'shell.navigation.history'
+  | 'shell.navigation.models'
+  | 'shell.navigation.settings'
+
+function getTopBarTitleKey(pathname: string): TopBarTitleKey {
   const normalizedPathname = stripLocalePrefix(pathname)
 
   if (normalizedPathname === '/history' || normalizedPathname.startsWith('/history/')) {
     return 'shell.navigation.history'
+  }
+
+  if (normalizedPathname === '/live' || normalizedPathname.startsWith('/live/')) {
+    return 'shell.navigation.live'
   }
 
   if (normalizedPathname === '/models' || normalizedPathname.startsWith('/models/')) {

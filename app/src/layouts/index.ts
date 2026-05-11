@@ -8,3 +8,8 @@ export {
   type TwoColumnLayoutProps,
   type TwoColumnLayoutRatio,
 } from './TwoColumnLayout'
+export {
+  WorkspaceSidePanel,
+  type WorkspaceSidePanelProps,
+  type WorkspaceSidePanelSize,
+} from './WorkspaceSidePanel'

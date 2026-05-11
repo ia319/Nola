@@ -21,7 +21,8 @@ class Settings(BaseSettings):
     compute_type: str = "default"  # "default", "float16", "int8"
 
     # Live realtime settings
-    live_realtime_transcriber: LiveRealtimeTranscriberSetting = "mock"
+    # Keep mock internal; do not expose it as a product option for now.
+    live_realtime_transcriber: LiveRealtimeTranscriberSetting = "whisper_streaming"
     # Server settings
     host: str = "127.0.0.1"
     port: int = 8000

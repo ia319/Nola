@@ -145,6 +145,10 @@ function buildConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       is_multilingual: true,
       schema: TEST_ENGINE_SCHEMA,
     },
+    live_realtime: {
+      runtime_adapter: 'whisper_streaming',
+      supports_runtime_overrides: true,
+    },
     transcription: {
       defaults: buildTranscriptionDefaults(),
       schema: [
@@ -208,6 +212,7 @@ function buildConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
     ...config,
     ...overrides,
+    live_realtime: overrides.live_realtime ?? config.live_realtime,
   }
 }
 

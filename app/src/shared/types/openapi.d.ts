@@ -842,6 +842,7 @@ export interface components {
      */
     AppConfigResponse: {
       engine: components['schemas']['EngineConfigResponse']
+      live_realtime: components['schemas']['LiveRealtimeConfigResponse']
       transcription: components['schemas']['TranscriptionConfigResponse']
       file: components['schemas']['FileConfigResponse']
       /** Effective Languages */
@@ -1272,6 +1273,19 @@ export interface components {
       label_key: string
     }
     /**
+     * LiveRealtimeConfigResponse
+     * @description Expose the active Live realtime runtime mode.
+     */
+    LiveRealtimeConfigResponse: {
+      /**
+       * Runtime Adapter
+       * @enum {string}
+       */
+      runtime_adapter: 'mock' | 'whisper_streaming'
+      /** Supports Runtime Overrides */
+      supports_runtime_overrides: boolean
+    }
+    /**
      * LiveRealtimeDefaults
      * @description Validate one resolved Live realtime defaults payload.
      */
@@ -1338,7 +1352,6 @@ export interface components {
      * @description Partial update payload for application-level Live realtime defaults.
      * @example {
      *       "beam_size": 3,
-     *       "context_prompt": "Domain terms and proper nouns",
      *       "language": "en",
      *       "vad_parameters": {
      *         "threshold": 0.6
@@ -1513,6 +1526,10 @@ export interface components {
       /** Vad Filter */
       vad_filter?: boolean | null
       vad_parameters?: components['schemas']['LiveRealtimeVadParametersUpdateRequest'] | null
+      /** Device */
+      device?: ('auto' | 'cpu' | 'cuda') | null
+      /** Compute Type */
+      compute_type?: ('default' | 'float16' | 'int8') | null
     }
     /**
      * LiveRealtimeSchemaResponse

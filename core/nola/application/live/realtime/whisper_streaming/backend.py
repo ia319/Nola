@@ -13,7 +13,6 @@ from nola.application.live.realtime.whisper_streaming.config import (
     WhisperStreamingTask,
     WhisperStreamingTemperature,
     WhisperStreamingVadParameters,
-    combine_initial_prompt,
 )
 from nola.application.live.realtime.whisper_streaming.errors import (
     WhisperStreamingRuntimeError,
@@ -139,10 +138,7 @@ class WhisperStreamingFasterWhisperBackend(WhisperStreamingInferenceBackend):
         """Return timestamped words and segment boundaries for one audio window."""
         model = self._require_model()
         audio = np.asarray(waveform, dtype=np.float32)
-        initial_prompt = combine_initial_prompt(
-            context_prompt=config.context_prompt,
-            dynamic_prompt=prompt,
-        )
+        initial_prompt = _normalize_initial_prompt(prompt)
         try:
             segments, _info = model.transcribe(
                 audio,
@@ -212,6 +208,11 @@ def _collect_model_output(
         words=tuple(words),
         segment_end_ms=tuple(segment_end_ms),
     )
+
+
+def _normalize_initial_prompt(prompt: str) -> str | None:
+    normalized = prompt.strip()
+    return normalized or None
 
 
 def _seconds_to_ms(value: float) -> int:

@@ -20,6 +20,13 @@ from nola.config.live_realtime import (
     get_live_realtime_effective_defaults,
     resolve_live_realtime_defaults,
 )
+from nola.engines.base import (
+    ALLOWED_ENGINE_COMPUTE_TYPES,
+    ALLOWED_ENGINE_DEVICES,
+    EngineComputeType,
+    EngineConfig,
+    EngineDevice,
+)
 from nola.model_hub import ModelInfo, UnknownModelError, require_model
 from nola.model_hub.contracts import ModelCacheState
 
@@ -55,6 +62,24 @@ _FASTER_WHISPER_CONFIG_KEYS: tuple[str, ...] = (
     "no_speech_threshold",
     "condition_on_previous_text",
 )
+_EXECUTION_CONFIG_KEYS: tuple[str, ...] = ("device", "compute_type")
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedLiveSessionOverrides:
+    """Carry split session overrides for realtime defaults and execution."""
+
+    realtime: ConfigMap
+    execution: ConfigMap
+    all: ConfigMap
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedLiveExecutionConfig:
+    """Carry one resolved Live execution target."""
+
+    device: EngineDevice
+    compute_type: EngineComputeType
 
 
 class SupportsLiveRuntimeConfigRead(Protocol):
@@ -171,7 +196,7 @@ def _build_session_overrides(
     *,
     language_hint: str | None,
     runtime_overrides: LiveRealtimeRuntimeOverrides | None,
-) -> ConfigMap:
+) -> ResolvedLiveSessionOverrides:
     overrides: ConfigMap = {}
     if language_hint is not None:
         normalized_hint = language_hint.strip().lower()
@@ -180,7 +205,55 @@ def _build_session_overrides(
 
     if runtime_overrides:
         overrides = deep_merge(overrides, runtime_overrides)
-    return overrides
+
+    overrides.pop("context_prompt", None)
+    realtime_overrides = {
+        key: value
+        for key, value in overrides.items()
+        if key not in _EXECUTION_CONFIG_KEYS
+    }
+    execution_overrides = {
+        key: value for key, value in overrides.items() if key in _EXECUTION_CONFIG_KEYS
+    }
+    return ResolvedLiveSessionOverrides(
+        realtime=realtime_overrides,
+        execution=execution_overrides,
+        all=overrides,
+    )
+
+
+def _resolve_engine_device(value: object) -> EngineDevice:
+    if isinstance(value, str) and value in ALLOWED_ENGINE_DEVICES:
+        return cast(EngineDevice, value)
+    _raise_runtime_config_error(
+        status_code=422,
+        code="runtime_config_invalid",
+        message="Live realtime execution device is invalid",
+    )
+
+
+def _resolve_engine_compute_type(value: object) -> EngineComputeType:
+    if isinstance(value, str) and value in ALLOWED_ENGINE_COMPUTE_TYPES:
+        return cast(EngineComputeType, value)
+    _raise_runtime_config_error(
+        status_code=422,
+        code="runtime_config_invalid",
+        message="Live realtime execution compute type is invalid",
+    )
+
+
+def _resolve_execution_config(
+    execution_overrides: ConfigMap,
+) -> ResolvedLiveExecutionConfig:
+    engine_config = EngineConfig()
+    return ResolvedLiveExecutionConfig(
+        device=_resolve_engine_device(
+            execution_overrides.get("device", engine_config.device)
+        ),
+        compute_type=_resolve_engine_compute_type(
+            execution_overrides.get("compute_type", engine_config.compute_type)
+        ),
+    )
 
 
 def _serialize_nested(values: ConfigMap, keys: tuple[str, ...]) -> JsonDict:
@@ -191,8 +264,9 @@ def _build_whisper_streaming_snapshot(
     *,
     runtime: LiveRealtimeAdapter,
     model_id: str,
+    execution: ResolvedLiveExecutionConfig,
     resolved_defaults: ConfigMap,
-    session_overrides: ConfigMap,
+    session_overrides: ResolvedLiveSessionOverrides,
 ) -> LiveRuntimeConfig:
     vad_parameters = resolved_defaults.get("vad_parameters")
     if not isinstance(vad_parameters, dict):
@@ -207,9 +281,13 @@ def _build_whisper_streaming_snapshot(
         "runtime": runtime,
         "model_id": model_id,
         "audio_format": LIVE_REALTIME_AUDIO_FORMAT,
+        "execution": {
+            "device": execution.device,
+            "compute_type": execution.compute_type,
+        },
         "language": resolved_defaults["language"],
         "task": resolved_defaults["task"],
-        "context_prompt": resolved_defaults["context_prompt"],
+        "context_prompt": None,
         "whisper_streaming": {
             "sample_rate": 16000,
             **_serialize_nested(resolved_defaults, _WHISPER_STREAMING_CONFIG_KEYS),
@@ -223,7 +301,7 @@ def _build_whisper_streaming_snapshot(
             "vad_filter": resolved_defaults["vad_filter"],
             "vad_parameters": vad_parameters,
         },
-        "session_overrides": session_overrides if session_overrides else None,
+        "session_overrides": session_overrides.all if session_overrides.all else None,
     }
     return snapshot
 
@@ -282,6 +360,7 @@ def build_live_runtime_config(
         language_hint=language_hint,
         runtime_overrides=runtime_overrides,
     )
+    execution = _resolve_execution_config(session_overrides.execution)
     model_info = _resolve_whisper_streaming_model(
         request_model_id=request_model_id,
         config_store=config_store,
@@ -290,7 +369,7 @@ def build_live_runtime_config(
     try:
         effective_defaults = get_live_realtime_effective_defaults(config_store)
         resolved_defaults = resolve_live_realtime_defaults(
-            deep_merge(effective_defaults, session_overrides)
+            deep_merge(effective_defaults, session_overrides.realtime)
         )
     except (TypeError, ValueError, ValidationError) as error:
         raise LiveUseCaseError(
@@ -308,6 +387,7 @@ def build_live_runtime_config(
         snapshot=_build_whisper_streaming_snapshot(
             runtime=runtime,
             model_id=model_info.model_id,
+            execution=execution,
             resolved_defaults=resolved_defaults,
             session_overrides=session_overrides,
         ),

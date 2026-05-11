@@ -27,7 +27,6 @@ from nola.application.models import ModelOperationLocks
 from nola.common.event_bus import EventBus, event_bus
 from nola.config import settings
 from nola.config.live_realtime import LiveRealtimeAdapter
-from nola.engines.base import EngineConfig
 from nola.model_hub import (
     ModelDownloader,
     ModelStorage,
@@ -154,14 +153,13 @@ def _create_whisper_streaming_live_transcriber(
     runtime_snapshot = whisper_streaming_runtime_snapshot_from_live_snapshot(
         runtime_config
     )
-    engine_config = EngineConfig()
     loader = WhisperStreamingRuntimeLoader(
         config_store=get_app_config_db(),
         config=WhisperStreamingRuntimeLoaderConfig(
             env_model_dir=settings.model_dir,
             default_model_dir=settings.default_model_dir,
-            device=engine_config.device,
-            compute_type=engine_config.compute_type,
+            device=runtime_snapshot.device,
+            compute_type=runtime_snapshot.compute_type,
             model_id=runtime_snapshot.model_id,
         ),
         storage_factory=ModelStorage,

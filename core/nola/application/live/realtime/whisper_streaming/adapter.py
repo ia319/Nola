@@ -140,14 +140,13 @@ class WhisperStreamingLiveTranscriber:
         for track_id, state in tuple(self._tracks.items()):
             try:
                 update = self._finish_processor(state)
-                results.extend(
-                    self._update_to_results(
-                        track_id=track_id,
-                        source=state.source,
-                        state=state,
-                        update=update,
-                    )
+                track_results = self._update_to_results(
+                    track_id=track_id,
+                    source=state.source,
+                    state=state,
+                    update=update,
                 )
+                results.extend(track_results)
             finally:
                 self._tracks.pop(track_id, None)
                 state.processor.close()

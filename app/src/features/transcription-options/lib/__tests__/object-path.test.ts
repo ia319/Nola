@@ -21,7 +21,13 @@ describe('object-path', () => {
 
     expect(getValueByPath(source, 'audio.language.name')).toBeUndefined()
     expect(getValueByPath(source, '')).toBeUndefined()
+    expect(getValueByPath(source, 'audio..code')).toBeUndefined()
     expect(getValueByPath(null, 'audio.language.code')).toBeUndefined()
+  })
+
+  it('does not read prototype pollution path segments', () => {
+    expect(getValueByPath({}, 'constructor.prototype.polluted')).toBeUndefined()
+    expect(getValueByPath({}, '__proto__.polluted')).toBeUndefined()
   })
 
   it('sets nested values and creates missing objects', () => {
@@ -50,5 +56,25 @@ describe('object-path', () => {
         temperature: 0.7,
       },
     })
+  })
+
+  it('does not write prototype pollution path segments', () => {
+    const target: Record<string, unknown> = {}
+
+    setValueByPath(target, '__proto__.polluted', true)
+    setValueByPath(target, 'constructor.prototype.polluted', true)
+    setValueByPath(target, 'safe.prototype.polluted', true)
+
+    expect(target).toEqual({})
+    expect(({} as { polluted?: unknown }).polluted).toBeUndefined()
+  })
+
+  it('does not write partial branches for malformed paths', () => {
+    const target: Record<string, unknown> = {}
+
+    setValueByPath(target, 'decoding..temperature', 0.3)
+    setValueByPath(target, 'audio.language.', 'en')
+
+    expect(target).toEqual({})
   })
 })

@@ -37,10 +37,12 @@ import type {
   LiveRealtimeTranscriptFinalPayload,
   LiveRealtimeTranscriptPreviewPayload,
 } from '../../transport/types'
+import { useLiveDeviceStore } from '../../store/live-device-store'
 import type { CreateLiveSessionRequest, LiveSessionDetail, LiveTrack } from '@/shared/types'
 
 afterEach(() => {
   useLiveRealtimeStore.getState().resetLiveRealtimeRuntimeState()
+  useLiveDeviceStore.getState().resetLiveDeviceState()
   vi.clearAllMocks()
 })
 
@@ -50,6 +52,10 @@ describe('LiveRealtimeSessionService', () => {
 
     await setup.service.start({
       title: 'Live test',
+      runtimeOverrides: {
+        language: 'en',
+        min_chunk_ms: 800,
+      },
       sources: ['microphone', 'system'],
       microphoneCapture: {
         deviceId: 'temp-microphone-1',
@@ -60,6 +66,10 @@ describe('LiveRealtimeSessionService', () => {
     expect(setup.createSession).toHaveBeenCalledWith({
       mode: 'streaming',
       title: 'Live test',
+      runtime_overrides: {
+        language: 'en',
+        min_chunk_ms: 800,
+      },
     })
     expect(setup.transport.connectCalls).toEqual(['session-1'])
     expect(setup.captureRepository.microphoneSessions).toHaveLength(1)
@@ -79,6 +89,13 @@ describe('LiveRealtimeSessionService', () => {
       capturedAtMs: 0,
       durationMs: 20,
     })
+    setup.captureRepository.microphoneSessions[0]?.emitLevel({
+      level: 0.52,
+      peak: 0.6,
+      isMutedLike: false,
+      measuredAt: 1,
+    })
+    expect(useLiveDeviceStore.getState().microphoneCapture.level?.level).toBe(0.52)
 
     setup.transport.emitEvent(transcriptPreviewEvent('session-1', 'track-microphone-1'))
     expect(
@@ -114,6 +131,41 @@ describe('LiveRealtimeSessionService', () => {
     expect(state.runState).toBe('finished')
     expect(state.connectionState).toBe('closed')
     expect(state.tracksBySource).toEqual({})
+    expect(useLiveDeviceStore.getState().microphoneCapture.state).toBe('stopped')
+  })
+
+  it('reuses provided capture sessions without starting a second browser capture', async () => {
+    const setup = createServiceSetup()
+    const systemSession = new MockCaptureSession('system')
+
+    await setup.service.start({
+      sources: ['system'],
+      captureSessions: {
+        system: systemSession,
+      },
+    })
+
+    expect(setup.captureRepository.systemSessions).toHaveLength(0)
+    expect(useLiveDeviceStore.getState().systemAudioCapture.sessionId).toBeNull()
+
+    systemSession.emitLevel({
+      level: 0.52,
+      peak: 0.6,
+      isMutedLike: false,
+      measuredAt: 1,
+    })
+    expect(useLiveDeviceStore.getState().systemAudioCapture.level).toBeNull()
+
+    systemSession.emitFrame(audioFrame('system', 0))
+
+    expect(setup.transport.audioFrames[0]).toMatchObject({
+      trackId: 'track-system-1',
+      source: 'system',
+      sequence: 0,
+    })
+
+    await setup.service.stop()
+    expect(systemSession.stop).not.toHaveBeenCalled()
   })
 
   it('cleans up transport when capture permission fails after connect', async () => {
@@ -154,6 +206,28 @@ describe('LiveRealtimeSessionService', () => {
     const state = useLiveRealtimeStore.getState()
     expect(state.runState).toBe('failed')
     expect(state.lastError?.code).toBe('websocket_closed')
+  })
+
+  it('does not stop borrowed capture when the transport fails', async () => {
+    const setup = createServiceSetup()
+    const systemSession = new MockCaptureSession('system')
+
+    await setup.service.start({
+      sources: ['system'],
+      captureSessions: {
+        system: systemSession,
+      },
+    })
+    setup.transport.fail({
+      code: 'websocket_closed',
+      message: 'Realtime WebSocket closed unexpectedly',
+      retryable: false,
+    })
+    await flushAsyncWork()
+
+    expect(systemSession.stop).not.toHaveBeenCalled()
+    expect(setup.transport.closeCalls).toBe(1)
+    expect(useLiveRealtimeStore.getState().runState).toBe('failed')
   })
 
   it('stops active capture when the transport fails without an error payload', async () => {
@@ -427,6 +501,7 @@ class MockCaptureSession implements LiveCaptureSession {
   readonly startedAt = 1
   state: LiveCaptureState = 'capturing'
   stopError: Error | null = null
+  private readonly levelCallbacks = new Set<(level: LiveAudioLevel) => void>()
   private readonly frameCallbacks = new Set<(frame: RealtimeAudioFrame) => void>()
   private readonly stateCallbacks = new Set<(change: LiveCaptureStateChange) => void>()
 
@@ -452,8 +527,11 @@ class MockCaptureSession implements LiveCaptureSession {
     this.state = 'capturing'
   }
 
-  onLevel(_callback: (level: LiveAudioLevel) => void): LiveUnsubscribe {
-    return () => undefined
+  onLevel(callback: (level: LiveAudioLevel) => void): LiveUnsubscribe {
+    this.levelCallbacks.add(callback)
+    return () => {
+      this.levelCallbacks.delete(callback)
+    }
   }
 
   onAudioFrame(callback: (frame: RealtimeAudioFrame) => void): LiveUnsubscribe {
@@ -473,6 +551,12 @@ class MockCaptureSession implements LiveCaptureSession {
   emitFrame(frame: RealtimeAudioFrame): void {
     for (const callback of this.frameCallbacks) {
       callback(frame)
+    }
+  }
+
+  emitLevel(level: LiveAudioLevel): void {
+    for (const callback of this.levelCallbacks) {
+      callback(level)
     }
   }
 

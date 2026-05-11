@@ -24,6 +24,7 @@ vi.mock('react-i18next', () => ({
         ({
           'shell.navigation.label': 'Primary navigation',
           'shell.navigation.tasks': 'Tasks',
+          'shell.navigation.live': 'Live',
           'shell.navigation.history': 'History',
           'shell.navigation.models': 'Models',
           'shell.navigation.settings': 'Settings',
@@ -70,19 +71,27 @@ describe('AppSidebar', () => {
     expect(screen.getByText('v3.0')).toBeTruthy()
     expect(screen.getByRole('navigation', { name: 'Primary navigation' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Tasks' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('link', { name: 'Live' })).toHaveAttribute('href', '/live')
     expect(screen.getByRole('link', { name: 'History' })).toHaveAttribute('href', '/history')
     expect(screen.getByRole('link', { name: 'Models' })).toHaveAttribute('href', '/models')
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'Tasks',
+      'Live',
+      'History',
+      'Models',
+      'Settings',
+    ])
   })
 
   it('highlights the active destination from the current path', () => {
-    sidebarMocks.pathname = '/models/library'
+    sidebarMocks.pathname = '/live/session'
 
     render(<AppSidebar />)
 
-    expect(screen.getByRole('link', { name: 'Models' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('link', { name: 'Models' })).toHaveClass('bg-sidebar-accent')
-    expect(screen.getByRole('link', { name: 'Models' })).toHaveClass('font-semibold')
+    expect(screen.getByRole('link', { name: 'Live' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Live' })).toHaveClass('bg-sidebar-accent')
+    expect(screen.getByRole('link', { name: 'Live' })).toHaveClass('font-semibold')
   })
 
   it.each(['sm', 'md'] as const)(

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { BellDot } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { useUiPreferencesStore } from '@/app/locale/ui-preferences-store'
@@ -47,6 +47,7 @@ vi.mock('react-i18next', () => ({
         'settings.tabs.export': 'Export',
         'settings.tabs.modelStorage': 'Model Storage',
         'settings.tabs.systemInfo': 'System Info',
+        'components.workspaceSidePanel.close': 'Close panel',
       }
 
       return messages[key] ?? key
@@ -60,6 +61,7 @@ import { PageHeader } from '../PageHeader'
 import { SectionHeader } from '../SectionHeader'
 import { SettingsLayout } from '../SettingsLayout'
 import { TwoColumnLayout } from '../TwoColumnLayout'
+import { WorkspaceSidePanel } from '../WorkspaceSidePanel'
 
 describe('ContentCanvas', () => {
   it('renders the expected semantic wrapper and default canvas classes', () => {
@@ -147,6 +149,100 @@ describe('TwoColumnLayout', () => {
 
     expect(left).toHaveClass('lg:col-span-5')
     expect(right).toHaveClass('lg:col-span-7')
+  })
+})
+
+describe('WorkspaceSidePanel', () => {
+  function WorkspaceSidePanelHarness({ open = true }: { open?: boolean }) {
+    const [isOpen, setIsOpen] = useState(open)
+
+    return (
+      <div className="flex min-h-0">
+        <main>Main workspace</main>
+        <WorkspaceSidePanel
+          open={isOpen}
+          onOpenChange={setIsOpen}
+          title="Session settings"
+          description="Tune runtime parameters."
+          footer={<button type="button">Apply</button>}
+          className="side-panel-shell"
+          bodyClassName="side-panel-body"
+        >
+          <div>Runtime controls</div>
+        </WorkspaceSidePanel>
+      </div>
+    )
+  }
+
+  function WorkspaceSidePanelFocusHarness() {
+    const [isOpen, setIsOpen] = useState(false)
+
+    return (
+      <div className="flex min-h-0">
+        <button type="button" onClick={() => setIsOpen(true)}>
+          Open settings
+        </button>
+        <WorkspaceSidePanel
+          open={isOpen}
+          onOpenChange={setIsOpen}
+          title="Session settings"
+          description="Tune runtime parameters."
+        >
+          <button type="button">Runtime option</button>
+        </WorkspaceSidePanel>
+      </div>
+    )
+  }
+
+  it('renders inline panel content and keeps slot class names separate', () => {
+    render(<WorkspaceSidePanelHarness />)
+
+    const panel = screen.getByText('Session settings').closest('[data-slot="workspace-side-panel"]')
+    const body = screen
+      .getByText('Runtime controls')
+      .closest('[data-slot="workspace-side-panel-body"]')
+    const footer = screen
+      .getByRole('button', { name: 'Apply' })
+      .closest('[data-slot="workspace-side-panel-footer"]')
+
+    expect(panel).toHaveClass('side-panel-shell')
+    expect(panel).toHaveClass('h-full')
+    expect(body).toHaveClass('side-panel-body')
+    expect(body).toHaveClass('overflow-y-auto')
+    expect(footer).toHaveClass('shrink-0')
+    expect(body).not.toHaveClass('side-panel-shell')
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeTruthy()
+  })
+
+  it('closes through the standard close button without unmounting siblings', () => {
+    render(<WorkspaceSidePanelHarness />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close panel' }))
+
+    expect(screen.queryByText('Runtime controls')).toBeNull()
+    expect(screen.getByText('Main workspace')).toBeTruthy()
+  })
+
+  it('does not render when closed', () => {
+    render(<WorkspaceSidePanelHarness open={false} />)
+
+    expect(screen.queryByText('Runtime controls')).toBeNull()
+    expect(screen.getByText('Main workspace')).toBeTruthy()
+  })
+
+  it('moves focus into the panel and restores focus after Escape closes it', () => {
+    render(<WorkspaceSidePanelFocusHarness />)
+
+    const trigger = screen.getByRole('button', { name: 'Open settings' })
+    trigger.focus()
+    fireEvent.click(trigger)
+
+    expect(screen.getByRole('button', { name: 'Close panel' })).toHaveFocus()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByText('Runtime option')).toBeNull()
+    expect(trigger).toHaveFocus()
   })
 })
 

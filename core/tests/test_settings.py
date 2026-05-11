@@ -6,6 +6,14 @@ from pydantic import ValidationError
 from nola.config.settings import Settings
 
 
+def test_live_realtime_transcriber_defaults_to_whisper_streaming(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("NOLA_LIVE_REALTIME_TRANSCRIBER", raising=False)
+
+    assert Settings().live_realtime_transcriber == "whisper_streaming"
+
+
 def test_live_realtime_transcriber_accepts_supported_modes() -> None:
     mock_settings = Settings(live_realtime_transcriber="mock")
 

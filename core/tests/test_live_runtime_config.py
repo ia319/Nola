@@ -69,8 +69,9 @@ def test_build_live_runtime_config_merges_three_layers() -> None:
         language_hint="zh",
         runtime_overrides={
             "language": "en",
+            "device": "cuda",
+            "compute_type": "float16",
             "beam_size": 3,
-            "context_prompt": None,
             "vad_parameters": {"threshold": 0.6},
         },
         config_store=config_store,
@@ -83,14 +84,19 @@ def test_build_live_runtime_config_merges_three_layers() -> None:
     assert resolved.snapshot["schema_version"] == LIVE_RUNTIME_CONFIG_SCHEMA_VERSION
     assert resolved.snapshot["runtime"] == "whisper_streaming"
     assert resolved.snapshot["model_id"] == "small"
+    assert resolved.snapshot["execution"] == {
+        "device": "cuda",
+        "compute_type": "float16",
+    }
     assert resolved.snapshot["language"] == "en"
     assert resolved.snapshot["context_prompt"] is None
     assert resolved.snapshot["faster_whisper"]["beam_size"] == 3
     assert resolved.snapshot["vad"]["vad_parameters"]["threshold"] == 0.6
     assert resolved.snapshot["session_overrides"] == {
         "language": "en",
+        "device": "cuda",
+        "compute_type": "float16",
         "beam_size": 3,
-        "context_prompt": None,
         "vad_parameters": {"threshold": 0.6},
     }
 
@@ -110,6 +116,28 @@ def test_live_runtime_snapshot_does_not_drift_with_later_defaults() -> None:
     config_store.set_prefix("live_realtime.", {"beam_size": 1})
 
     assert resolved.snapshot["faster_whisper"]["beam_size"] == 4
+
+
+def test_live_runtime_config_uses_execution_overrides() -> None:
+    """Session execution overrides should enter the persisted runtime snapshot."""
+    resolved = build_live_runtime_config(
+        runtime_adapter="whisper_streaming",
+        request_model_id="small",
+        language_hint=None,
+        runtime_overrides={"device": "cpu", "compute_type": "int8"},
+        config_store=FakeConfigStore(),
+        model_storage=FakeModelStorage(),
+    )
+
+    assert resolved.snapshot["execution"] == {
+        "device": "cpu",
+        "compute_type": "int8",
+    }
+
+    snapshot = whisper_streaming_runtime_snapshot_from_live_snapshot(resolved.snapshot)
+
+    assert snapshot.device == "cpu"
+    assert snapshot.compute_type == "int8"
 
 
 def test_live_runtime_config_uses_configured_model_when_request_omits_model() -> None:

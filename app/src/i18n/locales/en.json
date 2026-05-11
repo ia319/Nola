@@ -228,10 +228,9 @@
       "field": {
         "language": "Language",
         "task": "Task",
-        "contextPrompt": "Context Prompt",
         "minChunkMs": "Minimum Chunk (ms)",
         "bufferTrimmingMs": "Buffer Trimming (ms)",
-        "promptMaxChars": "Prompt Window",
+        "promptMaxChars": "Context Window",
         "timestampToleranceMs": "Timestamp Tolerance (ms)",
         "maxDuplicateNgram": "Duplicate N-Gram Limit",
         "silenceRmsThreshold": "Silence RMS Threshold",
@@ -255,7 +254,6 @@
       "description": {
         "language": "Choose the language hint for new Live Realtime sessions.",
         "task": "Choose whether Live Realtime transcribes source audio or translates it to English.",
-        "contextPrompt": "Provide domain terms, names, or spelling hints for new Live Realtime sessions.",
         "minChunkMs": "Control the minimum audio window sent to the realtime transcriber.",
         "bufferTrimmingMs": "Control how much recent audio context remains in the streaming buffer.",
         "promptMaxChars": "Limit the text context carried forward between realtime decoding passes.",
@@ -591,14 +589,317 @@
     },
     "detailSheet": {
       "close": "Close"
+    },
+    "workspaceSidePanel": {
+      "close": "Close panel"
     }
   },
   "routes": {
     "loading": {
       "tasks": "Loading task workbench...",
+      "live": "Loading live workbench...",
       "history": "Loading history...",
       "models": "Loading models...",
       "settings": "Loading settings..."
+    }
+  },
+  "live": {
+    "workbench": {
+      "title": "Live",
+      "description": "Real-time transcription",
+      "sessionTitle": "Live transcription",
+      "actions": {
+        "start": "Start session",
+        "preparing": "Preparing capture...",
+        "starting": "Starting...",
+        "stop": "Stop session",
+        "stopping": "Stopping..."
+      },
+      "sources": {
+        "microphone": "Microphone",
+        "system": "System audio"
+      },
+      "runtime": {
+        "mock": "Mock",
+        "whisperStreaming": "WhisperStreaming"
+      },
+      "statusBar": {
+        "region": "Real-time transcription status",
+        "status": "Status",
+        "session": "Session",
+        "duration": "Duration",
+        "connection": "Connection",
+        "tracks": "Tracks",
+        "runtime": "Realtime engine",
+        "runState": {
+          "idle": "Idle",
+          "preparing": "Preparing capture",
+          "starting": "Starting",
+          "active": "Recording",
+          "finishing": "Stopping",
+          "finished": "Finished",
+          "failed": "Failed"
+        },
+        "connectionState": {
+          "idle": "Idle",
+          "connecting": "Connecting",
+          "ready": "Ready",
+          "streaming": "Streaming",
+          "finishing": "Finishing",
+          "closed": "Closed",
+          "failed": "Failed"
+        }
+      },
+      "sessionSetup": {
+        "title": "Session setup",
+        "loading": "Loading",
+        "unavailable": "Unavailable",
+        "settings": "Session settings",
+        "model": {
+          "label": "Model",
+          "loading": "Loading models",
+          "noDownloaded": "No downloaded models"
+        },
+        "task": {
+          "label": "Task"
+        },
+        "language": {
+          "label": "Language",
+          "auto": "Auto detect"
+        },
+        "sources": {
+          "level": "Level {{percent}}%"
+        },
+        "microphone": {
+          "title": "Microphone",
+          "description": "Enable this source for the next live session, then choose an input device and test the level.",
+          "toggle": "Use microphone",
+          "device": "Input device",
+          "defaultDevice": "System default",
+          "fallbackDevice": "Microphone {{index}}",
+          "loading": "Loading devices",
+          "noDevice": "No microphone available",
+          "actions": {
+            "test": "Test microphone",
+            "stop": "Stop test"
+          },
+          "status": {
+            "loading": "Loading devices",
+            "inventoryError": "Device inventory failed",
+            "permissionRequired": "Permission required",
+            "permissionDenied": "Permission denied",
+            "noDevice": "No microphone available",
+            "unsupported": "Microphone capture unsupported",
+            "notImplemented": "Desktop capture not implemented",
+            "ready": "Ready",
+            "starting": "Starting",
+            "capturing": "Capturing",
+            "paused": "Paused",
+            "stopping": "Stopping",
+            "stopped": "Stopped",
+            "failed": "Capture failed"
+          }
+        },
+        "systemAudio": {
+          "title": "System audio",
+          "description": "Enable this source for the next live session, then choose and test a browser capture source.",
+          "toggle": "Use system audio",
+          "captureSource": {
+            "label": "Capture source"
+          },
+          "actions": {
+            "start": "Choose source",
+            "test": "Test capture",
+            "stopTest": "Stop test",
+            "stop": "Stop capture"
+          },
+          "status": {
+            "loading": "Loading devices",
+            "inventoryError": "Device inventory failed",
+            "limited": "Browser capture available",
+            "unsupported": "System audio unsupported",
+            "notImplemented": "Desktop capture not implemented",
+            "ready": "Ready",
+            "starting": "Starting",
+            "capturing": "Capturing",
+            "paused": "Paused",
+            "stopping": "Stopping",
+            "stopped": "Stopped",
+            "permissionDenied": "Permission denied",
+            "trackMissing": "No audio track selected",
+            "failed": "Capture failed"
+          }
+        }
+      },
+      "settings": {
+        "title": "Runtime configuration",
+        "description": "Adjust runtime parameters for live transcription sessions.",
+        "loading": "Loading runtime parameters...",
+        "state": {
+          "idle": "Edit parameters before starting this session.",
+          "starting": "Session startup is locking runtime parameters.",
+          "active": "Session is running. Runtime parameters are read-only.",
+          "finishing": "Session shutdown is locking runtime parameters.",
+          "finished": "Session is finished. Runtime parameters are read-only.",
+          "failed": "Adjust parameters before retrying this session."
+        },
+        "actions": {
+          "apply": "Apply",
+          "resetDraft": "Reset draft",
+          "saveDefaults": "Save as defaults",
+          "savingDefaults": "Saving defaults...",
+          "resetSavedDefaults": "Reset saved defaults",
+          "resettingDefaults": "Resetting defaults...",
+          "retry": "Retry"
+        },
+        "toast": {
+          "defaultsSaved": "Live defaults saved",
+          "defaultsReset": "Live defaults reset",
+          "refreshWarning": "Defaults saved, but refresh failed"
+        },
+        "empty": {
+          "title": "No adjustable settings",
+          "description": "This session currently has no editable runtime settings."
+        },
+        "snapshot": {
+          "empty": {
+            "title": "Runtime snapshot unavailable",
+            "description": "The active session has not returned a resolved runtime snapshot yet."
+          }
+        }
+      },
+      "transcript": {
+        "title": "Live transcript",
+        "kind": {
+          "final": "Final",
+          "committed_partial": "Partial",
+          "preview": "Preview"
+        },
+        "actions": {
+          "expand": "Expand transcript area",
+          "restore": "Restore setup area"
+        },
+        "empty": {
+          "title": "No transcript yet",
+          "description": "Start a live session to stream transcript output here.",
+          "noModelTitle": "No downloaded model",
+          "noModelDescription": "Download a local model before starting a live transcription session.",
+          "configuredModelUnavailableTitle": "Default model unavailable",
+          "configuredModelUnavailableDescription": "The configured default model is not downloaded. The live session will use the selected downloaded model."
+        }
+      },
+      "compact": {
+        "title": "Compact live view",
+        "open": "Open compact view",
+        "expand": "Expand compact view",
+        "close": "Close compact view",
+        "empty": "No live transcript yet",
+        "unsupported": {
+          "title": "Small window unavailable",
+          "description": "The current browser does not support Document Picture-in-Picture. Use a supported browser or the desktop app."
+        },
+        "desktopUnavailable": {
+          "title": "Desktop small window unavailable",
+          "description": "This build does not include the desktop window adapter yet."
+        },
+        "openFailed": {
+          "title": "Small window failed to open",
+          "description": "The browser blocked the small window request. Try again from the compact view button."
+        }
+      },
+      "errors": {
+        "actions": {
+          "retry": "Retry"
+        },
+        "generic": {
+          "title": "Live session failed",
+          "description": "The live session stopped unexpectedly. Check the selected model and audio sources, then try again."
+        },
+        "liveSourceRequired": {
+          "title": "No audio source selected",
+          "description": "Enable at least one audio source before starting a live session."
+        },
+        "runtimeModelNotConfigured": {
+          "title": "No model selected",
+          "description": "Select a downloaded model before starting a live session."
+        },
+        "runtimeModelNotRegistered": {
+          "title": "Selected model is unavailable",
+          "description": "Choose a model that is still registered and downloaded locally."
+        },
+        "runtimeModelNotDownloaded": {
+          "title": "No downloaded model",
+          "description": "Download a local model before starting a live transcription session."
+        },
+        "runtimeConfigInvalid": {
+          "title": "Runtime settings unavailable",
+          "description": "Refresh the Live realtime settings and try again."
+        },
+        "microphonePermissionRequired": {
+          "title": "Microphone permission required",
+          "description": "Allow microphone access in the browser, then start the session again."
+        },
+        "microphonePermissionDenied": {
+          "title": "Microphone permission denied",
+          "description": "Enable microphone permission for this site in the browser settings."
+        },
+        "microphoneCaptureUnsupported": {
+          "title": "Microphone capture unsupported",
+          "description": "The current environment cannot capture microphone audio."
+        },
+        "microphoneCaptureFailed": {
+          "title": "Microphone capture failed",
+          "description": "Check the selected input device and try again."
+        },
+        "systemAudioUnsupported": {
+          "title": "System audio unsupported",
+          "description": "The current environment cannot capture system audio."
+        },
+        "systemAudioPermissionDenied": {
+          "title": "System audio permission denied",
+          "description": "Start browser capture again and choose a source that includes audio."
+        },
+        "systemAudioTrackMissing": {
+          "title": "No system audio track",
+          "description": "Choose a browser capture source that exposes audio."
+        },
+        "systemAudioCaptureFailed": {
+          "title": "System audio capture failed",
+          "description": "Start browser system-audio capture again."
+        },
+        "websocketUnavailable": {
+          "title": "Realtime connection unavailable",
+          "description": "This browser runtime cannot open the realtime connection."
+        },
+        "websocketConnectFailed": {
+          "title": "Realtime connection failed",
+          "description": "Check that the backend is running and try again."
+        },
+        "websocketClosed": {
+          "title": "Realtime connection closed",
+          "description": "The realtime connection closed before the session finished."
+        },
+        "trackReadyTimeout": {
+          "title": "Audio track did not start",
+          "description": "The backend did not confirm the audio track in time."
+        },
+        "sessionFinishTimeout": {
+          "title": "Session finish timed out",
+          "description": "The backend did not confirm session finish in time."
+        },
+        "sessionStartFailed": {
+          "title": "Session failed to start",
+          "description": "The live session could not start. Review the model and audio source settings."
+        },
+        "sessionStopFailed": {
+          "title": "Session failed to stop",
+          "description": "The live session could not stop cleanly. Check the connection state."
+        },
+        "sessionStateInvalid": {
+          "title": "Session state changed",
+          "description": "The requested action no longer matches the current live session state."
+        }
+      }
     }
   },
   "error": {
@@ -820,6 +1121,7 @@
     "navigation": {
       "label": "Primary navigation",
       "tasks": "Tasks",
+      "live": "Live",
       "history": "History",
       "models": "Models",
       "settings": "Settings"

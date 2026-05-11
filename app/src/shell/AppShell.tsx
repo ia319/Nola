@@ -51,13 +51,16 @@ export function AppShell({ settingsTabs }: AppShellProps = {}) {
   )
 
   return (
-    <div data-slot="app-shell" className="bg-background text-foreground min-h-screen">
+    <div
+      data-slot="app-shell"
+      className="bg-background text-foreground h-dvh min-h-dvh overflow-hidden"
+    >
       <AppLocaleController />
       <ActivityDataBridge />
       <AppSidebar />
       <div
         data-slot="app-shell-workspace"
-        className="flex min-h-screen min-w-0 flex-col lg:ml-[var(--sidebar-width)]"
+        className="flex h-dvh min-h-0 min-w-0 flex-col overflow-hidden lg:ml-[var(--sidebar-width)]"
       >
         <AppTopBar
           activityCount={activityCount}

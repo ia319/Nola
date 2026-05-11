@@ -2,7 +2,10 @@ import { createLiveSession as defaultCreateLiveSession } from '../api'
 import type { LiveAudioCaptureRepository } from '../capture/audio-capture-repository'
 import { createAudioCaptureRepository } from '../capture/audio-capture-repository'
 import { LiveCaptureError } from '../capture/errors'
+import { isReusableLiveCaptureSession } from '../capture/session-utils'
 import type {
+  LiveCaptureErrorCode,
+  LiveCaptureStateChange,
   LiveAudioSourceKind,
   LiveCaptureSession,
   LiveMicrophoneCaptureOptions,
@@ -29,6 +32,7 @@ import {
   type LiveRealtimeRuntimeError,
   type LiveRealtimeRuntimeErrorCode,
 } from '../store/live-realtime-store'
+import { useLiveDeviceStore } from '../store/live-device-store'
 import type { CreateLiveSessionRequest, LiveSessionDetail, LiveTrack } from '@/shared/types'
 
 const DEFAULT_SOURCES: LiveAudioSourceKind[] = ['microphone']
@@ -55,11 +59,18 @@ export interface LiveRealtimeSessionStartOptions {
   title?: string | null
   languageHint?: string | null
   modelId?: string | null
+  runtimeOverrides?: CreateLiveSessionRequest['runtime_overrides']
   sources?: LiveAudioSourceKind[]
   microphoneCapture?: LiveMicrophoneCaptureOptions
   systemAudioCapture?: LiveSystemAudioCaptureOptions
+  captureSessions?: Partial<Record<LiveAudioSourceKind, LiveCaptureSession>>
   connect?: LiveRealtimeConnectOptions
   diagnosticsWav?: LiveRealtimeDiagnosticsWavStartOptions | true
+}
+
+interface ActiveCaptureSession {
+  session: LiveCaptureSession
+  ownedByService: boolean
 }
 
 export class LiveRealtimeSessionError extends Error implements LiveRealtimeRuntimeError {
@@ -84,7 +95,7 @@ export class LiveRealtimeSessionService {
   private readonly createCaptureRepository: CreateAudioCaptureRepositoryFunction
   private readonly trackReadyTimeoutMs: LiveDurationMs
   private readonly sessionFinishTimeoutMs: LiveDurationMs
-  private readonly captureSessions = new Map<LiveAudioSourceKind, LiveCaptureSession>()
+  private readonly captureSessions = new Map<LiveAudioSourceKind, ActiveCaptureSession>()
   private readonly tracksBySource = new Map<LiveAudioSourceKind, LiveTrack>()
   private readonly captureUnsubscribers: LiveUnsubscribe[] = []
   private readonly transportUnsubscribers: LiveUnsubscribe[] = []
@@ -224,8 +235,12 @@ export class LiveRealtimeSessionService {
     transport: LiveRealtimeTransport,
     options: LiveRealtimeSessionStartOptions,
   ): Promise<void> {
-    const captureSession = await this.startCaptureSession(source, captureRepository, options)
-    this.captureSessions.set(source, captureSession)
+    const activeCapture = await this.startCaptureSession(source, captureRepository, options)
+    const { session: captureSession } = activeCapture
+    this.captureSessions.set(source, activeCapture)
+    if (activeCapture.ownedByService) {
+      this.bindCaptureSessionToDeviceStore(captureSession)
+    }
     this.captureUnsubscribers.push(
       captureSession.onStateChange((change) => {
         if (change.state === 'failed') {
@@ -260,16 +275,101 @@ export class LiveRealtimeSessionService {
     )
   }
 
-  private startCaptureSession(
+  private async startCaptureSession(
     source: LiveAudioSourceKind,
     captureRepository: LiveAudioCaptureRepository,
     options: LiveRealtimeSessionStartOptions,
-  ): Promise<LiveCaptureSession> {
-    if (source === 'microphone') {
-      return captureRepository.startMicrophoneCapture(options.microphoneCapture)
+  ): Promise<ActiveCaptureSession> {
+    const reusableSession = options.captureSessions?.[source]
+    if (isReusableLiveCaptureSession(reusableSession, source)) {
+      return Promise.resolve({ session: reusableSession, ownedByService: false })
     }
 
-    return captureRepository.startSystemAudioCapture(options.systemAudioCapture)
+    this.setDeviceStoreCaptureStarting(source, options)
+
+    try {
+      if (source === 'microphone') {
+        return {
+          session: await captureRepository.startMicrophoneCapture(options.microphoneCapture),
+          ownedByService: true,
+        }
+      }
+
+      return {
+        session: await captureRepository.startSystemAudioCapture(options.systemAudioCapture),
+        ownedByService: true,
+      }
+    } catch (error) {
+      this.setDeviceStoreCaptureFailure(source, error)
+      throw error
+    }
+  }
+
+  private bindCaptureSessionToDeviceStore(captureSession: LiveCaptureSession): void {
+    const store = useLiveDeviceStore.getState()
+    const snapshot = {
+      sessionId: captureSession.id,
+      deviceId: captureSession.deviceId,
+      startedAt: captureSession.startedAt,
+    }
+
+    if (captureSession.sourceKind === 'microphone') {
+      store.setMicrophoneCaptureSession(snapshot)
+      this.captureUnsubscribers.push(
+        captureSession.onLevel((level) => {
+          useLiveDeviceStore.getState().setMicrophoneLevel(level)
+        }),
+        captureSession.onStateChange((change) => {
+          useLiveDeviceStore.getState().setMicrophoneCaptureState(change)
+        }),
+      )
+      return
+    }
+
+    store.setSystemAudioCaptureSession(snapshot)
+    this.captureUnsubscribers.push(
+      captureSession.onLevel((level) => {
+        useLiveDeviceStore.getState().setSystemAudioLevel(level)
+      }),
+      captureSession.onStateChange((change) => {
+        useLiveDeviceStore.getState().setSystemAudioCaptureState(change)
+      }),
+    )
+  }
+
+  private setDeviceStoreCaptureStarting(
+    source: LiveAudioSourceKind,
+    options: LiveRealtimeSessionStartOptions,
+  ): void {
+    const store = useLiveDeviceStore.getState()
+    if (source === 'microphone') {
+      store.setMicrophoneCaptureStarting(options.microphoneCapture?.deviceId ?? null)
+      return
+    }
+
+    store.setSystemAudioCaptureStarting()
+  }
+
+  private setDeviceStoreCaptureFailure(source: LiveAudioSourceKind, error: unknown): void {
+    const store = useLiveDeviceStore.getState()
+    const errorCode = getCaptureErrorCode(error, source)
+    if (source === 'microphone') {
+      store.setMicrophoneCaptureFailure(errorCode)
+      return
+    }
+
+    store.setSystemAudioCaptureFailure(errorCode)
+  }
+
+  private setDeviceStoreCaptureStopped(session: LiveCaptureSession): void {
+    const store = useLiveDeviceStore.getState()
+    const change = createStoppedCaptureStateChange()
+    if (session.sourceKind === 'microphone') {
+      store.setMicrophoneCaptureState(change)
+      return
+    }
+
+    store.setSystemAudioCaptureState(change)
   }
 
   private sendCaptureFrame(frame: RealtimeAudioFrame): void {
@@ -508,9 +608,12 @@ export class LiveRealtimeSessionService {
     this.captureSessions.clear()
 
     let firstError: unknown = null
-    for (const session of sessions) {
+    for (const { session, ownedByService } of sessions) {
+      if (!ownedByService) continue
+
       try {
         await session.stop()
+        this.setDeviceStoreCaptureStopped(session)
       } catch (error) {
         firstError ??= error
       }
@@ -592,6 +695,14 @@ export class LiveRealtimeSessionService {
   }
 }
 
+function createStoppedCaptureStateChange(): LiveCaptureStateChange {
+  return {
+    state: 'stopped',
+    changedAt: Date.now(),
+    errorCode: null,
+  }
+}
+
 export function createLiveRealtimeSessionService(
   dependencies?: LiveRealtimeSessionServiceDependencies,
 ): LiveRealtimeSessionService {
@@ -614,6 +725,9 @@ function buildCreateLiveSessionPayload(
   if (options.modelId !== undefined) {
     payload.model_id = options.modelId
   }
+  if (options.runtimeOverrides !== undefined) {
+    payload.runtime_overrides = options.runtimeOverrides
+  }
 
   return payload
 }
@@ -635,8 +749,12 @@ function getTrackLabel(source: LiveAudioSourceKind): string {
   return source === 'microphone' ? 'Microphone' : 'System audio'
 }
 
-function fallbackCaptureErrorCode(source: LiveAudioSourceKind): LiveRealtimeRuntimeErrorCode {
+function fallbackCaptureErrorCode(source: LiveAudioSourceKind): LiveCaptureErrorCode {
   return source === 'microphone' ? 'microphone_capture_failed' : 'system_audio_capture_failed'
+}
+
+function getCaptureErrorCode(error: unknown, source: LiveAudioSourceKind): LiveCaptureErrorCode {
+  return error instanceof LiveCaptureError ? error.code : fallbackCaptureErrorCode(source)
 }
 
 function toRuntimeError(error: LiveRealtimeRuntimeError): LiveRealtimeRuntimeError {

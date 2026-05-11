@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from nola.config.constants import ALLOWED_AUDIO_TYPES, ALLOWED_EXTENSIONS
+from nola.config.live_realtime import LiveRealtimeAdapter
 from nola.config.settings import settings
 from nola.config.transcription.languages import LanguageOptionSchema
 from nola.config.transcription.schema.models import OptionGroupSchema
@@ -44,6 +45,13 @@ class ModelConfigResponse(BaseModel):
     last_loaded_device: EngineDevice | None = None
     last_loaded_compute_type: EngineComputeType | None = None
     restart_required: bool = False
+
+
+class LiveRealtimeConfigResponse(BaseModel):
+    """Expose the active Live realtime runtime mode."""
+
+    runtime_adapter: LiveRealtimeAdapter
+    supports_runtime_overrides: bool
 
 
 class VadParametersDefaultsResponse(BaseModel):
@@ -113,6 +121,7 @@ class AppConfigResponse(BaseModel):
     """Aggregate application configuration required by the frontend."""
 
     engine: EngineConfigResponse
+    live_realtime: LiveRealtimeConfigResponse
     transcription: TranscriptionConfigResponse
     file: FileConfigResponse
     effective_languages: list[LanguageOptionSchema]
@@ -146,6 +155,7 @@ __all__ = [
     "EngineConfigResponse",
     "EngineDefaultsResponse",
     "FileConfigResponse",
+    "LiveRealtimeConfigResponse",
     "ModelConfigResponse",
     "TranscriptionConfigResponse",
     "TranscriptionDefaultsPatchResponse",

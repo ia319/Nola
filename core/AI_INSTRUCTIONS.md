@@ -308,7 +308,7 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - `nola/api/routes/models.py` + `nola/api/schemas/models.py`: Model management and runtime download APIs.
 - `nola/config/transcription/schema/`: Config-driven option schema for frontend controls and validation boundaries.
 - `nola/config/export/`: Export defaults, export format contracts, and filename helpers.
-- `nola/config/live_realtime/`: Live realtime built-in defaults, persisted override resolution, adapter support metadata, and Settings schema.
+- `nola/config/live_realtime/`: Live realtime built-in defaults, persisted override resolution, adapter support metadata, and Settings schema without static prompt controls.
 - `nola/config/session/`: Workbench session defaults for execution and transcription.
 - `nola/config/session/schema.py`: Execution option schema metadata for frontend device and compute-type controls.
 - `nola/application/files/`: File upload, list, integrity, cleanup, single-delete, and batch-delete use-cases.
@@ -373,7 +373,7 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - Persist the resolved Live realtime `runtime_config` snapshot when creating a session; make WebSocket runtime use the session snapshot, not current defaults.
 - Return a stable runtime config error for an active Live session with no snapshot; do not reconstruct history from current defaults.
 - Ignore persisted `live_realtime.*` defaults in `mock` mode; reject only explicit per-session runtime overrides for mock sessions.
-- Expose `context_prompt` as the user-facing prompt context; keep lower-level `initial_prompt` internal to WhisperStreaming prompt composition.
+- Keep static prompt context out of Live realtime schema, frontend controls, and per-session overrides. Treat compatibility `context_prompt` values as ignored inputs.
 - Keep `word_timestamps=True`, local model path loading, `local_files_only`, and the PCM16LE 16 kHz mono contract non-configurable from clients.
 - Normalize blank Live realtime `language` values to `None` before inference.
 - Keep WhisperStreaming runtime code in `nola/application/live/realtime/whisper_streaming`. Do not move Live runtime ownership into `nola/engines` or `nola/services`.
@@ -381,6 +381,8 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - Use settings-backed `EngineConfig` values for current Live WhisperStreaming device and compute-type defaults. Do not silently reuse Workbench Session defaults for Live.
 - Offload Live transcriber factory creation from the WebSocket route through a threadpool because WhisperStreaming mode may load a model.
 - Close flushed WhisperStreaming processors when a track is removed or all tracks are flushed; keep adapter `release()` idempotent.
+- Keep WhisperStreaming boundary confirmation track-scoped and processor-local. Do not add process-wide transcript memory or cross-track anchor state.
+- Skip silent WhisperStreaming inference windows only when no speech or pending transcript exists.
 - Treat the in-memory Live stream connection registry as single-process coordination only. Use distributed coordination before running multiple API workers for Live WebSockets.
 - Keep Live timestamps timezone-aware UTC ISO strings.
 - Keep Live session list and detail segment reads paginated; reject invalid `limit`/`offset` values before repository calls.
@@ -516,11 +518,11 @@ Application-layer orchestration:
 - `live/realtime/connection_registry.py`: Prevent concurrent writers for one Live session inside one API worker process.
 - `live/realtime/errors.py`: Define realtime runtime errors for route mapping.
 - `live/realtime/whisper_streaming/adapter.py`: Map Live waveform frames to track-scoped WhisperStreaming processors and Live transcriber results.
-- `live/realtime/whisper_streaming/backend.py`: Adapt faster-whisper inference output into timestamped words and segment boundaries for online processing.
-- `live/realtime/whisper_streaming/config.py`: Validate WhisperStreaming runtime snapshots for chunking, prompt length, trimming, decoding, VAD pass-through, silence close, context reset, and blank-language normalization.
+- `live/realtime/whisper_streaming/backend.py`: Adapt faster-whisper inference output into timestamped words and segment boundaries using dynamic WhisperStreaming prompt history only.
+- `live/realtime/whisper_streaming/config.py`: Validate WhisperStreaming runtime snapshots for chunking, dynamic prompt length, trimming, decoding, VAD pass-through, silence close, context reset, and blank-language normalization.
 - `live/realtime/whisper_streaming/hypothesis.py`: Maintain LocalAgreement hypothesis state and upstream-compatible duplicate handling.
 - `live/realtime/whisper_streaming/loader.py`: Resolve configured model id, model directory, cache state, and Live backend creation without using the offline worker.
-- `live/realtime/whisper_streaming/processor.py`: Manage one track's audio buffer, prompt/context split, LocalAgreement processing, segment trimming, final close, and context reset.
+- `live/realtime/whisper_streaming/processor.py`: Manage one track's audio buffer, prompt/context split, LocalAgreement processing, boundary confirmation, segment trimming, final close, and context reset.
 - `live/realtime/whisper_streaming/silence.py`: Track silence decisions for segment close and context reset without altering audio samples.
 - `live/realtime/whisper_streaming/types.py`: Keep internal word, chunk, processor update, model output, and backend contracts.
 - `models/contracts.py`: Protocol contracts for model registry, storage, downloader, config store, and operation locks.
@@ -615,7 +617,7 @@ Configuration and constants:
 - `settings.py`: Pydantic Settings (data_dir, exports_dir, max_file_size, model defaults, Live realtime transcriber mode, host/port)
 - `constants.py`: Validation constants (MIME/extension allowlists, language set, batch limits via `MAX_BATCH_TASK_IDS`)
 - `common/`: Shared config patch helper and config value types
-- `live_realtime/`: Resolve Live realtime built-in/effective defaults, supported adapter metadata, schema-driven field groups, and `live_realtime.` prefix behavior.
+- `live_realtime/`: Resolve Live realtime built-in/effective defaults, supported adapter metadata, schema-driven field groups, and `live_realtime.` prefix behavior without exposing static prompt controls.
 - `transcription/contracts.py`: Keep shared option keys/contracts for API validators and schema assembly.
 - `transcription/schema/models.py`: Keep field/group schema models; enforce numeric invariants (`min <= max`, `step > 0`) and select option-source one-of rules.
 - `transcription/schema/registry.py`: Build transcription schema registry and grouped response view.
@@ -680,10 +682,12 @@ Keep Live realtime defaults under `live_realtime.`; do not mix them with Workben
 Persist resolved Live realtime snapshots on session creation and use those snapshots for WebSocket runtime construction.
 Reject active Live sessions without runtime snapshots with a stable config error; do not rebuild missing snapshots from current defaults.
 Keep `mock` runtime independent from persisted Live realtime defaults; reject only explicit per-session runtime overrides in mock mode.
-Expose user prompt context as `context_prompt`; keep faster-whisper `initial_prompt` internal and composed with dynamic WhisperStreaming context.
+Keep static user prompt context out of Live realtime schemas and runtime overrides; keep faster-whisper `initial_prompt` internal and composed from dynamic WhisperStreaming context only.
 Keep `word_timestamps`, audio contract fields, model paths, cache roots, arbitrary Hugging Face ids, and `local_files_only` unavailable to frontend overrides.
 Normalize blank Live realtime `language` values to `None` before calling faster-whisper.
 Keep WhisperStreaming processor state track-scoped. Do not share hypothesis buffers, audio buffers, or silence state across microphone and system tracks.
+Keep WhisperStreaming boundary confirmation track-scoped and processor-local. Do not add process-wide transcript memory or cross-track anchor state.
+Skip silent WhisperStreaming inference windows only when no speech or pending transcript exists.
 Keep WhisperStreaming model ownership connection-local through one transcriber instance. Do not add a process-wide model pool without explicit ref-count and release design.
 Keep Live WhisperStreaming loader/backend independent from `FasterWhisperEngine`, `worker.py`, and `worker_engine.py`; share only neutral faster-whisper lifecycle helpers.
 
