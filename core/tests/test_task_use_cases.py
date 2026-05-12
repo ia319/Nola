@@ -55,6 +55,7 @@ class FakeTaskStore:
         engine_device: str | None = None,
         engine_compute_type: str | None = None,
         runtime_config: dict[str, object] | None = None,
+        request_overrides: dict[str, object] | None = None,
     ) -> None:
         task = {
             "id": task_id,
@@ -68,6 +69,7 @@ class FakeTaskStore:
             "completed_at": None,
             "options": options,
             "runtime_config": runtime_config,
+            "request_overrides": request_overrides,
         }
         self.tasks[task_id] = task
         self.enqueued.append(
@@ -81,6 +83,7 @@ class FakeTaskStore:
                 "engine_device": engine_device,
                 "engine_compute_type": engine_compute_type,
                 "runtime_config": runtime_config,
+                "request_overrides": request_overrides,
             }
         )
 
@@ -113,6 +116,7 @@ class FailingEnqueueTaskStore(FakeTaskStore):
         engine_device: str | None = None,
         engine_compute_type: str | None = None,
         runtime_config: dict[str, object] | None = None,
+        request_overrides: dict[str, object] | None = None,
     ) -> None:
         if task_id in self.fail_enqueue_task_ids:
             raise RuntimeError("sqlite busy")
@@ -126,6 +130,7 @@ class FailingEnqueueTaskStore(FakeTaskStore):
             engine_device=engine_device,
             engine_compute_type=engine_compute_type,
             runtime_config=runtime_config,
+            request_overrides=request_overrides,
         )
 
 
@@ -142,6 +147,7 @@ def _base_task(*, task_id: str, file_id: str, status: str) -> dict[str, object]:
         "completed_at": None,
         "options": None,
         "runtime_config": None,
+        "request_overrides": None,
     }
 
 
@@ -235,6 +241,12 @@ def test_create_task_persists_execution_config() -> None:
             "transcription_options": {"language": "en"},
             "request_options": {"language": "en"},
         },
+        request_overrides={
+            "schema_version": 1,
+            "model_id": "small",
+            "engine": {"device": "cpu", "compute_type": "default"},
+            "transcription_options": {"language": "en"},
+        },
         task_id_factory=lambda: "task-001",
     )
 
@@ -257,6 +269,12 @@ def test_create_task_persists_execution_config() -> None:
                 "engine_compute_type": "default",
                 "transcription_options": {"language": "en"},
                 "request_options": {"language": "en"},
+            },
+            "request_overrides": {
+                "schema_version": 1,
+                "model_id": "small",
+                "engine": {"device": "cpu", "compute_type": "default"},
+                "transcription_options": {"language": "en"},
             },
         }
     ]
@@ -284,6 +302,12 @@ def test_batch_retry_tasks_returns_mixed_outcomes() -> None:
                     "engine_compute_type": "float16",
                     "transcription_options": {"language": "zh"},
                     "request_options": {"language": "zh"},
+                },
+                "request_overrides": {
+                    "schema_version": 1,
+                    "model_id": "small",
+                    "engine": {"device": "cuda", "compute_type": "float16"},
+                    "transcription_options": {"language": "zh"},
                 },
             },
             "pending": _base_task(task_id="pending", file_id="f2", status="pending"),
@@ -324,6 +348,12 @@ def test_batch_retry_tasks_returns_mixed_outcomes() -> None:
         "engine_compute_type": "float16",
         "transcription_options": {"language": "zh"},
         "request_options": {"language": "zh"},
+    }
+    assert task_store.enqueued[0]["request_overrides"] == {
+        "schema_version": 1,
+        "model_id": "small",
+        "engine": {"device": "cuda", "compute_type": "float16"},
+        "transcription_options": {"language": "zh"},
     }
     assert results[1]["error_code"] == "file_missing"
     assert results[2]["error_code"] == "invalid_status"

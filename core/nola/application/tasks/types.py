@@ -55,6 +55,7 @@ class TaskDetailPayload(TaskSummaryPayload):
     duration: float | None
     segments: list[TaskSegment] | None
     error: str | None
+    request_overrides: TaskRequestOverrides | None
     runtime_config: TaskRuntimeConfig | None
 
 
