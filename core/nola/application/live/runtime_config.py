@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from nola.application.live.errors import LiveUseCaseError
 from nola.application.live.types import (
     LiveRealtimeRuntimeOverrides,
+    LiveRequestOverrides,
     LiveRuntimeConfig,
 )
 from nola.common.merge import deep_merge
@@ -31,6 +32,7 @@ from nola.model_hub import ModelInfo, UnknownModelError, require_model
 from nola.model_hub.contracts import ModelCacheState
 
 LIVE_RUNTIME_CONFIG_SCHEMA_VERSION = 1
+LIVE_REQUEST_OVERRIDES_SCHEMA_VERSION = 1
 LiveRealtimeAudioFormat: TypeAlias = Literal["pcm_s16le_16khz_mono"]
 LIVE_REALTIME_AUDIO_FORMAT: LiveRealtimeAudioFormat = "pcm_s16le_16khz_mono"
 _MODEL_CONFIG_PREFIX = "model."
@@ -222,6 +224,25 @@ def _build_session_overrides(
     )
 
 
+def build_live_request_overrides(
+    *,
+    model_id: str | None,
+    language_hint: str | None,
+    runtime_overrides: LiveRealtimeRuntimeOverrides | None,
+) -> LiveRequestOverrides | None:
+    """Build a snapshot of user-provided Live session override parameters."""
+    request_overrides: LiveRequestOverrides = {
+        "schema_version": LIVE_REQUEST_OVERRIDES_SCHEMA_VERSION
+    }
+    if model_id is not None and model_id.strip():
+        request_overrides["model_id"] = model_id.strip()
+    if language_hint is not None and language_hint.strip():
+        request_overrides["language_hint"] = language_hint.strip().lower()
+    if runtime_overrides:
+        request_overrides["runtime_overrides"] = runtime_overrides
+    return request_overrides if len(request_overrides) > 1 else None
+
+
 def _resolve_engine_device(value: object) -> EngineDevice:
     if isinstance(value, str) and value in ALLOWED_ENGINE_DEVICES:
         return cast(EngineDevice, value)
@@ -396,10 +417,12 @@ def build_live_runtime_config(
 
 __all__ = [
     "LIVE_REALTIME_AUDIO_FORMAT",
+    "LIVE_REQUEST_OVERRIDES_SCHEMA_VERSION",
     "LIVE_RUNTIME_CONFIG_SCHEMA_VERSION",
     "LiveRealtimeAudioFormat",
     "ResolvedLiveRuntimeConfig",
     "SupportsLiveRuntimeConfigRead",
     "SupportsLiveRuntimeModelStorage",
+    "build_live_request_overrides",
     "build_live_runtime_config",
 ]

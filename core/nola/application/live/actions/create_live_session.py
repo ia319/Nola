@@ -14,6 +14,7 @@ from nola.application.live.runtime_config import (
 from nola.application.live.types import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
     LiveRealtimeRuntimeOverrides,
+    LiveRequestOverrides,
     LiveRuntimeConfig,
     LiveSessionMode,
     LiveSessionPayload,
@@ -45,6 +46,7 @@ def create_live_session(
     language_hint: str | None,
     model_id: str | None,
     runtime_overrides: LiveRealtimeRuntimeOverrides | None = None,
+    request_overrides: LiveRequestOverrides | None = None,
     runtime_config: LiveRuntimeConfig | None = None,
     runtime_adapter: LiveRealtimeAdapter = "mock",
     config_store: SupportsLiveRuntimeConfigRead | None = None,
@@ -85,6 +87,7 @@ def create_live_session(
         runtime=resolved_runtime.runtime if resolved_runtime else None,
         audio_format=resolved_runtime.audio_format if resolved_runtime else None,
         runtime_config=runtime_config,
+        request_overrides=request_overrides,
         started_at=now,
         created_at=now,
         updated_at=now,

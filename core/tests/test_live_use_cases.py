@@ -6,7 +6,9 @@ from typing import cast
 import pytest
 
 from nola.application.live import (
+    batch_delete_live_session_records,
     create_live_session,
+    delete_live_session_record,
     fail_live_session,
     finish_live_session,
     get_live_session,
@@ -21,7 +23,9 @@ from nola.application.live.types import (
     LiveSegmentRecord,
     LiveSessionMode,
     LiveSessionRecord,
+    LiveSessionSortBy,
     LiveSessionStatus,
+    LiveSortOrder,
     LiveTrackRecord,
     LiveTrackSource,
 )
@@ -51,6 +55,7 @@ class FakeLiveStore:
         runtime: str | None,
         audio_format: str | None,
         runtime_config: dict[str, object] | None = None,
+        request_overrides: dict[str, object] | None = None,
         started_at: str,
         created_at: str,
         updated_at: str,
@@ -65,6 +70,7 @@ class FakeLiveStore:
             "runtime": runtime,
             "audio_format": audio_format,
             "runtime_config": runtime_config,
+            "request_overrides": request_overrides,
             "started_at": started_at,
             "ended_at": None,
             "error": None,
@@ -80,17 +86,44 @@ class FakeLiveStore:
         return session.copy() if session else None
 
     def list_sessions(
-        self, limit: int = DEFAULT_LIVE_SESSION_LIMIT, offset: int = 0
+        self,
+        limit: int = DEFAULT_LIVE_SESSION_LIMIT,
+        offset: int = 0,
+        *,
+        q: str | None = None,
+        status: LiveSessionStatus | None = None,
+        sort_by: LiveSessionSortBy = "started_at",
+        order: LiveSortOrder = "desc",
     ) -> list[LiveSessionRecord]:
+        sessions = list(self.sessions.values())
+        if q:
+            query = q.casefold()
+            sessions = [
+                session
+                for session in sessions
+                if query in session["id"].casefold()
+                or query in (session["title"] or "").casefold()
+            ]
+        if status is not None:
+            sessions = [session for session in sessions if session["status"] == status]
+        reverse = order == "desc"
         sessions = sorted(
-            self.sessions.values(),
-            key=lambda session: (session["started_at"], session["id"]),
-            reverse=True,
+            sessions,
+            key=lambda session: (
+                session[sort_by] or "",
+                session["id"],
+            ),
+            reverse=reverse,
         )
         return [session.copy() for session in sessions[offset : offset + limit]]
 
-    def count_sessions(self) -> int:
-        return len(self.sessions)
+    def count_sessions(
+        self,
+        *,
+        q: str | None = None,
+        status: LiveSessionStatus | None = None,
+    ) -> int:
+        return len(self.list_sessions(limit=len(self.sessions), q=q, status=status))
 
     def finish_session(
         self,
@@ -124,6 +157,15 @@ class FakeLiveStore:
         session["ended_at"] = ended_at
         session["updated_at"] = updated_at
         return dict(session)  # type: ignore[return-value]
+
+    def delete_session_record(self, session_id: str) -> bool:
+        session = self.sessions.get(session_id)
+        if session is None or session["status"] not in {"finished", "failed"}:
+            return False
+        self.sessions.pop(session_id)
+        self.tracks.pop(session_id, None)
+        self.segments.pop(session_id, None)
+        return True
 
     def create_track(
         self,
@@ -220,6 +262,14 @@ class FakeLiveStore:
     def count_segments(self, session_id: str) -> int:
         return len(self.segments.get(session_id, []))
 
+    def list_final_segments(self, session_id: str) -> list[LiveSegmentRecord]:
+        segment_limit = len(self.segments.get(session_id, []))
+        return [
+            segment.copy()
+            for segment in self.list_segments(session_id, limit=segment_limit)
+            if segment["is_final"]
+        ]
+
 
 class FakeConfigStore:
     """In-memory config store for Live runtime use-case tests."""
@@ -257,6 +307,7 @@ def _session(
         "runtime": None,
         "audio_format": None,
         "runtime_config": None,
+        "request_overrides": None,
         "started_at": started_at,
         "ended_at": "2026-01-01T00:10:00" if status != "active" else None,
         "error": "failed" if status == "failed" else None,
@@ -295,6 +346,36 @@ def test_create_live_session_returns_active_payload() -> None:
     assert live_store.created_sessions[0]["runtime_config"] == {
         "schema_version": 1,
         "runtime": "mock",
+    }
+
+
+def test_create_live_session_preserves_request_overrides() -> None:
+    live_store = FakeLiveStore()
+
+    payload = create_live_session(
+        live_store=live_store,
+        title="Planning",
+        mode="streaming",
+        language_hint="en",
+        model_id="small",
+        request_overrides={
+            "schema_version": 1,
+            "model_id": "small",
+            "language_hint": "en",
+        },
+        session_id_factory=lambda: "live-overrides",
+        timestamp_factory=lambda: "2026-01-01T00:00:00",
+    )
+
+    assert payload["request_overrides"] == {
+        "schema_version": 1,
+        "model_id": "small",
+        "language_hint": "en",
+    }
+    assert live_store.created_sessions[0]["request_overrides"] == {
+        "schema_version": 1,
+        "model_id": "small",
+        "language_hint": "en",
     }
 
 
@@ -396,6 +477,47 @@ def test_list_live_sessions_returns_paged_payload() -> None:
     assert [session["session_id"] for session in payload["sessions"]] == ["new"]
 
 
+def test_list_live_sessions_applies_history_filters_and_sorting() -> None:
+    live_store = FakeLiveStore(
+        sessions={
+            "alpha": _session(
+                session_id="alpha",
+                status="finished",
+                started_at="2026-01-01T00:00:00",
+            ),
+            "beta": {
+                **_session(
+                    session_id="beta",
+                    status="failed",
+                    started_at="2026-01-02T00:00:00",
+                ),
+                "title": "Review Call",
+            },
+            "gamma": {
+                **_session(
+                    session_id="gamma",
+                    status="finished",
+                    started_at="2026-01-03T00:00:00",
+                ),
+                "title": "Review Notes",
+            },
+        }
+    )
+
+    payload = list_live_sessions(
+        live_store=live_store,
+        limit=10,
+        offset=0,
+        q="review",
+        status="finished",
+        sort_by="title",
+        order="asc",
+    )
+
+    assert payload["total"] == 1
+    assert [session["session_id"] for session in payload["sessions"]] == ["gamma"]
+
+
 def test_list_live_sessions_rejects_invalid_pagination() -> None:
     live_store = FakeLiveStore()
 
@@ -415,6 +537,38 @@ def test_list_live_sessions_rejects_invalid_pagination() -> None:
     assert limit_error.value.status_code == 422
     assert max_limit_error.value.status_code == 422
     assert offset_error.value.status_code == 422
+
+
+def test_list_live_sessions_rejects_invalid_history_filters() -> None:
+    live_store = FakeLiveStore()
+
+    with pytest.raises(LiveUseCaseError) as status_error:
+        list_live_sessions(
+            live_store=live_store,
+            limit=10,
+            offset=0,
+            status="paused",
+        )
+
+    with pytest.raises(LiveUseCaseError) as sort_error:
+        list_live_sessions(
+            live_store=live_store,
+            limit=10,
+            offset=0,
+            sort_by="runtime",
+        )
+
+    with pytest.raises(LiveUseCaseError) as order_error:
+        list_live_sessions(
+            live_store=live_store,
+            limit=10,
+            offset=0,
+            order="sideways",
+        )
+
+    assert status_error.value.status_code == 422
+    assert sort_error.value.status_code == 422
+    assert order_error.value.status_code == 422
 
 
 def test_get_live_session_returns_tracks_and_segments() -> None:
@@ -728,3 +882,59 @@ def test_fail_live_session_raises_when_missing() -> None:
         )
 
     assert error.value.status_code == 404
+
+
+def test_delete_live_session_record_deletes_terminal_session() -> None:
+    live_store = FakeLiveStore(
+        sessions={"live-001": _session(session_id="live-001", status="finished")}
+    )
+
+    payload = delete_live_session_record(
+        live_store=live_store,
+        session_id="live-001",
+    )
+
+    assert payload == {
+        "session_id": "live-001",
+        "message": "Live session record deleted successfully",
+    }
+    assert live_store.get_session("live-001") is None
+
+
+def test_delete_live_session_record_rejects_active_session() -> None:
+    live_store = FakeLiveStore(sessions={"live-001": _session(session_id="live-001")})
+
+    with pytest.raises(LiveUseCaseError) as error:
+        delete_live_session_record(
+            live_store=live_store,
+            session_id="live-001",
+        )
+
+    assert error.value.status_code == 400
+    assert live_store.get_session("live-001") is not None
+
+
+def test_batch_delete_live_session_records_returns_mixed_outcomes() -> None:
+    live_store = FakeLiveStore(
+        sessions={
+            "finished": _session(session_id="finished", status="finished"),
+            "failed": _session(session_id="failed", status="failed"),
+            "active": _session(session_id="active", status="active"),
+        }
+    )
+
+    payload = batch_delete_live_session_records(
+        live_store=live_store,
+        session_ids=["finished", "active", "missing", "failed", "finished"],
+    )
+
+    assert payload["action"] == "delete_record"
+    assert payload["summary"] == {"requested": 5, "succeeded": 2, "failed": 3}
+    assert payload["results"][0]["ok"] is True
+    assert payload["results"][1]["error_code"] == "invalid_status"
+    assert payload["results"][2]["error_code"] == "not_found"
+    assert payload["results"][3]["ok"] is True
+    assert payload["results"][4]["error_code"] == "duplicate_session_id"
+    assert live_store.get_session("finished") is None
+    assert live_store.get_session("failed") is None
+    assert live_store.get_session("active") is not None

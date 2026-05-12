@@ -2,12 +2,16 @@
 
 from typing import Literal, TypeAlias, TypedDict
 
+from typing_extensions import NotRequired
+
 from nola.common.types import JsonDict
 from nola.config.common import ConfigMap
 
 LiveSessionStatus = Literal["active", "finished", "failed"]
 LiveSessionMode = Literal["streaming", "background"]
 LiveTrackSource = Literal["microphone", "system"]
+LiveSessionSortBy = Literal["started_at", "ended_at", "status", "title"]
+LiveSortOrder = Literal["asc", "desc"]
 LiveRealtimeRuntimeOverrides: TypeAlias = ConfigMap
 LiveRuntimeConfig: TypeAlias = JsonDict
 LiveRequestOverrides: TypeAlias = JsonDict
@@ -17,12 +21,31 @@ LIVE_SESSION_STATUSES: tuple[LiveSessionStatus, ...] = (
     "finished",
     "failed",
 )
+DELETABLE_LIVE_SESSION_STATUSES: tuple[LiveSessionStatus, ...] = (
+    "finished",
+    "failed",
+)
 LIVE_SESSION_MODES: tuple[LiveSessionMode, ...] = ("streaming", "background")
 LIVE_TRACK_SOURCES: tuple[LiveTrackSource, ...] = ("microphone", "system")
+LIVE_SESSION_SORT_FIELDS: tuple[LiveSessionSortBy, ...] = (
+    "started_at",
+    "ended_at",
+    "status",
+    "title",
+)
+LIVE_SORT_ORDERS: tuple[LiveSortOrder, ...] = ("asc", "desc")
+DEFAULT_LIVE_SESSION_SORT_BY: LiveSessionSortBy = "started_at"
+DEFAULT_LIVE_SORT_ORDER: LiveSortOrder = "desc"
 DEFAULT_LIVE_SEGMENT_LIMIT = 100
 MAX_LIVE_SEGMENT_LIMIT = 500
 DEFAULT_LIVE_SESSION_LIMIT = 50
 MAX_LIVE_SESSION_LIMIT = 100
+MAX_BATCH_LIVE_SESSION_IDS = 500
+BatchLiveSessionActionErrorCode = Literal[
+    "not_found",
+    "invalid_status",
+    "duplicate_session_id",
+]
 
 
 class LiveSessionRecord(TypedDict):
@@ -128,6 +151,7 @@ class LiveSegmentPayload(TypedDict):
 class LiveSessionPayload(LiveSessionSummaryPayload):
     """Live session detail payload with tracks and segments."""
 
+    request_overrides: LiveRequestOverrides | None
     runtime_config: LiveRuntimeConfig | None
     tracks: list[LiveTrackPayload]
     segments: list[LiveSegmentPayload]
@@ -143,3 +167,39 @@ class LiveSessionListPayload(TypedDict):
     total: int
     limit: int
     offset: int
+
+
+class DeleteLiveSessionRecordPayload(TypedDict):
+    """Delete-live-session-record payload."""
+
+    session_id: str
+    message: str
+
+
+class BatchLiveSessionActionSummaryPayload(TypedDict):
+    """Batch live session action summary counts."""
+
+    requested: int
+    succeeded: int
+    failed: int
+
+
+class BatchLiveSessionActionResultPayload(TypedDict):
+    """Per-session result for batch live session actions."""
+
+    session_id: str
+    ok: bool
+    message: str
+    error_code: NotRequired[BatchLiveSessionActionErrorCode]
+    status: NotRequired[LiveSessionStatus]
+
+
+BatchLiveSessionActionName = Literal["delete_record"]
+
+
+class BatchLiveSessionActionPayload(TypedDict):
+    """Batch live session action payload."""
+
+    action: BatchLiveSessionActionName
+    summary: BatchLiveSessionActionSummaryPayload
+    results: list[BatchLiveSessionActionResultPayload]
