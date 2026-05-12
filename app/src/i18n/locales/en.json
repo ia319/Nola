@@ -1694,9 +1694,64 @@
       }
     },
     "live": {
+      "selection": {
+        "selectedCount_one": "{{count}} selected",
+        "selectedCount_other": "{{count}} selected"
+      },
+      "batch": {
+        "export": "Export selected",
+        "delete": "Delete selected"
+      },
+      "filters": {
+        "searchPlaceholder": "Search by session ID or title",
+        "statusAll": "All statuses"
+      },
+      "status": {
+        "active": "Active",
+        "finished": "Finished",
+        "failed": "Failed"
+      },
+      "table": {
+        "caption": "History live session records",
+        "selectAll": "Select all live history rows",
+        "selectRow": "Select live session {{sessionId}}",
+        "titleFallback": "Untitled session",
+        "columns": {
+          "sessionId": "Session ID",
+          "title": "Title",
+          "status": "Status",
+          "started": "Started",
+          "ended": "Ended",
+          "actions": "Actions"
+        },
+        "actions": {
+          "export": "Export record",
+          "deleteRecord": "Delete record",
+          "more": "More actions for {{sessionId}}"
+        }
+      },
       "empty": {
         "title": "No live records found",
         "description": "Finished live sessions will appear in this view."
+      },
+      "toast": {
+        "actionFailed": "Live action failed, please retry",
+        "deleted": "Live session deleted: {{sessionId}}",
+        "export": {
+          "one": "Live export started",
+          "saved": "Live export saved: {{path}}"
+        },
+        "batchExport": {
+          "success_one": "Exported {{count}} live session",
+          "success_other": "Exported {{count}} live sessions"
+        },
+        "batchDelete": {
+          "success_one": "Deleted {{count}} live session",
+          "success_other": "Deleted {{count}} live sessions",
+          "partial": "Deleted {{succeeded}} live sessions, {{failed}} failed",
+          "failed_one": "Delete failed for {{count}} live session",
+          "failed_other": "Delete failed for {{count}} live sessions"
+        }
       }
     },
     "taskDetail": {
