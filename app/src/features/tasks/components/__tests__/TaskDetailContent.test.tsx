@@ -21,6 +21,9 @@ vi.mock('react-i18next', () => ({
         'history.taskDetail.segments.empty.title': 'No segments available',
         'history.taskDetail.technicalUnavailable.description': 'No technical properties yet',
         'history.taskDetail.technicalUnavailable.title': 'Technical properties unavailable',
+        'history.requestParameters.title': 'Request Parameters',
+        'history.requestParameters.unavailable.title': 'Request parameters unavailable',
+        'history.requestParameters.unavailable.description': 'No request parameters',
         'tasks.fields.completedAt': 'Completed At',
         'tasks.fields.createdAt': 'Created At',
         'tasks.fields.progress': 'Progress',
@@ -44,6 +47,8 @@ function createTask(overrides: Partial<TaskDetail> = {}): TaskDetail {
     duration: 300,
     segments: null,
     error: null,
+    request_overrides: null,
+    runtime_config: null,
     ...overrides,
   }
 }
@@ -61,5 +66,31 @@ describe('TaskDetailContent', () => {
 
     expect(screen.getByText('100%')).toBeInTheDocument()
     expect(screen.queryByText('120%')).not.toBeInTheDocument()
+  })
+
+  it('renders request override parameters as formatted json', () => {
+    render(
+      <TaskDetailContent
+        task={createTask({
+          request_overrides: {
+            model_id: 'large-v3',
+            engine: {
+              device: 'cuda',
+            },
+          },
+        })}
+      />,
+    )
+
+    expect(screen.getByText('Request Parameters')).toBeInTheDocument()
+    expect(screen.getByText(/"model_id": "large-v3"/)).toBeInTheDocument()
+    expect(screen.getByText(/"device": "cuda"/)).toBeInTheDocument()
+  })
+
+  it('renders the request parameter empty state', () => {
+    render(<TaskDetailContent task={createTask({ request_overrides: null })} />)
+
+    expect(screen.getByText('Request parameters unavailable')).toBeInTheDocument()
+    expect(screen.getByText('No request parameters')).toBeInTheDocument()
   })
 })

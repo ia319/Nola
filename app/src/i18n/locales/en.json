@@ -779,6 +779,13 @@
           "expand": "Expand transcript area",
           "restore": "Restore setup area"
         },
+        "download": {
+          "action": "Download transcript",
+          "toast": {
+            "success": "Transcript download started",
+            "failed": "Transcript download failed"
+          }
+        },
         "empty": {
           "title": "No transcript yet",
           "description": "Start a live session to stream transcript output here.",
@@ -1734,6 +1741,43 @@
         "title": "No live records found",
         "description": "Finished live sessions will appear in this view."
       },
+      "detail": {
+        "eyebrow": "Live detail",
+        "close": "Close live detail",
+        "copySessionId": "Copy session ID",
+        "loading": "Loading live detail...",
+        "sections": {
+          "transcriptionResult": "Transcription Result",
+          "sessionMetadata": "Session Metadata",
+          "technicalProperties": "Technical Properties"
+        },
+        "fields": {
+          "sessionId": "Session ID",
+          "status": "Status",
+          "mode": "Mode",
+          "startedAt": "Started At",
+          "endedAt": "Ended At",
+          "languageHint": "Language Hint",
+          "model": "Model",
+          "runtime": "Runtime",
+          "audioFormat": "Audio Format",
+          "error": "Error",
+          "unavailable": "Unavailable"
+        },
+        "mode": {
+          "streaming": "Streaming",
+          "background": "Background"
+        },
+        "segments": {
+          "empty": {
+            "title": "No final segments available",
+            "description": "This live session does not include final transcript segments yet."
+          }
+        },
+        "toast": {
+          "sessionIdCopied": "Session ID copied"
+        }
+      },
       "toast": {
         "actionFailed": "Live action failed, please retry",
         "deleted": "Live session deleted: {{sessionId}}",
@@ -1752,6 +1796,13 @@
           "failed_one": "Delete failed for {{count}} live session",
           "failed_other": "Delete failed for {{count}} live sessions"
         }
+      }
+    },
+    "requestParameters": {
+      "title": "Request Parameters",
+      "unavailable": {
+        "title": "Request parameters unavailable",
+        "description": "No request override parameters are available for this record."
       }
     },
     "taskDetail": {
