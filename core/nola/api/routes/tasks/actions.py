@@ -22,7 +22,10 @@ from nola.application.tasks.actions import (
 )
 from nola.application.tasks.errors import TaskUseCaseError
 from nola.application.tasks.execution_config import resolve_task_execution_config
-from nola.application.tasks.runtime_config import build_task_runtime_config
+from nola.application.tasks.runtime_config import (
+    build_task_request_overrides,
+    build_task_runtime_config,
+)
 from nola.application.tasks.types import (
     BatchTaskActionPayload,
     CancelTaskPayload,
@@ -90,9 +93,10 @@ async def create_transcription(request: TranscriptionRequest) -> CreateTaskPaylo
     """
     try:
         request_options = request.get_options_dict()
+        request_execution = _build_request_execution_values(request)
         config_db = get_app_config_db()
         execution_config = resolve_task_execution_config(
-            request=_build_request_execution_values(request),
+            request=request_execution,
             session_defaults=_build_session_execution_values(config_db),
             settings_defaults=_build_settings_execution_values(),
             model_resolver=_resolve_model_id,
@@ -102,6 +106,10 @@ async def create_transcription(request: TranscriptionRequest) -> CreateTaskPaylo
             execution_config=execution_config,
             config_store=config_db,
         )
+        request_overrides = build_task_request_overrides(
+            request_options=request_options,
+            request_execution=request_execution,
+        )
         return create_task(
             file_store=get_file_db(),
             task_store=get_task_db(),
@@ -109,6 +117,7 @@ async def create_transcription(request: TranscriptionRequest) -> CreateTaskPaylo
             options=request_options,
             execution_config=execution_config,
             runtime_config=runtime_config,
+            request_overrides=request_overrides,
         )
     except TaskUseCaseError as error:
         raise_http_error(error)

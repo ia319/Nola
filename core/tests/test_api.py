@@ -331,6 +331,17 @@ class TestTranscriptionsAPI:
         assert stored["engine_compute_type"] == "float16"
         assert stored["options"] == {"language": "en"}
         assert stored["runtime_config"] == data["runtime_config"]
+        assert stored["request_overrides"] == {
+            "schema_version": 1,
+            "model_id": "large-v3",
+            "engine": {"device": "cuda", "compute_type": "float16"},
+            "transcription_options": {"language": "en"},
+        }
+
+        detail_response = client.get(f"/api/transcription-tasks/{data['task_id']}")
+        assert detail_response.status_code == 200
+        detail_payload = detail_response.json()
+        assert detail_payload["request_overrides"] == stored["request_overrides"]
 
     def test_create_task_runtime_config_uses_creation_time_defaults(
         self, client: TestClient
@@ -359,8 +370,10 @@ class TestTranscriptionsAPI:
         stored = task_db.get_task(task_id)
 
         assert detail_response.status_code == 200
-        detail_runtime_config = detail_response.json()["runtime_config"]
+        detail_payload = detail_response.json()
+        detail_runtime_config = detail_payload["runtime_config"]
         assert detail_runtime_config["transcription_options"]["beam_size"] == 3
+        assert detail_payload["request_overrides"] is None
         assert stored is not None
         assert stored["runtime_config"] == detail_runtime_config
 
