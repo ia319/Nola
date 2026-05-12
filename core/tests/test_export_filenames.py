@@ -2,11 +2,37 @@
 
 from pathlib import Path
 
-from nola.config.export.filenames import write_unique_export_text
+from nola.config.export.filenames import build_export_filename, write_unique_export_text
 
 
 class TestExportFilenameHelpers:
     """Test filename reservation and write behaviors."""
+
+    def test_build_export_filename_ignores_requested_directory_segments(self):
+        """Filename input should not control the server save directory."""
+        unix_path_name = build_export_filename(
+            requested_name="../../secret.srt",
+            fallback_name="fallback",
+            extension="vtt",
+        )
+        windows_path_name = build_export_filename(
+            requested_name=r"C:\Users\ia\Desktop\meeting.txt",
+            fallback_name="fallback",
+            extension="srt",
+        )
+
+        assert unix_path_name == "secret.vtt"
+        assert windows_path_name == "meeting.srt"
+
+    def test_build_export_filename_removes_unsafe_characters(self):
+        """Filename input should keep a safe basename with the fixed extension."""
+        filename = build_export_filename(
+            requested_name="bad:name?.txt",
+            fallback_name="fallback",
+            extension=".txt",
+        )
+
+        assert filename == "bad_name_.txt"
 
     def test_write_unique_export_text_uses_requested_name_when_available(
         self, tmp_path
