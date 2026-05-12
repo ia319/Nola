@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -67,6 +67,7 @@ export function useHistoryLiveExportDialog({
     createExportDialogValue(FALLBACK_EXPORT_OPTIONS),
   )
   const [isSubmittingExport, setIsSubmittingExport] = useState(false)
+  const isSubmittingExportRef = useRef(false)
   const [isUpdatingDefaults, setIsUpdatingDefaults] = useState(false)
   const [lastSavedPath, setLastSavedPath] = useState<string | null>(null)
 
@@ -157,7 +158,7 @@ export function useHistoryLiveExportDialog({
   }
 
   function closeExportDialog(): void {
-    if (isSubmittingExport) {
+    if (isSubmittingExportRef.current) {
       return
     }
 
@@ -168,12 +169,13 @@ export function useHistoryLiveExportDialog({
   }
 
   async function confirmExport(): Promise<void> {
-    if (!exportDialog.open) {
+    if (!exportDialog.open || isSubmittingExportRef.current) {
       return
     }
 
     const options = buildCurrentExportOptions()
 
+    isSubmittingExportRef.current = true
     setIsSubmittingExport(true)
     try {
       try {
@@ -218,6 +220,7 @@ export function useHistoryLiveExportDialog({
         }
       }
     } finally {
+      isSubmittingExportRef.current = false
       setIsSubmittingExport(false)
     }
   }
