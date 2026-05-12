@@ -1530,6 +1530,11 @@
   "history": {
     "title": "History",
     "description": "Review archived task records and recent execution output.",
+    "navigationLabel": "History sections",
+    "views": {
+      "task": "Task",
+      "live": "Live"
+    },
     "modes": {
       "files": "Filename",
       "tasks": "Task ID"
@@ -1686,6 +1691,12 @@
           "linkedTasks_one": "{{count}} file still has linked tasks",
           "linkedTasks_other": "{{count}} files still have linked tasks"
         }
+      }
+    },
+    "live": {
+      "empty": {
+        "title": "No live records found",
+        "description": "Finished live sessions will appear in this view."
       }
     },
     "taskDetail": {
