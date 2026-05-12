@@ -52,8 +52,18 @@ export {
   resampleLinear,
 } from './capture/pcm'
 
-export type { LiveSessionDetailQuery } from './api'
-export { createLiveSession, finishLiveSession, getLiveSession } from './api'
+export type { LiveSessionDetailQuery, LiveSessionExportApiOptions } from './api'
+export {
+  batchDeleteLiveSessionRecords,
+  batchExportLiveSessions,
+  createLiveSession,
+  deleteLiveSessionRecord,
+  downloadLiveSessionExport,
+  finishLiveSession,
+  getLiveSession,
+  listLiveSessions,
+  saveLiveSessionExport,
+} from './api'
 
 export type {
   LiveRealtimeAdapter,
