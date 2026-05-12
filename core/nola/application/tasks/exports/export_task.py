@@ -1,8 +1,5 @@
 """Single-task export use-case."""
 
-import re
-from urllib.parse import quote
-
 from fastapi.responses import JSONResponse, Response
 
 from nola.application.tasks.contracts import SupportsFileQueries, SupportsTaskQueries
@@ -11,6 +8,7 @@ from nola.application.tasks.exports.export_common import resolve_export_options
 from nola.config import settings
 from nola.config.export import (
     ExportFormat,
+    build_download_content_disposition,
     build_export_filename,
     write_unique_export_text,
 )
@@ -115,19 +113,10 @@ def export_task(
             ) from error
         return JSONResponse(content={"saved_path": f"exports/{export_path.name}"})
 
-    # Sanitize for ASCII-safe header value (RFC 6266).
-    ascii_name = export_filename.encode("ascii", "ignore").decode()
-    ascii_name = re.sub(r"[^A-Za-z0-9._-]", "_", ascii_name)
-    if not ascii_name or ascii_name.startswith("."):
-        ascii_name = f"export.{formatter.file_extension}"
-
     return Response(
         content=content,
         media_type=formatter.content_type,
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="{ascii_name}"; '
-                f"filename*=UTF-8''{quote(export_filename)}"
-            )
+            "Content-Disposition": build_download_content_disposition(export_filename)
         },
     )

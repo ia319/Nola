@@ -2527,3 +2527,40 @@ class TestBatchExportAPI:
         assert "/" not in content_disp
         assert "\\" not in content_disp
         assert '"badheader.zip"' in content_disp
+
+    def test_batch_export_non_ascii_zip_name(self, client: TestClient):
+        """Test that non-ASCII zip_name uses RFC filename encoding."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="non-ascii-zip-file",
+            filename="non-ascii.mp3",
+            path="/tmp/non-ascii.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="non-ascii-zip-task",
+            file_id="non-ascii-zip-file",
+            options=None,
+        )
+        _claim_pending_task(task_db, "non-ascii-zip-task")
+        task_db.complete(
+            task_id="non-ascii-zip-task",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Non ASCII zip"}],
+            duration=1.0,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks/export/batch",
+            json={
+                "task_ids": ["non-ascii-zip-task"],
+                "format": "srt",
+                "zip_name": "\u4e2d\u6587_export",
+            },
+        )
+
+        assert response.status_code == 200
+        content_disp = response.headers["content-disposition"]
+        assert 'filename="_export.zip"' in content_disp
+        assert "filename*=UTF-8''%E4%B8%AD%E6%96%87_export.zip" in content_disp

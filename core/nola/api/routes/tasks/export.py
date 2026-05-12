@@ -11,7 +11,7 @@ from nola.api.schemas import BatchExportRequest, SavedExportResponse
 from nola.application.tasks.errors import TaskUseCaseError
 from nola.application.tasks.exports import batch_export_tasks, export_task
 from nola.application.tasks.exports.batch_export_tasks import BatchExportArchive
-from nola.config.export import ExportFormat
+from nola.config.export import ExportFormat, build_download_content_disposition
 from nola.services.formatters import list_export_content_types
 
 router = APIRouter()
@@ -120,7 +120,9 @@ async def batch_export(request: BatchExportRequest) -> Response:
             io.BytesIO(result.data),
             media_type=result.media_type,
             headers={
-                "Content-Disposition": f'attachment; filename="{result.filename}"'
+                "Content-Disposition": build_download_content_disposition(
+                    result.filename
+                )
             },
         )
     except TaskUseCaseError as error:
