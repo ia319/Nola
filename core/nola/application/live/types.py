@@ -10,6 +10,7 @@ LiveSessionMode = Literal["streaming", "background"]
 LiveTrackSource = Literal["microphone", "system"]
 LiveRealtimeRuntimeOverrides: TypeAlias = ConfigMap
 LiveRuntimeConfig: TypeAlias = JsonDict
+LiveRequestOverrides: TypeAlias = JsonDict
 
 LIVE_SESSION_STATUSES: tuple[LiveSessionStatus, ...] = (
     "active",
@@ -36,6 +37,7 @@ class LiveSessionRecord(TypedDict):
     runtime: str | None
     audio_format: str | None
     runtime_config: LiveRuntimeConfig | None
+    request_overrides: LiveRequestOverrides | None
     started_at: str
     ended_at: str | None
     error: str | None

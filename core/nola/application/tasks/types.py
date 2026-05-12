@@ -16,6 +16,7 @@ BatchTaskActionErrorCode = Literal[
 TaskOptions = dict[str, object]
 TaskSegment = dict[str, object]
 TaskRuntimeConfig: TypeAlias = JsonDict
+TaskRequestOverrides: TypeAlias = JsonDict
 
 
 @dataclass(frozen=True, slots=True)
