@@ -10,6 +10,7 @@ from typing import cast
 from nola.application.live.types import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
     DEFAULT_LIVE_SESSION_LIMIT,
+    LiveRequestOverrides,
     LiveSegmentRecord,
     LiveSessionMode,
     LiveSessionRecord,
@@ -22,15 +23,15 @@ from nola.common.types import JsonDict
 logger = logging.getLogger(__name__)
 
 
-def _serialize_runtime_config(runtime_config: JsonDict | None) -> str | None:
-    """Return a JSON snapshot string or reject unsafe runtime config."""
-    if runtime_config is None:
+def _serialize_json_object(value: JsonDict | None, *, field_name: str) -> str | None:
+    """Return a JSON object string or reject unsafe values."""
+    if value is None:
         return None
     try:
-        return json.dumps(runtime_config, allow_nan=False)
+        return json.dumps(value, allow_nan=False)
     except (TypeError, ValueError) as error:
         raise ValueError(
-            "runtime_config must be JSON-serializable and cannot contain "
+            f"{field_name} must be JSON-serializable and cannot contain "
             f"NaN/Infinity: {error}"
         ) from error
 
@@ -51,24 +52,43 @@ class LiveDatabase:
     def _to_session_record(self, row: sqlite3.Row) -> LiveSessionRecord:
         """Return one live session row as an application record."""
         values = dict(row)
-        runtime_config_raw = values.get("runtime_config")
-        if runtime_config_raw:
+        self._parse_session_json_object(
+            values,
+            session_id=row["id"],
+            field_name="runtime_config",
+        )
+        self._parse_session_json_object(
+            values,
+            session_id=row["id"],
+            field_name="request_overrides",
+        )
+        return cast(LiveSessionRecord, values)
+
+    def _parse_session_json_object(
+        self,
+        values: dict[str, object],
+        *,
+        session_id: str,
+        field_name: str,
+    ) -> None:
+        raw_value = values.get(field_name)
+        if raw_value:
             try:
-                runtime_config = json.loads(runtime_config_raw)
-                if isinstance(runtime_config, dict):
-                    values["runtime_config"] = cast(JsonDict, runtime_config)
+                parsed = json.loads(cast(str, raw_value))
+                if isinstance(parsed, dict):
+                    values[field_name] = cast(JsonDict, parsed)
                 else:
                     logger.warning(
-                        "Invalid live runtime_config shape for %s",
-                        row["id"],
+                        "Invalid live %s shape for %s",
+                        field_name,
+                        session_id,
                     )
-                    values["runtime_config"] = None
+                    values[field_name] = None
             except json.JSONDecodeError:
-                logger.warning("Corrupted live runtime_config for %s", row["id"])
-                values["runtime_config"] = None
+                logger.warning("Corrupted live %s for %s", field_name, session_id)
+                values[field_name] = None
         else:
-            values["runtime_config"] = None
-        return cast(LiveSessionRecord, values)
+            values[field_name] = None
 
     def _to_track_record(self, row: sqlite3.Row) -> LiveTrackRecord:
         """Return one live track row as an application record."""
@@ -92,6 +112,7 @@ class LiveDatabase:
         runtime: str | None,
         audio_format: str | None,
         runtime_config: JsonDict | None = None,
+        request_overrides: LiveRequestOverrides | None = None,
         started_at: str,
         created_at: str,
         updated_at: str,
@@ -103,10 +124,10 @@ class LiveDatabase:
                     """
                     INSERT INTO live_sessions (
                         id, title, mode, status, language_hint, model_id,
-                        runtime, audio_format, runtime_config, started_at,
-                        created_at, updated_at
+                        runtime, audio_format, runtime_config, request_overrides,
+                        started_at, created_at, updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     RETURNING *
                     """,
                     (
@@ -118,7 +139,14 @@ class LiveDatabase:
                         model_id,
                         runtime,
                         audio_format,
-                        _serialize_runtime_config(runtime_config),
+                        _serialize_json_object(
+                            runtime_config,
+                            field_name="runtime_config",
+                        ),
+                        _serialize_json_object(
+                            request_overrides,
+                            field_name="request_overrides",
+                        ),
                         started_at,
                         created_at,
                         updated_at,

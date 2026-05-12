@@ -27,6 +27,7 @@ class TaskRowRaw(TypedDict):
     timeout_seconds: int
     options: str | None
     runtime_config: str | None
+    request_overrides: str | None
     progress: float
     duration: float | None
     segments: str | None
@@ -54,6 +55,7 @@ class TaskRow(TypedDict):
     timeout_seconds: int
     options: dict[str, Any] | None
     runtime_config: JsonDict | None
+    request_overrides: JsonDict | None
     progress: float
     duration: float | None
     segments: list[dict[str, Any]] | None

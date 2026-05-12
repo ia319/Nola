@@ -526,9 +526,11 @@ class TestTaskDatabase:
                 "engine_device",
                 "engine_compute_type",
                 "runtime_config",
+                "request_overrides",
             } <= columns
             assert task is not None
             assert task["model_id"] is None
             assert task["engine_device"] is None
             assert task["engine_compute_type"] is None
             assert task["runtime_config"] is None
+            assert task["request_overrides"] is None

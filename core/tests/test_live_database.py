@@ -28,6 +28,7 @@ def _create_session(
     live_db: LiveDatabase,
     session_id: str = "live-001",
     runtime_config: dict[str, object] | None = None,
+    request_overrides: dict[str, object] | None = None,
 ) -> None:
     """Create one active live session for repository tests."""
     live_db.create_session(
@@ -40,6 +41,7 @@ def _create_session(
         runtime=None,
         audio_format="pcm_s16le_16khz_mono",
         runtime_config=runtime_config,
+        request_overrides=request_overrides,
         started_at="2026-01-01T00:00:00",
         created_at="2026-01-01T00:00:00",
         updated_at="2026-01-01T00:00:00",
@@ -79,8 +81,8 @@ def test_init_db_creates_live_tables_and_indexes():
     } <= indexes
 
 
-def test_init_db_adds_live_runtime_config_to_legacy_database():
-    """init_db() should add runtime_config to older live session tables."""
+def test_init_db_adds_live_config_columns_to_legacy_database():
+    """init_db() should add config JSON columns to older live session tables."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "legacy.db"
         with closing(sqlite3.connect(db_path)) as conn:
@@ -128,8 +130,10 @@ def test_init_db_adds_live_runtime_config_to_legacy_database():
 
     columns = {row[1] for row in rows}
     assert "runtime_config" in columns
+    assert "request_overrides" in columns
     assert stored is not None
     assert stored["runtime_config"] is None
+    assert stored["request_overrides"] is None
 
 
 def test_create_get_list_and_count_session(live_database):
@@ -147,6 +151,7 @@ def test_create_get_list_and_count_session(live_database):
     assert stored["status"] == "active"
     assert stored["audio_format"] == "pcm_s16le_16khz_mono"
     assert stored["runtime_config"] is None
+    assert stored["request_overrides"] is None
     assert live_db.count_sessions() == 1
     assert [session["id"] for session in sessions] == ["live-001"]
 
@@ -172,6 +177,61 @@ def test_create_session_preserves_runtime_config_snapshot(live_database):
         "runtime": "mock",
         "language": "en",
     }
+
+
+def test_create_session_preserves_request_overrides_snapshot(live_database):
+    """Live sessions should store accepted request override snapshots."""
+    live_db = live_database
+
+    _create_session(
+        live_db,
+        request_overrides={
+            "schema_version": 1,
+            "model_id": "small",
+            "language_hint": "en",
+            "runtime_overrides": {
+                "device": "cpu",
+                "compute_type": "default",
+                "beam_size": 3,
+            },
+        },
+    )
+
+    stored = live_db.get_session("live-001")
+
+    assert stored is not None
+    assert stored["request_overrides"] == {
+        "schema_version": 1,
+        "model_id": "small",
+        "language_hint": "en",
+        "runtime_overrides": {
+            "device": "cpu",
+            "compute_type": "default",
+            "beam_size": 3,
+        },
+    }
+
+
+def test_get_session_drops_invalid_config_json_shapes(live_database):
+    """Live config JSON fields should become None when stored shapes are invalid."""
+    live_db = live_database
+    _create_session(live_db)
+
+    with sqlite3.connect(live_db.db_path) as conn:
+        conn.execute(
+            """
+            UPDATE live_sessions
+            SET runtime_config = ?, request_overrides = ?
+            WHERE id = ?
+            """,
+            ("[]", "[]", "live-001"),
+        )
+
+    stored = live_db.get_session("live-001")
+
+    assert stored is not None
+    assert stored["runtime_config"] is None
+    assert stored["request_overrides"] is None
 
 
 def test_finish_session_only_updates_active_session(live_database):
