@@ -9,7 +9,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { isSameHistorySearch, normalizeHistorySearch } from '@/routes/history-search'
 import type { ExportDialogValue, ExportRequestOptions } from '@/features/export'
 import type { UseHistoryTaskActionsResult } from '../hooks/useHistoryTaskActions'
-import type { FileInfo, LiveSessionSummary, TaskDetail, TaskSummary } from '@/shared/types'
+import type {
+  FileInfo,
+  LiveSessionDetail,
+  LiveSessionSummary,
+  TaskDetail,
+  TaskSummary,
+} from '@/shared/types'
 
 const historyPageMocks = vi.hoisted(() => ({
   logger: {
@@ -20,6 +26,7 @@ const historyPageMocks = vi.hoisted(() => ({
   useHistoryTasks: vi.fn(),
   useHistoryFiles: vi.fn(),
   useHistoryLiveActions: vi.fn(),
+  useHistoryLiveDetail: vi.fn(),
   useHistoryLiveSessions: vi.fn(),
   useHistoryTaskDetail: vi.fn(),
   useHistoryFileAssociatedTasks: vi.fn(),
@@ -187,6 +194,32 @@ vi.mock('react-i18next', () => ({
         'history.live.table.actions.export': 'Export record',
         'history.live.table.actions.deleteRecord': 'Delete record',
         'history.live.table.actions.more': `More actions for ${String(params?.sessionId)}`,
+        'history.live.detail.eyebrow': 'Live detail',
+        'history.live.detail.close': 'Close live detail',
+        'history.live.detail.copySessionId': 'Copy session ID',
+        'history.live.detail.loading': 'Loading live detail...',
+        'history.live.detail.sections.transcriptionResult': 'Transcription Result',
+        'history.live.detail.sections.sessionMetadata': 'Session Metadata',
+        'history.live.detail.sections.technicalProperties': 'Technical Properties',
+        'history.live.detail.fields.sessionId': 'Session ID',
+        'history.live.detail.fields.status': 'Status',
+        'history.live.detail.fields.mode': 'Mode',
+        'history.live.detail.fields.startedAt': 'Started At',
+        'history.live.detail.fields.endedAt': 'Ended At',
+        'history.live.detail.fields.languageHint': 'Language Hint',
+        'history.live.detail.fields.model': 'Model',
+        'history.live.detail.fields.runtime': 'Runtime',
+        'history.live.detail.fields.audioFormat': 'Audio Format',
+        'history.live.detail.fields.error': 'Error',
+        'history.live.detail.fields.unavailable': 'Unavailable',
+        'history.live.detail.mode.streaming': 'Streaming',
+        'history.live.detail.mode.background': 'Background',
+        'history.live.detail.segments.empty.title': 'No final segments available',
+        'history.live.detail.segments.empty.description': 'No final segments yet',
+        'history.live.detail.toast.sessionIdCopied': 'Session ID copied',
+        'history.requestParameters.title': 'Request Parameters',
+        'history.requestParameters.unavailable.title': 'Request parameters unavailable',
+        'history.requestParameters.unavailable.description': 'No request parameters',
         'history.table.caption': 'History task records',
         'history.table.columns.taskId': 'Task ID',
         'history.table.columns.filename': 'Filename',
@@ -416,6 +449,10 @@ vi.mock('../hooks/useHistoryLiveActions', () => ({
   useHistoryLiveActions: historyPageMocks.useHistoryLiveActions,
 }))
 
+vi.mock('../hooks/useHistoryLiveDetail', () => ({
+  useHistoryLiveDetail: historyPageMocks.useHistoryLiveDetail,
+}))
+
 vi.mock('../hooks/useHistoryLiveSessions', () => ({
   useHistoryLiveSessions: historyPageMocks.useHistoryLiveSessions,
 }))
@@ -524,6 +561,36 @@ function createLiveSession(overrides: Partial<LiveSessionSummary>): LiveSessionS
   }
 }
 
+function createLiveDetail(overrides: Partial<LiveSessionDetail> = {}): LiveSessionDetail {
+  return {
+    ...createLiveSession({ session_id: 'live-finished', status: 'finished' }),
+    request_overrides: {
+      model_id: 'large-v3',
+    },
+    runtime_config: null,
+    segment_limit: 100,
+    segment_offset: 0,
+    segment_total: 1,
+    segments: [
+      {
+        confidence: null,
+        created_at: '2026-04-11T10:00:01.000Z',
+        end_ms: 2000,
+        is_final: true,
+        language: 'en',
+        segment_id: 'segment-1',
+        sequence: 1,
+        session_id: 'live-finished',
+        start_ms: 0,
+        text: 'Live detail transcript.',
+        track_id: null,
+      },
+    ],
+    tracks: [],
+    ...overrides,
+  }
+}
+
 function createTaskDetail(overrides: Partial<TaskDetail> = {}) {
   return {
     task_id: 'task-completed',
@@ -555,6 +622,7 @@ describe('HistoryPage', () => {
     historyPageMocks.useHistoryTasks.mockReset()
     historyPageMocks.useHistoryFiles.mockReset()
     historyPageMocks.useHistoryLiveActions.mockReset()
+    historyPageMocks.useHistoryLiveDetail.mockReset()
     historyPageMocks.useHistoryLiveSessions.mockReset()
     historyPageMocks.useHistoryTaskDetail.mockReset()
     historyPageMocks.useHistoryFileAssociatedTasks.mockReset()
@@ -627,6 +695,12 @@ describe('HistoryPage', () => {
       deleteLiveSessions: vi.fn(),
       exportLiveSession: vi.fn(),
       exportLiveSessions: vi.fn(),
+    })
+    historyPageMocks.useHistoryLiveDetail.mockReturnValue({
+      session: null,
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(),
     })
     historyPageMocks.useHistoryFileTaskCounts.mockReturnValue(new Map([['file-archive', 3]]))
     historyPageMocks.useHistoryFileAssociatedTasks.mockReturnValue([
@@ -788,6 +862,26 @@ describe('HistoryPage', () => {
     expect(screen.getByText('live-finished')).toBeTruthy()
     expect(screen.getByText('Live briefing')).toBeTruthy()
     expect(screen.getByText('Daily standup')).toBeTruthy()
+  })
+
+  it('opens live detail from a live history row', async () => {
+    historyPageMocks.search = {
+      mode: 'live',
+    }
+    historyPageMocks.useHistoryLiveDetail.mockReturnValue({
+      session: createLiveDetail(),
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(),
+    })
+
+    renderHistoryPage()
+
+    fireEvent.click(screen.getByText('live-finished'))
+
+    expect(await screen.findByText('Live detail transcript.')).toBeTruthy()
+    expect(screen.getByText('Request Parameters')).toBeTruthy()
+    expect(screen.getByText(/"model_id": "large-v3"/)).toBeTruthy()
   })
 
   it('runs live row and batch actions with existing table controls', async () => {
