@@ -35,11 +35,12 @@ const PAGE_SIZE_SET = new Set<number>(HISTORY_PAGE_SIZE_OPTIONS)
 
 export type HistoryPageSize = (typeof HISTORY_PAGE_SIZE_OPTIONS)[number]
 export type HistoryRecordsMode = 'files' | 'tasks'
+export type HistoryRouteMode = HistoryRecordsMode | 'live'
 export type HistoryTaskQuery = TaskQueryModel & {
   page_size: HistoryPageSize
 }
 
-const MODE_OPTIONS: readonly HistoryRecordsMode[] = ['tasks', 'files']
+const MODE_OPTIONS: readonly HistoryRouteMode[] = ['tasks', 'files', 'live']
 const MODE_SET = new Set(MODE_OPTIONS)
 
 export interface HistoryFileQuery {
@@ -52,7 +53,7 @@ export interface HistoryFileQuery {
 }
 
 export interface HistoryRouteSearch {
-  mode?: HistoryRecordsMode
+  mode?: HistoryRouteMode
   q?: string
   status?: TaskFilterStatus
   content_type?: FileContentTypeFilterValue
@@ -101,8 +102,9 @@ export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
   const pageSizeValue = parsePositiveInt(searchRecord.page_size)
 
   const next: HistoryRouteSearch = {}
-  const normalizedMode =
-    MODE_SET.has(modeValue as HistoryRecordsMode) && modeValue === 'files' ? 'files' : 'tasks'
+  const normalizedMode = MODE_SET.has(modeValue as HistoryRouteMode)
+    ? (modeValue as HistoryRouteMode)
+    : 'tasks'
 
   if (normalizedMode === 'files') {
     next.mode = 'files'
@@ -120,6 +122,13 @@ export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
 
     if (FILE_ORDER_SET.has(orderValue as FileSortOrder) && orderValue !== DEFAULT_FILE_SORT_ORDER) {
       next.order = orderValue as FileSortOrder
+    }
+  }
+
+  if (normalizedMode === 'live') {
+    next.mode = 'live'
+    if (qValue !== '') {
+      next.q = qValue
     }
   }
 
@@ -161,7 +170,7 @@ export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
 
 /** Convert normalized route search params into backend query model. */
 export function buildHistoryTaskQuery(search: HistoryRouteSearch): HistoryTaskQuery {
-  const isTaskMode = search.mode !== 'files'
+  const isTaskMode = search.mode !== 'files' && search.mode !== 'live'
   return {
     q: isTaskMode ? (search.q ?? '') : '',
     status: isTaskMode ? (search.status ?? DEFAULT_TASK_FILTER_STATUS) : DEFAULT_TASK_FILTER_STATUS,

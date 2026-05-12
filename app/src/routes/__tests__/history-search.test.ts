@@ -71,6 +71,26 @@ describe('history-search', () => {
     })
   })
 
+  it('normalizes live mode without task or file filters', () => {
+    expect(
+      normalizeHistorySearch({
+        mode: 'live',
+        content_type: 'audio/wav',
+        order: 'asc',
+        page: '2',
+        page_size: '50',
+        q: '  session  ',
+        sort_by: 'filename',
+        status: 'processing',
+      }),
+    ).toEqual({
+      mode: 'live',
+      page: 2,
+      page_size: 50,
+      q: 'session',
+    })
+  })
+
   it('compares mode as part of the normalized search identity', () => {
     expect(
       isSameHistorySearch(
