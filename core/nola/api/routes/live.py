@@ -99,7 +99,12 @@ from nola.application.live.realtime import (
     ensure_pcm16le_contract,
 )
 from nola.application.live.runtime_config import build_live_request_overrides
-from nola.application.live.types import LiveRuntimeConfig
+from nola.application.live.types import (
+    LiveRuntimeConfig,
+    LiveSessionSortBy,
+    LiveSessionStatus,
+    LiveSortOrder,
+)
 from nola.application.live.values import ensure_live_session_status
 from nola.common.types import JsonValue
 from nola.config.export import ExportFormat, build_download_content_disposition
@@ -334,12 +339,18 @@ def list_live_sessions_endpoint(
         max_length=200,
         description="Search live sessions by session ID or title",
     ),
-    status: str | None = Query(None, description="Filter by live session status"),
-    sort_by: str = Query(
+    status: LiveSessionStatus | None = Query(
+        None,
+        description="Filter by live session status",
+    ),
+    sort_by: LiveSessionSortBy = Query(
         DEFAULT_LIVE_SESSION_SORT_BY,
         description="Sort field: started_at, ended_at, status, or title",
     ),
-    order: str = Query(DEFAULT_LIVE_SORT_ORDER, description="Sort order: asc or desc"),
+    order: LiveSortOrder = Query(
+        DEFAULT_LIVE_SORT_ORDER,
+        description="Sort order: asc or desc",
+    ),
 ) -> LiveSessionListPayload:
     """Return paged live session summaries."""
     try:

@@ -1543,6 +1543,44 @@ def test_export_live_session_save_to_disk(client: TestClient) -> None:
     assert saved_content.strip() == "saved transcript"
 
 
+def test_export_live_session_save_sanitizes_requested_filename(
+    client: TestClient,
+) -> None:
+    """Live server-side save should ignore directory segments in filename input."""
+    session_id = _create_stored_live_session(
+        session_id="live-save-sanitized",
+        title="Live Save Sanitized",
+        status="finished",
+        final_text="saved transcript",
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        exports_path = tmp_path / "exports"
+        with patch.object(
+            Settings,
+            "exports_dir",
+            new_callable=PropertyMock,
+            return_value=exports_path,
+        ):
+            response = client.get(
+                f"/api/live/sessions/{session_id}/export",
+                params={
+                    "format": "txt",
+                    "include_timestamps": "false",
+                    "save": "true",
+                    "filename": "../../secret.txt",
+                },
+            )
+            saved_content = (exports_path / "secret.txt").read_text(encoding="utf-8")
+
+        assert not (tmp_path / "secret.txt").exists()
+
+    assert response.status_code == 200
+    assert response.json() == {"saved_path": "exports/secret.txt"}
+    assert saved_content.strip() == "saved transcript"
+
+
 def test_export_live_session_rejects_active_or_empty_session(
     client: TestClient,
 ) -> None:
@@ -1794,6 +1832,24 @@ def test_openapi_exposes_live_paths(client: TestClient) -> None:
     assert "/api/live/sessions/{session_id}/export" in paths
     assert "/api/live/sessions/{session_id}/finish" in paths
     assert "/api/live/sessions/{session_id}/record" in paths
+
+    list_parameters = {
+        parameter["name"]: parameter["schema"]
+        for parameter in paths["/api/live/sessions"]["get"]["parameters"]
+    }
+
+    def parameter_enum(name: str) -> list[str]:
+        schema = list_parameters[name]
+        if "enum" in schema:
+            return schema["enum"]
+        for candidate in schema.get("anyOf", []):
+            if "enum" in candidate:
+                return candidate["enum"]
+        return []
+
+    assert parameter_enum("status") == ["active", "finished", "failed"]
+    assert parameter_enum("sort_by") == ["started_at", "ended_at", "status", "title"]
+    assert parameter_enum("order") == ["asc", "desc"]
 
 
 class _FlushTrackRouteTranscriber:

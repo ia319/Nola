@@ -4453,11 +4453,11 @@ export interface operations {
         /** @description Search live sessions by session ID or title */
         q?: string | null
         /** @description Filter by live session status */
-        status?: string | null
+        status?: ('active' | 'finished' | 'failed') | null
         /** @description Sort field: started_at, ended_at, status, or title */
-        sort_by?: string
+        sort_by?: 'started_at' | 'ended_at' | 'status' | 'title'
         /** @description Sort order: asc or desc */
-        order?: string
+        order?: 'asc' | 'desc'
       }
       header?: never
       path?: never
