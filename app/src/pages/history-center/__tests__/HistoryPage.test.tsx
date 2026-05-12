@@ -89,6 +89,9 @@ vi.mock('react-i18next', () => ({
       const messages: Record<string, string> = {
         'history.title': 'History',
         'history.description': 'Review archived task records and recent execution output.',
+        'history.navigationLabel': 'History sections',
+        'history.views.task': 'Task',
+        'history.views.live': 'Live',
         'history.modes.files': 'Filename',
         'history.modes.tasks': 'Task ID',
         'history.toolbar.searchLabel': 'Search history records',
@@ -161,6 +164,8 @@ vi.mock('react-i18next', () => ({
         'history.files.deleteDialog.cancel': 'Cancel',
         'history.files.deleteDialog.confirm': 'Delete file',
         'history.files.deleteDialog.deleting': 'Deleting...',
+        'history.live.empty.title': 'No live records found',
+        'history.live.empty.description': 'Finished live sessions will appear in this view.',
         'history.table.caption': 'History task records',
         'history.table.columns.taskId': 'Task ID',
         'history.table.columns.filename': 'Filename',
@@ -576,7 +581,10 @@ describe('HistoryPage', () => {
 
     const page = screen.getByRole('main')
     expect(page).toHaveAttribute('data-slot', 'history-page')
-    expect(screen.getByRole('heading', { level: 1, name: 'History', hidden: true })).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'History' })).toBeTruthy()
+    expect(screen.getByRole('navigation', { name: 'History sections' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Task' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Live' })).toBeEnabled()
     expect(screen.getByRole('textbox', { name: 'Search history records' })).toBeTruthy()
     expect(screen.getByPlaceholderText('Search by task ID or filename')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Export Selected' })).toBeNull()
@@ -641,6 +649,70 @@ describe('HistoryPage', () => {
       mode: 'files',
       q: 'alpha',
     })
+  })
+
+  it('switches to live history through the top-level tab', () => {
+    historyPageMocks.search = {
+      order: 'asc',
+      page: 3,
+      q: 'alpha',
+      sort_by: 'filename',
+      status: 'processing',
+    }
+
+    renderHistoryPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Live' }))
+
+    const navigation = historyPageMocks.navigate.mock.calls.at(-1)?.[0]
+    expect(navigation?.replace).toBe(false)
+    expect(
+      navigation?.search({
+        order: 'asc',
+        page: 3,
+        q: 'alpha',
+        sort_by: 'filename',
+        status: 'processing',
+      }),
+    ).toEqual({
+      mode: 'live',
+    })
+  })
+
+  it('renders live mode without task or filename data sources', () => {
+    historyPageMocks.search = {
+      mode: 'live',
+      q: 'session',
+    }
+
+    renderHistoryPage()
+
+    expect(screen.getByRole('button', { name: 'Live' })).toHaveAttribute('aria-current', 'page')
+    expect(historyPageMocks.useHistoryTasks).not.toHaveBeenCalled()
+    expect(historyPageMocks.useHistoryFiles).not.toHaveBeenCalled()
+    expect(screen.getByText('No live records found')).toBeTruthy()
+  })
+
+  it('switches from live history back to the default task history', () => {
+    historyPageMocks.search = {
+      mode: 'live',
+      page: 2,
+      q: 'session',
+    }
+
+    renderHistoryPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Task' }))
+
+    const navigation = historyPageMocks.navigate.mock.calls.at(-1)?.[0]
+    expect(navigation?.replace).toBe(false)
+    expect(
+      navigation?.search({
+        mode: 'live',
+        page: 2,
+        q: 'session',
+      }),
+    ).toEqual({})
   })
 
   it('shows batch actions after selecting a row and opens the export dialog', async () => {

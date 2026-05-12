@@ -7,6 +7,7 @@ import { useActiveLocale } from '@/app/locale/use-active-locale'
 import { ErrorBoundary, type InteractiveSortState } from '@/components/common'
 import { HISTORY_PAGE_SIZE } from '@/config/constants'
 import { ContentCanvas } from '@/layouts'
+import { cn } from '@/lib/utils'
 import {
   buildHistoryFileQuery,
   buildHistoryTaskQuery,
@@ -17,7 +18,24 @@ import {
 import { DEFAULT_FILE_CONTENT_TYPE_FILTER } from '@/shared/lib/file-query-options'
 import type { FileSortBy, FileSortOrder, TaskFilterStatus, TaskSortBy } from '@/shared/types'
 import { HistoryFileModeView } from './HistoryFileModeView'
+import { HistoryLiveModeView } from './HistoryLiveModeView'
 import { HistoryTaskModeView } from './HistoryTaskModeView'
+
+type HistoryViewMode = 'live' | 'task'
+
+const HISTORY_VIEW_TABS: readonly {
+  key: HistoryViewMode
+  labelKey: 'history.views.live' | 'history.views.task'
+}[] = [
+  {
+    key: 'task',
+    labelKey: 'history.views.task',
+  },
+  {
+    key: 'live',
+    labelKey: 'history.views.live',
+  },
+]
 
 interface HistoryPageProps {
   search: HistoryRouteSearch
@@ -28,7 +46,8 @@ export function HistoryPage({ search, updateSearch }: HistoryPageProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const activeLocale = useActiveLocale()
-  const mode = search.mode ?? 'tasks'
+  const viewMode: HistoryViewMode = search.mode === 'live' ? 'live' : 'task'
+  const recordsMode: HistoryRecordsMode = search.mode === 'files' ? 'files' : 'tasks'
   const taskQuery = useMemo(() => buildHistoryTaskQuery(search), [search])
   const fileQuery = useMemo(() => buildHistoryFileQuery(search), [search])
 
@@ -120,6 +139,27 @@ export function HistoryPage({ search, updateSearch }: HistoryPageProps) {
     },
     [updateSearch],
   )
+  const handleViewChange = useCallback(
+    (nextMode: HistoryViewMode) => {
+      if (nextMode === viewMode) {
+        return
+      }
+
+      updateSearch(
+        {
+          mode: nextMode === 'task' ? undefined : 'live',
+          q: undefined,
+          status: undefined,
+          content_type: undefined,
+          sort_by: undefined,
+          order: undefined,
+          page: undefined,
+        },
+        false,
+      )
+    },
+    [updateSearch, viewMode],
+  )
   const handleModeChange = useCallback(
     (nextMode: HistoryRecordsMode) => {
       updateSearch(
@@ -142,41 +182,80 @@ export function HistoryPage({ search, updateSearch }: HistoryPageProps) {
 
   return (
     <ErrorBoundary>
-      <ContentCanvas
-        as="main"
-        width="full"
-        height="fill"
-        className="gap-0 px-0 py-0"
-        data-slot="history-page"
-      >
-        <h1 className="sr-only">{t('history.title')}</h1>
-        <p className="sr-only">{t('history.description')}</p>
-        {mode === 'tasks' ? (
-          <HistoryTaskModeView
-            query={taskQuery}
-            onSearchChange={handleSearchChange}
-            onStatusChange={handleStatusChange}
-            onSortChange={handleTaskSortChange}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
-            onPageClamp={handlePageClamp}
-            onModeChange={handleModeChange}
-            onCreateTask={handleCreateTask}
-          />
-        ) : (
-          <HistoryFileModeView
-            query={fileQuery}
-            onSearchChange={handleSearchChange}
-            onContentTypeChange={handleFileContentTypeChange}
-            onSortChange={handleFileSortChange}
-            onPageClamp={handlePageClamp}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
-            onModeChange={handleModeChange}
-            onCreateTask={handleCreateTask}
-          />
-        )}
-      </ContentCanvas>
+      <main data-slot="history-page" className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="border-outline-variant/70 bg-background/95 border-b">
+          <ContentCanvas width="full" className="gap-4 py-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div className="space-y-1">
+                <h1 className="text-foreground text-xl font-semibold tracking-tight">
+                  {t('history.title')}
+                </h1>
+                <p className="text-muted-foreground text-sm">{t('history.description')}</p>
+              </div>
+
+              <nav
+                aria-label={t('history.navigationLabel')}
+                className="-mx-1 flex items-center gap-1 overflow-x-auto px-1"
+              >
+                {HISTORY_VIEW_TABS.map((tab) => {
+                  const active = viewMode === tab.key
+
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      aria-current={active ? 'page' : undefined}
+                      className={cn(
+                        'inline-flex h-10 items-center border-b-2 px-3 text-sm font-medium whitespace-nowrap transition-colors',
+                        active
+                          ? 'border-foreground text-foreground'
+                          : 'text-muted-foreground hover:text-foreground border-transparent',
+                      )}
+                      onClick={() => {
+                        handleViewChange(tab.key)
+                      }}
+                    >
+                      {t(tab.labelKey)}
+                    </button>
+                  )
+                })}
+              </nav>
+            </div>
+          </ContentCanvas>
+        </div>
+
+        <ContentCanvas width="full" height="fill" className="min-w-0 gap-0 px-0 py-0">
+          <div className="flex min-h-0 flex-1 flex-col">
+            {viewMode === 'live' ? (
+              <HistoryLiveModeView />
+            ) : recordsMode === 'tasks' ? (
+              <HistoryTaskModeView
+                query={taskQuery}
+                onSearchChange={handleSearchChange}
+                onStatusChange={handleStatusChange}
+                onSortChange={handleTaskSortChange}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+                onPageClamp={handlePageClamp}
+                onModeChange={handleModeChange}
+                onCreateTask={handleCreateTask}
+              />
+            ) : (
+              <HistoryFileModeView
+                query={fileQuery}
+                onSearchChange={handleSearchChange}
+                onContentTypeChange={handleFileContentTypeChange}
+                onSortChange={handleFileSortChange}
+                onPageClamp={handlePageClamp}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+                onModeChange={handleModeChange}
+                onCreateTask={handleCreateTask}
+              />
+            )}
+          </div>
+        </ContentCanvas>
+      </main>
     </ErrorBoundary>
   )
 }
