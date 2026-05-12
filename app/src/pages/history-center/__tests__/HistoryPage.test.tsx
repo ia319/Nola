@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { isSameHistorySearch, normalizeHistorySearch } from '@/routes/history-search'
 import type { ExportDialogValue, ExportRequestOptions } from '@/features/export'
 import type { UseHistoryTaskActionsResult } from '../hooks/useHistoryTaskActions'
-import type { FileInfo, TaskDetail, TaskSummary } from '@/shared/types'
+import type { FileInfo, LiveSessionSummary, TaskDetail, TaskSummary } from '@/shared/types'
 
 const historyPageMocks = vi.hoisted(() => ({
   logger: {
@@ -19,6 +19,8 @@ const historyPageMocks = vi.hoisted(() => ({
   search: {} as Record<string, unknown>,
   useHistoryTasks: vi.fn(),
   useHistoryFiles: vi.fn(),
+  useHistoryLiveActions: vi.fn(),
+  useHistoryLiveSessions: vi.fn(),
   useHistoryTaskDetail: vi.fn(),
   useHistoryFileAssociatedTasks: vi.fn(),
   useHistoryFileTaskCounts: vi.fn(),
@@ -166,6 +168,25 @@ vi.mock('react-i18next', () => ({
         'history.files.deleteDialog.deleting': 'Deleting...',
         'history.live.empty.title': 'No live records found',
         'history.live.empty.description': 'Finished live sessions will appear in this view.',
+        'history.live.batch.delete': 'Delete selected',
+        'history.live.batch.export': 'Export selected',
+        'history.live.filters.searchPlaceholder': 'Search by session ID or title',
+        'history.live.filters.statusAll': 'All statuses',
+        'history.live.status.active': 'Active',
+        'history.live.status.finished': 'Finished',
+        'history.live.status.failed': 'Failed',
+        'history.live.table.caption': 'History live session records',
+        'history.live.table.selectAll': 'Select all live history rows',
+        'history.live.table.titleFallback': 'Untitled session',
+        'history.live.table.columns.sessionId': 'Session ID',
+        'history.live.table.columns.title': 'Title',
+        'history.live.table.columns.status': 'Status',
+        'history.live.table.columns.started': 'Started',
+        'history.live.table.columns.ended': 'Ended',
+        'history.live.table.columns.actions': 'Actions',
+        'history.live.table.actions.export': 'Export record',
+        'history.live.table.actions.deleteRecord': 'Delete record',
+        'history.live.table.actions.more': `More actions for ${String(params?.sessionId)}`,
         'history.table.caption': 'History task records',
         'history.table.columns.taskId': 'Task ID',
         'history.table.columns.filename': 'Filename',
@@ -225,6 +246,14 @@ vi.mock('react-i18next', () => ({
 
       if (key === 'history.files.table.selectRow') {
         return `Select file ${String(params?.fileId)}`
+      }
+
+      if (key === 'history.live.selection.selectedCount') {
+        return `${String(params?.count)} selected`
+      }
+
+      if (key === 'history.live.table.selectRow') {
+        return `Select live session ${String(params?.sessionId)}`
       }
 
       if (key === 'history.files.table.tasksCount') {
@@ -346,6 +375,7 @@ vi.mock('@/components/common', async () => {
 
 vi.mock('@/features/export', () => ({
   ExportDialog: historyPageMocks.exportDialog,
+  buildExportFilename: () => 'default-live-export.srt',
   buildSingleExportFilename: () => 'default-export.srt',
   useExportDefaults: () => ({
     defaults: {
@@ -380,6 +410,14 @@ vi.mock('../hooks/useHistoryTaskActions', () => ({
 
 vi.mock('../hooks/useHistoryFiles', () => ({
   useHistoryFiles: historyPageMocks.useHistoryFiles,
+}))
+
+vi.mock('../hooks/useHistoryLiveActions', () => ({
+  useHistoryLiveActions: historyPageMocks.useHistoryLiveActions,
+}))
+
+vi.mock('../hooks/useHistoryLiveSessions', () => ({
+  useHistoryLiveSessions: historyPageMocks.useHistoryLiveSessions,
 }))
 
 vi.mock('../hooks/useHistoryTaskDetail', () => ({
@@ -467,6 +505,25 @@ function createFile(overrides: Partial<FileInfo>): FileInfo {
   }
 }
 
+function createLiveSession(overrides: Partial<LiveSessionSummary>): LiveSessionSummary {
+  return {
+    audio_format: null,
+    created_at: '2026-04-11T10:00:00.000Z',
+    ended_at: '2026-04-11T10:12:00.000Z',
+    error: null,
+    language_hint: null,
+    mode: 'streaming',
+    model_id: 'large-v3',
+    runtime: null,
+    session_id: 'live-1',
+    started_at: '2026-04-11T10:00:00.000Z',
+    status: 'finished',
+    title: 'Live briefing',
+    updated_at: '2026-04-11T10:12:00.000Z',
+    ...overrides,
+  }
+}
+
 function createTaskDetail(overrides: Partial<TaskDetail> = {}) {
   return {
     task_id: 'task-completed',
@@ -497,6 +554,8 @@ describe('HistoryPage', () => {
     historyPageMocks.search = {}
     historyPageMocks.useHistoryTasks.mockReset()
     historyPageMocks.useHistoryFiles.mockReset()
+    historyPageMocks.useHistoryLiveActions.mockReset()
+    historyPageMocks.useHistoryLiveSessions.mockReset()
     historyPageMocks.useHistoryTaskDetail.mockReset()
     historyPageMocks.useHistoryFileAssociatedTasks.mockReset()
     historyPageMocks.useHistoryFileTaskCounts.mockReset()
@@ -547,6 +606,27 @@ describe('HistoryPage', () => {
       isLoading: false,
       error: null,
       refresh: vi.fn(),
+    })
+    historyPageMocks.useHistoryLiveSessions.mockReturnValue({
+      sessions: [
+        createLiveSession({ session_id: 'live-finished', status: 'finished' }),
+        createLiveSession({
+          ended_at: null,
+          session_id: 'live-active',
+          status: 'active',
+          title: 'Daily standup',
+        }),
+      ],
+      total: 2,
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(),
+    })
+    historyPageMocks.useHistoryLiveActions.mockReturnValue({
+      deleteLiveSession: vi.fn(),
+      deleteLiveSessions: vi.fn(),
+      exportLiveSession: vi.fn(),
+      exportLiveSessions: vi.fn(),
     })
     historyPageMocks.useHistoryFileTaskCounts.mockReturnValue(new Map([['file-archive', 3]]))
     historyPageMocks.useHistoryFileAssociatedTasks.mockReturnValue([
@@ -683,6 +763,7 @@ describe('HistoryPage', () => {
     historyPageMocks.search = {
       mode: 'live',
       q: 'session',
+      status: 'finished',
     }
 
     renderHistoryPage()
@@ -690,7 +771,155 @@ describe('HistoryPage', () => {
     expect(screen.getByRole('button', { name: 'Live' })).toHaveAttribute('aria-current', 'page')
     expect(historyPageMocks.useHistoryTasks).not.toHaveBeenCalled()
     expect(historyPageMocks.useHistoryFiles).not.toHaveBeenCalled()
+    expect(historyPageMocks.useHistoryLiveSessions).toHaveBeenCalledWith({
+      onPageClamp: expect.any(Function),
+      query: {
+        order: 'desc',
+        page: 1,
+        page_size: 20,
+        q: 'session',
+        sort_by: 'started_at',
+        status: 'finished',
+      },
+    })
+    expect(screen.getByPlaceholderText('Search by session ID or title')).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: 'Session ID' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: 'Title' })).toBeTruthy()
+    expect(screen.getByText('live-finished')).toBeTruthy()
+    expect(screen.getByText('Live briefing')).toBeTruthy()
+    expect(screen.getByText('Daily standup')).toBeTruthy()
+  })
+
+  it('runs live row and batch actions with existing table controls', async () => {
+    const exportLiveSession = vi.fn().mockResolvedValue({ mode: 'download' })
+    const deleteLiveSession = vi.fn().mockResolvedValue(undefined)
+    const exportLiveSessions = vi.fn().mockResolvedValue(undefined)
+    const deleteLiveSessions = vi.fn().mockResolvedValue(undefined)
+
+    historyPageMocks.search = {
+      mode: 'live',
+    }
+    historyPageMocks.useHistoryLiveActions.mockReturnValue({
+      deleteLiveSession,
+      deleteLiveSessions,
+      exportLiveSession,
+      exportLiveSessions,
+    })
+
+    renderHistoryPage()
+
+    openMenu(screen.getByRole('button', { name: 'More actions for live-finished' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Export record' }))
+
+    await waitFor(() => {
+      expect(historyPageMocks.exportDialog.mock.calls.at(-1)?.[0]).toMatchObject({
+        open: true,
+        taskCount: 1,
+      })
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm export' }))
+
+    await waitFor(() => {
+      expect(exportLiveSession).toHaveBeenCalledWith(
+        expect.objectContaining({ session_id: 'live-finished' }),
+        expect.objectContaining({ format: 'srt' }),
+      )
+    })
+
+    openMenu(screen.getByRole('button', { name: 'More actions for live-finished' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete record' }))
+
+    await waitFor(() => {
+      expect(deleteLiveSession).toHaveBeenCalledWith(
+        expect.objectContaining({ session_id: 'live-finished' }),
+      )
+    })
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select live session live-finished' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Export selected (1)' }))
+
+    await waitFor(() => {
+      expect(historyPageMocks.exportDialog.mock.calls.at(-1)?.[0]).toMatchObject({
+        open: true,
+        taskCount: 1,
+      })
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm export' }))
+
+    await waitFor(() => {
+      expect(exportLiveSessions).toHaveBeenCalledWith(
+        ['live-finished'],
+        expect.objectContaining({ format: 'srt' }),
+      )
+    })
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select live session live-finished' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected (1)' }))
+
+    await waitFor(() => {
+      expect(deleteLiveSessions).toHaveBeenCalledWith(['live-finished'])
+    })
+  })
+
+  it('renders the live history empty state', () => {
+    historyPageMocks.search = {
+      mode: 'live',
+    }
+    historyPageMocks.useHistoryLiveSessions.mockReturnValue({
+      sessions: [],
+      total: 0,
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(),
+    })
+
+    renderHistoryPage()
+
     expect(screen.getByText('No live records found')).toBeTruthy()
+    expect(screen.getByText('Finished live sessions will appear in this view.')).toBeTruthy()
+  })
+
+  it('renders a live table skeleton while the first page is loading', () => {
+    historyPageMocks.search = {
+      mode: 'live',
+    }
+    historyPageMocks.useHistoryLiveSessions.mockReturnValue({
+      sessions: [],
+      total: 0,
+      isLoading: true,
+      error: null,
+      refresh: vi.fn(),
+    })
+
+    renderHistoryPage()
+
+    expect(screen.getByRole('table', { name: 'History live session records' })).toBeTruthy()
+    expect(screen.queryByText('No live records found')).toBeNull()
+  })
+
+  it('renders a retryable live table error state', () => {
+    const refresh = vi.fn()
+    historyPageMocks.search = {
+      mode: 'live',
+    }
+    historyPageMocks.useHistoryLiveSessions.mockReturnValue({
+      sessions: [],
+      total: 0,
+      isLoading: false,
+      error: {
+        code: 'API_SERVER_UNKNOWN',
+        i18nKey: 'error.api.serverError',
+        retriable: true,
+      },
+      refresh,
+    })
+
+    renderHistoryPage()
+
+    expect(screen.getByText('An error occurred')).toBeTruthy()
+    expect(screen.getByText('Server error')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Try Again' }))
+    expect(refresh).toHaveBeenCalledTimes(1)
   })
 
   it('switches from live history back to the default task history', () => {

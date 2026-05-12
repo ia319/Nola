@@ -10,12 +10,20 @@ import { ContentCanvas } from '@/layouts'
 import { cn } from '@/lib/utils'
 import {
   buildHistoryFileQuery,
+  buildHistoryLiveQuery,
   buildHistoryTaskQuery,
   type HistoryRecordsMode,
   type HistoryPageSize,
   type HistoryRouteSearch,
 } from '@/routes/history-search'
 import { DEFAULT_FILE_CONTENT_TYPE_FILTER } from '@/shared/lib/file-query-options'
+import {
+  DEFAULT_LIVE_FILTER_STATUS,
+  DEFAULT_LIVE_SORT_BY,
+  DEFAULT_LIVE_SORT_ORDER,
+  type LiveHistorySortBy,
+  type LiveSessionFilterStatus,
+} from '@/shared/lib/live-query-options'
 import type { FileSortBy, FileSortOrder, TaskFilterStatus, TaskSortBy } from '@/shared/types'
 import { HistoryFileModeView } from './HistoryFileModeView'
 import { HistoryLiveModeView } from './HistoryLiveModeView'
@@ -50,6 +58,7 @@ export function HistoryPage({ search, updateSearch }: HistoryPageProps) {
   const recordsMode: HistoryRecordsMode = search.mode === 'files' ? 'files' : 'tasks'
   const taskQuery = useMemo(() => buildHistoryTaskQuery(search), [search])
   const fileQuery = useMemo(() => buildHistoryFileQuery(search), [search])
+  const liveQuery = useMemo(() => buildHistoryLiveQuery(search), [search])
 
   const handleSearchChange = useCallback(
     (value: string) => {
@@ -77,6 +86,33 @@ export function HistoryPage({ search, updateSearch }: HistoryPageProps) {
         {
           sort_by: sort.key === 'created_at' ? undefined : sort.key,
           order: sort.direction === 'desc' ? undefined : sort.direction,
+          page: undefined,
+        },
+        false,
+      )
+    },
+    [updateSearch],
+  )
+
+  const handleLiveStatusChange = useCallback(
+    (value: LiveSessionFilterStatus) => {
+      updateSearch(
+        {
+          status: value === DEFAULT_LIVE_FILTER_STATUS ? undefined : value,
+          page: undefined,
+        },
+        true,
+      )
+    },
+    [updateSearch],
+  )
+
+  const handleLiveSortChange = useCallback(
+    (sort: InteractiveSortState<LiveHistorySortBy>) => {
+      updateSearch(
+        {
+          sort_by: sort.key === DEFAULT_LIVE_SORT_BY ? undefined : sort.key,
+          order: sort.direction === DEFAULT_LIVE_SORT_ORDER ? undefined : sort.direction,
           page: undefined,
         },
         false,
@@ -227,7 +263,15 @@ export function HistoryPage({ search, updateSearch }: HistoryPageProps) {
         <ContentCanvas width="full" height="fill" className="min-w-0 gap-0 px-0 py-0">
           <div className="flex min-h-0 flex-1 flex-col">
             {viewMode === 'live' ? (
-              <HistoryLiveModeView />
+              <HistoryLiveModeView
+                query={liveQuery}
+                onSearchChange={handleSearchChange}
+                onStatusChange={handleLiveStatusChange}
+                onSortChange={handleLiveSortChange}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+                onPageClamp={handlePageClamp}
+              />
             ) : recordsMode === 'tasks' ? (
               <HistoryTaskModeView
                 query={taskQuery}

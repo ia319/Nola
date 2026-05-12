@@ -18,20 +18,30 @@ import {
   type FileContentTypeFilterValue,
 } from '@/shared/lib/file-query-options'
 import {
+  DEFAULT_LIVE_FILTER_STATUS,
+  LIVE_FILTER_STATUS_OPTIONS,
+  type LiveSessionFilterStatus,
+} from '@/shared/lib/live-query-options'
+import {
   DEFAULT_TASK_FILTER_STATUS,
   TASK_FILTER_STATUS_OPTIONS,
 } from '@/shared/lib/task-query-options'
 import type { TaskFilterStatus } from '@/shared/types'
 
+type HistoryToolbarMode = HistoryRecordsMode | 'live'
+
 export interface HistoryToolbarProps {
-  mode: HistoryRecordsMode
+  mode: HistoryToolbarMode
   searchValue: string
   isLoading?: boolean
   statusValue?: TaskFilterStatus
+  liveStatusValue?: LiveSessionFilterStatus
   contentTypeValue?: FileContentTypeFilterValue
+  showRecordsModeToggle?: boolean
   onSearchChange: (value: string) => void
   onSearchSubmit: (value: string) => void
   onStatusChange?: (value: TaskFilterStatus) => void
+  onLiveStatusChange?: (value: LiveSessionFilterStatus) => void
   onContentTypeChange?: (value: FileContentTypeFilterValue) => void
   onModeChange?: (mode: HistoryRecordsMode) => void
 }
@@ -41,18 +51,26 @@ export function HistoryToolbar({
   searchValue,
   isLoading = false,
   statusValue = DEFAULT_TASK_FILTER_STATUS,
+  liveStatusValue = DEFAULT_LIVE_FILTER_STATUS,
   contentTypeValue = DEFAULT_FILE_CONTENT_TYPE_FILTER,
+  showRecordsModeToggle = true,
   onSearchChange,
   onSearchSubmit,
   onStatusChange,
+  onLiveStatusChange,
   onContentTypeChange,
   onModeChange,
 }: HistoryToolbarProps) {
   const { t } = useTranslation()
-  const searchPlaceholder =
-    mode === 'files'
-      ? t('history.files.filters.searchPlaceholder')
-      : t('history.toolbar.searchPlaceholder')
+  const searchPlaceholder = (() => {
+    if (mode === 'files') {
+      return t('history.files.filters.searchPlaceholder')
+    }
+    if (mode === 'live') {
+      return t('history.live.filters.searchPlaceholder')
+    }
+    return t('history.toolbar.searchPlaceholder')
+  })()
 
   function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
     if (event.key !== 'Enter') return
@@ -95,39 +113,41 @@ export function HistoryToolbar({
           ) : null}
         </label>
 
-        <div
-          data-slot="history-mode-toggle"
-          className="bg-surface-container inline-flex w-fit items-center gap-1 rounded-lg p-1"
-        >
-          <Button
-            type="button"
-            size="xs"
-            variant={mode === 'files' ? 'secondary' : 'ghost'}
-            className="aria-pressed:bg-background aria-pressed:text-foreground text-[10px] font-semibold tracking-[0.18em] uppercase aria-pressed:shadow-xs"
-            aria-pressed={mode === 'files'}
-            disabled={isLoading || !onModeChange}
-            onClick={() => {
-              onModeChange?.('files')
-            }}
+        {showRecordsModeToggle && mode !== 'live' ? (
+          <div
+            data-slot="history-mode-toggle"
+            className="bg-surface-container inline-flex w-fit items-center gap-1 rounded-lg p-1"
           >
-            <FileText />
-            {t('history.modes.files')}
-          </Button>
-          <Button
-            type="button"
-            size="xs"
-            variant={mode === 'tasks' ? 'secondary' : 'ghost'}
-            className="aria-pressed:bg-background aria-pressed:text-foreground text-[10px] font-semibold tracking-[0.18em] uppercase aria-pressed:shadow-xs"
-            aria-pressed={mode === 'tasks'}
-            disabled={isLoading || !onModeChange}
-            onClick={() => {
-              onModeChange?.('tasks')
-            }}
-          >
-            <Hash />
-            {t('history.modes.tasks')}
-          </Button>
-        </div>
+            <Button
+              type="button"
+              size="xs"
+              variant={mode === 'files' ? 'secondary' : 'ghost'}
+              className="aria-pressed:bg-background aria-pressed:text-foreground text-[10px] font-semibold tracking-[0.18em] uppercase aria-pressed:shadow-xs"
+              aria-pressed={mode === 'files'}
+              disabled={isLoading || !onModeChange}
+              onClick={() => {
+                onModeChange?.('files')
+              }}
+            >
+              <FileText />
+              {t('history.modes.files')}
+            </Button>
+            <Button
+              type="button"
+              size="xs"
+              variant={mode === 'tasks' ? 'secondary' : 'ghost'}
+              className="aria-pressed:bg-background aria-pressed:text-foreground text-[10px] font-semibold tracking-[0.18em] uppercase aria-pressed:shadow-xs"
+              aria-pressed={mode === 'tasks'}
+              disabled={isLoading || !onModeChange}
+              onClick={() => {
+                onModeChange?.('tasks')
+              }}
+            >
+              <Hash />
+              {t('history.modes.tasks')}
+            </Button>
+          </div>
+        ) : null}
 
         {mode === 'tasks' ? (
           <Select
@@ -152,6 +172,33 @@ export function HistoryToolbar({
                   {option === DEFAULT_TASK_FILTER_STATUS
                     ? t('tasks.filters.statusAll')
                     : t(`tasks.status.${option}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : mode === 'live' ? (
+          <Select
+            value={liveStatusValue}
+            disabled={isLoading || !onLiveStatusChange}
+            onValueChange={(value) => {
+              onLiveStatusChange?.(value as LiveSessionFilterStatus)
+            }}
+          >
+            <SelectTrigger
+              className="w-full min-w-[152px] lg:w-[168px]"
+              aria-label={t('history.toolbar.status')}
+            >
+              <div className="flex items-center gap-2">
+                <Filter className="size-4" />
+                <SelectValue />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              {LIVE_FILTER_STATUS_OPTIONS.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option === DEFAULT_LIVE_FILTER_STATUS
+                    ? t('history.live.filters.statusAll')
+                    : t(`history.live.status.${option}`)}
                 </SelectItem>
               ))}
             </SelectContent>
