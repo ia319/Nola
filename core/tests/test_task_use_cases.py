@@ -362,6 +362,23 @@ def test_batch_retry_tasks_returns_mixed_outcomes() -> None:
     assert task_store.get_task("retry-1") is not None
 
 
+def test_batch_retry_tasks_allows_missing_request_overrides() -> None:
+    file_store = FakeFileStore(files={"f1": {"id": "f1", "filename": "failed.mp3"}})
+    task = _base_task(task_id="failed", file_id="f1", status="failed")
+    task.pop("request_overrides")
+    task_store = FakeTaskStore(tasks={"failed": task})
+
+    payload = batch_retry_tasks(
+        task_store=task_store,
+        file_store=file_store,
+        task_ids=["failed"],
+        task_id_factory=lambda: "retry-1",
+    )
+
+    assert payload["summary"] == {"requested": 1, "succeeded": 1, "failed": 0}
+    assert task_store.enqueued[0]["request_overrides"] is None
+
+
 def test_batch_retry_tasks_continues_when_enqueue_fails() -> None:
     file_store = FakeFileStore(
         files={
