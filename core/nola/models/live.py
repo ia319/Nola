@@ -10,17 +10,30 @@ from typing import cast
 from nola.application.live.types import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
     DEFAULT_LIVE_SESSION_LIMIT,
+    DEFAULT_LIVE_SESSION_SORT_BY,
+    DEFAULT_LIVE_SORT_ORDER,
+    DELETABLE_LIVE_SESSION_STATUSES,
     LiveRequestOverrides,
     LiveSegmentRecord,
     LiveSessionMode,
     LiveSessionRecord,
+    LiveSessionSortBy,
     LiveSessionStatus,
+    LiveSortOrder,
     LiveTrackRecord,
     LiveTrackSource,
 )
 from nola.common.types import JsonDict
+from nola.models.query_helpers import build_contains_like_pattern
 
 logger = logging.getLogger(__name__)
+
+_LIVE_SESSION_SORT_COLUMNS: dict[LiveSessionSortBy, str] = {
+    "started_at": "started_at",
+    "ended_at": "ended_at",
+    "status": "status",
+    "title": "title",
+}
 
 
 def _serialize_json_object(value: JsonDict | None, *, field_name: str) -> str | None:
@@ -169,24 +182,67 @@ class LiveDatabase:
         self,
         limit: int = DEFAULT_LIVE_SESSION_LIMIT,
         offset: int = 0,
+        *,
+        q: str | None = None,
+        status: LiveSessionStatus | None = None,
+        sort_by: LiveSessionSortBy = DEFAULT_LIVE_SESSION_SORT_BY,
+        order: LiveSortOrder = DEFAULT_LIVE_SORT_ORDER,
     ) -> list[LiveSessionRecord]:
-        """Return paged live sessions in newest-first order."""
+        """Return paged live sessions matching history filters."""
+        where_sql, params = self._build_session_filters(q=q, status=status)
+        sort_column = _LIVE_SESSION_SORT_COLUMNS[sort_by]
+        order_sql = "ASC" if order == "asc" else "DESC"
         with closing(self._connect()) as conn:
             cursor = conn.execute(
-                """
+                f"""
                 SELECT * FROM live_sessions
-                ORDER BY started_at DESC, id DESC
+                {where_sql}
+                ORDER BY {sort_column} {order_sql}, id {order_sql}
                 LIMIT ? OFFSET ?
                 """,
-                (limit, offset),
+                (*params, limit, offset),
             )
             return [self._to_session_record(row) for row in cursor.fetchall()]
 
-    def count_sessions(self) -> int:
-        """Return total live session count."""
+    def count_sessions(
+        self,
+        *,
+        q: str | None = None,
+        status: LiveSessionStatus | None = None,
+    ) -> int:
+        """Return total live session count matching filters."""
+        where_sql, params = self._build_session_filters(q=q, status=status)
         with closing(self._connect()) as conn:
-            cursor = conn.execute("SELECT COUNT(*) FROM live_sessions")
+            cursor = conn.execute(
+                f"SELECT COUNT(*) FROM live_sessions {where_sql}",
+                params,
+            )
             return int(cursor.fetchone()[0])
+
+    def _build_session_filters(
+        self,
+        *,
+        q: str | None,
+        status: LiveSessionStatus | None,
+    ) -> tuple[str, tuple[object, ...]]:
+        filters: list[str] = []
+        params: list[object] = []
+        if q:
+            pattern = build_contains_like_pattern(q)
+            filters.append(
+                """
+                (
+                    lower(id) LIKE ? ESCAPE '\\'
+                    OR lower(coalesce(title, '')) LIKE ? ESCAPE '\\'
+                )
+                """
+            )
+            params.extend([pattern, pattern])
+        if status is not None:
+            filters.append("status = ?")
+            params.append(status)
+        where_sql = f"WHERE {' AND '.join(filters)}" if filters else ""
+        return where_sql, tuple(params)
 
     def finish_session(
         self,
@@ -234,6 +290,19 @@ class LiveDatabase:
                 row = cursor.fetchone()
 
         return self._to_session_record(row) if row is not None else None
+
+    def delete_session_record(self, session_id: str) -> bool:
+        """Delete one terminal live session record."""
+        with closing(self._connect()) as conn:
+            with conn:
+                cursor = conn.execute(
+                    """
+                    DELETE FROM live_sessions
+                    WHERE id = ? AND status IN (?, ?)
+                    """,
+                    (session_id, *DELETABLE_LIVE_SESSION_STATUSES),
+                )
+                return cursor.rowcount > 0
 
     def create_track(
         self,
@@ -384,6 +453,19 @@ class LiveDatabase:
                 LIMIT ? OFFSET ?
                 """,
                 (session_id, limit, offset),
+            )
+            return [self._to_segment_record(row) for row in cursor.fetchall()]
+
+    def list_final_segments(self, session_id: str) -> list[LiveSegmentRecord]:
+        """Return final transcript segments attached to one live session."""
+        with closing(self._connect()) as conn:
+            cursor = conn.execute(
+                """
+                SELECT * FROM live_segments
+                WHERE session_id = ? AND is_final = 1
+                ORDER BY sequence ASC, id ASC
+                """,
+                (session_id,),
             )
             return [self._to_segment_record(row) for row in cursor.fetchall()]
 

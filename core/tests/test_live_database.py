@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from nola.application.live.types import LiveSessionStatus
 from nola.models import FileDatabase, LiveDatabase, TaskDatabase, init_db
 
 
@@ -27,24 +28,27 @@ def live_database():
 def _create_session(
     live_db: LiveDatabase,
     session_id: str = "live-001",
+    title: str | None = "Daily meeting",
+    status: LiveSessionStatus = "active",
+    started_at: str = "2026-01-01T00:00:00",
     runtime_config: dict[str, object] | None = None,
     request_overrides: dict[str, object] | None = None,
 ) -> None:
     """Create one active live session for repository tests."""
     live_db.create_session(
         session_id=session_id,
-        title="Daily meeting",
+        title=title,
         mode="streaming",
-        status="active",
+        status=status,
         language_hint="en",
         model_id=None,
         runtime=None,
         audio_format="pcm_s16le_16khz_mono",
         runtime_config=runtime_config,
         request_overrides=request_overrides,
-        started_at="2026-01-01T00:00:00",
-        created_at="2026-01-01T00:00:00",
-        updated_at="2026-01-01T00:00:00",
+        started_at=started_at,
+        created_at=started_at,
+        updated_at=started_at,
     )
 
 
@@ -154,6 +158,57 @@ def test_create_get_list_and_count_session(live_database):
     assert stored["request_overrides"] is None
     assert live_db.count_sessions() == 1
     assert [session["id"] for session in sessions] == ["live-001"]
+
+
+def test_list_sessions_applies_history_filters(live_database):
+    """Live session list should support history search, status, and sort options."""
+    live_db = live_database
+
+    _create_session(
+        live_db,
+        session_id="live-alpha",
+        title="Planning",
+        status="finished",
+        started_at="2026-01-01T00:00:00",
+    )
+    _create_session(
+        live_db,
+        session_id="live-beta",
+        title="Review",
+        status="failed",
+        started_at="2026-01-02T00:00:00",
+    )
+    _create_session(
+        live_db,
+        session_id="live-gamma",
+        title="Review",
+        status="finished",
+        started_at="2026-01-03T00:00:00",
+    )
+
+    sessions = live_db.list_sessions(
+        limit=10,
+        offset=0,
+        q="review",
+        status="finished",
+        sort_by="started_at",
+        order="asc",
+    )
+
+    assert [session["id"] for session in sessions] == ["live-gamma"]
+    assert live_db.count_sessions(q="review", status="finished") == 1
+
+
+def test_list_sessions_escapes_search_wildcards(live_database):
+    """Live session search should treat SQL wildcard characters as literals."""
+    live_db = live_database
+
+    _create_session(live_db, session_id="live-percent", title="Budget 100%")
+    _create_session(live_db, session_id="live-normal", title="Budget 1000")
+
+    sessions = live_db.list_sessions(limit=10, offset=0, q="100%", order="asc")
+
+    assert [session["id"] for session in sessions] == ["live-percent"]
 
 
 def test_create_session_preserves_runtime_config_snapshot(live_database):
@@ -334,6 +389,43 @@ def test_create_tracks_and_segments(live_database):
     assert live_db.count_segments("live-001") == 2
 
 
+def test_list_final_segments_returns_only_final_segments(live_database):
+    """Live final segment queries should exclude preview and partial rows."""
+    live_db = live_database
+    _create_session(live_db)
+
+    live_db.create_segment(
+        segment_id="preview",
+        session_id="live-001",
+        track_id=None,
+        sequence=1,
+        start_ms=0,
+        end_ms=500,
+        text="preview",
+        language=None,
+        confidence=None,
+        is_final=False,
+        created_at="2026-01-01T00:00:01",
+    )
+    live_db.create_segment(
+        segment_id="final",
+        session_id="live-001",
+        track_id=None,
+        sequence=2,
+        start_ms=500,
+        end_ms=1000,
+        text="final",
+        language=None,
+        confidence=None,
+        is_final=True,
+        created_at="2026-01-01T00:00:02",
+    )
+
+    assert [segment["id"] for segment in live_db.list_final_segments("live-001")] == [
+        "final"
+    ]
+
+
 def test_finish_track_only_updates_open_track(live_database):
     """finish_track() should persist one open live track end timestamp."""
     live_db = live_database
@@ -453,6 +545,52 @@ def test_create_segment_rejects_cross_session_track(live_database):
         )
 
     assert live_db.list_segments("live-b") == []
+
+
+def test_delete_session_record_removes_terminal_session_and_children(live_database):
+    """Deleting a terminal live session should cascade to tracks and segments."""
+    live_db = live_database
+    _create_session(live_db, status="finished")
+    live_db.create_track(
+        track_id="track-001",
+        session_id="live-001",
+        source="microphone",
+        label="Mic",
+        device_label="Built-in microphone",
+        sample_rate=16000,
+        channel_count=1,
+        started_at="2026-01-01T00:00:00",
+        ended_at="2026-01-01T00:01:00",
+        created_at="2026-01-01T00:00:00",
+    )
+    live_db.create_segment(
+        segment_id="segment-001",
+        session_id="live-001",
+        track_id="track-001",
+        sequence=1,
+        start_ms=0,
+        end_ms=1000,
+        text="final",
+        language="en",
+        confidence=0.9,
+        is_final=True,
+        created_at="2026-01-01T00:00:01",
+    )
+
+    assert live_db.delete_session_record("live-001") is True
+
+    assert live_db.get_session("live-001") is None
+    assert live_db.list_tracks("live-001") == []
+    assert live_db.list_segments("live-001") == []
+
+
+def test_delete_session_record_rejects_active_session(live_database):
+    """Deleting a live session record should be limited to terminal sessions."""
+    live_db = live_database
+    _create_session(live_db)
+
+    assert live_db.delete_session_record("live-001") is False
+    assert live_db.get_session("live-001") is not None
 
 
 def test_live_tables_do_not_affect_task_tables():
