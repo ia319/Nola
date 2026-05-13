@@ -63,6 +63,8 @@ def build_export_archive_filename(
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     if requested_name:
         safe_name = re.sub(r'[\r\n/\\"]', "", requested_name).strip()
+        if safe_name.lower().endswith(".zip"):
+            safe_name = safe_name[:-4].strip()
         return f"{safe_name}.zip" if safe_name else f"{fallback_prefix}_{timestamp}.zip"
     return f"{fallback_prefix}_{timestamp}.zip"
 

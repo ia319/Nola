@@ -109,8 +109,11 @@ def batch_export_live_sessions(
             )
 
     if success_count == 0 and errors:
+        status_code = (
+            500 if any(error["reason"] == "internal_error" for error in errors) else 400
+        )
         raise LiveUseCaseError(
-            status_code=400,
+            status_code=status_code,
             detail=f"All {len(errors)} live exports failed",
         )
 

@@ -1707,6 +1707,33 @@ def test_batch_export_live_sessions_supports_non_ascii_zip_name(
     assert "filename*=UTF-8''%E4%B8%AD%E6%96%87_export.zip" in content_disp
 
 
+def test_batch_export_live_sessions_avoids_double_zip_suffix(
+    client: TestClient,
+) -> None:
+    """Live batch export should not append a duplicate ZIP suffix."""
+    session_id = _create_stored_live_session(
+        session_id="live-batch-zip-suffix",
+        title="ZIP Suffix",
+        status="finished",
+        final_text="zip suffix transcript",
+    )
+
+    response = client.post(
+        "/api/live/sessions/export/batch",
+        json={
+            "session_ids": [session_id],
+            "format": "txt",
+            "include_timestamps": False,
+            "zip_name": "live_export.zip",
+        },
+    )
+
+    assert response.status_code == 200
+    content_disp = response.headers["content-disposition"]
+    assert "live_export.zip.zip" not in content_disp
+    assert 'filename="live_export.zip"' in content_disp
+
+
 def test_batch_export_live_sessions_rejects_all_failed(client: TestClient) -> None:
     """Live batch export should reject requests with no successful files."""
     active_id = _create_stored_live_session(
@@ -1721,6 +1748,31 @@ def test_batch_export_live_sessions_rejects_all_failed(client: TestClient) -> No
     )
 
     assert response.status_code == 400
+    assert response.json()["detail"] == "All 1 live exports failed"
+
+
+def test_batch_export_live_sessions_preserves_internal_error_status(
+    client: TestClient,
+) -> None:
+    """Live batch export should return 500 when all failures are internal."""
+    session_id = _create_stored_live_session(
+        session_id="live-batch-internal-error",
+        title="Internal Error",
+        status="finished",
+        final_text="internal error transcript",
+    )
+
+    with patch(
+        "nola.application.live.exports.batch_export_live_sessions."
+        "build_live_segment_data",
+        side_effect=RuntimeError("formatter input failed"),
+    ):
+        response = client.post(
+            "/api/live/sessions/export/batch",
+            json={"session_ids": [session_id], "format": "txt"},
+        )
+
+    assert response.status_code == 500
     assert response.json()["detail"] == "All 1 live exports failed"
 
 
