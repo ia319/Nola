@@ -59,7 +59,9 @@ export function SettingsTabPage({ tab }: SettingsTabPageProps) {
         </div>
       }
     >
-      <ActiveTabComponent />
+      <div data-slot="settings-tab-content" className="min-w-0 pb-6">
+        <ActiveTabComponent />
+      </div>
     </Suspense>
   )
 }
