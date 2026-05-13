@@ -1,8 +1,10 @@
-import type { FileListApiQuery, TaskListApiQuery } from '@/shared/types'
+import type { FileListApiQuery, LiveSessionListApiQuery, TaskListApiQuery } from '@/shared/types'
 
 type TaskListKeyParams = TaskListApiQuery
 
 type FileListKeyParams = FileListApiQuery
+
+type LiveListKeyParams = LiveSessionListApiQuery
 
 function normalizeTaskListParams(params: TaskListKeyParams = {}) {
   return {
@@ -19,6 +21,17 @@ function normalizeFileListParams(params: FileListKeyParams = {}) {
   return {
     q: params.q ?? '',
     content_type: params.content_type ?? null,
+    sort_by: params.sort_by ?? null,
+    order: params.order ?? null,
+    limit: params.limit ?? null,
+    offset: params.offset ?? null,
+  }
+}
+
+function normalizeLiveListParams(params: LiveListKeyParams = {}) {
+  return {
+    q: params.q ?? '',
+    status: params.status ?? null,
     sort_by: params.sort_by ?? null,
     order: params.order ?? null,
     limit: params.limit ?? null,
@@ -43,6 +56,14 @@ export const queryKeys = {
     details: () => ['files', 'detail'] as const,
     detail: (fileId: string) => ['files', 'detail', fileId] as const,
     integrity: () => ['files', 'integrity'] as const,
+  },
+  live: {
+    all: ['live'] as const,
+    lists: () => ['live', 'list'] as const,
+    list: (params: LiveListKeyParams = {}) =>
+      ['live', 'list', normalizeLiveListParams(params)] as const,
+    details: () => ['live', 'detail'] as const,
+    detail: (sessionId: string) => ['live', 'detail', sessionId] as const,
   },
   models: {
     all: ['models'] as const,

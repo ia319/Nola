@@ -2,16 +2,18 @@
 
 import io
 import logging
-import re
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime
-from pathlib import Path
 
 from nola.application.tasks.contracts import SupportsFileQueries, SupportsTaskQueries
 from nola.application.tasks.errors import TaskUseCaseError
 from nola.application.tasks.exports.export_common import resolve_export_options
-from nola.config.export import ExportFormat, build_export_filename
+from nola.config.export import (
+    ExportFormat,
+    build_export_archive_filename,
+    build_export_filename,
+    reserve_unique_export_filename,
+)
 from nola.models import AppConfigDatabase
 from nola.models.tasks import TaskStatus
 from nola.services.formatters import get_formatter
@@ -27,19 +29,6 @@ class BatchExportArchive:
     data: bytes
     filename: str
     media_type: str = "application/zip"
-
-
-def _reserve_unique_filename(candidate: str, used_names: set[str]) -> str:
-    """Return a non-conflicting filename within one zip archive."""
-    stem = Path(candidate).stem
-    suffix = Path(candidate).suffix
-    unique_name = candidate
-    counter = 1
-    while unique_name in used_names:
-        unique_name = f"{stem}_{counter}{suffix}"
-        counter += 1
-    used_names.add(unique_name)
-    return unique_name
 
 
 def batch_export_tasks(
@@ -111,7 +100,7 @@ def batch_export_tasks(
                     fallback_name=fallback_name,
                     extension=formatter.file_extension,
                 )
-                filename = _reserve_unique_filename(filename, used_names)
+                filename = reserve_unique_export_filename(filename, used_names)
                 archive.writestr(filename, content)
                 success_count += 1
             except Exception:
@@ -125,7 +114,10 @@ def batch_export_tasks(
 
         if errors:
             lines = [f"{item['task_id']}: {item['reason']}" for item in errors]
-            error_report_name = _reserve_unique_filename("_errors.txt", used_names)
+            error_report_name = reserve_unique_export_filename(
+                "_errors.txt",
+                used_names,
+            )
             archive.writestr(error_report_name, "\n".join(lines))
 
     if success_count == 0 and errors:
@@ -135,15 +127,10 @@ def batch_export_tasks(
         )
 
     zip_buffer.seek(0)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    if zip_name:
-        # Remove header/path injection characters from user-provided zip name.
-        safe_name = re.sub(r'[\r\n/\\"]', "", zip_name).strip()
-        zip_filename = f"{safe_name}.zip" if safe_name else f"export_{timestamp}.zip"
-    else:
-        zip_filename = f"export_{timestamp}.zip"
-
     return BatchExportArchive(
         data=zip_buffer.getvalue(),
-        filename=zip_filename,
+        filename=build_export_archive_filename(
+            requested_name=zip_name,
+            fallback_prefix="export",
+        ),
     )

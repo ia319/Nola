@@ -58,6 +58,7 @@ def init_db(db_path: str | Path | None = None) -> None:
                     -- Transcription options (JSON)
                     options TEXT,
                     runtime_config TEXT,
+                    request_overrides TEXT,
 
                     -- Task execution config
                     model_id TEXT,
@@ -112,6 +113,7 @@ def init_db(db_path: str | Path | None = None) -> None:
                     runtime TEXT,
                     audio_format TEXT,
                     runtime_config TEXT,
+                    request_overrides TEXT,
                     started_at TEXT NOT NULL,
                     ended_at TEXT,
                     error TEXT,
@@ -193,6 +195,9 @@ def init_db(db_path: str | Path | None = None) -> None:
                 "runtime_config": (
                     "ALTER TABLE transcription_tasks ADD COLUMN runtime_config TEXT"
                 ),
+                "request_overrides": (
+                    "ALTER TABLE transcription_tasks ADD COLUMN request_overrides TEXT"
+                ),
             }
             for column_name, alter_sql in task_execution_columns.items():
                 if column_name not in existing_columns:
@@ -202,3 +207,7 @@ def init_db(db_path: str | Path | None = None) -> None:
             existing_live_columns = {row[1] for row in cursor.fetchall()}
             if "runtime_config" not in existing_live_columns:
                 conn.execute("ALTER TABLE live_sessions ADD COLUMN runtime_config TEXT")
+            if "request_overrides" not in existing_live_columns:
+                conn.execute(
+                    "ALTER TABLE live_sessions ADD COLUMN request_overrides TEXT"
+                )

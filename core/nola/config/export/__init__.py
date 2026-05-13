@@ -4,9 +4,13 @@ from nola.config.export.defaults import (
     EXPORT_CONFIG_PREFIX,
     get_effective_defaults,
     get_engine_defaults,
+    resolve_export_options,
 )
 from nola.config.export.filenames import (
+    build_download_content_disposition,
+    build_export_archive_filename,
     build_export_filename,
+    reserve_unique_export_filename,
     resolve_unique_export_path,
     write_unique_export_text,
 )
@@ -23,9 +27,13 @@ __all__ = [
     "ExportDefaultsPatchResponse",
     "ExportFormat",
     "ExportResolvedDefaultsResponse",
+    "build_download_content_disposition",
+    "build_export_archive_filename",
     "build_export_filename",
     "get_effective_defaults",
     "get_engine_defaults",
+    "reserve_unique_export_filename",
     "resolve_unique_export_path",
+    "resolve_export_options",
     "write_unique_export_text",
 ]

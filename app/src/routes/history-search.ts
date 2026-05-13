@@ -8,6 +8,17 @@ import {
   type FileContentTypeFilterValue,
 } from '@/shared/lib/file-query-options'
 import {
+  DEFAULT_LIVE_FILTER_STATUS,
+  DEFAULT_LIVE_SORT_BY,
+  DEFAULT_LIVE_SORT_ORDER,
+  LIVE_FILTER_STATUS_OPTIONS,
+  LIVE_ORDER_OPTIONS,
+  LIVE_SORT_OPTIONS,
+  type LiveHistorySortBy,
+  type LiveHistorySortOrder,
+  type LiveSessionFilterStatus,
+} from '@/shared/lib/live-query-options'
+import {
   DEFAULT_TASK_FILTER_STATUS,
   DEFAULT_TASK_ORDER,
   DEFAULT_TASK_SORT_BY,
@@ -31,15 +42,19 @@ const SORT_SET = new Set<TaskSortBy>(TASK_SORT_OPTIONS)
 const ORDER_SET = new Set<SortOrder>(TASK_ORDER_OPTIONS)
 const FILE_SORT_SET = new Set<FileSortBy>(FILE_SORT_OPTIONS)
 const FILE_ORDER_SET = new Set<FileSortOrder>(FILE_ORDER_OPTIONS)
+const LIVE_STATUS_SET = new Set<LiveSessionFilterStatus>(LIVE_FILTER_STATUS_OPTIONS)
+const LIVE_SORT_SET = new Set<LiveHistorySortBy>(LIVE_SORT_OPTIONS)
+const LIVE_ORDER_SET = new Set<LiveHistorySortOrder>(LIVE_ORDER_OPTIONS)
 const PAGE_SIZE_SET = new Set<number>(HISTORY_PAGE_SIZE_OPTIONS)
 
 export type HistoryPageSize = (typeof HISTORY_PAGE_SIZE_OPTIONS)[number]
 export type HistoryRecordsMode = 'files' | 'tasks'
+export type HistoryRouteMode = HistoryRecordsMode | 'live'
 export type HistoryTaskQuery = TaskQueryModel & {
   page_size: HistoryPageSize
 }
 
-const MODE_OPTIONS: readonly HistoryRecordsMode[] = ['tasks', 'files']
+const MODE_OPTIONS: readonly HistoryRouteMode[] = ['tasks', 'files', 'live']
 const MODE_SET = new Set(MODE_OPTIONS)
 
 export interface HistoryFileQuery {
@@ -51,13 +66,22 @@ export interface HistoryFileQuery {
   page_size: HistoryPageSize
 }
 
+export interface HistoryLiveQuery {
+  q: string
+  status: LiveSessionFilterStatus
+  sort_by: LiveHistorySortBy
+  order: LiveHistorySortOrder
+  page: number
+  page_size: HistoryPageSize
+}
+
 export interface HistoryRouteSearch {
-  mode?: HistoryRecordsMode
+  mode?: HistoryRouteMode
   q?: string
-  status?: TaskFilterStatus
+  status?: LiveSessionFilterStatus | TaskFilterStatus
   content_type?: FileContentTypeFilterValue
-  sort_by?: TaskSortBy | FileSortBy
-  order?: SortOrder | FileSortOrder
+  sort_by?: FileSortBy | LiveHistorySortBy | TaskSortBy
+  order?: FileSortOrder | LiveHistorySortOrder | SortOrder
   page?: number
   page_size?: HistoryPageSize
 }
@@ -101,8 +125,9 @@ export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
   const pageSizeValue = parsePositiveInt(searchRecord.page_size)
 
   const next: HistoryRouteSearch = {}
-  const normalizedMode =
-    MODE_SET.has(modeValue as HistoryRecordsMode) && modeValue === 'files' ? 'files' : 'tasks'
+  const normalizedMode = MODE_SET.has(modeValue as HistoryRouteMode)
+    ? (modeValue as HistoryRouteMode)
+    : 'tasks'
 
   if (normalizedMode === 'files') {
     next.mode = 'files'
@@ -120,6 +145,34 @@ export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
 
     if (FILE_ORDER_SET.has(orderValue as FileSortOrder) && orderValue !== DEFAULT_FILE_SORT_ORDER) {
       next.order = orderValue as FileSortOrder
+    }
+  }
+
+  if (normalizedMode === 'live') {
+    next.mode = 'live'
+    if (qValue !== '') {
+      next.q = qValue
+    }
+
+    if (
+      LIVE_STATUS_SET.has(statusValue as LiveSessionFilterStatus) &&
+      statusValue !== DEFAULT_LIVE_FILTER_STATUS
+    ) {
+      next.status = statusValue as LiveSessionFilterStatus
+    }
+
+    if (
+      LIVE_SORT_SET.has(sortByValue as LiveHistorySortBy) &&
+      sortByValue !== DEFAULT_LIVE_SORT_BY
+    ) {
+      next.sort_by = sortByValue as LiveHistorySortBy
+    }
+
+    if (
+      LIVE_ORDER_SET.has(orderValue as LiveHistorySortOrder) &&
+      orderValue !== DEFAULT_LIVE_SORT_ORDER
+    ) {
+      next.order = orderValue as LiveHistorySortOrder
     }
   }
 
@@ -161,10 +214,13 @@ export function normalizeHistorySearch(search: unknown): HistoryRouteSearch {
 
 /** Convert normalized route search params into backend query model. */
 export function buildHistoryTaskQuery(search: HistoryRouteSearch): HistoryTaskQuery {
-  const isTaskMode = search.mode !== 'files'
+  const isTaskMode = search.mode !== 'files' && search.mode !== 'live'
   return {
     q: isTaskMode ? (search.q ?? '') : '',
-    status: isTaskMode ? (search.status ?? DEFAULT_TASK_FILTER_STATUS) : DEFAULT_TASK_FILTER_STATUS,
+    status:
+      isTaskMode && STATUS_SET.has(search.status as TaskFilterStatus)
+        ? (search.status as TaskFilterStatus)
+        : DEFAULT_TASK_FILTER_STATUS,
     sort_by:
       isTaskMode && SORT_SET.has(search.sort_by as TaskSortBy)
         ? (search.sort_by as TaskSortBy)
@@ -194,6 +250,28 @@ export function buildHistoryFileQuery(search: HistoryRouteSearch): HistoryFileQu
       isFileMode && FILE_ORDER_SET.has(search.order as FileSortOrder)
         ? (search.order as FileSortOrder)
         : DEFAULT_FILE_SORT_ORDER,
+    page: search.page ?? 1,
+    page_size: search.page_size ?? HISTORY_PAGE_SIZE,
+  }
+}
+
+/** Convert normalized route search params into live history query model. */
+export function buildHistoryLiveQuery(search: HistoryRouteSearch): HistoryLiveQuery {
+  const isLiveMode = search.mode === 'live'
+  return {
+    q: isLiveMode ? (search.q ?? '') : '',
+    status:
+      isLiveMode && LIVE_STATUS_SET.has(search.status as LiveSessionFilterStatus)
+        ? (search.status as LiveSessionFilterStatus)
+        : DEFAULT_LIVE_FILTER_STATUS,
+    sort_by:
+      isLiveMode && LIVE_SORT_SET.has(search.sort_by as LiveHistorySortBy)
+        ? (search.sort_by as LiveHistorySortBy)
+        : DEFAULT_LIVE_SORT_BY,
+    order:
+      isLiveMode && LIVE_ORDER_SET.has(search.order as LiveHistorySortOrder)
+        ? (search.order as LiveHistorySortOrder)
+        : DEFAULT_LIVE_SORT_ORDER,
     page: search.page ?? 1,
     page_size: search.page_size ?? HISTORY_PAGE_SIZE,
   }

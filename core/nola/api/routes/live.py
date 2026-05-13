@@ -1,10 +1,12 @@
 """Live transcription REST and realtime endpoints."""
 
+import io
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Annotated, NoReturn, TypeAlias
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket
+from fastapi.responses import Response, StreamingResponse
 from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 from starlette.websockets import WebSocketDisconnect
@@ -45,21 +47,39 @@ from nola.api.schemas import (
     LiveSessionDetailResponse,
     LiveSessionListResponse,
     LiveTrackResponse,
+    SavedExportResponse,
+)
+from nola.api.schemas.live import (
+    BatchLiveSessionActionRequest,
+    BatchLiveSessionActionResponse,
+    DeleteLiveSessionRecordResponse,
+    LiveSessionBatchExportRequest,
 )
 from nola.api.schemas.live_realtime import LiveRealtimeDiagnosticsWavStartEvent
 from nola.application.live import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
     DEFAULT_LIVE_SESSION_LIMIT,
+    DEFAULT_LIVE_SESSION_SORT_BY,
+    DEFAULT_LIVE_SORT_ORDER,
     MAX_LIVE_SEGMENT_LIMIT,
     MAX_LIVE_SESSION_LIMIT,
+    BatchLiveSessionActionPayload,
+    DeleteLiveSessionRecordPayload,
     LiveSessionListPayload,
     LiveSessionPayload,
     LiveUseCaseError,
     SupportsLiveRepository,
+    batch_delete_live_session_records,
     create_live_session,
+    delete_live_session_record,
     finish_live_session,
     get_live_session,
     list_live_sessions,
+)
+from nola.application.live.exports import (
+    LiveBatchExportArchive,
+    batch_export_live_sessions,
+    export_live_session,
 )
 from nola.application.live.realtime import (
     LIVE_REALTIME_SUPPORTED_PROTOCOL_VERSIONS,
@@ -78,11 +98,19 @@ from nola.application.live.realtime import (
     LiveStreamConnectionRegistry,
     ensure_pcm16le_contract,
 )
-from nola.application.live.types import LiveRuntimeConfig
+from nola.application.live.runtime_config import build_live_request_overrides
+from nola.application.live.types import (
+    LiveRuntimeConfig,
+    LiveSessionSortBy,
+    LiveSessionStatus,
+    LiveSortOrder,
+)
 from nola.application.live.values import ensure_live_session_status
 from nola.common.types import JsonValue
+from nola.config.export import ExportFormat, build_download_content_disposition
 from nola.config.live_realtime import LiveRealtimeAdapter
 from nola.models import AppConfigDatabase
+from nola.services.formatters import list_export_content_types
 
 router = APIRouter(prefix="/api/live", tags=["live"])
 LiveStoreDependency: TypeAlias = Annotated[SupportsLiveRepository, Depends(get_live_db)]
@@ -115,6 +143,34 @@ LIVE_REALTIME_CLOSE_NORMAL = 1000
 LIVE_REALTIME_CLOSE_POLICY = 1008
 LIVE_REALTIME_CLOSE_NOT_FOUND = 4404
 LIVE_REALTIME_CLOSE_CONFLICT = 4409
+
+LIVE_EXPORT_FILE_RESPONSE_CONTENT: dict[str, dict[str, dict[str, str]]] = {
+    media_type: {"schema": {"type": "string", "format": "binary"}}
+    for media_type in list_export_content_types()
+}
+
+LIVE_EXPORT_RESPONSES: dict[int | str, dict[str, object]] = {
+    200: {
+        "description": (
+            "save=false returns subtitle file; save=true returns saved path JSON"
+        ),
+        "content": {
+            "application/json": {
+                "schema": {"$ref": "#/components/schemas/SavedExportResponse"}
+            },
+            **LIVE_EXPORT_FILE_RESPONSE_CONTENT,
+        },
+    }
+}
+
+LIVE_BATCH_EXPORT_RESPONSES: dict[int | str, dict[str, object]] = {
+    200: {
+        "description": "ZIP archive download",
+        "content": {
+            "application/zip": {"schema": {"type": "string", "format": "binary"}}
+        },
+    }
+}
 
 
 def _raise_live_http_error(error: LiveUseCaseError) -> NoReturn:
@@ -235,16 +291,22 @@ def create_live_session_endpoint(
 ) -> LiveSessionPayload:
     """Create an active live transcription session."""
     try:
+        runtime_overrides = (
+            request.runtime_overrides.get_options_dict()
+            if request.runtime_overrides is not None
+            else None
+        )
         return create_live_session(
             live_store=live_store,
             title=request.title,
             mode=request.mode,
             language_hint=request.language_hint,
             model_id=request.model_id,
-            runtime_overrides=(
-                request.runtime_overrides.get_options_dict()
-                if request.runtime_overrides is not None
-                else None
+            runtime_overrides=runtime_overrides,
+            request_overrides=build_live_request_overrides(
+                model_id=request.model_id,
+                language_hint=request.language_hint,
+                runtime_overrides=runtime_overrides,
             ),
             runtime_adapter=runtime_adapter,
             config_store=config_store,
@@ -272,6 +334,23 @@ def list_live_sessions_endpoint(
         description="Max results",
     ),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
+    q: str | None = Query(
+        None,
+        max_length=200,
+        description="Search live sessions by session ID or title",
+    ),
+    status: LiveSessionStatus | None = Query(
+        None,
+        description="Filter by live session status",
+    ),
+    sort_by: LiveSessionSortBy = Query(
+        DEFAULT_LIVE_SESSION_SORT_BY,
+        description="Sort field: started_at, ended_at, status, or title",
+    ),
+    order: LiveSortOrder = Query(
+        DEFAULT_LIVE_SORT_ORDER,
+        description="Sort order: asc or desc",
+    ),
 ) -> LiveSessionListPayload:
     """Return paged live session summaries."""
     try:
@@ -279,6 +358,44 @@ def list_live_sessions_endpoint(
             live_store=live_store,
             limit=limit,
             offset=offset,
+            q=q,
+            status=status,
+            sort_by=sort_by,
+            order=order,
+        )
+    except LiveUseCaseError as error:
+        _raise_live_http_error(error)
+
+
+@router.post(
+    "/sessions/export/batch",
+    summary="Batch export live sessions",
+    response_class=StreamingResponse,
+    responses=LIVE_BATCH_EXPORT_RESPONSES,
+)
+def batch_export_live_sessions_endpoint(
+    request: LiveSessionBatchExportRequest,
+    live_store: LiveStoreDependency,
+    config_store: AppConfigDependency,
+) -> Response:
+    """Export multiple finished live sessions as a ZIP archive."""
+    try:
+        result: LiveBatchExportArchive = batch_export_live_sessions(
+            live_store=live_store,
+            config_store=config_store,
+            session_ids=request.session_ids,
+            requested_format=request.format,
+            requested_include_timestamps=request.include_timestamps,
+            zip_name=request.zip_name,
+        )
+        return StreamingResponse(
+            io.BytesIO(result.data),
+            media_type=result.media_type,
+            headers={
+                "Content-Disposition": build_download_content_disposition(
+                    result.filename
+                )
+            },
         )
     except LiveUseCaseError as error:
         _raise_live_http_error(error)
@@ -314,6 +431,86 @@ def get_live_session_endpoint(
         )
     except LiveUseCaseError as error:
         _raise_live_http_error(error)
+
+
+@router.get(
+    "/sessions/{session_id}/export",
+    summary="Export live session result",
+    response_model=SavedExportResponse,
+    responses=LIVE_EXPORT_RESPONSES,
+)
+def export_live_session_endpoint(
+    session_id: str,
+    live_store: LiveStoreDependency,
+    config_store: AppConfigDependency,
+    format: ExportFormat | None = Query(
+        None,
+        description="Output format; omitted values use persisted export defaults",
+    ),
+    include_timestamps: bool | None = Query(
+        None,
+        description=(
+            "Include timestamps (TXT only); omitted values use persisted defaults"
+        ),
+    ),
+    filename: str | None = Query(
+        None,
+        max_length=255,
+        description=(
+            "Optional output filename for single export. Extension is inferred "
+            "from selected format."
+        ),
+    ),
+    save: bool = Query(False, description="Save to server instead of download"),
+) -> Response:
+    """Export a finished live session as subtitle file."""
+    try:
+        return export_live_session(
+            live_store=live_store,
+            config_store=config_store,
+            session_id=session_id,
+            requested_format=format,
+            requested_include_timestamps=include_timestamps,
+            requested_filename=filename,
+            save=save,
+        )
+    except LiveUseCaseError as error:
+        _raise_live_http_error(error)
+
+
+@router.delete(
+    "/sessions/{session_id}/record",
+    summary="Delete live session record",
+    response_model=DeleteLiveSessionRecordResponse,
+)
+def delete_live_session_record_endpoint(
+    session_id: str,
+    live_store: LiveStoreDependency,
+) -> DeleteLiveSessionRecordPayload:
+    """Delete a terminal live session record."""
+    try:
+        return delete_live_session_record(
+            live_store=live_store,
+            session_id=session_id,
+        )
+    except LiveUseCaseError as error:
+        _raise_live_http_error(error)
+
+
+@router.post(
+    "/sessions/batch/delete-records",
+    summary="Batch delete terminal live session records",
+    response_model=BatchLiveSessionActionResponse,
+)
+def batch_delete_live_session_records_endpoint(
+    request: BatchLiveSessionActionRequest,
+    live_store: LiveStoreDependency,
+) -> BatchLiveSessionActionPayload:
+    """Delete multiple terminal live session records and return per-item outcomes."""
+    return batch_delete_live_session_records(
+        live_store=live_store,
+        session_ids=request.session_ids,
+    )
 
 
 @router.post(

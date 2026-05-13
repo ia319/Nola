@@ -1,15 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createLiveSession, finishLiveSession, getLiveSession } from '../api'
+import {
+  batchDeleteLiveSessionRecords,
+  batchExportLiveSessions,
+  createLiveSession,
+  deleteLiveSessionRecord,
+  downloadLiveSessionExport,
+  finishLiveSession,
+  getLiveSession,
+  listLiveSessions,
+  saveLiveSessionExport,
+} from '../api'
 import type { LiveSessionDetail } from '@/shared/types'
 
 const apiClientMocks = vi.hoisted(() => ({
+  delete: vi.fn(),
   get: vi.fn(),
   post: vi.fn(),
 }))
 
 vi.mock('@/shared/lib/api-client', () => ({
   default: {
+    delete: apiClientMocks.delete,
     get: apiClientMocks.get,
     post: apiClientMocks.post,
   },
@@ -83,6 +95,140 @@ describe('realtime api', () => {
         },
       },
     )
+  })
+
+  it('lists live sessions with history query params', async () => {
+    const signal = new AbortController().signal
+    apiClientMocks.get.mockResolvedValueOnce({
+      data: {
+        limit: 20,
+        offset: 0,
+        sessions: [liveSession('session-1')],
+        total: 1,
+      },
+    })
+
+    const response = await listLiveSessions(
+      {
+        limit: 20,
+        offset: 0,
+        order: 'asc',
+        q: 'session',
+        sort_by: 'title',
+        status: 'finished',
+      },
+      signal,
+    )
+
+    expect(apiClientMocks.get).toHaveBeenCalledWith('/api/live/sessions', {
+      params: {
+        limit: 20,
+        offset: 0,
+        order: 'asc',
+        q: 'session',
+        sort_by: 'title',
+        status: 'finished',
+      },
+      signal,
+    })
+    expect(response.total).toBe(1)
+  })
+
+  it('exports live sessions and parses download filenames', async () => {
+    const signal = new AbortController().signal
+    const blob = new Blob(['srt'])
+    apiClientMocks.get.mockResolvedValueOnce({
+      data: blob,
+      headers: {
+        'content-disposition': "attachment; filename*=UTF-8''meeting.srt",
+      },
+    })
+    apiClientMocks.get.mockResolvedValueOnce({ data: { saved_path: 'exports/meeting.srt' } })
+    apiClientMocks.post.mockResolvedValueOnce({
+      data: blob,
+      headers: {
+        'content-disposition': 'attachment; filename="live.zip"',
+      },
+    })
+
+    const download = await downloadLiveSessionExport(
+      'session-1',
+      {
+        filename: 'meeting',
+        format: 'srt',
+        include_timestamps: true,
+      },
+      signal,
+    )
+    const saved = await saveLiveSessionExport('session-1', { format: 'txt' })
+    const batch = await batchExportLiveSessions({
+      format: 'srt',
+      include_timestamps: true,
+      session_ids: ['session-1'],
+      zip_name: 'live',
+    })
+
+    expect(apiClientMocks.get).toHaveBeenNthCalledWith(1, '/api/live/sessions/session-1/export', {
+      params: {
+        filename: 'meeting',
+        format: 'srt',
+        include_timestamps: true,
+        save: false,
+      },
+      responseType: 'blob',
+      signal,
+    })
+    expect(apiClientMocks.get).toHaveBeenNthCalledWith(2, '/api/live/sessions/session-1/export', {
+      params: {
+        format: 'txt',
+        save: true,
+      },
+      signal: undefined,
+    })
+    expect(apiClientMocks.post).toHaveBeenCalledWith(
+      '/api/live/sessions/export/batch',
+      {
+        format: 'srt',
+        include_timestamps: true,
+        session_ids: ['session-1'],
+        zip_name: 'live',
+      },
+      {
+        responseType: 'blob',
+        signal: undefined,
+      },
+    )
+    expect(download.filename).toBe('meeting.srt')
+    expect(saved.saved_path).toBe('exports/meeting.srt')
+    expect(batch.filename).toBe('live.zip')
+  })
+
+  it('deletes live session records', async () => {
+    apiClientMocks.delete.mockResolvedValueOnce({
+      data: {
+        message: 'Live session record deleted',
+        session_id: 'session-1',
+      },
+    })
+    apiClientMocks.post.mockResolvedValueOnce({
+      data: {
+        action: 'delete_record',
+        results: [],
+        summary: {
+          failed: 0,
+          requested: 1,
+          succeeded: 1,
+        },
+      },
+    })
+
+    await deleteLiveSessionRecord('session-1')
+    await batchDeleteLiveSessionRecords({ session_ids: ['session-1'] })
+
+    expect(apiClientMocks.delete).toHaveBeenCalledWith('/api/live/sessions/session-1/record')
+    expect(apiClientMocks.post).toHaveBeenCalledWith('/api/live/sessions/batch/delete-records', {
+      session_ids: ['session-1'],
+    })
   })
 })
 

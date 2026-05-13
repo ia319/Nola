@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildSingleExportFilename } from '../filename'
+import { buildExportFilename, buildSingleExportFilename } from '../filename'
 
 describe('buildSingleExportFilename', () => {
   it('uses custom filename when provided', () => {
@@ -43,5 +43,17 @@ describe('buildSingleExportFilename', () => {
     })
 
     expect(filename).toBe('a__b_c.srt')
+  })
+})
+
+describe('buildExportFilename', () => {
+  it('builds a fallback filename for non-task exports', () => {
+    const filename = buildExportFilename({
+      fallbackId: 'session-1',
+      format: 'vtt',
+      sourceName: 'Live session',
+    })
+
+    expect(filename).toBe('Live session.vtt')
   })
 })

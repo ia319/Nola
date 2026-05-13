@@ -25,5 +25,6 @@ def get_task_detail(
         "duration": task["duration"],
         "segments": task["segments"],
         "error": task["error"],
+        "request_overrides": task["request_overrides"],
         "runtime_config": task["runtime_config"],
     }

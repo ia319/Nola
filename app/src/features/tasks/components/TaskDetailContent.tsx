@@ -1,6 +1,7 @@
-import { AlertCircle, FileText } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { JsonPropertiesBlock } from '@/components/common/JsonPropertiesBlock'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import type { Segment, TaskDetail } from '@/shared/types'
@@ -176,10 +177,11 @@ export function TaskDetailContent({ task }: TaskDetailContentProps) {
             {t('history.taskDetail.sections.technicalProperties')}
           </h3>
 
-          <EmptyState
-            icon={<AlertCircle className="size-6" />}
-            title={t('history.taskDetail.technicalUnavailable.title')}
-            description={t('history.taskDetail.technicalUnavailable.description')}
+          <JsonPropertiesBlock
+            value={task.request_overrides}
+            title={t('history.requestParameters.title')}
+            emptyTitle={t('history.requestParameters.unavailable.title')}
+            emptyDescription={t('history.requestParameters.unavailable.description')}
           />
         </section>
       </aside>

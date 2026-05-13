@@ -44,6 +44,7 @@ class TaskQueueRepository(TaskRepositoryBase):
         engine_device: str | None = None,
         engine_compute_type: str | None = None,
         runtime_config: JsonDict | None = None,
+        request_overrides: JsonDict | None = None,
     ) -> None:
         """Add task to queue."""
         with closing(self._connect()) as conn:
@@ -52,9 +53,9 @@ class TaskQueueRepository(TaskRepositoryBase):
                     """
                     INSERT INTO transcription_tasks
                     (id, file_id, status, priority, max_retries, options,
-                     runtime_config, model_id, engine_device, engine_compute_type,
-                     created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     runtime_config, request_overrides, model_id, engine_device,
+                     engine_compute_type, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         task_id,
@@ -66,6 +67,10 @@ class TaskQueueRepository(TaskRepositoryBase):
                         _serialize_json_field(
                             runtime_config,
                             field_name="runtime_config",
+                        ),
+                        _serialize_json_field(
+                            request_overrides,
+                            field_name="request_overrides",
                         ),
                         model_id,
                         engine_device,

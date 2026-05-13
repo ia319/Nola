@@ -86,6 +86,7 @@ def build_live_session_payload(
     """Build a live session detail payload."""
     return {
         **to_live_session_summary_payload(session),
+        "request_overrides": session["request_overrides"],
         "runtime_config": session["runtime_config"],
         "tracks": [to_live_track_payload(track) for track in tracks],
         "segments": [to_live_segment_payload(segment) for segment in segments],

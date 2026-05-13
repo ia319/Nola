@@ -331,6 +331,17 @@ class TestTranscriptionsAPI:
         assert stored["engine_compute_type"] == "float16"
         assert stored["options"] == {"language": "en"}
         assert stored["runtime_config"] == data["runtime_config"]
+        assert stored["request_overrides"] == {
+            "schema_version": 1,
+            "model_id": "large-v3",
+            "engine": {"device": "cuda", "compute_type": "float16"},
+            "transcription_options": {"language": "en"},
+        }
+
+        detail_response = client.get(f"/api/transcription-tasks/{data['task_id']}")
+        assert detail_response.status_code == 200
+        detail_payload = detail_response.json()
+        assert detail_payload["request_overrides"] == stored["request_overrides"]
 
     def test_create_task_runtime_config_uses_creation_time_defaults(
         self, client: TestClient
@@ -359,8 +370,10 @@ class TestTranscriptionsAPI:
         stored = task_db.get_task(task_id)
 
         assert detail_response.status_code == 200
-        detail_runtime_config = detail_response.json()["runtime_config"]
+        detail_payload = detail_response.json()
+        detail_runtime_config = detail_payload["runtime_config"]
         assert detail_runtime_config["transcription_options"]["beam_size"] == 3
+        assert detail_payload["request_overrides"] is None
         assert stored is not None
         assert stored["runtime_config"] == detail_runtime_config
 
@@ -2514,3 +2527,40 @@ class TestBatchExportAPI:
         assert "/" not in content_disp
         assert "\\" not in content_disp
         assert '"badheader.zip"' in content_disp
+
+    def test_batch_export_non_ascii_zip_name(self, client: TestClient):
+        """Test that non-ASCII zip_name uses RFC filename encoding."""
+        file_db = get_file_db()
+        task_db = get_task_db()
+
+        file_db.create_file(
+            file_id="non-ascii-zip-file",
+            filename="non-ascii.mp3",
+            path="/tmp/non-ascii.mp3",
+            size=1000,
+        )
+        task_db.enqueue(
+            task_id="non-ascii-zip-task",
+            file_id="non-ascii-zip-file",
+            options=None,
+        )
+        _claim_pending_task(task_db, "non-ascii-zip-task")
+        task_db.complete(
+            task_id="non-ascii-zip-task",
+            segments=[{"start": 0.0, "end": 1.0, "text": "Non ASCII zip"}],
+            duration=1.0,
+        )
+
+        response = client.post(
+            "/api/transcription-tasks/export/batch",
+            json={
+                "task_ids": ["non-ascii-zip-task"],
+                "format": "srt",
+                "zip_name": "\u4e2d\u6587_export",
+            },
+        )
+
+        assert response.status_code == 200
+        content_disp = response.headers["content-disposition"]
+        assert 'filename="_export.zip"' in content_disp
+        assert "filename*=UTF-8''%E4%B8%AD%E6%96%87_export.zip" in content_disp

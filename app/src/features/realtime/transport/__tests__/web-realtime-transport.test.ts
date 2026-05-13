@@ -208,6 +208,27 @@ describe('WebLiveRealtimeTransport', () => {
     ])
   })
 
+  it('dispatches session.finished before reporting the expected closed state', async () => {
+    const transport = createTransport()
+    const readyPromise = connectAndOpen(transport)
+    const socket = lastSocket()
+    socket.message(JSON.stringify(serverReadyEvent('session-1')))
+    await readyPromise
+
+    const observed: string[] = []
+    transport.onEvent((event) => {
+      observed.push(`event:${event.type}:${transport.state}`)
+    })
+    transport.onStateChange((change) => {
+      observed.push(`state:${change.state}`)
+    })
+
+    socket.message(JSON.stringify(sessionFinishedEvent('session-1')))
+
+    expect(observed).toEqual(['event:session.finished:ready', 'state:closed'])
+    expect(transport.state).toBe('closed')
+  })
+
   it('maps server errors to failed state and connect rejection', async () => {
     const transport = createTransport()
     const errors: Array<LiveRealtimeTransportError | null> = []
@@ -334,6 +355,17 @@ function diagnosticsStoppedEvent(sessionId: string): LiveRealtimeDiagnosticsWavS
     ],
     total_file_byte_length: 684,
     reason: 'client_stop',
+  }
+}
+
+function sessionFinishedEvent(sessionId: string): LiveRealtimeServerEvent {
+  return {
+    ...serverEnvelope('session.finished', sessionId),
+    session: {
+      ...liveSession(sessionId),
+      status: 'finished',
+      ended_at: '2026-05-06T00:00:01Z',
+    },
   }
 }
 

@@ -19,6 +19,9 @@ export type Segment = Schemas['SegmentResponse']
 /** Task status derived from OpenAPI enum constraint. */
 export type TaskStatus = Schemas['TaskSummaryResponse']['status']
 
+/** Task request overrides captured at creation time. */
+export type TaskRequestOverrides = TaskDetail['request_overrides']
+
 /** GET /api/transcription-tasks query parameters. */
 export type TaskListApiQuery = NonNullable<ListTasksOperation['parameters']['query']>
 

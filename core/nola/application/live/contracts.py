@@ -5,11 +5,14 @@ from typing import Protocol
 from nola.application.live.types import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
     DEFAULT_LIVE_SESSION_LIMIT,
+    LiveRequestOverrides,
     LiveRuntimeConfig,
     LiveSegmentRecord,
     LiveSessionMode,
     LiveSessionRecord,
+    LiveSessionSortBy,
     LiveSessionStatus,
+    LiveSortOrder,
     LiveTrackRecord,
     LiveTrackSource,
 )
@@ -23,12 +26,24 @@ class SupportsLiveSessionQueries(Protocol):
         ...
 
     def list_sessions(
-        self, limit: int = DEFAULT_LIVE_SESSION_LIMIT, offset: int = 0
+        self,
+        limit: int = DEFAULT_LIVE_SESSION_LIMIT,
+        offset: int = 0,
+        *,
+        q: str | None = None,
+        status: LiveSessionStatus | None = None,
+        sort_by: LiveSessionSortBy = "started_at",
+        order: LiveSortOrder = "desc",
     ) -> list[LiveSessionRecord]:
         """Return paged live session records."""
         ...
 
-    def count_sessions(self) -> int:
+    def count_sessions(
+        self,
+        *,
+        q: str | None = None,
+        status: LiveSessionStatus | None = None,
+    ) -> int:
         """Return the total live session count."""
         ...
 
@@ -48,6 +63,7 @@ class SupportsLiveSessionMutations(Protocol):
         runtime: str | None,
         audio_format: str | None,
         runtime_config: LiveRuntimeConfig | None = None,
+        request_overrides: LiveRequestOverrides | None = None,
         started_at: str,
         created_at: str,
         updated_at: str,
@@ -74,6 +90,10 @@ class SupportsLiveSessionMutations(Protocol):
         updated_at: str,
     ) -> LiveSessionRecord | None:
         """Mark an active live session failed and return the updated snapshot."""
+        ...
+
+    def delete_session_record(self, session_id: str) -> bool:
+        """Delete one terminal live session record."""
         ...
 
 
@@ -130,6 +150,10 @@ class SupportsLiveSegmentQueries(Protocol):
 
     def count_segments(self, session_id: str) -> int:
         """Return total transcript segment count for one live session."""
+        ...
+
+    def list_final_segments(self, session_id: str) -> list[LiveSegmentRecord]:
+        """Return final transcript segments attached to one live session."""
         ...
 
 

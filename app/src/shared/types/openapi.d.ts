@@ -715,6 +715,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/live/sessions/export/batch': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch export live sessions
+     * @description Export multiple finished live sessions as a ZIP archive.
+     */
+    post: operations['batch_export_live_sessions_endpoint_api_live_sessions_export_batch_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/live/sessions/{session_id}': {
     parameters: {
       query?: never
@@ -729,6 +749,66 @@ export interface paths {
     get: operations['get_live_session_endpoint_api_live_sessions__session_id__get']
     put?: never
     post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/live/sessions/{session_id}/export': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Export live session result
+     * @description Export a finished live session as subtitle file.
+     */
+    get: operations['export_live_session_endpoint_api_live_sessions__session_id__export_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/live/sessions/{session_id}/record': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Delete live session record
+     * @description Delete a terminal live session record.
+     */
+    delete: operations['delete_live_session_record_endpoint_api_live_sessions__session_id__record_delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/live/sessions/batch/delete-records': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch delete terminal live session records
+     * @description Delete multiple terminal live session records and return per-item outcomes.
+     */
+    post: operations['batch_delete_live_session_records_endpoint_api_live_sessions_batch_delete_records_post']
     delete?: never
     options?: never
     head?: never
@@ -928,6 +1008,59 @@ export interface components {
       failed: number
     }
     /**
+     * BatchLiveSessionActionRequest
+     * @description Batch action request for live session record operations.
+     */
+    BatchLiveSessionActionRequest: {
+      /**
+       * Session Ids
+       * @description List of live session IDs to process
+       */
+      session_ids: string[]
+    }
+    /**
+     * BatchLiveSessionActionResponse
+     * @description Response for batch live actions.
+     */
+    BatchLiveSessionActionResponse: {
+      /**
+       * Action
+       * @constant
+       */
+      action: 'delete_record'
+      summary: components['schemas']['BatchLiveSessionActionSummaryResponse']
+      /** Results */
+      results: components['schemas']['BatchLiveSessionActionResultResponse'][]
+    }
+    /**
+     * BatchLiveSessionActionResultResponse
+     * @description Per-session result for batch live actions.
+     */
+    BatchLiveSessionActionResultResponse: {
+      /** Session Id */
+      session_id: string
+      /** Ok */
+      ok: boolean
+      /** Message */
+      message: string
+      /** Error Code */
+      error_code?: ('not_found' | 'invalid_status' | 'duplicate_session_id') | null
+      /** Status */
+      status?: ('active' | 'finished' | 'failed') | null
+    }
+    /**
+     * BatchLiveSessionActionSummaryResponse
+     * @description Batch live action summary counts.
+     */
+    BatchLiveSessionActionSummaryResponse: {
+      /** Requested */
+      requested: number
+      /** Succeeded */
+      succeeded: number
+      /** Failed */
+      failed: number
+    }
+    /**
      * BatchTaskActionRequest
      * @description Batch action request for task-level operations.
      */
@@ -1067,6 +1200,16 @@ export interface components {
       runtime_config?: {
         [key: string]: components['schemas']['JsonValue']
       } | null
+    }
+    /**
+     * DeleteLiveSessionRecordResponse
+     * @description Live session record deletion response.
+     */
+    DeleteLiveSessionRecordResponse: {
+      /** Session Id */
+      session_id: string
+      /** Message */
+      message: string
     }
     /**
      * DeleteResponse
@@ -1718,6 +1861,29 @@ export interface components {
       created_at: string
     }
     /**
+     * LiveSessionBatchExportRequest
+     * @description Accept batch export options for multiple live sessions.
+     */
+    LiveSessionBatchExportRequest: {
+      /**
+       * Session Ids
+       * @description List of live session IDs to export
+       */
+      session_ids: string[]
+      /** @description Output format for all files. If omitted, resolve from persisted export defaults. */
+      format?: components['schemas']['ExportFormat'] | null
+      /**
+       * Include Timestamps
+       * @description Include timestamps in TXT format. If omitted, resolve from persisted export defaults.
+       */
+      include_timestamps?: boolean | null
+      /**
+       * Zip Name
+       * @description Custom ZIP filename (without extension)
+       */
+      zip_name?: string | null
+    }
+    /**
      * LiveSessionDetailResponse
      * @description Expose one live session with tracks and a paged segment window.
      */
@@ -1754,7 +1920,17 @@ export interface components {
       created_at: string
       /** Updated At */
       updated_at: string
-      /** Runtime Config */
+      /**
+       * Request Overrides
+       * @description User-provided live override parameters accepted at creation time.
+       */
+      request_overrides?: {
+        [key: string]: components['schemas']['JsonValue']
+      } | null
+      /**
+       * Runtime Config
+       * @description Resolved runtime snapshot for diagnostics and future comparison UI.
+       */
       runtime_config?: {
         [key: string]: components['schemas']['JsonValue']
       } | null
@@ -2336,7 +2512,17 @@ export interface components {
       segments: components['schemas']['SegmentResponse'][] | null
       /** Error */
       error: string | null
-      /** Runtime Config */
+      /**
+       * Request Overrides
+       * @description User-provided task override parameters accepted at creation time.
+       */
+      request_overrides?: {
+        [key: string]: components['schemas']['JsonValue']
+      } | null
+      /**
+       * Runtime Config
+       * @description Resolved runtime snapshot for diagnostics and future comparison UI.
+       */
       runtime_config?: {
         [key: string]: components['schemas']['JsonValue']
       } | null
@@ -4264,6 +4450,14 @@ export interface operations {
         limit?: number
         /** @description Offset for pagination */
         offset?: number
+        /** @description Search live sessions by session ID or title */
+        q?: string | null
+        /** @description Filter by live session status */
+        status?: ('active' | 'finished' | 'failed') | null
+        /** @description Sort field: started_at, ended_at, status, or title */
+        sort_by?: 'started_at' | 'ended_at' | 'status' | 'title'
+        /** @description Sort order: asc or desc */
+        order?: 'asc' | 'desc'
       }
       header?: never
       path?: never
@@ -4324,6 +4518,39 @@ export interface operations {
       }
     }
   }
+  batch_export_live_sessions_endpoint_api_live_sessions_export_batch_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LiveSessionBatchExportRequest']
+      }
+    }
+    responses: {
+      /** @description ZIP archive download */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/zip': string
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   get_live_session_endpoint_api_live_sessions__session_id__get: {
     parameters: {
       query?: {
@@ -4347,6 +4574,114 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['LiveSessionDetailResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  export_live_session_endpoint_api_live_sessions__session_id__export_get: {
+    parameters: {
+      query?: {
+        /** @description Output format; omitted values use persisted export defaults */
+        format?: components['schemas']['ExportFormat'] | null
+        /** @description Include timestamps (TXT only); omitted values use persisted defaults */
+        include_timestamps?: boolean | null
+        /** @description Optional output filename for single export. Extension is inferred from selected format. */
+        filename?: string | null
+        /** @description Save to server instead of download */
+        save?: boolean
+      }
+      header?: never
+      path: {
+        session_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description save=false returns subtitle file; save=true returns saved path JSON */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SavedExportResponse']
+          'application/x-subrip': string
+          'text/vtt': string
+          'text/plain': string
+          'text/x-ssa': string
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  delete_live_session_record_endpoint_api_live_sessions__session_id__record_delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        session_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeleteLiveSessionRecordResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  batch_delete_live_session_records_endpoint_api_live_sessions_batch_delete_records_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BatchLiveSessionActionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BatchLiveSessionActionResponse']
         }
       }
       /** @description Validation Error */

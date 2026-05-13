@@ -9,6 +9,7 @@ from nola.application.tasks.types import (
     CreateTaskPayload,
     ResolvedTaskExecutionConfig,
     TaskOptions,
+    TaskRequestOverrides,
     TaskRuntimeConfig,
 )
 
@@ -21,6 +22,7 @@ def create_task(
     options: TaskOptions | None,
     execution_config: ResolvedTaskExecutionConfig,
     runtime_config: TaskRuntimeConfig | None = None,
+    request_overrides: TaskRequestOverrides | None = None,
     task_id_factory: Callable[[], str] | None = None,
 ) -> CreateTaskPayload:
     """Create a pending transcription task for an uploaded file."""
@@ -38,6 +40,7 @@ def create_task(
         engine_device=execution_config["engine_device"],
         engine_compute_type=execution_config["engine_compute_type"],
         runtime_config=runtime_config,
+        request_overrides=request_overrides,
     )
 
     return {

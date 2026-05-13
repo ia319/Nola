@@ -6,10 +6,14 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from nola.api.schemas.live_realtime_config import LiveRealtimeRuntimeOverridesRequest
 from nola.application.live.types import (
+    MAX_BATCH_LIVE_SESSION_IDS,
+    BatchLiveSessionActionErrorCode,
+    BatchLiveSessionActionName,
     LiveSessionMode,
     LiveSessionStatus,
     LiveTrackSource,
 )
+from nola.config.export import ExportFormat
 
 LiveSessionModeLiteral: TypeAlias = LiveSessionMode
 LiveSessionStatusLiteral: TypeAlias = LiveSessionStatus
@@ -80,7 +84,16 @@ class LiveSessionSummaryResponse(BaseModel):
 class LiveSessionDetailResponse(LiveSessionSummaryResponse):
     """Expose one live session with tracks and a paged segment window."""
 
-    runtime_config: dict[str, JsonValue] | None = None
+    request_overrides: dict[str, JsonValue] | None = Field(
+        default=None,
+        description="User-provided live override parameters accepted at creation time.",
+    )
+    runtime_config: dict[str, JsonValue] | None = Field(
+        default=None,
+        description=(
+            "Resolved runtime snapshot for diagnostics and future comparison UI."
+        ),
+    )
     tracks: list[LiveTrackResponse]
     segments: list[LiveSegmentResponse]
     segment_total: int
@@ -95,3 +108,76 @@ class LiveSessionListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class LiveSessionBatchExportRequest(BaseModel):
+    """Accept batch export options for multiple live sessions."""
+
+    session_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_BATCH_LIVE_SESSION_IDS,
+        description="List of live session IDs to export",
+    )
+    format: ExportFormat | None = Field(
+        None,
+        description=(
+            "Output format for all files. "
+            "If omitted, resolve from persisted export defaults."
+        ),
+    )
+    include_timestamps: bool | None = Field(
+        None,
+        description=(
+            "Include timestamps in TXT format. "
+            "If omitted, resolve from persisted export defaults."
+        ),
+    )
+    zip_name: str | None = Field(
+        None,
+        description="Custom ZIP filename (without extension)",
+    )
+
+
+class BatchLiveSessionActionRequest(BaseModel):
+    """Batch action request for live session record operations."""
+
+    session_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_BATCH_LIVE_SESSION_IDS,
+        description="List of live session IDs to process",
+    )
+
+
+class DeleteLiveSessionRecordResponse(BaseModel):
+    """Live session record deletion response."""
+
+    session_id: str
+    message: str
+
+
+class BatchLiveSessionActionResultResponse(BaseModel):
+    """Per-session result for batch live actions."""
+
+    session_id: str
+    ok: bool
+    message: str
+    error_code: BatchLiveSessionActionErrorCode | None = None
+    status: LiveSessionStatusLiteral | None = None
+
+
+class BatchLiveSessionActionSummaryResponse(BaseModel):
+    """Batch live action summary counts."""
+
+    requested: int
+    succeeded: int
+    failed: int
+
+
+class BatchLiveSessionActionResponse(BaseModel):
+    """Response for batch live actions."""
+
+    action: BatchLiveSessionActionName
+    summary: BatchLiveSessionActionSummaryResponse
+    results: list[BatchLiveSessionActionResultResponse]

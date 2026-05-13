@@ -7,5 +7,6 @@
  */
 
 export { ErrorBoundary } from './ErrorBoundary'
+export { JsonPropertiesBlock } from './JsonPropertiesBlock'
 export * from './interactive-table'
 export type { TaskActionHandler } from './types'

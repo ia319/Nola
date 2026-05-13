@@ -59,6 +59,7 @@ def batch_retry_tasks(
                 engine_device=task["engine_device"],
                 engine_compute_type=task["engine_compute_type"],
                 runtime_config=task["runtime_config"],
+                request_overrides=task.get("request_overrides"),
             )
         except Exception as error:
             return {

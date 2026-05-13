@@ -2,7 +2,7 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, JsonValue
+from pydantic import BaseModel, Field, JsonValue
 
 # Derive from backend TaskStatus enum values.
 TaskStatusLiteral = Literal["pending", "processing", "completed", "failed", "cancelled"]
@@ -41,7 +41,16 @@ class TaskDetailResponse(TaskSummaryResponse):
     duration: float | None
     segments: list[SegmentResponse] | None
     error: str | None
-    runtime_config: dict[str, JsonValue] | None = None
+    request_overrides: dict[str, JsonValue] | None = Field(
+        default=None,
+        description="User-provided task override parameters accepted at creation time.",
+    )
+    runtime_config: dict[str, JsonValue] | None = Field(
+        default=None,
+        description=(
+            "Resolved runtime snapshot for diagnostics and future comparison UI."
+        ),
+    )
 
 
 class TaskListResponse(BaseModel):

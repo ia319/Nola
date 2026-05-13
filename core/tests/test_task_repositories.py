@@ -151,11 +151,12 @@ def test_task_store_get_task_drops_invalid_json_shapes(task_repositories):
         conn.execute(
             """
             UPDATE transcription_tasks
-            SET segments = ?, options = ?, runtime_config = ?
+            SET segments = ?, options = ?, runtime_config = ?, request_overrides = ?
             WHERE id = ?
             """,
             (
                 json.dumps({"start": 0.0, "end": 1.0, "text": "bad-shape"}),
+                json.dumps(["bad-shape"]),
                 json.dumps(["bad-shape"]),
                 json.dumps(["bad-shape"]),
                 "task-001",
@@ -168,6 +169,7 @@ def test_task_store_get_task_drops_invalid_json_shapes(task_repositories):
     assert task["segments"] is None
     assert task["options"] is None
     assert task["runtime_config"] is None
+    assert task["request_overrides"] is None
 
 
 def test_task_store_preserves_execution_config(task_repositories):
@@ -222,3 +224,29 @@ def test_task_store_preserves_runtime_config(task_repositories):
     assert json.loads(claimed["runtime_config"]) == runtime_config
     assert stored is not None
     assert stored["runtime_config"] == runtime_config
+
+
+def test_task_store_preserves_request_overrides(task_repositories):
+    """Queue and store layers should keep accepted request override snapshots."""
+    file_db, queue_repo, store_repo = task_repositories
+
+    request_overrides = {
+        "schema_version": 1,
+        "model_id": "small",
+        "engine": {"device": "cpu", "compute_type": "default"},
+        "transcription_options": {"language": "en", "beam_size": 3},
+    }
+    file_db.create_file("file-001", "audio.wav", "/tmp/audio.wav", 1024)
+    queue_repo.enqueue(
+        "task-001",
+        "file-001",
+        request_overrides=request_overrides,
+    )
+
+    claimed = queue_repo.dequeue("worker-001")
+    stored = store_repo.get_task("task-001")
+
+    assert claimed is not None
+    assert json.loads(claimed["request_overrides"]) == request_overrides
+    assert stored is not None
+    assert stored["request_overrides"] == request_overrides

@@ -7,7 +7,9 @@ from typing import Any, Protocol, cast
 
 from nola.application.tasks.types import (
     ResolvedTaskExecutionConfig,
+    TaskExecutionConfigValues,
     TaskOptions,
+    TaskRequestOverrides,
     TaskRuntimeConfig,
 )
 from nola.common.merge import deep_merge
@@ -17,6 +19,7 @@ from nola.engines.base import TranscribeOptions
 from nola.engines.faster_whisper_defaults import serialize_faster_whisper_default
 
 TASK_RUNTIME_CONFIG_SCHEMA_VERSION = 1
+TASK_REQUEST_OVERRIDES_SCHEMA_VERSION = 1
 _TRANSCRIBE_OPTION_FIELDS = frozenset(field.name for field in fields(TranscribeOptions))
 
 
@@ -134,6 +137,34 @@ def build_task_runtime_config(
             else None
         ),
     }
+
+
+def build_task_request_overrides(
+    *,
+    request_options: TaskOptions | None,
+    request_execution: TaskExecutionConfigValues,
+) -> TaskRequestOverrides | None:
+    """Build the accepted user override snapshot for task history display."""
+    filtered_request_options = _filter_valid_options(request_options)
+    engine: ConfigMap = {}
+    if request_execution.device is not None:
+        engine["device"] = request_execution.device
+    if request_execution.compute_type is not None:
+        engine["compute_type"] = request_execution.compute_type
+
+    request_overrides: TaskRequestOverrides = {
+        "schema_version": TASK_REQUEST_OVERRIDES_SCHEMA_VERSION,
+    }
+    if request_execution.model_id is not None:
+        request_overrides["model_id"] = request_execution.model_id
+    if engine:
+        request_overrides["engine"] = engine
+    if filtered_request_options:
+        request_overrides["transcription_options"] = _serialize_config_map(
+            filtered_request_options
+        )
+
+    return request_overrides if len(request_overrides) > 1 else None
 
 
 def transcribe_options_from_runtime_config(

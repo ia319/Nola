@@ -11,6 +11,28 @@ from nola.models.taskdb.types import TaskRow
 logger = logging.getLogger(__name__)
 
 
+def _parse_json_object(
+    task: dict[str, Any],
+    *,
+    field_name: str,
+    task_id: str,
+) -> None:
+    raw_value = task.get(field_name)
+    if raw_value:
+        try:
+            parsed = json.loads(raw_value)
+            if isinstance(parsed, dict):
+                task[field_name] = cast(JsonDict, parsed)
+            else:
+                logger.warning("Invalid %s JSON shape for task %s", field_name, task_id)
+                task[field_name] = None
+        except json.JSONDecodeError:
+            logger.warning("Corrupted %s JSON for task %s", field_name, task_id)
+            task[field_name] = None
+    else:
+        task[field_name] = None
+
+
 def parse_task_row(row: sqlite3.Row, task_id: str) -> TaskRow:
     """Parse JSON columns from a task row."""
     task = dict(row)
@@ -42,18 +64,6 @@ def parse_task_row(row: sqlite3.Row, task_id: str) -> TaskRow:
             logger.warning("Corrupted options JSON for task %s", task_id)
             task["options"] = None
 
-    runtime_config_raw = task.get("runtime_config")
-    if runtime_config_raw:
-        try:
-            runtime_config = json.loads(runtime_config_raw)
-            if isinstance(runtime_config, dict):
-                task["runtime_config"] = cast(JsonDict, runtime_config)
-            else:
-                logger.warning("Invalid runtime_config JSON shape for task %s", task_id)
-                task["runtime_config"] = None
-        except json.JSONDecodeError:
-            logger.warning("Corrupted runtime_config JSON for task %s", task_id)
-            task["runtime_config"] = None
-    else:
-        task["runtime_config"] = None
+    _parse_json_object(task, field_name="runtime_config", task_id=task_id)
+    _parse_json_object(task, field_name="request_overrides", task_id=task_id)
     return cast(TaskRow, task)

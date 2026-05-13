@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Maximize2, Minimize2, PictureInPicture2, Play, Square } from 'lucide-react'
+import { Download, Maximize2, Minimize2, PictureInPicture2, Play, Square } from 'lucide-react'
 
 import { Button } from '@/components/ui'
 import {
@@ -15,6 +15,7 @@ import {
 import { buildEngineComputeTypeOptions, buildEngineDeviceOptions } from '@/config/engine-options'
 import logger from '@/config/logger'
 import { useAppConfig } from '@/config/use-app-config'
+import { buildExportFilename } from '@/features/export'
 import { useModels } from '@/features/models'
 import {
   areLiveRealtimeDraftValuesEqual,
@@ -22,6 +23,7 @@ import {
   buildLiveRealtimeRuntimeOverrides,
   clearLiveRealtimeDraftValue,
   createLiveRealtimeSessionService,
+  downloadLiveSessionExport,
   isTemporaryLiveDeviceId,
   isLiveRealtimeSessionError,
   resolveLiveRealtimeEffectiveValue,
@@ -57,6 +59,7 @@ import {
 } from '@/routes/live-workbench-search'
 import { isAppError } from '@/shared/lib/error-factory'
 import { queryKeys } from '@/shared/lib/query-keys'
+import { downloadBlob } from '@/shared/lib/utils'
 import type {
   AppError,
   EngineComputeType,
@@ -621,10 +624,12 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
   const [sessionPreparing, setSessionPreparing] = useState(false)
   const [compactOpen, setCompactOpen] = useState(false)
   const [compactWindow, setCompactWindow] = useState<Window | null>(null)
+  const [exportDownloading, setExportDownloading] = useState(false)
   const [fallbackView, setFallbackView] = useState<LiveWorkbenchView>(LIVE_WORKBENCH_DEFAULT_VIEW)
   const [durationNowMs, setDurationNowMs] = useState(() => Date.now())
   const compactWindowRef = useRef<Window | null>(null)
   const compactWindowPagehideListenerRef = useRef<EventListener | null>(null)
+  const exportDownloadingRef = useRef(false)
   const liveDevices = useLiveDeviceInventory()
   const emptyValue = formatLiveWorkbenchEmptyValue()
   const liveRuntimeAdapter = config?.live_realtime?.runtime_adapter ?? null
@@ -1191,6 +1196,11 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
     defaultsQuery.isPending ||
     schemaQuery.isPending
   const stopButtonDisabled = !selectLiveWorkbenchCanStopSession(liveRunState)
+  const canDownloadTranscript =
+    liveSession?.status === 'finished' &&
+    Boolean(liveSession?.session_id) &&
+    transcriptCounts.finalCount > 0
+  const downloadTranscriptDisabled = !canDownloadTranscript || exportDownloading
   const sessionActionLabel = sessionPreparing
     ? t('live.workbench.actions.preparing')
     : t(resolveLiveWorkbenchStartButtonKey(liveRunState))
@@ -1447,6 +1457,34 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
       toast.error(t('live.workbench.compact.openFailed.title'), {
         description: t('live.workbench.compact.openFailed.description'),
       })
+    }
+  }
+
+  async function handleDownloadTranscript(): Promise<void> {
+    if (!liveSession?.session_id || !canDownloadTranscript || exportDownloadingRef.current) {
+      return
+    }
+
+    exportDownloadingRef.current = true
+    setExportDownloading(true)
+    try {
+      const { blob, filename } = await downloadLiveSessionExport(liveSession.session_id)
+      const fallbackFilename = buildExportFilename({
+        fallbackId: liveSession.session_id,
+        format: 'srt',
+        sourceName: liveSession.title,
+      })
+      downloadBlob(blob, filename || fallbackFilename)
+      toast.success(t('live.workbench.transcript.download.toast.success'))
+    } catch (error: unknown) {
+      logger.error('live.workbench.downloadTranscriptFailed', {
+        error,
+        sessionId: liveSession.session_id,
+      })
+      toast.error(t('live.workbench.transcript.download.toast.failed'))
+    } finally {
+      exportDownloadingRef.current = false
+      setExportDownloading(false)
     }
   }
 
@@ -1915,6 +1953,18 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
               onRetry={liveLastError?.retryable ? handleStartSession : undefined}
               actions={
                 <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t('live.workbench.transcript.download.action')}
+                    disabled={downloadTranscriptDisabled}
+                    onClick={() => {
+                      void handleDownloadTranscript()
+                    }}
+                  >
+                    <Download className="size-4" />
+                  </Button>
                   <Button
                     type="button"
                     variant="ghost"

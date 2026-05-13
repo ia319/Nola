@@ -10,27 +10,41 @@ from typing import cast
 from nola.application.live.types import (
     DEFAULT_LIVE_SEGMENT_LIMIT,
     DEFAULT_LIVE_SESSION_LIMIT,
+    DEFAULT_LIVE_SESSION_SORT_BY,
+    DEFAULT_LIVE_SORT_ORDER,
+    DELETABLE_LIVE_SESSION_STATUSES,
+    LiveRequestOverrides,
     LiveSegmentRecord,
     LiveSessionMode,
     LiveSessionRecord,
+    LiveSessionSortBy,
     LiveSessionStatus,
+    LiveSortOrder,
     LiveTrackRecord,
     LiveTrackSource,
 )
 from nola.common.types import JsonDict
+from nola.models.query_helpers import build_contains_like_pattern
 
 logger = logging.getLogger(__name__)
 
+_LIVE_SESSION_SORT_COLUMNS: dict[LiveSessionSortBy, str] = {
+    "started_at": "started_at",
+    "ended_at": "ended_at",
+    "status": "status",
+    "title": "title",
+}
 
-def _serialize_runtime_config(runtime_config: JsonDict | None) -> str | None:
-    """Return a JSON snapshot string or reject unsafe runtime config."""
-    if runtime_config is None:
+
+def _serialize_json_object(value: JsonDict | None, *, field_name: str) -> str | None:
+    """Return a JSON object string or reject unsafe values."""
+    if value is None:
         return None
     try:
-        return json.dumps(runtime_config, allow_nan=False)
+        return json.dumps(value, allow_nan=False)
     except (TypeError, ValueError) as error:
         raise ValueError(
-            "runtime_config must be JSON-serializable and cannot contain "
+            f"{field_name} must be JSON-serializable and cannot contain "
             f"NaN/Infinity: {error}"
         ) from error
 
@@ -51,24 +65,53 @@ class LiveDatabase:
     def _to_session_record(self, row: sqlite3.Row) -> LiveSessionRecord:
         """Return one live session row as an application record."""
         values = dict(row)
-        runtime_config_raw = values.get("runtime_config")
-        if runtime_config_raw:
-            try:
-                runtime_config = json.loads(runtime_config_raw)
-                if isinstance(runtime_config, dict):
-                    values["runtime_config"] = cast(JsonDict, runtime_config)
-                else:
-                    logger.warning(
-                        "Invalid live runtime_config shape for %s",
-                        row["id"],
-                    )
-                    values["runtime_config"] = None
-            except json.JSONDecodeError:
-                logger.warning("Corrupted live runtime_config for %s", row["id"])
-                values["runtime_config"] = None
-        else:
-            values["runtime_config"] = None
+        self._parse_session_json_object(
+            values,
+            session_id=row["id"],
+            field_name="runtime_config",
+        )
+        self._parse_session_json_object(
+            values,
+            session_id=row["id"],
+            field_name="request_overrides",
+        )
         return cast(LiveSessionRecord, values)
+
+    def _parse_session_json_object(
+        self,
+        values: dict[str, object],
+        *,
+        session_id: str,
+        field_name: str,
+    ) -> None:
+        raw_value = values.get(field_name)
+        if raw_value is None or raw_value == "":
+            values[field_name] = None
+            return
+
+        if not isinstance(raw_value, str):
+            logger.warning(
+                "Invalid live %s storage type for %s",
+                field_name,
+                session_id,
+            )
+            values[field_name] = None
+            return
+
+        try:
+            parsed = json.loads(raw_value)
+            if isinstance(parsed, dict):
+                values[field_name] = cast(JsonDict, parsed)
+            else:
+                logger.warning(
+                    "Invalid live %s shape for %s",
+                    field_name,
+                    session_id,
+                )
+                values[field_name] = None
+        except (TypeError, json.JSONDecodeError):
+            logger.warning("Corrupted live %s for %s", field_name, session_id)
+            values[field_name] = None
 
     def _to_track_record(self, row: sqlite3.Row) -> LiveTrackRecord:
         """Return one live track row as an application record."""
@@ -92,6 +135,7 @@ class LiveDatabase:
         runtime: str | None,
         audio_format: str | None,
         runtime_config: JsonDict | None = None,
+        request_overrides: LiveRequestOverrides | None = None,
         started_at: str,
         created_at: str,
         updated_at: str,
@@ -103,10 +147,10 @@ class LiveDatabase:
                     """
                     INSERT INTO live_sessions (
                         id, title, mode, status, language_hint, model_id,
-                        runtime, audio_format, runtime_config, started_at,
-                        created_at, updated_at
+                        runtime, audio_format, runtime_config, request_overrides,
+                        started_at, created_at, updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     RETURNING *
                     """,
                     (
@@ -118,7 +162,14 @@ class LiveDatabase:
                         model_id,
                         runtime,
                         audio_format,
-                        _serialize_runtime_config(runtime_config),
+                        _serialize_json_object(
+                            runtime_config,
+                            field_name="runtime_config",
+                        ),
+                        _serialize_json_object(
+                            request_overrides,
+                            field_name="request_overrides",
+                        ),
                         started_at,
                         created_at,
                         updated_at,
@@ -141,24 +192,67 @@ class LiveDatabase:
         self,
         limit: int = DEFAULT_LIVE_SESSION_LIMIT,
         offset: int = 0,
+        *,
+        q: str | None = None,
+        status: LiveSessionStatus | None = None,
+        sort_by: LiveSessionSortBy = DEFAULT_LIVE_SESSION_SORT_BY,
+        order: LiveSortOrder = DEFAULT_LIVE_SORT_ORDER,
     ) -> list[LiveSessionRecord]:
-        """Return paged live sessions in newest-first order."""
+        """Return paged live sessions matching history filters."""
+        where_sql, params = self._build_session_filters(q=q, status=status)
+        sort_column = _LIVE_SESSION_SORT_COLUMNS[sort_by]
+        order_sql = "ASC" if order == "asc" else "DESC"
         with closing(self._connect()) as conn:
             cursor = conn.execute(
-                """
+                f"""
                 SELECT * FROM live_sessions
-                ORDER BY started_at DESC, id DESC
+                {where_sql}
+                ORDER BY {sort_column} {order_sql}, id {order_sql}
                 LIMIT ? OFFSET ?
                 """,
-                (limit, offset),
+                (*params, limit, offset),
             )
             return [self._to_session_record(row) for row in cursor.fetchall()]
 
-    def count_sessions(self) -> int:
-        """Return total live session count."""
+    def count_sessions(
+        self,
+        *,
+        q: str | None = None,
+        status: LiveSessionStatus | None = None,
+    ) -> int:
+        """Return total live session count matching filters."""
+        where_sql, params = self._build_session_filters(q=q, status=status)
         with closing(self._connect()) as conn:
-            cursor = conn.execute("SELECT COUNT(*) FROM live_sessions")
+            cursor = conn.execute(
+                f"SELECT COUNT(*) FROM live_sessions {where_sql}",
+                params,
+            )
             return int(cursor.fetchone()[0])
+
+    def _build_session_filters(
+        self,
+        *,
+        q: str | None,
+        status: LiveSessionStatus | None,
+    ) -> tuple[str, tuple[object, ...]]:
+        filters: list[str] = []
+        params: list[object] = []
+        if q:
+            pattern = build_contains_like_pattern(q)
+            filters.append(
+                """
+                (
+                    lower(id) LIKE ? ESCAPE '\\'
+                    OR lower(coalesce(title, '')) LIKE ? ESCAPE '\\'
+                )
+                """
+            )
+            params.extend([pattern, pattern])
+        if status is not None:
+            filters.append("status = ?")
+            params.append(status)
+        where_sql = f"WHERE {' AND '.join(filters)}" if filters else ""
+        return where_sql, tuple(params)
 
     def finish_session(
         self,
@@ -206,6 +300,19 @@ class LiveDatabase:
                 row = cursor.fetchone()
 
         return self._to_session_record(row) if row is not None else None
+
+    def delete_session_record(self, session_id: str) -> bool:
+        """Delete one terminal live session record."""
+        with closing(self._connect()) as conn:
+            with conn:
+                cursor = conn.execute(
+                    """
+                    DELETE FROM live_sessions
+                    WHERE id = ? AND status IN (?, ?)
+                    """,
+                    (session_id, *DELETABLE_LIVE_SESSION_STATUSES),
+                )
+                return cursor.rowcount > 0
 
     def create_track(
         self,
@@ -356,6 +463,19 @@ class LiveDatabase:
                 LIMIT ? OFFSET ?
                 """,
                 (session_id, limit, offset),
+            )
+            return [self._to_segment_record(row) for row in cursor.fetchall()]
+
+    def list_final_segments(self, session_id: str) -> list[LiveSegmentRecord]:
+        """Return final transcript segments attached to one live session."""
+        with closing(self._connect()) as conn:
+            cursor = conn.execute(
+                """
+                SELECT * FROM live_segments
+                WHERE session_id = ? AND is_final = 1
+                ORDER BY sequence ASC, id ASC
+                """,
+                (session_id,),
             )
             return [self._to_segment_record(row) for row in cursor.fetchall()]
 

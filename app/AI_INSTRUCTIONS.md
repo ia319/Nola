@@ -119,6 +119,7 @@ app/                          # Frontend workspace root
 │   │   │   │   ├── InteractiveTableSortableHeader.tsx # Sortable header control
 │   │   │   │   ├── types.ts    # Interactive table contracts
 │   │   │   │   └── index.ts    # Interactive table public exports
+│   │   │   ├── JsonPropertiesBlock.tsx # Read-only JSON property display for request parameter snapshots
 │   │   │   ├── types.ts      # Shared common-component callback contracts
 │   │   │   └── index.ts      # Common export entry (feature-agnostic)
 │   │   └── ui/               # Radix + Tailwind primitives plus Nola design components
@@ -244,7 +245,7 @@ app/                          # Frontend workspace root
 │   │   │           └── ui-preferences.test.ts # Verify settings preference option models
 │   │   ├── realtime/         # Live transcription runtime foundation
 │   │   │   ├── index.ts      # Expose realtime public API, stores, repositories, transport, service, and hooks
-│   │   │   ├── api.ts        # Live REST session API client
+│   │   │   ├── api.ts        # Live REST session, history, export, and delete API client
 │   │   │   ├── types.ts      # Shared realtime primitive types
 │   │   │   ├── __tests__/
 │   │   │   │   └── api.test.ts # Verify Live REST API request wiring
@@ -377,14 +378,17 @@ app/                          # Frontend workspace root
 │   │   │   ├── api-client.ts       # Axios instance + structured error interceptors
 │   │   │   ├── error-factory.ts    # AppError factory helpers (408/429 retriable)
 │   │   │   ├── error-utils.ts      # API error normalization helpers
+│   │   │   ├── content-disposition.ts # Shared attachment filename parser
 │   │   │   ├── file-query-options.ts # File list content-type/sort query options
 │   │   │   ├── file-validation.ts  # Pure file validation (ext/MIME/size)
 │   │   │   ├── format.ts           # formatFileSize() human-readable sizes
 │   │   │   ├── icons.ts            # Shared Lucide icon mapping
+│   │   │   ├── live-query-options.ts # Live history status/sort/order query options
+│   │   │   ├── object-path.ts      # Shared nested object read/write helpers
 │   │   │   ├── overlay-events.ts   # Cross-overlay close events
 │   │   │   ├── query-client.ts     # TanStack Query client defaults
 │   │   │   ├── query-fetcher.ts    # Shared query fetcher wrapper
-│   │   │   ├── query-keys.ts       # Query key factory
+│   │   │   ├── query-keys.ts       # Query key factory for tasks, files, live, models, and config
 │   │   │   ├── sse-client.ts       # Shared EventSource wrapper for typed SSE streams
 │   │   │   ├── task-query-options.ts # Task query option constants and guards
 │   │   │   ├── task-status.ts      # Task status groups derived from OpenAPI types
@@ -433,19 +437,27 @@ app/                          # Frontend workspace root
 │   │       └── layouts.test.tsx # Verify layout primitive rendering
 │   │
 │   ├── pages/                # Route page implementations
-│   │   ├── history-center/   # History task/file modes and detail dialogs
+│   │   ├── history-center/   # History task/file/live modes and detail dialogs
 │   │   │   ├── HistoryFileModeView.tsx # Compose file-mode history page
 │   │   │   ├── HistoryFileRecordsView.tsx # Render file history records
+│   │   │   ├── HistoryLiveModeView.tsx # Compose live-mode history page
+│   │   │   ├── HistoryLiveRecordsView.tsx # Render live history records with InteractiveTable
 │   │   │   ├── HistoryPage.tsx # Compose history center shell
 │   │   │   ├── HistoryPagination.tsx # Render history pagination controls
 │   │   │   ├── HistoryTaskModeView.tsx # Compose task-mode history page
 │   │   │   ├── HistoryTaskRecordsView.tsx # Render task history records
 │   │   │   ├── HistoryToolbar.tsx # Render history filters and actions
+│   │   │   ├── LiveSessionDetailContent.tsx # Render live detail final segments, metadata, and request parameters
+│   │   │   ├── LiveSessionDetailSheet.tsx # Wrap live detail content with shared sheet behavior
 │   │   │   ├── hooks/        # History-page query/action hooks
 │   │   │   │   ├── useHistoryFileActions.ts # Orchestrate file history mutations
 │   │   │   │   ├── useHistoryFileAssociatedTasks.ts # Resolve tasks linked to selected files
 │   │   │   │   ├── useHistoryFiles.ts # Query paged file history
 │   │   │   │   ├── useHistoryFileTaskCounts.ts # Resolve file-to-task counts
+│   │   │   │   ├── useHistoryLiveActions.ts # Orchestrate live history export/delete mutations
+│   │   │   │   ├── useHistoryLiveDetail.ts # Query one live session for history dialogs
+│   │   │   │   ├── useHistoryLiveExportDialog.ts # Manage live export dialog state and duplicate-submit guard
+│   │   │   │   ├── useHistoryLiveSessions.ts # Query paged live history
 │   │   │   │   ├── useHistorySearchDraft.ts # Keep URL search and input draft aligned
 │   │   │   │   ├── useHistoryTaskActions.ts # Orchestrate task history actions
 │   │   │   │   ├── useHistoryTaskDetail.ts # Query task detail for history dialogs
@@ -454,11 +466,15 @@ app/                          # Frontend workspace root
 │   │   │   │       ├── useHistoryFileActions.test.tsx # Verify file action orchestration
 │   │   │   │       ├── useHistoryFileAssociatedTasks.test.ts # Verify associated task resolution
 │   │   │   │       ├── useHistoryFileTaskCounts.test.ts # Verify file task-count resolution
+│   │   │   │       ├── useHistoryLiveActions.test.ts # Verify live history action orchestration
+│   │   │   │       ├── useHistoryLiveExportDialog.test.ts # Verify live export dialog state
+│   │   │   │       ├── useHistoryLiveSessions.test.tsx # Verify live history queries
 │   │   │   │       ├── useHistorySearchDraft.test.ts # Verify search draft synchronization
 │   │   │   │       ├── useHistoryTaskActions.test.ts # Verify task action orchestration
 │   │   │   │       └── useHistoryTasks.test.ts # Verify task history queries
 │   │   │   └── __tests__/    # History page tests
 │   │   │       ├── HistoryPage.test.tsx # Verify history center behavior
+│   │   │       ├── LiveSessionDetailContent.test.tsx # Verify live detail rendering
 │   │   │       └── HistoryPagination.test.tsx # Verify pagination controls
 │   │   ├── models-management/ # Models table, detail sheet, and actions
 │   │   │   ├── ModelsPage.tsx # Compose model management page
@@ -525,7 +541,7 @@ app/                          # Frontend workspace root
 │   │
 │   └── routes/               # Route page adapters and URL query contracts
 │       ├── route-pages.tsx   # Lazy-loaded route page composition
-│       ├── history-search.ts # History URL query normalize/build helpers
+│       ├── history-search.ts # History task/file/live URL query normalize/build helpers
 │       ├── live-workbench-search.ts # Live Workbench URL view-state helpers
 │       └── __tests__/        # Route helper tests
 │           ├── history-search.test.ts # Verify history search normalization
@@ -545,8 +561,11 @@ Keep future Storybook stories colocated under `src` beside the component or page
 - `src/features/activity/`: Aggregate task and model-download activity into `needsAttention`, `inProgress`, and `recent`.
 - `src/features/realtime/`: Provide UI-less Live device inventory, Web/Tauri adapter factories, capture sessions, PCM frame output, WebSocket transport, diagnostics, preview/committed/final transcript handling, runtime store, and session-service orchestration.
 - `src/pages/live-workbench/`: Compose the Live route UI, source setup, runtime settings panel, transcript focus mode, browser compact view, and session orchestration.
+- `src/pages/history-center/`: Compose Task and Live history modes, Task ID/Filename submodes, Live table actions, Live detail, and page-local history hooks.
 - `src/routes/live-workbench-search.ts`: Keep Live route search state focused on `view=transcript-focus`.
 - `src/shared/lib/time-format.ts`: Format shared millisecond clock values for Live duration and transcript ranges.
+- `src/shared/lib/content-disposition.ts`: Parse attachment filenames for Task and Live export downloads.
+- `src/shared/lib/live-query-options.ts`: Centralize Live history status, sort, and order option arrays and guards.
 - `src/pages/settings/LiveRealtimeTab.tsx`: Render schema-driven Live realtime defaults beside Transcription as a separate Settings tab.
 - `src/config/api.ts`: Provide Live realtime defaults and schema helpers alongside transcription/session/export config helpers.
 - `src/lib/runtime-environment.ts`: Centralize Web/Tauri runtime detection for app-level and realtime platform selection.
@@ -554,6 +573,7 @@ Keep future Storybook stories colocated under `src` beside the component or page
 - `src/shared/lib/overlay-events.ts`: Coordinate mutually exclusive detail sheets and Activity Center.
 - `src/shared/lib/task-status.ts`, `task-query-options.ts`, `file-query-options.ts`: Centralize runtime query option arrays and guards.
 - `src/components/common/interactive-table/`: Compose cross-feature sorting, selection, row actions, pagination, and local table query behavior.
+- `src/components/common/JsonPropertiesBlock.tsx`: Render request parameter snapshots as bounded read-only JSON blocks with empty-state handling.
 - `src/components/theme-provider.tsx`: Apply app-owned light/dark/system theme without `next-themes`.
 - `.storybook/`: Configure Storybook React Vite, public static assets, and app global CSS.
 
@@ -584,6 +604,10 @@ Keep future Storybook stories colocated under `src` beside the component or page
 - Keep `InteractiveTable` visual behavior aligned with `DataTable`; do not move it into `components/ui`.
 - Drive sorting through API for remote queries, server pagination, or incomplete client datasets. Use local full-set sorting only for temporary client-held lists such as Upload Queue.
 - Keep History-only query/action hooks in `src/pages/history-center/hooks`; do not restore `src/features/tasks/history`.
+- Keep History top-level navigation split as Task and Live. Preserve the Task ID / Filename switch inside Task history.
+- Reuse `InteractiveTable` for Live History. Do not add a separate history-table abstraction.
+- Keep Task and Live request parameter display sourced from `request_overrides`; do not render `runtime_config` as user request parameters.
+- Render request parameter snapshots through `JsonPropertiesBlock` or an equivalent common JSON display component. Do not add label-mapped parameter UIs or syntax-highlighting dependencies for this view.
 - Keep Upload Queue row clicks as selection toggles. Start transcription only from selected successful uploads.
 - Keep Live page UI in `src/pages/live-workbench`; keep `features/realtime` UI-less and reusable.
 - Pass Live session `runtime_overrides` through generated OpenAPI DTO aliases; do not hand-maintain override field shapes in feature code.
@@ -609,6 +633,8 @@ Keep future Storybook stories colocated under `src` beside the component or page
 - Keep realtime diagnostics events opaque: consume `capture_id`, `manifest_name`, and `file_name`; do not expect or display server absolute paths.
 - Keep realtime `preview` and `committed_partial` transcripts WebSocket-only and track-scoped. Clear them when a final transcript, track removal, or session finish supersedes them.
 - Keep final realtime transcripts bounded in memory. Do not reintroduce unbounded current-session transcript arrays.
+- Keep Live history details and exports final-segment-only. Do not show preview or committed partial transcripts as persisted history.
+- Keep Live Workbench transcript download as a direct default export. Do not add an export dialog or explicit export overrides to that control.
 - Treat ended realtime tracks as inactive. Do not keep sending audio frames after a `track.ready` event carries `ended_at`.
 - Treat realtime transport `failed` states as fatal even when they do not carry an error payload.
 - Reject pending realtime waits when the transport closes before `track.ready` or `session.finished`.
@@ -711,6 +737,7 @@ Backend (Pydantic) ──► openapi.json ──► openapi.d.ts ──► domai
 
 - `TaskStatus` and `ExportFormat` are **derived from OpenAPI enum**, not hardcoded. This ensures Single Source of Truth — backend adds a new status/format, frontend auto-inherits after `pnpm gen:types`.
 - Domain aliases/contracts avoid verbose `components['schemas']['TaskSummaryResponse']` paths in business code.
+- Task and Live request override aliases must derive from generated detail schemas in `shared/types/task.ts` and `shared/types/live.ts`; do not duplicate JSON shapes in page code.
 - Live realtime config DTOs must follow the config alias path: derive defaults, patch, and schema types from generated OpenAPI in `shared/types/config.ts`.
 - Live REST DTOs must follow the same thin-alias path: derive aliases from generated OpenAPI types in `shared/types/live.ts`, then import those aliases from `@/shared/types`.
 - Live WebSocket DTOs are not generated from OpenAPI. Keep them in `features/realtime/transport/types.ts` and validate inbound events, including `transcript.preview`, `transcript.committed_partial`, and `transcript.final`, with `features/realtime/transport/protocol.ts`.
@@ -780,7 +807,7 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `actions.ts`: Use refresh-safe wrappers (`cancelTaskAndRefresh`, `retryTaskAndRefresh`, `deleteTaskRecordAction`); call `requestTaskRefresh()` in `finally` for cancel/retry attempts.
   - `__tests__/actions.test.ts`: Verify wrapper refresh behavior and failure handling.
   - `components/CurrentBatchTasksPanel.tsx`: Compose current-batch table, per-task actions, and batch action flow; lock row actions by task id while a task action is in flight.
-  - `components/TaskDetailContent.tsx`: Render task detail dialog content; clamp progress display and normalize duration rounding before splitting time units.
+  - `components/TaskDetailContent.tsx`: Render task detail dialog content, request override snapshots, segments, metadata, and clamped progress values.
   - `components/TaskDetailSheet.tsx`: Wrap task detail content with shared sheet behavior.
   - `components/__tests__/CurrentBatchTasksPanel.test.tsx`: Verify current-batch table, selection, actions, filters, and sorting.
   - `hooks/useRecentTaskQuery.ts`: Normalize query/filter/sort/pagination state for recent tasks.
@@ -816,7 +843,7 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `components/__tests__/ExportDialog.test.tsx`: Verify export dialog behavior.
   - `hooks/useExportDefaults.ts`: Manage persisted export defaults with update/reset.
   - `hooks/__tests__/useExportDefaults.test.ts`: Verify export-default hook behavior.
-  - `lib/filename.ts`: Build frontend fallback filename aligned with backend rules.
+  - `lib/filename.ts`: Build frontend fallback filenames aligned with backend export rules.
   - `lib/__tests__/filename.test.ts`: Verify filename helper behavior.
   - `index.ts`: Expose export feature public exports.
 - **settings**:
@@ -841,7 +868,7 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `index.ts`: Expose model feature public exports.
 - **realtime**:
   - `index.ts`: Expose the public realtime foundation surface: REST API helpers, primitive types, device repository factory, capture repository factory, transport factory, session service, diagnostics, transcript event contracts, stores, hook, and runtime adapter helpers.
-  - `api.ts`: Create and fetch Live sessions through `/api/live/*` REST endpoints using shared Live DTO aliases, including `runtime_overrides`.
+  - `api.ts`: Create, list, fetch, finish, export, save-export, batch-export, delete, and batch-delete Live sessions through `/api/live/*` REST endpoints using shared Live DTO aliases.
   - `types.ts`: Keep shared realtime primitive aliases (`LiveTimestampMs`, `LiveDurationMs`, `LiveUnsubscribe`) and runtime capability states.
   - `config/LiveRealtimeSchemaForm.tsx`: Render backend-schema controls for editable defaults, per-session overrides, and read-only resolved snapshots.
   - `config/live-realtime-config-draft.ts`: Keep Live realtime draft comparison, default resolution, override clearing, and runtime override serialization.
@@ -879,6 +906,7 @@ Cross-feature composite components with feature-agnostic behavior.
 
 - **ErrorBoundary.tsx**: Class-based error boundary wrapping child components. Catch render-time exceptions and display i18n-powered fallback UI with retry button. Use `withTranslation` HOC for i18n access in class components.
 - **interactive-table/**: Compose feature-agnostic sortable headers, selection, batch action bar, row actions, pagination, and local full-set query behavior over `DataTable`.
+- **JsonPropertiesBlock.tsx**: Render bounded read-only JSON property blocks for request parameter snapshots and show `EmptyState` when no object is displayable.
 - **types.ts**: Keep shared task action callback contracts.
 - **__tests__/ErrorBoundary.test.tsx**: Component tests covering fallback rendering and retry recovery.
 - **interactive-table/__tests__/**: Cover table rendering, selection reset semantics, pagination, local query, row actions, and batch action behavior.
@@ -908,9 +936,9 @@ Page-level layout primitives.
 Route page implementations.
 
 - **task-workbench/**: Compose upload queue, session config, Advanced side sheet, and current-batch task table. Let session config create task-level execution payloads with `model_id` and schema-derived `engine` values.
-- **history-center/**: Compose Task ID and Filename modes, URL search state, pagination, detail dialogs, export dialog loading, and page-local history hooks.
+- **history-center/**: Compose Task and Live history modes, Task ID/Filename submodes, URL search state, pagination, task/live detail dialogs, live export/delete flows, and page-local history hooks.
 - **models-management/**: Compose model overview, model table, detail sheet, mutation de-duplication, canonical `configured_model_id` handling, Default/Running display, model refresh, and restart-free model selection feedback.
-- **live-workbench/**: Compose Live source setup, explicit capture preparation, session start/stop orchestration, runtime settings side panel, transcript focus mode, browser compact view, millisecond timing, and runtime error feedback.
+- **live-workbench/**: Compose Live source setup, explicit capture preparation, session start/stop orchestration, runtime settings side panel, transcript focus mode, browser compact view, default transcript download, millisecond timing, and runtime error feedback.
 - **settings/**: Compose General, Transcription, Live Realtime, Export, Model Storage, and System Info tabs. Keep subpage titles removed; show settings content directly. Keep engine resources read-only and use task-boundary reload language instead of restart-required language.
 - **settings/LiveRealtimeTab.tsx**: Render Live realtime defaults from backend schema metadata, persist patches through config API helpers, and keep special-value token state consistent with local validation.
 
@@ -941,14 +969,17 @@ Cross-feature shared code, split into `lib/` and `types/`.
 - **lib/__tests__/error-factory.test.ts**: Factory contract tests for retry semantics and `isAppError`.
 - **lib/error-utils.ts**: `formatApiError()` converts FastAPI error payloads into readable messages.
 - **lib/__tests__/error-utils.test.ts**: Formatting tests for string and validation-array payloads.
+- **lib/content-disposition.ts**: `parseFilenameFromContentDisposition()` extracts UTF-8 and fallback attachment filenames for Task and Live downloads.
 - **lib/file-query-options.ts**: Centralize file list sort/order/filter option constants and guards.
 - **lib/file-validation.ts**: Pure function `validateFile(file, config)` with config injection. Checks extension, MIME, size, empty file, no extension. Returns `AppError` on failure.
 - **lib/format.ts**: `formatFileSize(bytes)` — base-1024 human-readable string (B/KB/MB/GB/TB). Guards against negative/NaN/Infinity.
 - **lib/icons.ts**: Keep shared Lucide icon mappings.
+- **lib/live-query-options.ts**: Centralize Live history filter, sort, and order option constants and guards.
+- **lib/object-path.ts**: Read and write nested object values by dot path for schema-driven option controls.
 - **lib/overlay-events.ts**: Broadcast close events between Activity Center and detail overlays.
 - **lib/query-client.ts**: Keep TanStack Query retry/default behavior.
 - **lib/query-fetcher.ts**: Wrap API calls for Query consumers.
-- **lib/query-keys.ts**: Centralize query key factories for tasks, files, models, and config.
+- **lib/query-keys.ts**: Centralize query key factories for tasks, files, live sessions, models, and config.
 - **lib/sse-client.ts**: Shared EventSource wrapper with typed payloads and normalized API-base URL joining.
 - **lib/__tests__/sse-client.test.ts**: Verify SSE connection wiring, event parsing, and cleanup.
 - **lib/task-query-options.ts**: Centralize task filter/sort/order option constants and guards.
@@ -961,9 +992,9 @@ Cross-feature shared code, split into `lib/` and `types/`.
 - **types/app-error.ts**: Frontend error contract (`AppError`: `code`, `i18nKey`, `params`, `retriable`).
 - **types/config.ts**: Thin aliases for config contracts (`AppConfig`, `EngineDefaults`, `SessionDefaults`, `LiveRealtimeDefaults`, `LiveRealtimeOptionGroup`, `EngineDevice`, `EngineComputeType`, defaults update requests).
 - **types/file.ts**: Thin aliases over OpenAPI file schemas (`FileInfo`, `FileUploadResponse`, etc.).
-- **types/live.ts**: Thin aliases over OpenAPI Live REST schemas (`CreateLiveSessionRequest`, `LiveSessionDetail`, `LiveTrack`, `LiveSegment`, runtime snapshot fields, etc.).
+- **types/live.ts**: Thin aliases over OpenAPI Live REST schemas (`CreateLiveSessionRequest`, `LiveSessionDetail`, `LiveSessionBatchExportRequest`, `LiveTrack`, `LiveSegment`, request override fields, runtime snapshot fields, list/export query types, etc.).
 - **types/model.ts**: Thin aliases over OpenAPI model schemas and active download contracts.
-- **types/task.ts**: Thin aliases over OpenAPI task schemas + derived types (`TaskStatus`, `ExportFormat` from schema enums); task read responses expose persisted `model_id` context.
+- **types/task.ts**: Thin aliases over OpenAPI task schemas + derived types (`TaskStatus`, `ExportFormat` from schema enums); task detail responses expose request override and runtime snapshot context.
 - **types/task-query.ts**: Shared query model for list toolbar and pagination contracts.
 - **types/index.ts**: Barrel re-export for `import type { ... } from '@/shared/types'`.
 
@@ -972,7 +1003,7 @@ Cross-feature shared code, split into `lib/` and `types/`.
 Keep route adapters and search-model helpers in this directory. Keep page implementations in `src/pages/*`.
 
 - **route-pages.tsx**: Lazy-load primary pages, Settings tabs including Live Realtime, and route loading fallbacks.
-- **history-search.ts**: Normalize route search params and build task query model.
+- **history-search.ts**: Normalize route search params and build task, filename, and live history query models.
 - **live-workbench-search.ts**: Normalize Live Workbench view search params and omit the default view from URLs.
 - **__tests__/router.test.ts**: Verify route tree behavior.
 

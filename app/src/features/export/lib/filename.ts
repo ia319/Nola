@@ -37,16 +37,38 @@ export interface BuildSingleExportFilenameParams {
   customFilename?: string | null
 }
 
-/** Keep frontend filename fallback consistent with backend single-export semantics. */
+export interface BuildExportFilenameParams {
+  format: ExportFormat
+  fallbackId: string
+  sourceName?: string | null
+  customFilename?: string | null
+}
+
+/** Build a single-export filename from the same priority order as the backend. */
+export function buildExportFilename({
+  format,
+  fallbackId,
+  sourceName,
+  customFilename,
+}: BuildExportFilenameParams): string {
+  const customStem = customFilename ? extractStem(customFilename) : ''
+  const sourceStem = sourceName ? extractStem(sourceName) : ''
+  const fallbackStem = sanitizeStem(fallbackId) || 'export'
+  const stem = customStem || sourceStem || fallbackStem
+  return `${stem}.${format}`
+}
+
+/** Keep task export filename fallback stable for existing callers. */
 export function buildSingleExportFilename({
   format,
   taskId,
   taskFilename,
   customFilename,
 }: BuildSingleExportFilenameParams): string {
-  const customStem = customFilename ? extractStem(customFilename) : ''
-  const taskStem = taskFilename ? extractStem(taskFilename) : ''
-  const fallbackStem = sanitizeStem(taskId) || 'export'
-  const stem = customStem || taskStem || fallbackStem
-  return `${stem}.${format}`
+  return buildExportFilename({
+    customFilename,
+    fallbackId: taskId,
+    format,
+    sourceName: taskFilename,
+  })
 }

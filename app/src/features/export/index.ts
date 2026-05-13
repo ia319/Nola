@@ -17,4 +17,4 @@ export type {
 export { ExportDialog } from './components/ExportDialog'
 export type { ExportDialogValue } from './components/ExportDialog'
 export { useExportDefaults } from './hooks/useExportDefaults'
-export { buildSingleExportFilename } from './lib/filename'
+export { buildExportFilename, buildSingleExportFilename } from './lib/filename'

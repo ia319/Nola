@@ -1,6 +1,8 @@
 """Tests for live transcription API endpoints."""
 
+import io
 import tempfile
+import zipfile
 from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import PropertyMock, patch
@@ -22,7 +24,11 @@ from nola.api.deps import (
     get_task_db,
 )
 from nola.api.schemas import CreateLiveSessionRequest
-from nola.application.live import DEFAULT_LIVE_SESSION_LIMIT, LiveSessionRecord
+from nola.application.live import (
+    DEFAULT_LIVE_SESSION_LIMIT,
+    LiveSessionRecord,
+    LiveSessionStatus,
+)
 from nola.application.live.realtime import (
     LIVE_REALTIME_PROTOCOL_VERSION,
     LiveRealtimeTranscriberFrame,
@@ -104,6 +110,74 @@ def _create_live_session(client: TestClient) -> dict[str, object]:
 
     assert response.status_code == 200
     return response.json()
+
+
+def _create_stored_live_session(
+    *,
+    session_id: str,
+    title: str | None = "Export Session",
+    status: LiveSessionStatus = "finished",
+    final_text: str | None = "final text",
+    preview_text: str | None = None,
+    started_at: str = "2026-01-01T00:00:00+00:00",
+) -> str:
+    live_db = get_live_db()
+    live_db.create_session(
+        session_id=session_id,
+        title=title,
+        mode="streaming",
+        status="active",
+        language_hint="en",
+        model_id="small",
+        runtime="mock",
+        audio_format="pcm_s16le_16khz_mono",
+        runtime_config={"schema_version": 1, "runtime": "mock"},
+        started_at=started_at,
+        created_at=started_at,
+        updated_at=started_at,
+    )
+    if preview_text is not None:
+        live_db.create_segment(
+            segment_id=f"{session_id}-preview",
+            session_id=session_id,
+            track_id=None,
+            sequence=1,
+            start_ms=0,
+            end_ms=500,
+            text=preview_text,
+            language="en",
+            confidence=None,
+            is_final=False,
+            created_at="2026-01-01T00:00:01+00:00",
+        )
+    if final_text is not None:
+        live_db.create_segment(
+            segment_id=f"{session_id}-final",
+            session_id=session_id,
+            track_id=None,
+            sequence=2,
+            start_ms=500,
+            end_ms=1500,
+            text=final_text,
+            language="en",
+            confidence=0.95,
+            is_final=True,
+            created_at="2026-01-01T00:00:02+00:00",
+        )
+    if status == "finished":
+        live_db.finish_session(
+            session_id,
+            ended_at="2026-01-01T00:02:00+00:00",
+            updated_at="2026-01-01T00:02:00+00:00",
+        )
+    elif status == "failed":
+        live_db.fail_session(
+            session_id,
+            error="connection_closed",
+            ended_at="2026-01-01T00:02:00+00:00",
+            updated_at="2026-01-01T00:02:00+00:00",
+        )
+    return session_id
 
 
 class _DownloadedModelStorage:
@@ -221,7 +295,13 @@ def test_list_live_sessions_uses_dependency_override(client: TestClient) -> None
             self,
             limit: int = DEFAULT_LIVE_SESSION_LIMIT,
             offset: int = 0,
+            *,
+            q: str | None = None,
+            status: str | None = None,
+            sort_by: str = "started_at",
+            order: str = "desc",
         ) -> list[LiveSessionRecord]:
+            del q, status, sort_by, order
             session: LiveSessionRecord = {
                 "id": "override-session",
                 "title": "Override",
@@ -232,6 +312,7 @@ def test_list_live_sessions_uses_dependency_override(client: TestClient) -> None
                 "runtime": None,
                 "audio_format": None,
                 "runtime_config": None,
+                "request_overrides": None,
                 "started_at": "2026-01-01T00:00:00+00:00",
                 "ended_at": None,
                 "error": None,
@@ -240,7 +321,13 @@ def test_list_live_sessions_uses_dependency_override(client: TestClient) -> None
             }
             return [session][offset : offset + limit]
 
-        def count_sessions(self) -> int:
+        def count_sessions(
+            self,
+            *,
+            q: str | None = None,
+            status: str | None = None,
+        ) -> int:
+            del q, status
             return 1
 
     app.dependency_overrides[get_live_db] = OverrideLiveStore
@@ -251,6 +338,59 @@ def test_list_live_sessions_uses_dependency_override(client: TestClient) -> None
 
     assert response.status_code == 200
     assert response.json()["sessions"][0]["session_id"] == "override-session"
+
+
+def test_list_live_sessions_applies_history_query_params(client: TestClient) -> None:
+    """Live session list should expose search, status, sorting, and total filters."""
+    _create_stored_live_session(
+        session_id="live-planning",
+        title="Planning",
+        status="finished",
+        started_at="2026-01-01T00:00:00+00:00",
+    )
+    _create_stored_live_session(
+        session_id="live-review-old",
+        title="Review",
+        status="finished",
+        started_at="2026-01-02T00:00:00+00:00",
+    )
+    _create_stored_live_session(
+        session_id="live-review-failed",
+        title="Review",
+        status="failed",
+        started_at="2026-01-03T00:00:00+00:00",
+    )
+
+    response = client.get(
+        "/api/live/sessions",
+        params={
+            "q": "review",
+            "status": "finished",
+            "sort_by": "started_at",
+            "order": "asc",
+            "limit": 10,
+            "offset": 0,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+    assert [item["session_id"] for item in response.json()["sessions"]] == [
+        "live-review-old"
+    ]
+
+
+def test_list_live_sessions_rejects_invalid_history_query_params(
+    client: TestClient,
+) -> None:
+    """Live session list should reject unsupported filters before SQL."""
+    invalid_status = client.get("/api/live/sessions", params={"status": "paused"})
+    invalid_sort = client.get("/api/live/sessions", params={"sort_by": "runtime"})
+    invalid_order = client.get("/api/live/sessions", params={"order": "sideways"})
+
+    assert invalid_status.status_code == 422
+    assert invalid_sort.status_code == 422
+    assert invalid_order.status_code == 422
 
 
 def test_create_list_get_and_finish_live_session(client: TestClient) -> None:
@@ -264,6 +404,11 @@ def test_create_list_get_and_finish_live_session(client: TestClient) -> None:
     repeated_finish_response = client.post(f"/api/live/sessions/{session_id}/finish")
 
     assert created["status"] == "active"
+    assert created["request_overrides"] == {
+        "schema_version": 1,
+        "model_id": "small",
+        "language_hint": "en",
+    }
     assert created["tracks"] == []
     assert created["segments"] == []
     assert created["segment_total"] == 0
@@ -272,6 +417,7 @@ def test_create_list_get_and_finish_live_session(client: TestClient) -> None:
     assert list_response.json()["sessions"][0]["session_id"] == session_id
     assert detail_response.status_code == 200
     assert detail_response.json()["session_id"] == session_id
+    assert detail_response.json()["request_overrides"] == created["request_overrides"]
     assert finish_response.status_code == 200
     assert finish_response.json()["status"] == "finished"
     assert finish_response.json()["ended_at"] is not None
@@ -305,6 +451,23 @@ def test_create_live_session_mock_runtime_does_not_resolve_model_storage(
     assert response.status_code == 200
     assert response.json()["runtime"] == "mock"
     assert response.json()["runtime_config"]["runtime"] == "mock"
+
+
+def test_create_live_session_without_overrides_returns_null_request_overrides(
+    client: TestClient,
+) -> None:
+    """Live session creation should not invent request override snapshots."""
+    app.dependency_overrides[get_live_realtime_adapter] = lambda: "mock"
+    try:
+        response = client.post(
+            "/api/live/sessions",
+            json={"title": "No overrides", "mode": "streaming"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_live_realtime_adapter, None)
+
+    assert response.status_code == 200
+    assert response.json()["request_overrides"] is None
 
 
 def test_create_live_session_accepts_runtime_overrides_without_persisting_defaults(
@@ -343,6 +506,19 @@ def test_create_live_session_accepts_runtime_overrides_without_persisting_defaul
     assert before_defaults.status_code == 200
     assert response.status_code == 200
     assert response.json()["language_hint"] == "zh"
+    assert response.json()["request_overrides"] == {
+        "schema_version": 1,
+        "model_id": "small",
+        "language_hint": "zh",
+        "runtime_overrides": {
+            "language": "en",
+            "device": "cuda",
+            "compute_type": "float16",
+            "context_prompt": None,
+            "beam_size": 3,
+            "vad_parameters": {"threshold": 0.6},
+        },
+    }
     assert response.json()["runtime"] == "whisper_streaming"
     assert response.json()["runtime_config"]["execution"] == {
         "device": "cuda",
@@ -390,6 +566,10 @@ def test_create_live_session_runtime_config_uses_creation_time_defaults(
     assert response.status_code == 200
     assert response.json()["runtime_config"]["faster_whisper"]["beam_size"] == 3
     assert detail_response.status_code == 200
+    assert detail_response.json()["request_overrides"] == {
+        "schema_version": 1,
+        "model_id": "small",
+    }
     assert detail_response.json()["runtime_config"]["faster_whisper"]["beam_size"] == 3
 
 
@@ -1308,6 +1488,371 @@ def test_get_live_session_returns_paged_segments(client: TestClient) -> None:
     assert [segment["segment_id"] for segment in data["segments"]] == ["segment-002"]
 
 
+def test_export_live_session_uses_only_final_segments(client: TestClient) -> None:
+    """Live single export should download final transcript content only."""
+    session_id = _create_stored_live_session(
+        session_id="live-export",
+        title="Live Export",
+        status="finished",
+        final_text="final transcript",
+        preview_text="preview transcript",
+    )
+
+    response = client.get(
+        f"/api/live/sessions/{session_id}/export",
+        params={"format": "srt"},
+    )
+
+    assert response.status_code == 200
+    assert "final transcript" in response.text
+    assert "preview transcript" not in response.text
+    assert (
+        "filename*=UTF-8''Live%20Export.srt" in response.headers["content-disposition"]
+    )
+
+
+def test_export_live_session_save_to_disk(client: TestClient) -> None:
+    """Live single export should support server-side save mode."""
+    session_id = _create_stored_live_session(
+        session_id="live-save",
+        title="Live Save",
+        status="finished",
+        final_text="saved transcript",
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        exports_path = Path(tmpdir) / "exports"
+        with patch.object(
+            Settings,
+            "exports_dir",
+            new_callable=PropertyMock,
+            return_value=exports_path,
+        ):
+            response = client.get(
+                f"/api/live/sessions/{session_id}/export",
+                params={
+                    "format": "txt",
+                    "include_timestamps": "false",
+                    "save": "true",
+                },
+            )
+            saved_content = (exports_path / "Live Save.txt").read_text(encoding="utf-8")
+
+    assert response.status_code == 200
+    assert response.json() == {"saved_path": "exports/Live Save.txt"}
+    assert saved_content.strip() == "saved transcript"
+
+
+def test_export_live_session_save_sanitizes_requested_filename(
+    client: TestClient,
+) -> None:
+    """Live server-side save should ignore directory segments in filename input."""
+    session_id = _create_stored_live_session(
+        session_id="live-save-sanitized",
+        title="Live Save Sanitized",
+        status="finished",
+        final_text="saved transcript",
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        exports_path = tmp_path / "exports"
+        with patch.object(
+            Settings,
+            "exports_dir",
+            new_callable=PropertyMock,
+            return_value=exports_path,
+        ):
+            response = client.get(
+                f"/api/live/sessions/{session_id}/export",
+                params={
+                    "format": "txt",
+                    "include_timestamps": "false",
+                    "save": "true",
+                    "filename": "../../secret.txt",
+                },
+            )
+            saved_content = (exports_path / "secret.txt").read_text(encoding="utf-8")
+
+        assert not (tmp_path / "secret.txt").exists()
+
+    assert response.status_code == 200
+    assert response.json() == {"saved_path": "exports/secret.txt"}
+    assert saved_content.strip() == "saved transcript"
+
+
+def test_export_live_session_rejects_active_or_empty_session(
+    client: TestClient,
+) -> None:
+    """Live single export should reject non-finished and empty final sessions."""
+    active_id = _create_stored_live_session(
+        session_id="live-active",
+        status="active",
+        final_text="active final",
+    )
+    empty_id = _create_stored_live_session(
+        session_id="live-empty",
+        status="finished",
+        final_text=None,
+    )
+
+    active_response = client.get(f"/api/live/sessions/{active_id}/export")
+    empty_response = client.get(f"/api/live/sessions/{empty_id}/export")
+
+    assert active_response.status_code == 400
+    assert empty_response.status_code == 400
+    assert empty_response.json()["detail"] == "No final segments available"
+
+
+def test_batch_export_live_sessions_returns_zip_with_partial_failures(
+    client: TestClient,
+) -> None:
+    """Live batch export should include successful files and an error report."""
+    finished_id = _create_stored_live_session(
+        session_id="live-batch-ok",
+        title="Batch OK",
+        status="finished",
+        final_text="batch transcript",
+    )
+    active_id = _create_stored_live_session(
+        session_id="live-batch-active",
+        status="active",
+        final_text="active transcript",
+    )
+
+    response = client.post(
+        "/api/live/sessions/export/batch",
+        json={
+            "session_ids": [finished_id, active_id, "missing-live"],
+            "format": "txt",
+            "include_timestamps": False,
+        },
+    )
+
+    assert response.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        names = set(archive.namelist())
+        assert "Batch OK.txt" in names
+        assert "_errors.txt" in names
+        assert archive.read("Batch OK.txt").decode("utf-8").strip() == (
+            "batch transcript"
+        )
+        errors = archive.read("_errors.txt").decode("utf-8")
+        assert "live-batch-active: status_active" in errors
+        assert "missing-live: not_found" in errors
+
+
+def test_batch_export_live_sessions_renames_duplicate_zip_members(
+    client: TestClient,
+) -> None:
+    """Live batch export should avoid duplicate member names when all succeed."""
+    first_id = _create_stored_live_session(
+        session_id="live-batch-first",
+        title="Duplicate",
+        status="finished",
+        final_text="first transcript",
+    )
+    second_id = _create_stored_live_session(
+        session_id="live-batch-second",
+        title="Duplicate",
+        status="finished",
+        final_text="second transcript",
+    )
+
+    response = client.post(
+        "/api/live/sessions/export/batch",
+        json={
+            "session_ids": [first_id, second_id],
+            "format": "txt",
+            "include_timestamps": False,
+        },
+    )
+
+    assert response.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        names = set(archive.namelist())
+        assert names == {"Duplicate.txt", "Duplicate_1.txt"}
+        assert archive.read("Duplicate.txt").decode("utf-8").strip() == (
+            "first transcript"
+        )
+        assert archive.read("Duplicate_1.txt").decode("utf-8").strip() == (
+            "second transcript"
+        )
+
+
+def test_batch_export_live_sessions_supports_non_ascii_zip_name(
+    client: TestClient,
+) -> None:
+    """Live batch export should expose non-ASCII ZIP names through filename*."""
+    session_id = _create_stored_live_session(
+        session_id="live-batch-non-ascii",
+        title="Non ASCII",
+        status="finished",
+        final_text="zip transcript",
+    )
+
+    response = client.post(
+        "/api/live/sessions/export/batch",
+        json={
+            "session_ids": [session_id],
+            "format": "txt",
+            "include_timestamps": False,
+            "zip_name": "\u4e2d\u6587_export",
+        },
+    )
+
+    assert response.status_code == 200
+    content_disp = response.headers["content-disposition"]
+    assert 'filename="_export.zip"' in content_disp
+    assert "filename*=UTF-8''%E4%B8%AD%E6%96%87_export.zip" in content_disp
+
+
+def test_batch_export_live_sessions_avoids_double_zip_suffix(
+    client: TestClient,
+) -> None:
+    """Live batch export should not append a duplicate ZIP suffix."""
+    session_id = _create_stored_live_session(
+        session_id="live-batch-zip-suffix",
+        title="ZIP Suffix",
+        status="finished",
+        final_text="zip suffix transcript",
+    )
+
+    response = client.post(
+        "/api/live/sessions/export/batch",
+        json={
+            "session_ids": [session_id],
+            "format": "txt",
+            "include_timestamps": False,
+            "zip_name": "live_export.zip",
+        },
+    )
+
+    assert response.status_code == 200
+    content_disp = response.headers["content-disposition"]
+    assert "live_export.zip.zip" not in content_disp
+    assert 'filename="live_export.zip"' in content_disp
+
+
+def test_batch_export_live_sessions_rejects_all_failed(client: TestClient) -> None:
+    """Live batch export should reject requests with no successful files."""
+    active_id = _create_stored_live_session(
+        session_id="live-batch-all-fail",
+        status="active",
+        final_text="active transcript",
+    )
+
+    response = client.post(
+        "/api/live/sessions/export/batch",
+        json={"session_ids": [active_id], "format": "txt"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "All 1 live exports failed"
+
+
+def test_batch_export_live_sessions_preserves_internal_error_status(
+    client: TestClient,
+) -> None:
+    """Live batch export should return 500 when all failures are internal."""
+    session_id = _create_stored_live_session(
+        session_id="live-batch-internal-error",
+        title="Internal Error",
+        status="finished",
+        final_text="internal error transcript",
+    )
+
+    with patch(
+        "nola.application.live.exports.batch_export_live_sessions."
+        "build_live_segment_data",
+        side_effect=RuntimeError("formatter input failed"),
+    ):
+        response = client.post(
+            "/api/live/sessions/export/batch",
+            json={"session_ids": [session_id], "format": "txt"},
+        )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "All 1 live exports failed"
+
+
+def test_delete_live_session_record_removes_terminal_session(
+    client: TestClient,
+) -> None:
+    """Live delete should remove finished or failed sessions and child rows."""
+    session_id = _create_stored_live_session(
+        session_id="live-delete",
+        status="finished",
+        final_text="delete transcript",
+    )
+
+    response = client.delete(f"/api/live/sessions/{session_id}/record")
+
+    assert response.status_code == 200
+    assert response.json()["session_id"] == session_id
+    assert get_live_db().get_session(session_id) is None
+    assert get_live_db().list_segments(session_id) == []
+
+
+def test_delete_live_session_record_rejects_active_session(
+    client: TestClient,
+) -> None:
+    """Live delete should reject active sessions."""
+    session_id = _create_stored_live_session(
+        session_id="live-delete-active",
+        status="active",
+        final_text="active transcript",
+    )
+
+    response = client.delete(f"/api/live/sessions/{session_id}/record")
+
+    assert response.status_code == 400
+    assert get_live_db().get_session(session_id) is not None
+
+
+def test_batch_delete_live_sessions_returns_mixed_outcomes(
+    client: TestClient,
+) -> None:
+    """Live batch delete should return per-session outcomes."""
+    finished_id = _create_stored_live_session(
+        session_id="live-delete-finished",
+        status="finished",
+    )
+    failed_id = _create_stored_live_session(
+        session_id="live-delete-failed",
+        status="failed",
+    )
+    active_id = _create_stored_live_session(
+        session_id="live-delete-active",
+        status="active",
+    )
+
+    response = client.post(
+        "/api/live/sessions/batch/delete-records",
+        json={
+            "session_ids": [
+                finished_id,
+                active_id,
+                "missing-live",
+                failed_id,
+                finished_id,
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"] == {"requested": 5, "succeeded": 2, "failed": 3}
+    assert payload["results"][0]["ok"] is True
+    assert payload["results"][1]["error_code"] == "invalid_status"
+    assert payload["results"][2]["error_code"] == "not_found"
+    assert payload["results"][3]["ok"] is True
+    assert payload["results"][4]["error_code"] == "duplicate_session_id"
+    assert get_live_db().get_session(finished_id) is None
+    assert get_live_db().get_session(failed_id) is None
+    assert get_live_db().get_session(active_id) is not None
+
+
 def test_live_session_errors(client: TestClient) -> None:
     """Live routes should expose stable HTTP error boundaries."""
     invalid_create = client.post(
@@ -1333,8 +1878,30 @@ def test_openapi_exposes_live_paths(client: TestClient) -> None:
     assert response.status_code == 200
     paths = response.json()["paths"]
     assert "/api/live/sessions" in paths
+    assert "/api/live/sessions/export/batch" in paths
+    assert "/api/live/sessions/batch/delete-records" in paths
     assert "/api/live/sessions/{session_id}" in paths
+    assert "/api/live/sessions/{session_id}/export" in paths
     assert "/api/live/sessions/{session_id}/finish" in paths
+    assert "/api/live/sessions/{session_id}/record" in paths
+
+    list_parameters = {
+        parameter["name"]: parameter["schema"]
+        for parameter in paths["/api/live/sessions"]["get"]["parameters"]
+    }
+
+    def parameter_enum(name: str) -> list[str]:
+        schema = list_parameters[name]
+        if "enum" in schema:
+            return schema["enum"]
+        for candidate in schema.get("anyOf", []):
+            if "enum" in candidate:
+                return candidate["enum"]
+        return []
+
+    assert parameter_enum("status") == ["active", "finished", "failed"]
+    assert parameter_enum("sort_by") == ["started_at", "ended_at", "status", "title"]
+    assert parameter_enum("order") == ["asc", "desc"]
 
 
 class _FlushTrackRouteTranscriber:

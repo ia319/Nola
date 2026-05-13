@@ -54,6 +54,7 @@ class TaskDatabase:
         engine_device: str | None = None,
         engine_compute_type: str | None = None,
         runtime_config: JsonDict | None = None,
+        request_overrides: JsonDict | None = None,
     ) -> None:
         """Add task to queue."""
         self._queue.enqueue(
@@ -66,6 +67,7 @@ class TaskDatabase:
             engine_device=engine_device,
             engine_compute_type=engine_compute_type,
             runtime_config=runtime_config,
+            request_overrides=request_overrides,
         )
 
     def dequeue(self, worker_id: str) -> TaskRowRaw | None:

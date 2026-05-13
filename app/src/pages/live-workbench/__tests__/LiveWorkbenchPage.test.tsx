@@ -60,6 +60,8 @@ const liveWorkbenchPageMocks = vi.hoisted(() => ({
   patchLiveRealtimeDefaultsMock: vi.fn(),
   deleteLiveRealtimeDefaultsMock: vi.fn(),
   createLiveRealtimeSessionServiceMock: vi.fn(),
+  downloadLiveSessionExportMock: vi.fn(),
+  downloadBlobMock: vi.fn(),
   toastSuccessMock: vi.fn(),
   toastWarningMock: vi.fn(),
   toastErrorMock: vi.fn(),
@@ -136,6 +138,9 @@ vi.mock('react-i18next', () => ({
         'live.workbench.transcript.kind.preview': 'Preview',
         'live.workbench.transcript.actions.expand': 'Expand transcript area',
         'live.workbench.transcript.actions.restore': 'Restore setup area',
+        'live.workbench.transcript.download.action': 'Download transcript',
+        'live.workbench.transcript.download.toast.success': 'Transcript download started',
+        'live.workbench.transcript.download.toast.failed': 'Transcript download failed',
         'live.workbench.transcript.empty.title': 'No transcript yet',
         'live.workbench.transcript.empty.description':
           'Start a live session to stream transcript output here.',
@@ -250,8 +255,13 @@ vi.mock('@/features/realtime', async (importActual) => {
     ...actual,
     useLiveDeviceInventory: liveWorkbenchPageMocks.useLiveDeviceInventoryMock,
     createLiveRealtimeSessionService: liveWorkbenchPageMocks.createLiveRealtimeSessionServiceMock,
+    downloadLiveSessionExport: liveWorkbenchPageMocks.downloadLiveSessionExportMock,
   }
 })
+
+vi.mock('@/shared/lib/utils', () => ({
+  downloadBlob: liveWorkbenchPageMocks.downloadBlobMock,
+}))
 
 vi.mock('sonner', () => ({
   toast: {
@@ -648,6 +658,18 @@ function appendFinalTranscript(): void {
   })
 }
 
+function finishLiveSessionWithFinalTranscript(): void {
+  const session = buildLiveSessionDetail({
+    session_id: 'session-1',
+    status: 'finished',
+    ended_at: '2026-05-10T00:00:03.000Z',
+  })
+
+  useLiveRealtimeStore.getState().setLiveRealtimeSession(session)
+  appendFinalTranscript()
+  useLiveRealtimeStore.getState().setLiveRealtimeFinished(session)
+}
+
 function installDocumentPictureInPictureMock(): {
   compactDocument: Document
   compactWindow: Window
@@ -714,6 +736,10 @@ describe('LiveWorkbenchPage', () => {
     liveWorkbenchPageMocks.deleteLiveRealtimeDefaultsMock.mockResolvedValue(undefined)
     liveWorkbenchPageMocks.fetchLiveRealtimeDefaultsMock.mockResolvedValue({
       defaults: buildLiveRealtimeDefaults(),
+    })
+    liveWorkbenchPageMocks.downloadLiveSessionExportMock.mockResolvedValue({
+      blob: new Blob(['srt']),
+      filename: 'live.srt',
     })
     liveWorkbenchPageMocks.useMutationMock.mockImplementation((options) => ({
       isPending: false,
@@ -859,6 +885,84 @@ describe('LiveWorkbenchPage', () => {
     expect(updateSearch).not.toHaveBeenCalled()
     expect(compactWindow.close).toHaveBeenCalledTimes(1)
     expect(compactWindow.removeEventListener).toHaveBeenCalledWith('pagehide', expect.any(Function))
+  })
+
+  it('keeps transcript download disabled while the live session is active', () => {
+    useLiveRealtimeStore.getState().setLiveRealtimeSession(buildLiveSessionDetail())
+    useLiveRealtimeStore.getState().setLiveRealtimeActive()
+    appendFinalTranscript()
+
+    render(<LiveWorkbenchPage />)
+
+    expect(screen.getByRole('button', { name: 'Download transcript' })).toBeDisabled()
+  })
+
+  it('downloads a finished persisted session after the local stop state failed', async () => {
+    const session = buildLiveSessionDetail({
+      session_id: 'session-1',
+      status: 'finished',
+      ended_at: '2026-05-10T00:00:03.000Z',
+    })
+    useLiveRealtimeStore.getState().setLiveRealtimeSession(session)
+    appendFinalTranscript()
+    useLiveRealtimeStore.getState().setLiveRealtimeFailure({
+      code: 'websocket_closed',
+      message: 'Realtime WebSocket closed before session finished',
+      retryable: false,
+    })
+
+    render(<LiveWorkbenchPage />)
+
+    const downloadButton = screen.getByRole('button', { name: 'Download transcript' })
+    expect(downloadButton).not.toBeDisabled()
+
+    fireEvent.click(downloadButton)
+
+    await waitFor(() => {
+      expect(liveWorkbenchPageMocks.downloadLiveSessionExportMock).toHaveBeenCalledWith('session-1')
+    })
+  })
+
+  it('downloads a finished live transcript', async () => {
+    const blob = new Blob(['srt'])
+    liveWorkbenchPageMocks.downloadLiveSessionExportMock.mockResolvedValueOnce({
+      blob,
+      filename: 'meeting.srt',
+    })
+    finishLiveSessionWithFinalTranscript()
+
+    render(<LiveWorkbenchPage />)
+
+    const downloadButton = screen.getByRole('button', { name: 'Download transcript' })
+    expect(downloadButton).not.toBeDisabled()
+
+    fireEvent.click(downloadButton)
+
+    await waitFor(() => {
+      expect(liveWorkbenchPageMocks.downloadLiveSessionExportMock).toHaveBeenCalledWith('session-1')
+    })
+    expect(liveWorkbenchPageMocks.downloadBlobMock).toHaveBeenCalledWith(blob, 'meeting.srt')
+    expect(liveWorkbenchPageMocks.toastSuccessMock).toHaveBeenCalledWith(
+      'Transcript download started',
+    )
+  })
+
+  it('shows a toast when finished live transcript download fails', async () => {
+    liveWorkbenchPageMocks.downloadLiveSessionExportMock.mockRejectedValueOnce(
+      new Error('download failed'),
+    )
+    finishLiveSessionWithFinalTranscript()
+
+    render(<LiveWorkbenchPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Download transcript' }))
+
+    await waitFor(() => {
+      expect(liveWorkbenchPageMocks.toastErrorMock).toHaveBeenCalledWith(
+        'Transcript download failed',
+      )
+    })
+    expect(liveWorkbenchPageMocks.downloadBlobMock).not.toHaveBeenCalled()
   })
 
   it('toggles the settings side panel from session setup', () => {

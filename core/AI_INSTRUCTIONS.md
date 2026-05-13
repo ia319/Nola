@@ -83,9 +83,16 @@ core/
 │   │   │   ├── values.py      # Live value and pagination validators
 │   │   │   ├── actions/       # Live write-side use-cases
 │   │   │   │   ├── __init__.py # Live action exports
+│   │   │   │   ├── batch_delete_live_sessions.py # Batch terminal live-record delete use-case
 │   │   │   │   ├── create_live_session.py # Create active live session use-case
+│   │   │   │   ├── delete_live_session.py # Single terminal live-record delete use-case
 │   │   │   │   ├── fail_live_session.py # Mark active live session failed
 │   │   │   │   └── finish_live_session.py # Finish active live session use-case
+│   │   │   ├── exports/       # Live export use-cases (single/batch)
+│   │   │   │   ├── __init__.py # Live export use-case exports
+│   │   │   │   ├── batch_export_live_sessions.py # Batch live export archive use-case
+│   │   │   │   ├── export_common.py # Shared live export payload and segment helpers
+│   │   │   │   └── export_live_session.py # Single live session export use-case
 │   │   │   ├── queries/       # Live read-side use-cases
 │   │   │   │   ├── __init__.py # Live query exports
 │   │   │   │   ├── get_live_session.py # Live detail query with segment pagination
@@ -312,14 +319,16 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - `nola/config/session/`: Workbench session defaults for execution and transcription.
 - `nola/config/session/schema.py`: Execution option schema metadata for frontend device and compute-type controls.
 - `nola/application/files/`: File upload, list, integrity, cleanup, single-delete, and batch-delete use-cases.
-- `nola/application/live/`: Live session, track, segment contracts, payload builders, value guards, and create/list/get/finish use-cases.
+- `nola/application/live/`: Live session, track, segment contracts, payload builders, value guards, request override snapshots, create/list/get/finish/delete use-cases, and export orchestration.
+- `nola/application/live/exports/`: Export finished Live sessions from persisted final transcript segments through the shared formatter registry.
 - `nola/application/live/runtime_config.py`: Resolve Live realtime three-layer config snapshots and model/cache validation.
 - `nola/application/live/realtime/`: Live WebSocket runtime, PCM validation, WAV diagnostics, Mock transcriber, transcript contracts, protocol constants, and connection registry.
 - `nola/application/live/realtime/whisper_streaming/`: WhisperStreaming / LocalAgreement Live runtime adapter, processor, model loader, faster-whisper backend, and module source README.
 - `nola/application/models/`: Model list/detail/settings/download/cancel/delete/select use-cases and per-model operation locks.
-- `nola/application/tasks/`: Task use-cases, payload builders, and export orchestration.
+- `nola/application/tasks/`: Task use-cases, request override snapshots, payload builders, and export orchestration.
 - `nola/application/tasks/execution_config.py`: Resolve task-level `model_id`, `engine_device`, and `engine_compute_type` before persistence.
 - `nola/application/tasks/runtime_config.py`: Freeze complete transcription runtime snapshots at task creation and rebuild worker options from snapshots.
+- `nola/models/database.py`: Store independent `request_overrides` JSON columns for Task and Live history details.
 - `nola/models/live.py`: SQLite repository for independent Live sessions, tracks, and transcript segments.
 - `nola/api/routes/live.py` + `nola/api/schemas/live.py` + `nola/api/schemas/live_realtime.py`: Live REST and WebSocket endpoints plus response/protocol schemas.
 - `nola/api/schemas/live_realtime_config.py`: Pydantic schemas for Live realtime defaults and per-session runtime overrides.
@@ -348,6 +357,7 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - Treat engine construction failures as retryable task-start failures; keep validation and missing-cache failures non-retryable.
 - Keep `model_id`, `device`, and `compute_type` out of `TranscribeOptions` and task `options` JSON.
 - Persist a complete task `runtime_config` snapshot at task creation; make the worker prefer that snapshot over current `transcription.` defaults.
+- Persist Task `request_overrides` from accepted user request values only. Do not reconstruct it from `runtime_config`, task `options`, or current defaults.
 - Reject incomplete or malformed task `runtime_config` snapshots as non-retryable task data failures; do not fill missing fields from current dataclass defaults.
 - Keep legacy task fallback only for rows with no `runtime_config`.
 - Keep `restart_required` as a compatibility field returning `False` while task-boundary engine reload is supported; do not use it to signal manual worker restart.
@@ -357,6 +367,9 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - Keep Live as an independent backend subsystem. Do not write Live session, track, or segment data into `transcription_tasks`.
 - Keep `/api/live/*` as the Live REST resource namespace. Do not overload `/api/transcription-tasks/*` for realtime session lifecycle.
 - Keep Live routes as adapters for parsing, dependency injection, response models, and `LiveUseCaseError` mapping; put lifecycle and payload behavior in `nola/application/live`.
+- Keep Live history list responses summary-only. Return `request_overrides` and `runtime_config` only from detail and creation/finish snapshots.
+- Persist Live `request_overrides` from accepted user request values only. Do not reconstruct it from `runtime_config`, `session_overrides`, or current defaults.
+- Keep Live export and delete business behavior in `nola/application/live/exports` and `nola/application/live/actions`; keep routes as HTTP adapters.
 - Keep Live WebSocket business state in `nola/application/live/realtime`. Routes may accept sockets, map protocol errors, inject dependencies, and send/close frames only.
 - Keep `/api/live/sessions/{session_id}/stream` as the Live WebSocket endpoint. Use JSON text frames for control/events and binary frames for PCM payloads.
 - Keep realtime audio input at PCM16LE, 16 kHz, mono. Default runtime must not denoise, gain-normalize, compress, EQ, or trim content.
@@ -367,6 +380,7 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - Close open Live tracks when finishing a realtime session so finished sessions do not keep `ended_at = NULL` tracks.
 - Keep realtime runtime release idempotent because route cleanup may call it after normal finish or disconnect handling.
 - Keep realtime transcript semantics explicit: `preview` and `committed_partial` are WebSocket-only runtime feedback; only `final` is persisted in `live_segments`.
+- Use persisted final Live segments only for Live history details and exports; do not export preview or committed partial transcripts.
 - Select the Live realtime transcriber through `NOLA_LIVE_REALTIME_TRANSCRIBER` values `mock` or `whisper_streaming`; reject unsupported values with `runtime_config_invalid`.
 - Keep Live realtime defaults under the `live_realtime.` app-config prefix; do not read or write `transcription.` or Workbench Session defaults for Live runtime options.
 - Resolve Live realtime config precedence as `built-in defaults < persisted Live realtime defaults < per-session runtime_overrides`.
@@ -386,6 +400,9 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 - Treat the in-memory Live stream connection registry as single-process coordination only. Use distributed coordination before running multiple API workers for Live WebSockets.
 - Keep Live timestamps timezone-aware UTC ISO strings.
 - Keep Live session list and detail segment reads paginated; reject invalid `limit`/`offset` values before repository calls.
+- Keep Live history list filtering and sorting validated through status/sort/order allowlists before repository SQL.
+- Delete only terminal Live sessions (`finished` / `failed`) and rely on SQLite foreign-key cascade for child tracks and segments.
+- Keep batch Live export item failures sanitized in `_errors.txt`; preserve `500` semantics when every failure is internal.
 - Return a stable current snapshot for repeated Live finish requests. Do not turn an already-terminal session into an error when the session exists.
 - Do not add backend device enumeration APIs for browser or desktop user devices. Device inventory belongs to the client runtime adapters.
 
@@ -401,6 +418,7 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 > 4.  **Environment Check**: Verify `sqlite3` version >= 3.35.0 on startup.
 > 5.  **Live Integrity**: Keep Live foreign keys enabled, ensure a segment `track_id` belongs to the same `session_id`, and do not return unbounded segment lists.
 > 6.  **Runtime Snapshots**: Store Live session and transcription task `runtime_config` values as JSON snapshots; preserve `NULL` for legacy rows instead of fabricating current-default history.
+> 7.  **Request Override Snapshots**: Store `request_overrides` as accepted user override JSON only; return `NULL` rather than deriving missing history from resolved runtime snapshots.
 
 ---
 
@@ -412,6 +430,7 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 | uvicorn | 0.40.0 |
 | faster-whisper | 1.2.1 |
 | pydantic-settings | 2.12.0 |
+| typing-extensions | 4.15.0 |
 | Python | ^3.10 |
 
 ### Dev Dependencies
@@ -429,16 +448,16 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 
 ### nola/models/
 Data persistence layer (SQLite):
-- `database.py`: Schema initialization, connection management, foreign key enforcement, Live table/index creation, and task execution config column migrations.
+- `database.py`: Schema initialization, connection management, foreign key enforcement, Live table/index creation, task execution config migrations, and Task/Live request override columns.
 - `app_config.py`: `AppConfigDatabase` for persisted application defaults under `app_config`.
 - `files.py`: `FileDatabase` for managing audio file metadata. Uses `FileRow` TypedDict.
-- `live.py`: `LiveDatabase` for Live session, track, and segment persistence. Keep sessions newest-first, tracks creation-ordered, segments sequence-ordered and paginated.
+- `live.py`: `LiveDatabase` for Live session, track, and segment persistence. Keep sessions newest-first, tracks creation-ordered, segments sequence-ordered and paginated, final-segment export reads bounded, list filters allowlisted, terminal deletes guarded, and invalid JSON snapshots nulled with warnings.
 - `query_helpers.py`: Share SQLite `LIKE` escape and contains-pattern helpers across file and task repositories.
 - `tasks.py`: Keep `TaskDatabase` as facade and delegate to split repositories.
-- `taskdb/task_queue.py`: Handle enqueue/dequeue/heartbeat/complete/fail/requeue flows; persist task `model_id`, `engine_device`, and `engine_compute_type`; clear stale `error` on successful completion; reset `progress` when requeueing failed/timeout/dead-worker tasks.
-- `taskdb/task_store.py`: Handle get/list/count/cancel/delete persistence queries.
-- `taskdb/query_helpers.py`: Keep query helper functions isolated from repository classes; validate decoded JSON shapes for `segments` and `options` before casting task rows.
-- `taskdb/types.py`: Keep shared task statuses, sort fields, and task row TypedDict contracts including persisted execution config fields.
+- `taskdb/task_queue.py`: Handle enqueue/dequeue/heartbeat/complete/fail/requeue flows; persist task `model_id`, `engine_device`, `engine_compute_type`, `runtime_config`, and `request_overrides`; clear stale `error` on successful completion; reset `progress` when requeueing failed/timeout/dead-worker tasks.
+- `taskdb/task_store.py`: Handle get/list/count/cancel/delete persistence queries and decode task runtime/request JSON snapshots.
+- `taskdb/query_helpers.py`: Keep query helper functions isolated from repository classes; validate decoded JSON shapes for `segments`, `options`, `runtime_config`, and `request_overrides` before casting task rows.
+- `taskdb/types.py`: Keep shared task statuses, sort fields, and task row TypedDict contracts including persisted execution config and request override fields.
 - `utils/db.py`: Database utilities (e.g., `ensure_sqlite_version`).
 
 ### nola/common/
@@ -477,7 +496,7 @@ API adapter layer:
 - `routes/config.py`: Aggregated config endpoints, session defaults management, transcription defaults management, Live realtime defaults/schema management, and export defaults management.
 - `routes/files.py`: File upload/list/delete HTTP adapter. Delegate list, upload, integrity, cleanup, single delete, and batch delete orchestration to `application/files`; keep explicit `response_model`.
 - `routes/_live_realtime_events.py`: Build Live WebSocket server events, including preview/committed/final transcript events, from application payloads without putting event assembly in the router.
-- `routes/live.py`: Live REST and WebSocket adapter for create/list/detail/finish session endpoints plus `/api/live/sessions/{session_id}/stream`. Resolve dependencies through FastAPI dependency injection, create blocking realtime transcribers through `run_in_threadpool()`, and keep business behavior in `application/live`.
+- `routes/live.py`: Live REST and WebSocket adapter for create/list/detail/finish/export/delete session endpoints plus `/api/live/sessions/{session_id}/stream`. Resolve dependencies through FastAPI dependency injection, create blocking realtime transcribers through `run_in_threadpool()`, and keep business behavior in `application/live`.
 - `routes/models.py`: Model HTTP adapter for list/detail/download/cancel/delete/select/settings, SSE event stream, active-download runtime summary, and `409` responses for both active downloads and already-downloaded models.
 - `routes/transcriptions.py`: Canonical task router composition entry. Mount read/actions/export task route modules under `/api/transcription-tasks`.
 - `routes/tasks/read.py`: Read endpoints for task list/detail; keep sync handlers for sync DB dependencies.
@@ -486,11 +505,11 @@ API adapter layer:
 - `routes/tasks/_errors.py`: Convert task use-case errors into HTTP exceptions.
 - `schemas/config.py`: Config request/response schemas for session defaults, Live realtime defaults/schema, and export defaults.
 - `schemas/files.py`: Pydantic file request/response models (`FileResponse`, `FileListResponse`, batch delete, integrity, cleanup, etc.)
-- `schemas/live.py`: Pydantic Live request/response models for session creation overrides, runtime snapshots, summaries, detail payloads, tracks, segments, and list pagination.
+- `schemas/live.py`: Pydantic Live request/response models for session creation overrides, request override snapshots, runtime snapshots, summaries, detail payloads, tracks, segments, list pagination, export requests, and delete action results.
 - `schemas/live_realtime.py`: Pydantic Live WebSocket JSON control, server event, transcript preview/committed/final, diagnostics, error, and audio metadata schemas.
 - `schemas/live_realtime_config.py`: Pydantic Live realtime defaults, VAD parameter, and per-session runtime override schemas.
 - `schemas/models.py`: Model management request/response models for list/detail/settings/download runtime. Include download conflict metadata in route OpenAPI responses.
-- `schemas/responses.py`: Task response models (`TaskDetailResponse`, `CreateTaskResponse`, etc.); task read responses expose persisted `model_id` and `runtime_config` context
+- `schemas/responses.py`: Task response models (`TaskDetailResponse`, `CreateTaskResponse`, etc.); task detail responses expose persisted request override and runtime snapshot context.
 - `schemas/transcriptions.py`: Request models (`TranscriptionRequest`, `TaskEngineRequest`, `BatchTaskActionRequest`, `BatchExportRequest`, `TranscriptionDefaultsUpdateRequest`) with typed `VadParametersRequest` and `extra=forbid`
 - `schemas/validators.py`: Reusable validation functions for language, task options, temperature, and nested `vad_parameters` keys
 
@@ -504,11 +523,12 @@ Application-layer orchestration:
 - `live/contracts.py`: Protocol contracts for Live session, track, segment, and aggregate repository stores.
 - `live/types.py`: TypedDict payload contracts, Live literals, and session/segment pagination limits.
 - `live/values.py`: Validate Live modes, statuses, and pagination windows before payload or repository output.
-- `live/payloads.py`: Build Live session summary/detail/list payloads and validate stored enum values on read paths.
+- `live/payloads.py`: Build Live session summary/detail/list payloads, include detail-only request/runtime snapshots, and validate stored enum values on read paths.
 - `live/runtime_config.py`: Resolve Live realtime built-in defaults, persisted defaults, per-session overrides, model cache state, and API-safe runtime snapshots.
 - `live/_clock.py`: Generate timezone-aware UTC timestamps for Live lifecycle changes.
-- `live/actions/`: Live write-side use-cases (`create_live_session`, `finish_live_session`, `fail_live_session`); repeated finish returns the existing terminal snapshot when present.
-- `live/queries/`: Live read-side use-cases (`get_live_session`, `list_live_sessions`) with bounded session and segment pagination.
+- `live/actions/`: Live write-side use-cases (`create_live_session`, `finish_live_session`, `fail_live_session`, `delete_live_session`, `batch_delete_live_sessions`); repeated finish returns the existing terminal snapshot when present.
+- `live/queries/`: Live read-side use-cases (`get_live_session`, `list_live_sessions`) with bounded session/segment pagination and validated search/filter/sort inputs.
+- `live/exports/`: Live export use-cases (`export_live_session`, `batch_export_live_sessions`) that read final persisted segments, reuse formatter/config helpers, and return framework-neutral payloads for routes.
 - `live/realtime/protocol.py`: Keep Live WebSocket protocol version, event ordering, audio contract constants, transcript/runtime error codes, and stable error codes.
 - `live/realtime/session.py`: Own per-connection realtime state, track lifecycle, frame validation, transcriber dispatch, diagnostics control, final-only persistence, track/session flush, finish/failure cleanup, and open-track closeout.
 - `live/realtime/audio.py`: Validate PCM16LE frame metadata/payload length and convert PCM16LE to 16 kHz mono float32 waveform.
@@ -532,9 +552,9 @@ Application-layer orchestration:
 - `tasks/contracts.py`: Protocol contracts for task/file gateways used by use-cases.
 - `tasks/types.py`: TypedDict payload contracts for task use-case outputs and resolved task execution config.
 - `tasks/execution_config.py`: Resolve task execution config from request values, Session defaults, settings, and model aliases before enqueue.
-- `tasks/runtime_config.py`: Build complete task runtime snapshots at creation time and convert stored snapshots back to `TranscribeOptions`.
+- `tasks/runtime_config.py`: Build complete task runtime snapshots, build accepted request override snapshots, and convert stored snapshots back to `TranscribeOptions`.
 - `tasks/payloads.py`: Shared task payload builders (`to_task_summary_payload`, batch summary builder); preserve task `model_id` across list/detail/cancel responses.
-- `tasks/actions/`: Write-side use-cases (`create_task`, `cancel_task`, `batch_cancel_tasks`, `batch_retry_tasks`, `batch_delete_task_records`, `delete_task_record`); create/retry paths preserve persisted execution config.
+- `tasks/actions/`: Write-side use-cases (`create_task`, `cancel_task`, `batch_cancel_tasks`, `batch_retry_tasks`, `batch_delete_task_records`, `delete_task_record`); create/retry paths preserve persisted execution config, runtime snapshots, and request overrides.
 - `tasks/actions/_batch_action.py`: Reuse batch execution skeleton; keep per-task result semantics; return item-level failures instead of aborting whole batch.
 - `tasks/queries/`: Read-side use-cases (`list_tasks`, `get_task`).
 - `tasks/exports/`: Keep export use-cases (`export_task`, `batch_export_tasks`) and export option resolver; return framework-agnostic `BatchExportArchive` from batch use-case; map `save=true` write-path I/O failures to stable `TaskUseCaseError` details.
@@ -597,9 +617,13 @@ FastAPI entry point with lifespan management:
 - `GET /api/files/check-integrity` - Check database-file consistency
 - `POST /api/files/cleanup` - Remove orphan database records
 - `POST /api/live/sessions` - Create a Live session
-- `GET /api/live/sessions` - List Live sessions with pagination
+- `GET /api/live/sessions` - List Live sessions with search, status, sorting, and pagination
 - `GET /api/live/sessions/{session_id}` - Get one Live session with tracks and paged segments
+- `GET /api/live/sessions/{session_id}/export` - Export one finished Live session
+- `POST /api/live/sessions/export/batch` - Batch export finished Live sessions as ZIP
 - `POST /api/live/sessions/{session_id}/finish` - Finish one Live session and return its snapshot
+- `DELETE /api/live/sessions/{session_id}/record` - Delete one terminal Live session record
+- `POST /api/live/sessions/batch/delete-records` - Batch delete terminal Live session records
 - `WebSocket /api/live/sessions/{session_id}/stream` - Stream Live realtime control events, PCM audio frames, and preview/committed/final transcript events
 - `POST /api/transcription-tasks/` - Create transcription task
 - `GET /api/transcription-tasks/` - List tasks with status/search/sort/pagination
@@ -624,7 +648,7 @@ Configuration and constants:
 - `transcription/schema/responses.py`: Assemble config response models and defaults response payloads.
 - `transcription/defaults.py` + `transcription/languages.py`: Resolve effective defaults and effective language list.
 - `export/types.py`: Keep shared `ExportFormat` enum for config and formatter layers.
-- `export/`: Keep export defaults and filename handling without introducing `config -> services` reverse dependency.
+- `export/`: Keep export defaults, safe download/archive filenames, UTF-8 Content-Disposition handling, and unique saved export paths without introducing `config -> services` reverse dependency.
 - `session/defaults.py`: Resolve Workbench session defaults by combining execution defaults and transcription defaults.
 - `session/schema.py`: Publish execution control metadata for device and compute type through aggregated config responses.
 
@@ -632,6 +656,7 @@ Configuration and constants:
 Apply config-driven schema as the only source for frontend option metadata and task option values.
 Apply transcription defaults precedence as `engine defaults < persisted app defaults < task overrides` at task creation.
 Persist complete resolved transcription runtime snapshots on new tasks; make workers execute snapshots instead of recomputing from current defaults.
+Persist Task request override snapshots from accepted request values only; do not fill missing snapshots from resolved runtime config or legacy task options.
 Reject incomplete task runtime snapshots instead of filling them from current defaults; keep fallback recomputation only for legacy rows with no snapshot.
 Apply execution config precedence as request values, then Session defaults, then settings fallbacks.
 Publish execution `device` and `compute_type` options through `/api/config.engine.schema`; keep frontend option labels and values derived from this metadata.
@@ -658,6 +683,7 @@ Close the current transcription engine before loading a different engine fingerp
 Gate local-source-only VAD fields with the installed `faster-whisper` `VadOptions`.
 Treat `FasterWhisperEngine` progress callbacks as output coverage estimates; do not call them faster-whisper internal progress.
 Apply export defaults precedence as `built-in export defaults < persisted export defaults < request overrides`.
+Use shared export filename helpers for Task and Live downloads, archives, and saved files; strip path segments and apply the endpoint-selected extension.
 Map export write-path `OSError` and `UnicodeError` failures to stable API error details; do not widen this mapping to catch-all exceptions.
 Keep batch export error output sanitized; write stable task-level reasons to `_errors.txt` and do not write raw exception text into archives.
 Record `no_segments` as task-level batch export failure; return `400` only when every selected task fails.
@@ -668,6 +694,7 @@ Keep Live session, track, and segment data in independent `live_*` tables.
 Treat Live tracks as source metadata for microphone/system audio. Do not persist browser device inventory in the backend.
 Validate stored Live `mode`, `status`, and track/segment source values before emitting response payloads.
 Keep Live session list pagination bounded by `DEFAULT_LIVE_SESSION_LIMIT` and `MAX_LIVE_SESSION_LIMIT`.
+Validate Live session list search, status, sort field, and order before repository access; map sort fields through a SQL allowlist.
 Keep Live detail and finish segment pagination bounded by `DEFAULT_LIVE_SEGMENT_LIMIT` and `MAX_LIVE_SEGMENT_LIMIT`.
 Keep `track_id` optional on segments, but require same-session ownership when a segment references a track.
 Store Live lifecycle timestamps with timezone-aware UTC ISO strings.
@@ -680,6 +707,7 @@ Keep Live realtime final segments as the only persisted transcript history; prev
 Apply Live realtime config precedence as `built-in defaults < persisted Live realtime defaults < per-session runtime_overrides`.
 Keep Live realtime defaults under `live_realtime.`; do not mix them with Workbench Session defaults or transcription task defaults.
 Persist resolved Live realtime snapshots on session creation and use those snapshots for WebSocket runtime construction.
+Persist Live request override snapshots from accepted request values only; do not fill missing snapshots from resolved runtime config or session overrides.
 Reject active Live sessions without runtime snapshots with a stable config error; do not rebuild missing snapshots from current defaults.
 Keep `mock` runtime independent from persisted Live realtime defaults; reject only explicit per-session runtime overrides in mock mode.
 Keep static user prompt context out of Live realtime schemas and runtime overrides; keep faster-whisper `initial_prompt` internal and composed from dynamic WhisperStreaming context only.
@@ -690,11 +718,13 @@ Keep WhisperStreaming boundary confirmation track-scoped and processor-local. Do
 Skip silent WhisperStreaming inference windows only when no speech or pending transcript exists.
 Keep WhisperStreaming model ownership connection-local through one transcriber instance. Do not add a process-wide model pool without explicit ref-count and release design.
 Keep Live WhisperStreaming loader/backend independent from `FasterWhisperEngine`, `worker.py`, and `worker_engine.py`; share only neutral faster-whisper lifecycle helpers.
+Export only finished Live sessions and persisted final segments. Return controlled errors for active sessions and sessions without final segments.
+Delete only terminal Live sessions and preserve item-level results for batch delete.
 
 ### File and Model Rules
 Keep FastAPI routes as adapters for query/path/body parsing, dependency injection, `response_model`, and error mapping.
 Put file upload/list/integrity/cleanup/delete orchestration in `nola/application/files`.
-Put Live REST lifecycle, payload validation, and pagination orchestration in `nola/application/live`.
+Put Live REST lifecycle, payload validation, pagination, export, and delete orchestration in `nola/application/live`.
 Put Live WebSocket runtime state, PCM validation, diagnostics, Mock transcript orchestration, and WhisperStreaming realtime runtime in `nola/application/live/realtime`.
 Put model list/detail/settings/download/cancel/delete/select orchestration in `nola/application/models`.
 Validate upload files against the resolved content type after filename inference.
@@ -837,12 +867,16 @@ Model download contract: return `409` for both duplicate active downloads and al
 | Endpoint | Method | Body/Query | Response Model |
 |----------|--------|------------|----------------|
 | `/api/live/sessions` | POST | `CreateLiveSessionRequest` | `LiveSessionDetailResponse` |
-| `/api/live/sessions` | GET | `?limit=&offset=` | `LiveSessionListResponse` |
+| `/api/live/sessions` | GET | `?q=&status=&sort_by=&order=&limit=&offset=` | `LiveSessionListResponse` |
 | `/api/live/sessions/{session_id}` | GET | `?segment_limit=&segment_offset=` | `LiveSessionDetailResponse` |
+| `/api/live/sessions/{session_id}/export` | GET | `?format=&include_timestamps=&filename=&save=` | Binary or `SavedExportResponse` |
+| `/api/live/sessions/export/batch` | POST | `LiveSessionBatchExportRequest` | ZIP binary |
 | `/api/live/sessions/{session_id}/finish` | POST | `?segment_limit=&segment_offset=` | `LiveSessionDetailResponse` |
+| `/api/live/sessions/{session_id}/record` | DELETE | - | `DeleteLiveSessionRecordResponse` |
+| `/api/live/sessions/batch/delete-records` | POST | `BatchLiveSessionActionRequest` | `BatchLiveSessionActionResponse` |
 | `/api/live/sessions/{session_id}/stream` | WebSocket | JSON control/events + binary PCM payloads | Live realtime protocol events |
 
-Live REST contract: keep session data independent from transcription tasks; resolve per-session runtime overrides during session creation; persist and return `runtime_config`; return paged segments in detail/finish responses; keep repeated finish idempotent for existing terminal sessions.
+Live REST contract: keep session data independent from transcription tasks; resolve per-session runtime overrides during session creation; persist `request_overrides` and `runtime_config`; return snapshots from detail/create/finish responses, not list responses; return paged segments in detail/finish responses; export only finished sessions with final segments; delete only terminal sessions; keep repeated finish idempotent for existing terminal sessions.
 
 Live realtime contract: require `client.hello` before runtime events; create tracks through `track.start`; send audio as JSON metadata followed by binary PCM16LE payload; emit `transcript.preview`, `transcript.committed_partial`, and `transcript.final`; persist only final transcripts; reject malformed JSON and non-text JSON frames as `invalid_event`; return diagnostics artifacts as opaque metadata, not absolute paths.
 
@@ -861,7 +895,7 @@ Live realtime contract: require `client.hello` before runtime events; create tra
 | `/api/transcription-tasks/{task_id}/export` | GET | `?format=&include_timestamps=&filename=&save=` | Binary or `SavedExportResponse` |
 | `/api/transcription-tasks/export/batch` | POST | `BatchExportRequest` | ZIP binary |
 
-Task response contract: expose persisted `runtime_config` for task detail and creation responses; return `null` only for legacy rows without a stored snapshot.
+Task response contract: expose persisted `request_overrides` and `runtime_config` for task detail and creation responses; return `null` when no user overrides or no stored snapshot exists; keep list responses summary-only.
 
 ---
 
