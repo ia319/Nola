@@ -39,6 +39,7 @@ export function LiveSessionDetailSheet({
 
   async function handleCopySessionId(sessionId: string): Promise<void> {
     if (!navigator.clipboard?.writeText) {
+      toast.error(t('history.live.toast.actionFailed'))
       return
     }
 

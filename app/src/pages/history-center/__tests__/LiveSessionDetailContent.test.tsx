@@ -113,4 +113,31 @@ describe('LiveSessionDetailContent', () => {
     expect(screen.getByText('No final segments available')).toBeInTheDocument()
     expect(screen.getByText('Request parameters unavailable')).toBeInTheDocument()
   })
+
+  it('renders the empty state when only non-final segments exist', () => {
+    render(
+      <LiveSessionDetailContent
+        session={createLiveSession({
+          segments: [
+            {
+              confidence: null,
+              created_at: '2026-04-11T10:00:01.000Z',
+              end_ms: 2500,
+              is_final: false,
+              language: 'en',
+              segment_id: 'segment-1',
+              sequence: 1,
+              session_id: 'live-1',
+              start_ms: 0,
+              text: 'Draft transcript line.',
+              track_id: null,
+            },
+          ],
+        })}
+      />,
+    )
+
+    expect(screen.getByText('No final segments available')).toBeInTheDocument()
+    expect(screen.queryByText('Draft transcript line.')).not.toBeInTheDocument()
+  })
 })

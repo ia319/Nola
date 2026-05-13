@@ -41,6 +41,7 @@ function buildSegmentRange(segment: LiveSegment): string {
 export function LiveSessionDetailContent({ session }: LiveSessionDetailContentProps) {
   const { t } = useTranslation()
   const segments = session.segments ?? []
+  const finalSegments = segments.filter((segment) => segment.is_final)
   const unavailable = t('history.live.detail.fields.unavailable')
 
   return (
@@ -56,8 +57,8 @@ export function LiveSessionDetailContent({ session }: LiveSessionDetailContentPr
         </div>
 
         <div className="max-h-[60vh] space-y-5 overflow-y-auto px-6 py-6">
-          {segments.length > 0 ? (
-            segments.map((segment) => (
+          {finalSegments.length > 0 ? (
+            finalSegments.map((segment) => (
               <article
                 key={segment.segment_id}
                 className="grid gap-3 sm:grid-cols-[150px_minmax(0,1fr)]"

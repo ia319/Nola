@@ -248,24 +248,32 @@ describe('TaskWorkbenchUploadQueue', () => {
     expect(screen.getByRole('button', { name: 'Retry (1)' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Remove (3)' })).toBeEnabled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Upload selected (1)' }))
+    const uploadButton = screen.getByRole('button', { name: 'Upload selected (1)' })
+    fireEvent.click(uploadButton)
     await waitFor(() => {
       expect(onStartUploads).toHaveBeenCalledWith(['upload-pending'])
+      expect(uploadButton).toBeEnabled()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel (1)' }))
+    const cancelButton = screen.getByRole('button', { name: 'Cancel (1)' })
+    fireEvent.click(cancelButton)
     await waitFor(() => {
       expect(onCancelUploads).toHaveBeenCalledWith(['uploading'])
+      expect(cancelButton).toBeEnabled()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Retry (1)' }))
+    const retryButton = screen.getByRole('button', { name: 'Retry (1)' })
+    fireEvent.click(retryButton)
     await waitFor(() => {
       expect(onRetryUploads).toHaveBeenCalledWith(['failed'])
+      expect(retryButton).toBeEnabled()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove (3)' }))
+    const removeButton = screen.getByRole('button', { name: 'Remove (3)' })
+    fireEvent.click(removeButton)
     await waitFor(() => {
       expect(onRemoveUploads).toHaveBeenCalledWith(['upload-pending', 'failed', 'ready'])
+      expect(removeButton).toBeEnabled()
     })
   })
 

@@ -25,7 +25,13 @@ export function useHistoryLiveDetail(sessionId: string | null): UseHistoryLiveDe
   const liveDetailQuery = useQuery({
     enabled: Boolean(sessionId),
     queryKey: sessionId ? queryKeys.live.detail(sessionId) : queryKeys.live.details(),
-    queryFn: ({ signal }) => getLiveSession(sessionId ?? '', {}, signal),
+    queryFn: ({ signal }) => {
+      if (!sessionId) {
+        throw new Error('Cannot fetch live session detail without a session id')
+      }
+
+      return getLiveSession(sessionId, {}, signal)
+    },
   })
 
   return {
@@ -33,6 +39,10 @@ export function useHistoryLiveDetail(sessionId: string | null): UseHistoryLiveDe
     isLoading: liveDetailQuery.isPending && Boolean(sessionId),
     error: liveDetailQuery.error ? toAppError(liveDetailQuery.error) : null,
     refresh: async () => {
+      if (!sessionId) {
+        return
+      }
+
       await liveDetailQuery.refetch()
     },
   }
