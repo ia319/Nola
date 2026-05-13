@@ -13,6 +13,7 @@ packages = [{include = "nola"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
+typing-extensions = "^4.15.0"
 fastapi = "^0.128.0"
 python-multipart = "^0.0.20"
 uvicorn = {version = "^0.40.0", extras = ["standard"]}
@@ -47,5 +48,4 @@ strict = true
 [[tool.mypy.overrides]]
 module = ["faster_whisper", "faster_whisper.*"]
 ignore_missing_imports = true
-
 
