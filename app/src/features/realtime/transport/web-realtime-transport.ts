@@ -333,7 +333,9 @@ export class WebLiveRealtimeTransport implements LiveRealtimeTransport {
     } else if (event.type === 'session.finished') {
       this.expectedClose = true
       this.tracks.clear()
+      this.emitEvent(event)
       this.setState('closed')
+      return
     }
 
     this.emitEvent(event)

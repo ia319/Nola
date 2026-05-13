@@ -897,6 +897,32 @@ describe('LiveWorkbenchPage', () => {
     expect(screen.getByRole('button', { name: 'Download transcript' })).toBeDisabled()
   })
 
+  it('downloads a finished persisted session after the local stop state failed', async () => {
+    const session = buildLiveSessionDetail({
+      session_id: 'session-1',
+      status: 'finished',
+      ended_at: '2026-05-10T00:00:03.000Z',
+    })
+    useLiveRealtimeStore.getState().setLiveRealtimeSession(session)
+    appendFinalTranscript()
+    useLiveRealtimeStore.getState().setLiveRealtimeFailure({
+      code: 'websocket_closed',
+      message: 'Realtime WebSocket closed before session finished',
+      retryable: false,
+    })
+
+    render(<LiveWorkbenchPage />)
+
+    const downloadButton = screen.getByRole('button', { name: 'Download transcript' })
+    expect(downloadButton).not.toBeDisabled()
+
+    fireEvent.click(downloadButton)
+
+    await waitFor(() => {
+      expect(liveWorkbenchPageMocks.downloadLiveSessionExportMock).toHaveBeenCalledWith('session-1')
+    })
+  })
+
   it('downloads a finished live transcript', async () => {
     const blob = new Blob(['srt'])
     liveWorkbenchPageMocks.downloadLiveSessionExportMock.mockResolvedValueOnce({

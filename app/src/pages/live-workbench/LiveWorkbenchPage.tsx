@@ -1197,7 +1197,7 @@ export function LiveWorkbenchPage({ search, updateSearch }: LiveWorkbenchPagePro
     schemaQuery.isPending
   const stopButtonDisabled = !selectLiveWorkbenchCanStopSession(liveRunState)
   const canDownloadTranscript =
-    liveRunState === 'finished' &&
+    liveSession?.status === 'finished' &&
     Boolean(liveSession?.session_id) &&
     transcriptCounts.finalCount > 0
   const downloadTranscriptDisabled = !canDownloadTranscript || exportDownloading
