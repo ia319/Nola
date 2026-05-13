@@ -289,6 +289,28 @@ def test_get_session_drops_invalid_config_json_shapes(live_database):
     assert stored["request_overrides"] is None
 
 
+def test_get_session_drops_non_text_config_json_values(live_database):
+    """Live config JSON fields should become None when stored values are not text."""
+    live_db = live_database
+    _create_session(live_db)
+
+    with sqlite3.connect(live_db.db_path) as conn:
+        conn.execute(
+            """
+            UPDATE live_sessions
+            SET runtime_config = ?, request_overrides = ?
+            WHERE id = ?
+            """,
+            (1, 1, "live-001"),
+        )
+
+    stored = live_db.get_session("live-001")
+
+    assert stored is not None
+    assert stored["runtime_config"] is None
+    assert stored["request_overrides"] is None
+
+
 def test_finish_session_only_updates_active_session(live_database):
     """finish_session() should return an updated active session snapshot."""
     live_db = live_database

@@ -85,22 +85,32 @@ class LiveDatabase:
         field_name: str,
     ) -> None:
         raw_value = values.get(field_name)
-        if raw_value:
-            try:
-                parsed = json.loads(cast(str, raw_value))
-                if isinstance(parsed, dict):
-                    values[field_name] = cast(JsonDict, parsed)
-                else:
-                    logger.warning(
-                        "Invalid live %s shape for %s",
-                        field_name,
-                        session_id,
-                    )
-                    values[field_name] = None
-            except json.JSONDecodeError:
-                logger.warning("Corrupted live %s for %s", field_name, session_id)
+        if raw_value is None or raw_value == "":
+            values[field_name] = None
+            return
+
+        if not isinstance(raw_value, str):
+            logger.warning(
+                "Invalid live %s storage type for %s",
+                field_name,
+                session_id,
+            )
+            values[field_name] = None
+            return
+
+        try:
+            parsed = json.loads(raw_value)
+            if isinstance(parsed, dict):
+                values[field_name] = cast(JsonDict, parsed)
+            else:
+                logger.warning(
+                    "Invalid live %s shape for %s",
+                    field_name,
+                    session_id,
+                )
                 values[field_name] = None
-        else:
+        except (TypeError, json.JSONDecodeError):
+            logger.warning("Corrupted live %s for %s", field_name, session_id)
             values[field_name] = None
 
     def _to_track_record(self, row: sqlite3.Row) -> LiveTrackRecord:
