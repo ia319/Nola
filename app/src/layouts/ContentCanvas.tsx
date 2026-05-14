@@ -13,7 +13,7 @@ const contentCanvasWidthClasses: Record<ContentCanvasWidth, string> = {
 }
 
 const contentCanvasHeightClasses: Record<ContentCanvasHeight, string> = {
-  auto: 'min-h-full',
+  auto: 'min-h-full shrink-0',
   fill: 'min-h-0 flex-1',
 }
 
