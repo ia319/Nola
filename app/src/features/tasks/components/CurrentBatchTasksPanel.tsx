@@ -576,7 +576,6 @@ export function CurrentBatchTasksPanel({
           />
         }
         onRowClick={onOpenTaskDetail}
-        scrollAreaClassName="max-h-[30rem] overflow-auto"
         stickyHeader
         emptyState={
           <EmptyState
