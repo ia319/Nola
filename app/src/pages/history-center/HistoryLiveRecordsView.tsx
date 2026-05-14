@@ -414,8 +414,9 @@ export function HistoryLiveRecordsView({
             : null
         }
         onRowClick={onOpenLiveDetail}
-        scrollAreaClassName="max-h-[56vh] overflow-auto"
+        scrollAreaClassName="overflow-auto"
         stickyHeader
+        fillAvailableHeight
         pagination={
           <HistoryPagination
             page={query.page}

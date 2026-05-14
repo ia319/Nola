@@ -310,8 +310,9 @@ export function HistoryFileRecordsView({
             }
           : undefined
       }
-      scrollAreaClassName="max-h-[56vh] overflow-auto"
+      scrollAreaClassName="overflow-auto"
       stickyHeader
+      fillAvailableHeight
       pagination={
         <HistoryPagination
           page={query.page}
