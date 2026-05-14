@@ -35,6 +35,7 @@ export type DataTableProps<T> = Omit<ComponentPropsWithoutRef<'div'>, 'children'
   rowClassName?: string | ((row: T) => string | undefined)
   scrollAreaClassName?: string
   stickyHeader?: boolean
+  fillAvailableHeight?: boolean
 }
 
 function isStateConfig(
@@ -70,6 +71,7 @@ export function DataTable<T>({
   rowClassName,
   scrollAreaClassName,
   stickyHeader = false,
+  fillAvailableHeight = false,
   className,
   ...props
 }: DataTableProps<T>) {
@@ -91,6 +93,8 @@ export function DataTable<T>({
     : 1
   const skeletonRows = Array.from({ length: resolvedLoadingRowCount })
   const skeletonWidths = ['w-3/4', 'w-1/2', 'w-2/3', 'w-full'] as const
+  const shouldFillStateRow =
+    fillAvailableHeight && !isLoading && (Boolean(errorState) || rows.length === 0)
 
   useEffect(() => {
     if (!headerCheckboxRef.current) return
@@ -100,11 +104,27 @@ export function DataTable<T>({
   return (
     <div
       data-slot="data-table"
-      className={cn('bg-card overflow-hidden rounded-xl border shadow-sm', className)}
+      className={cn(
+        'bg-card min-w-0 overflow-hidden rounded-xl border shadow-sm',
+        fillAvailableHeight ? 'flex min-h-0 flex-1 flex-col' : 'shrink-0',
+        className,
+      )}
       {...props}
     >
-      <div className={cn('overflow-x-auto', scrollAreaClassName)}>
-        <table className="w-full min-w-full border-collapse text-sm" aria-busy={isLoading}>
+      <div
+        className={cn(
+          'overflow-x-auto',
+          fillAvailableHeight && 'min-h-0 flex-1 overflow-auto',
+          scrollAreaClassName,
+        )}
+      >
+        <table
+          className={cn(
+            'w-full min-w-full border-collapse text-sm',
+            shouldFillStateRow && 'h-full',
+          )}
+          aria-busy={isLoading}
+        >
           {caption ? <caption className="sr-only">{caption}</caption> : null}
 
           <thead
@@ -147,7 +167,7 @@ export function DataTable<T>({
             </tr>
           </thead>
 
-          <tbody>
+          <tbody className={cn(shouldFillStateRow && 'h-full')}>
             {isLoading ? (
               loadingState ? (
                 <tr>
@@ -178,24 +198,36 @@ export function DataTable<T>({
                 ))
               )
             ) : errorState ? (
-              <tr>
-                <td colSpan={columnCount} className="p-6">
-                  {isStateConfig(errorState) ? <EmptyState {...errorState} /> : errorState}
+              <tr className={cn(shouldFillStateRow && 'h-full')}>
+                <td colSpan={columnCount} className={cn('p-6', shouldFillStateRow && 'h-full')}>
+                  <div
+                    className={cn(
+                      shouldFillStateRow && 'flex h-full min-h-48 items-center justify-center',
+                    )}
+                  >
+                    {isStateConfig(errorState) ? <EmptyState {...errorState} /> : errorState}
+                  </div>
                 </td>
               </tr>
             ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan={columnCount} className="p-6">
-                  {isStateConfig(emptyState) ? (
-                    <EmptyState {...emptyState} />
-                  ) : (
-                    (emptyState ?? (
-                      <EmptyState
-                        title={t('components.dataTable.empty.title')}
-                        description={t('components.dataTable.empty.description')}
-                      />
-                    ))
-                  )}
+              <tr className={cn(shouldFillStateRow && 'h-full')}>
+                <td colSpan={columnCount} className={cn('p-6', shouldFillStateRow && 'h-full')}>
+                  <div
+                    className={cn(
+                      shouldFillStateRow && 'flex h-full min-h-48 items-center justify-center',
+                    )}
+                  >
+                    {isStateConfig(emptyState) ? (
+                      <EmptyState {...emptyState} />
+                    ) : (
+                      (emptyState ?? (
+                        <EmptyState
+                          title={t('components.dataTable.empty.title')}
+                          description={t('components.dataTable.empty.description')}
+                        />
+                      ))
+                    )}
+                  </div>
                 </td>
               </tr>
             ) : (
