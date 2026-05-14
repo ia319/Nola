@@ -276,7 +276,7 @@ describe('ModelsPage', () => {
     const page = screen.getByRole('main')
     expect(page.getAttribute('data-slot')).toBe('models-page')
     expect(page.className).toContain('max-w-none')
-    expect(page.className).toContain('flex-1')
+    expect(page.className).toContain('min-h-full')
 
     expect(screen.getByRole('heading', { level: 1, name: 'Models' })).toBeTruthy()
     expect(
