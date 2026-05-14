@@ -181,6 +181,21 @@
     @apply border-border outline-ring/50;
   }
 
+  /*
+   * Let the app shell own page scrolling so document scrollbars do not
+   * expose blank outer space behind routed content.
+   */
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  html,
+  body {
+    overflow: hidden;
+  }
+
   html {
     font-family: var(--font-sans);
   }
@@ -189,7 +204,8 @@
     @apply bg-background text-foreground;
 
     font-family: var(--font-body);
-    min-height: 100vh;
+    margin: 0;
+    min-height: 100%;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizelegibility;
   }

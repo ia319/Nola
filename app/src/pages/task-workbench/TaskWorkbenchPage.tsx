@@ -412,7 +412,7 @@ export function TaskWorkbenchPage() {
         }
       />
 
-      <section data-slot="task-workbench-activity" className="min-h-0">
+      <section data-slot="task-workbench-activity" className="min-h-0 pb-6 sm:pb-8">
         <ErrorBoundary>
           <CurrentBatchTasksPanel
             title={t('tasks.workbench.sections.activity.title')}

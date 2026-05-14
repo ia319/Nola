@@ -651,59 +651,60 @@ Keep future Storybook stories colocated under `src` beside the component or page
 > 1. **Feature Cohesion**: Keep feature logic colocated; add `components/`, `hooks/`, `lib/`, and `store/` only when that feature needs them.
 > 2. **Barrel Exports**: Every feature with a public surface must expose it via an `index.ts`. External files should import from a feature index; keep internal helper-only feature folders private.
 > 3. **Shared UI**: Put Nola design-system primitives in `src/components/ui/` or `src/layouts/`; do not add new design-system components under `src/components/common/`.
-> 4. **Interactive Tables**: Keep cross-feature interactive table composition in `src/components/common/interactive-table`; keep `DataTable` as the lower-level UI primitive.
-> 5. **Routing**: Keep route trees and route adapters in `router.tsx` / `src/routes/*`; keep page implementations in `src/pages/*`; keep product shell code in `src/shell/*`.
-> 6. **API Types**: `shared/types/openapi.d.ts` is AUTO-GENERATED from the backend OpenAPI spec (`pnpm gen:types`). Do NOT manually edit it. Hand-maintained aliases/contracts (`config.ts`, `file.ts`, `task.ts`, `api-error.ts`, `app-error.ts`) provide stable, readable types for business code.
-> 7. **Lib Layer Boundaries**:
+> 4. **Page Scrolling**: Keep `html`, `body`, and `#root` at full height; route vertical page scrolling through `src/shell/AppShell.tsx`; do not add document or body scroll fallbacks for routed pages.
+> 5. **Interactive Tables**: Keep cross-feature interactive table composition in `src/components/common/interactive-table`; keep `DataTable` as the lower-level UI primitive.
+> 6. **Routing**: Keep route trees and route adapters in `router.tsx` / `src/routes/*`; keep page implementations in `src/pages/*`; keep product shell code in `src/shell/*`.
+> 7. **API Types**: `shared/types/openapi.d.ts` is AUTO-GENERATED from the backend OpenAPI spec (`pnpm gen:types`). Do NOT manually edit it. Hand-maintained aliases/contracts (`config.ts`, `file.ts`, `task.ts`, `api-error.ts`, `app-error.ts`) provide stable, readable types for business code.
+> 8. **Lib Layer Boundaries**:
 >    - `src/lib/*`: app/platform-level helpers (e.g., shadcn `cn`)
 >    - `src/shared/lib/*`: cross-feature reusable runtime helpers
 >    - `src/features/*/lib/*`: feature-private helpers; promote to `shared/lib` only when reused by another feature
-> 8. **Schema-Driven Controls**: Drive language/task/prompt context, advanced controls, Live realtime defaults, and engine execution selects from backend schema metadata; do not reintroduce hardcoded option groups.
-> 9. **Transcription Defaults Priority**: Apply `engine defaults < persisted defaults < task overrides` when composing transcription request payloads and defaults patches.
-> 10. **Defaults Patch Semantics**: Use `undefined` for unchanged fields, use `null` to clear persisted overrides, and send concrete values for explicit overrides.
-> 11. **Execution Config Boundary**: Keep `model_id`, `device`, and `compute_type` out of `transcription-options`; compose them as `model_id` and `engine` in Workbench.
-> 12. **Session Defaults Boundary**: Use Session defaults for Workbench task defaults. Use transcription defaults for Settings transcription defaults.
-> 13. **Language Ordering**: Consume `effective_languages` in backend return order; do not assume alphabetical ordering.
-> 14. **Vitest Environment Split**: Keep `node` as default test environment. Add `// @vitest-environment jsdom` only for DOM-driven tests.
-> 15. **Import Boundaries (ESLint-Enforced)**:
+> 9. **Schema-Driven Controls**: Drive language/task/prompt context, advanced controls, Live realtime defaults, and engine execution selects from backend schema metadata; do not reintroduce hardcoded option groups.
+> 10. **Transcription Defaults Priority**: Apply `engine defaults < persisted defaults < task overrides` when composing transcription request payloads and defaults patches.
+> 11. **Defaults Patch Semantics**: Use `undefined` for unchanged fields, use `null` to clear persisted overrides, and send concrete values for explicit overrides.
+> 12. **Execution Config Boundary**: Keep `model_id`, `device`, and `compute_type` out of `transcription-options`; compose them as `model_id` and `engine` in Workbench.
+> 13. **Session Defaults Boundary**: Use Session defaults for Workbench task defaults. Use transcription defaults for Settings transcription defaults.
+> 14. **Language Ordering**: Consume `effective_languages` in backend return order; do not assume alphabetical ordering.
+> 15. **Vitest Environment Split**: Keep `node` as default test environment. Add `// @vitest-environment jsdom` only for DOM-driven tests.
+> 16. **Import Boundaries (ESLint-Enforced)**:
 >     - Outside `src/features/*`, import public feature surfaces from `@/features/<name>`; do not deep import `@/features/<name>/**` unless the folder is explicitly helper-only and has no public barrel.
 >     - Keep `@/features/settings/lib/ui-preferences` as a settings-page helper exception until it gains a public barrel or moves to `src/app/locale`.
 >     - `src/components/common/*` must not import from `@/features/*`.
 >     - Inside `src/features/<name>/*`, do not deep import from other features; import only via feature public entry.
-> 16. **Feature Naming Boundary**:
+> 17. **Feature Naming Boundary**:
 >     - Use `src/features/tasks` for reusable task lifecycle, polling, detail, and action APIs.
 >     - Keep History page-specific hooks under `src/pages/history-center/hooks`.
 >     - Use `src/features/transcription-options` for option composition and defaults-patch logic.
 >     - Do not create or restore `src/features/history` or `src/features/transcription`.
-> 17. **Subdomain Composition Boundary**:
+> 18. **Subdomain Composition Boundary**:
 >     - Keep `transcription-options` independent from `tasks`.
 >     - Compose `transcription-options` with `tasks` only in page or shell containers under `src/pages/*` and `src/shell/*`.
 >     - Do not reintroduce compatibility re-export modules for removed legacy feature roots.
-> 18. **Task API Path Boundary**:
+> 19. **Task API Path Boundary**:
 >     - Use `/api/transcription-tasks/*` as runtime task endpoints.
 >     - Do not add new frontend runtime clients for `/api/transcriptions/*` aliases.
-> 19. **Locale Routing Boundary**:
+> 20. **Locale Routing Boundary**:
 >     - Use `src/app/locale/*` for locale-prefix parsing, route localization, and UI preference persistence.
 >     - Let explicit Settings language changes rewrite the current route with a locale prefix.
 >     - Keep the default locale path unprefixed until the user explicitly chooses a language.
-> 20. **Theme Boundary**:
+> 21. **Theme Boundary**:
 >     - Use the app-owned `ThemeProvider`, `useTheme`, and UI preferences store.
 >     - Do not introduce new `next-themes` usage.
 >     - Apply document theme before paint and serialize UI preference writes.
-> 21. **Activity Boundary**:
+> 22. **Activity Boundary**:
 >     - Keep Activity Center as a client aggregation layer over task polling, active downloads, and model SSE.
 >     - Store structured route targets and data only; render labels in shell/i18n.
 >     - Do not represent Default/Running model mismatch as attention.
 >     - Do not use `restart_required` to create restart attention while task-boundary reload remains the backend contract.
 >     - Keep upload completion as toast/queue feedback, not Activity Center history.
-> 22. **DataTable Boundary**:
+> 23. **DataTable Boundary**:
 >     - Disable select-all while loading, error, or empty states render.
 >     - Ignore nested interactive controls when handling row clicks.
 >     - Use keyboard activation only on the row element.
-> 23. **Query Semantics Boundary**:
+> 24. **Query Semantics Boundary**:
 >     - Sort remote or paged datasets through API query params, not current-page arrays.
 >     - Keep task/file/model runtime option arrays in shared or feature query-option helpers; do not duplicate status arrays in pages.
-> 24. **Live Realtime Settings Boundary**:
+> 25. **Live Realtime Settings Boundary**:
 >     - Use `/settings/live-realtime` as the Settings tab for Live realtime defaults.
 >     - Keep it adjacent to Transcription and outside the Transcription tab content.
 >     - Use backend schema `label_key`, `description_key`, `group_label_key`, default values, adapter support, and range metadata for controls.

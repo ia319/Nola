@@ -433,7 +433,7 @@ export function ModelsPage() {
 
   return (
     <ErrorBoundary>
-      <ContentCanvas as="main" width="full" height="fill" className="gap-6" data-slot="models-page">
+      <ContentCanvas as="main" width="full" className="gap-6" data-slot="models-page">
         <PageHeader title={t('models.title')} description={t('models.description')} />
 
         {!listErrorMessage ? (
@@ -508,38 +508,40 @@ export function ModelsPage() {
           </section>
         ) : null}
 
-        <ModelList
-          models={models}
-          downloads={downloads}
-          query={modelListQuery}
-          errorMessage={listErrorMessage}
-          isLoading={isInitialLoading}
-          onSearchChange={(search) => {
-            updateModelListQuery((current) => ({
-              ...current,
-              q: search,
-            }))
-          }}
-          onStatusFilterChange={(status) => {
-            updateModelListQuery((current) => ({
-              ...current,
-              status,
-            }))
-          }}
-          onSortChange={(sort: InteractiveSortState<ModelListSortBy>) => {
-            updateModelListQuery((current) => ({
-              ...current,
-              sort_by: sort.key,
-              order: sort.direction,
-            }))
-          }}
-          onDownload={handleDownload}
-          onCancel={handleCancel}
-          onDelete={handleDelete}
-          onSelect={handleSelect}
-          onOpenDetail={setSelectedModelId}
-          onRetry={refresh}
-        />
+        <div data-slot="models-list-region" className="pb-6 sm:pb-8">
+          <ModelList
+            models={models}
+            downloads={downloads}
+            query={modelListQuery}
+            errorMessage={listErrorMessage}
+            isLoading={isInitialLoading}
+            onSearchChange={(search) => {
+              updateModelListQuery((current) => ({
+                ...current,
+                q: search,
+              }))
+            }}
+            onStatusFilterChange={(status) => {
+              updateModelListQuery((current) => ({
+                ...current,
+                status,
+              }))
+            }}
+            onSortChange={(sort: InteractiveSortState<ModelListSortBy>) => {
+              updateModelListQuery((current) => ({
+                ...current,
+                sort_by: sort.key,
+                order: sort.direction,
+              }))
+            }}
+            onDownload={handleDownload}
+            onCancel={handleCancel}
+            onDelete={handleDelete}
+            onSelect={handleSelect}
+            onOpenDetail={setSelectedModelId}
+            onRetry={refresh}
+          />
+        </div>
 
         <DetailSheet
           open={selectedModelId !== null}

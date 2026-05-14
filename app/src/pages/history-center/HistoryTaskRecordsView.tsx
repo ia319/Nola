@@ -706,8 +706,9 @@ export function HistoryTaskRecordsView({
             : null
         }
         onRowClick={onOpenTaskDetail}
-        scrollAreaClassName="max-h-[56vh] overflow-auto"
+        scrollAreaClassName="overflow-auto"
         stickyHeader
+        fillAvailableHeight
         pagination={
           <HistoryPagination
             page={query.page}

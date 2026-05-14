@@ -37,6 +37,7 @@ export type InteractiveTableProps<Row, SortKey extends string = string> = Omit<
   rowClassName?: DataTableProps<Row>['rowClassName']
   scrollAreaClassName?: string
   stickyHeader?: boolean
+  fillAvailableHeight?: boolean
   tableClassName?: string
 }
 
@@ -127,6 +128,7 @@ export function InteractiveTable<Row, SortKey extends string = string>({
   rowClassName,
   scrollAreaClassName,
   stickyHeader,
+  fillAvailableHeight = false,
   tableClassName,
   className,
   ...props
@@ -239,7 +241,8 @@ export function InteractiveTable<Row, SortKey extends string = string>({
     <div
       data-slot="interactive-table"
       className={cn(
-        'bg-card flex min-h-0 flex-col overflow-hidden rounded-xl border shadow-sm',
+        'bg-card flex min-w-0 flex-col overflow-hidden rounded-xl border shadow-sm',
+        fillAvailableHeight ? 'min-h-0 flex-1' : 'shrink-0',
         className,
       )}
       {...props}
@@ -283,6 +286,7 @@ export function InteractiveTable<Row, SortKey extends string = string>({
         rowClassName={resolvedRowClassName}
         scrollAreaClassName={scrollAreaClassName}
         stickyHeader={stickyHeader}
+        fillAvailableHeight={fillAvailableHeight}
         className={cn('rounded-none border-0 shadow-none', tableClassName)}
       />
 
