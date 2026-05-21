@@ -83,7 +83,7 @@ export function AppShell({ settingsTabs }: AppShellProps = {}) {
         onOpenChange={handleActivityCenterOpenChange}
         onNavigate={handleActivityNavigate}
       />
-      <Toaster />
+      <Toaster closeButton />
     </div>
   )
 }
