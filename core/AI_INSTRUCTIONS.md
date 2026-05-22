@@ -1,6 +1,6 @@
 # AI Instructions - Nola Core
 
-> This file helps AI quickly understand the project structure.
+> Backend project reference for AI-assisted navigation and human onboarding.
 
 ## Project Overview
 
@@ -11,13 +11,15 @@
 
 ---
 
-## Code Style
+## Reference Style
 
-> [!IMPORTANT]
-> **Comments must be:**
-> - In English
-> - Brief and objective
-> - Imperative mood (e.g., "Return the config" not "Returns the config")
+> **Reference text and code comment standards**
+>
+> - Reference language: English.
+> - Reference tone: brief, objective, result-state.
+> - Reference shape: noun phrases, stable contracts, concrete paths.
+> - Reference wording: objective noun phrases over command-style instructions.
+> - Function docs: concise behavior summary, no tense markers.
 
 ---
 
@@ -32,68 +34,68 @@ core/
 ├── nola/                      # Main package
 │   ├── __init__.py            # Version info (v0.1.0)
 │   ├── main.py                # FastAPI entry point
-│   ├── application/           # Application-layer use-cases
+│   ├── application/           # Application-layer workflows
 │   │   ├── __init__.py        # Application package exports
-│   │   ├── files/             # File upload/list/delete use-cases
-│   │   │   ├── __init__.py    # File use-case exports
+│   │   ├── files/             # File upload/list/delete workflows
+│   │   │   ├── __init__.py    # File workflow exports
 │   │   │   ├── contracts.py   # File store and upload stream protocols
-│   │   │   ├── errors.py      # File use-case error model
+│   │   │   ├── errors.py      # File workflow error model
 │   │   │   ├── payloads.py    # File response payload builders
 │   │   │   ├── types.py       # File TypedDict payload contracts
-│   │   │   ├── actions/       # File write-side use-cases
+│   │   │   ├── actions/       # File write-side workflows
 │   │   │   │   ├── __init__.py # File action exports
-│   │   │   │   ├── batch_delete_uploaded_files.py # Batch file delete use-case
-│   │   │   │   ├── cleanup_orphan_files.py # Orphan cleanup use-case
-│   │   │   │   ├── delete_uploaded_file.py # Single file delete use-case
-│   │   │   │   └── upload_uploaded_file.py # Upload validation/storage use-case
-│   │   │   └── queries/       # File read-side use-cases
+│   │   │   │   ├── batch_delete_uploaded_files.py # Batch file delete workflow
+│   │   │   │   ├── cleanup_orphan_files.py # Orphan cleanup workflow
+│   │   │   │   ├── delete_uploaded_file.py # Single file delete workflow
+│   │   │   │   └── upload_uploaded_file.py # Upload validation/storage workflow
+│   │   │   └── queries/       # File read-side workflows
 │   │   │       ├── __init__.py # File query exports
 │   │   │       ├── check_file_integrity.py # File integrity query
 │   │   │       ├── get_uploaded_file.py # File detail query
 │   │   │       └── list_uploaded_files.py # File list query
-│   │   ├── models/            # Model registry/cache/download use-cases
-│   │   │   ├── __init__.py    # Model use-case exports
+│   │   ├── models/            # Model registry/cache/download workflows
+│   │   │   ├── __init__.py    # Model workflow exports
 │   │   │   ├── contracts.py   # Model storage/downloader/config protocols
-│   │   │   ├── errors.py      # Model use-case error model
+│   │   │   ├── errors.py      # Model workflow error model
 │   │   │   ├── operation_locks.py # Per-model mutation locks
 │   │   │   ├── payloads.py    # Model response payload builders
 │   │   │   ├── types.py       # Model TypedDict payload contracts
 │   │   │   ├── values.py      # Model query value helpers
-│   │   │   ├── actions/       # Model write-side use-cases
+│   │   │   ├── actions/       # Model write-side workflows
 │   │   │   │   ├── __init__.py # Model action exports
-│   │   │   │   ├── cancel_model_download.py # Cancel download use-case
-│   │   │   │   ├── delete_model_cache.py # Delete cached model use-case
-│   │   │   │   ├── select_configured_model.py # Select default model use-case
-│   │   │   │   ├── start_model_download.py # Start download use-case
-│   │   │   │   └── update_model_settings.py # Update model settings use-case
-│   │   │   └── queries/       # Model read-side use-cases
+│   │   │   │   ├── cancel_model_download.py # Cancel download workflow
+│   │   │   │   ├── delete_model_cache.py # Delete cached model workflow
+│   │   │   │   ├── select_configured_model.py # Select default model workflow
+│   │   │   │   ├── start_model_download.py # Start download workflow
+│   │   │   │   └── update_model_settings.py # Update model settings workflow
+│   │   │   └── queries/       # Model read-side workflows
 │   │   │       ├── __init__.py # Model query exports
 │   │   │       ├── get_model_detail.py # Model detail query
 │   │   │       ├── get_model_settings.py # Model settings query
 │   │   │       ├── list_active_downloads.py # Active download query
 │   │   │       └── list_models.py # Model list query
-│   │   ├── live/              # Live transcription session use-cases
-│   │   │   ├── __init__.py    # Live use-case exports
+│   │   ├── live/              # Live transcription session workflows
+│   │   │   ├── __init__.py    # Live workflow exports
 │   │   │   ├── _clock.py      # UTC timestamp helper
 │   │   │   ├── contracts.py   # Live repository protocols
-│   │   │   ├── errors.py      # Live use-case error model
+│   │   │   ├── errors.py      # Live workflow error model
 │   │   │   ├── payloads.py    # Live response payload builders
-│   │   │   ├── runtime_config.py # Resolve Live realtime config snapshots
+│   │   │   ├── runtime_config.py # Live realtime config snapshot resolution
 │   │   │   ├── types.py       # Live TypedDict payloads, literals, and pagination limits
 │   │   │   ├── values.py      # Live value and pagination validators
-│   │   │   ├── actions/       # Live write-side use-cases
+│   │   │   ├── actions/       # Live write-side workflows
 │   │   │   │   ├── __init__.py # Live action exports
-│   │   │   │   ├── batch_delete_live_sessions.py # Batch terminal live-record delete use-case
-│   │   │   │   ├── create_live_session.py # Create active live session use-case
-│   │   │   │   ├── delete_live_session.py # Single terminal live-record delete use-case
-│   │   │   │   ├── fail_live_session.py # Mark active live session failed
-│   │   │   │   └── finish_live_session.py # Finish active live session use-case
-│   │   │   ├── exports/       # Live export use-cases (single/batch)
-│   │   │   │   ├── __init__.py # Live export use-case exports
-│   │   │   │   ├── batch_export_live_sessions.py # Batch live export archive use-case
+│   │   │   │   ├── batch_delete_live_sessions.py # Batch terminal live-record delete workflow
+│   │   │   │   ├── create_live_session.py # Active Live session creation
+│   │   │   │   ├── delete_live_session.py # Single terminal live-record delete workflow
+│   │   │   │   ├── fail_live_session.py # Active Live session failure transition
+│   │   │   │   └── finish_live_session.py # Active Live session finish transition
+│   │   │   ├── exports/       # Live export workflows (single/batch)
+│   │   │   │   ├── __init__.py # Live export workflow exports
+│   │   │   │   ├── batch_export_live_sessions.py # Batch live export archive workflow
 │   │   │   │   ├── export_common.py # Shared live export payload and segment helpers
-│   │   │   │   └── export_live_session.py # Single live session export use-case
-│   │   │   ├── queries/       # Live read-side use-cases
+│   │   │   │   └── export_live_session.py # Single live session export workflow
+│   │   │   ├── queries/       # Live read-side workflows
 │   │   │   │   ├── __init__.py # Live query exports
 │   │   │   │   ├── get_live_session.py # Live detail query with segment pagination
 │   │   │   │   └── list_live_sessions.py # Live session list query
@@ -119,32 +121,32 @@ core/
 │   │   │           ├── processor.py # Track-scoped online processor and trimming
 │   │   │           ├── silence.py  # Silence state for segment close/context reset
 │   │   │           └── types.py    # Runtime internal contracts
-│   │   └── tasks/             # Task use-cases and shared payload contracts
-│   │       ├── __init__.py    # Task use-case exports
+│   │   └── tasks/             # Task workflows and shared payload contracts
+│   │       ├── __init__.py    # Task workflow exports
 │   │       ├── contracts.py   # Task/file gateway protocols
-│   │       ├── errors.py      # Task use-case error model
-│   │       ├── execution_config.py # Resolve task-level engine execution config
+│   │       ├── errors.py      # Task workflow error model
+│   │       ├── execution_config.py # Task-level engine execution config resolution
 │   │       ├── payloads.py    # Shared task response payload builders
-│   │       ├── runtime_config.py # Resolve task runtime config snapshots
+│   │       ├── runtime_config.py # Task runtime config snapshot resolution
 │   │       ├── types.py       # TypedDict payload contracts
-│   │       ├── actions/       # Write-side use-cases (create/cancel/batch/delete)
-│   │       │   ├── __init__.py # Action use-case exports
+│   │       ├── actions/       # Write-side workflows (create/cancel/batch/delete)
+│   │       │   ├── __init__.py # Action workflow exports
 │   │       │   ├── _batch_action.py # Shared batch action executor
-│   │       │   ├── batch_cancel_tasks.py # Batch cancel use-case
-│   │       │   ├── batch_delete_task_records.py # Batch terminal-record delete use-case
-│   │       │   ├── batch_retry_tasks.py # Batch retry use-case
-│   │       │   ├── cancel_task.py # Single task cancel use-case
-│   │       │   ├── create_task.py # Task creation use-case
-│   │       │   └── delete_task_record.py # Terminal task-record deletion use-case
-│   │       ├── queries/       # Read-side use-cases (list/detail)
-│   │       │   ├── __init__.py # Query use-case exports
-│   │       │   ├── get_task.py # Task detail query use-case
-│   │       │   └── list_tasks.py # Task list query use-case
-│   │       └── exports/       # Export use-cases (single/batch)
-│   │           ├── __init__.py # Export use-case exports
-│   │           ├── batch_export_tasks.py # Batch export archive use-case
+│   │       │   ├── batch_cancel_tasks.py # Batch cancel workflow
+│   │       │   ├── batch_delete_task_records.py # Batch terminal-record delete workflow
+│   │       │   ├── batch_retry_tasks.py # Batch retry workflow
+│   │       │   ├── cancel_task.py # Single task cancel workflow
+│   │       │   ├── create_task.py # Task creation workflow
+│   │       │   └── delete_task_record.py # Terminal task-record deletion workflow
+│   │       ├── queries/       # Read-side workflows (list/detail)
+│   │       │   ├── __init__.py # Query workflow exports
+│   │       │   ├── get_task.py # Task detail query workflow
+│   │       │   └── list_tasks.py # Task list query workflow
+│   │       └── exports/       # Export workflows (single/batch)
+│   │           ├── __init__.py # Export workflow exports
+│   │           ├── batch_export_tasks.py # Batch export archive workflow
 │   │           ├── export_common.py # Shared export payload and error helpers
-│   │           └── export_task.py # Single task export use-case
+│   │           └── export_task.py # Single task export workflow
 │   ├── config/                # Settings, constants, and config modules
 │   │   ├── __init__.py        # Config exports
 │   │   ├── settings.py        # Pydantic Settings (paths, limits, model, Live runtime mode)
@@ -203,7 +205,7 @@ core/
 │   │   │       ├── read.py    # Task list/detail endpoints
 │   │   │       ├── actions.py # Task mutation endpoints
 │   │   │       ├── export.py  # Task export endpoints
-│   │   │       └── _errors.py # Task use-case error mapping helper
+│   │   │       └── _errors.py # Task workflow error mapping helper
 │   │   └── schemas/           # Pydantic request/response models
 │   │       ├── __init__.py    # Schema package exports
 │   │       ├── config.py      # Session defaults and export defaults schemas
@@ -270,7 +272,7 @@ core/
     ├── test_engines.py        # Engine tests
     ├── test_event_bus.py      # Event-bus publish/subscribe tests
     ├── test_export_filenames.py # Export filename helper tests
-    ├── test_file_use_cases.py # File application use-case tests
+    ├── test_file_use_cases.py # File application workflow tests
     ├── test_formatters.py     # Formatter tests
     ├── test_faster_whisper_runtime.py # Shared faster-whisper lifecycle tests
     ├── test_live_api.py      # Live REST and WebSocket API tests
@@ -288,8 +290,8 @@ core/
     ├── test_live_realtime_whisper_streaming_processor.py # Live WhisperStreaming processor tests
     ├── test_live_realtime_whisper_streaming_silence.py # Live WhisperStreaming silence tests
     ├── test_live_runtime_config.py # Live runtime config resolver tests
-    ├── test_live_use_cases.py # Live application use-case tests
-    ├── test_model_use_cases.py # Model application use-case tests
+    ├── test_live_use_cases.py # Live application workflow tests
+    ├── test_model_use_cases.py # Model application workflow tests
     ├── test_models.py         # Database tests
     ├── test_model_downloader.py # Model downloader tests
     ├── test_model_registry.py # Model registry tests
@@ -298,7 +300,7 @@ core/
     ├── test_settings.py       # Settings validation tests
     ├── test_task_execution_config.py # Task execution config resolution tests
     ├── test_task_repositories.py # taskdb repository tests
-    ├── test_task_use_cases.py # Application-layer task use-case tests
+    ├── test_task_use_cases.py # Application-layer task workflow tests
     ├── test_transcription_config.py # Transcription schema/defaults tests
     ├── test_transcription_contracts.py # Transcription contract consistency tests
     ├── test_transcription_schemas.py # Request schema validation tests
@@ -306,119 +308,169 @@ core/
     └── test_worker_engine.py  # Worker engine reload tests
 ```
 
-Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, and `.ruff_cache/` out of this tree.
+### Workspace Exclusions
 
-### Recent Additions
+- `data/`: local runtime data.
+- `__pycache__/`: Python bytecode cache.
+- `.pytest_cache/`: pytest cache.
+- `.mypy_cache/`: mypy cache.
+- `.ruff_cache/`: ruff cache.
 
-- `nola/common/event_bus.py`: Process-wide in-memory event bus for model-download SSE.
-- `nola/model_hub/`: Model registry, storage, downloader, and domain errors.
-- `nola/api/routes/models.py` + `nola/api/schemas/models.py`: Model management and runtime download APIs.
-- `nola/config/transcription/schema/`: Config-driven option schema for frontend controls and validation boundaries.
-- `nola/config/export/`: Export defaults, export format contracts, and filename helpers.
-- `nola/config/live_realtime/`: Live realtime built-in defaults, persisted override resolution, adapter support metadata, and Settings schema without static prompt controls.
-- `nola/config/session/`: Workbench session defaults for execution and transcription.
-- `nola/config/session/schema.py`: Execution option schema metadata for frontend device and compute-type controls.
-- `nola/application/files/`: File upload, list, integrity, cleanup, single-delete, and batch-delete use-cases.
-- `nola/application/live/`: Live session, track, segment contracts, payload builders, value guards, request override snapshots, create/list/get/finish/delete use-cases, and export orchestration.
-- `nola/application/live/exports/`: Export finished Live sessions from persisted final transcript segments through the shared formatter registry.
-- `nola/application/live/runtime_config.py`: Resolve Live realtime three-layer config snapshots and model/cache validation.
-- `nola/application/live/realtime/`: Live WebSocket runtime, PCM validation, WAV diagnostics, Mock transcriber, transcript contracts, protocol constants, and connection registry.
-- `nola/application/live/realtime/whisper_streaming/`: WhisperStreaming / LocalAgreement Live runtime adapter, processor, model loader, faster-whisper backend, and module source README.
-- `nola/application/models/`: Model list/detail/settings/download/cancel/delete/select use-cases and per-model operation locks.
-- `nola/application/tasks/`: Task use-cases, request override snapshots, payload builders, and export orchestration.
-- `nola/application/tasks/execution_config.py`: Resolve task-level `model_id`, `engine_device`, and `engine_compute_type` before persistence.
-- `nola/application/tasks/runtime_config.py`: Freeze complete transcription runtime snapshots at task creation and rebuild worker options from snapshots.
-- `nola/models/database.py`: Store independent `request_overrides` JSON columns for Task and Live history details.
-- `nola/models/live.py`: SQLite repository for independent Live sessions, tracks, and transcript segments.
-- `nola/api/routes/live.py` + `nola/api/schemas/live.py` + `nola/api/schemas/live_realtime.py`: Live REST and WebSocket endpoints plus response/protocol schemas.
-- `nola/api/schemas/live_realtime_config.py`: Pydantic schemas for Live realtime defaults and per-session runtime overrides.
-- `nola/api/routes/_live_realtime_events.py`: Live WebSocket server event assembly kept outside the router.
-- `nola/engines/faster_whisper_defaults.py`: Neutral helper for installed faster-whisper and VAD option defaults.
-- `nola/engines/faster_whisper_runtime.py`: Shared faster-whisper model creation and close helpers used by offline engine and Live backend.
-- `nola/services/worker_engine.py`: Reuse or reload `FasterWhisperEngine` at task boundaries from a model/model-dir/device/compute-type fingerprint.
+## Backend Architecture Contracts
 
-### Current Backend Guardrails
+> Backend boundary contract. Directory tree: file-level map. This section: layer ownership, persistence, runtime boundaries, API contracts.
 
-- Reject file deletion with `409` when any transcription task references the file.
-- Return `404` when a file row disappears between lookup and delete; do not unlink and report success.
-- Keep file upload validation on the resolved content type, not only the raw request header.
-- Clean up partial upload files on stream read, write, size-limit, or cancellation failures.
-- Do not let upload stream close failures mask the original upload outcome.
-- Offload blocking upload file writes and metadata writes from async upload use-cases.
-- Return `409` when a model download starts for an already-downloaded model.
-- Serialize model download start and cache deletion per canonical model id through application-layer locks.
-- Treat Hugging Face repos with revisions as `downloaded` without scanning incomplete files.
-- Remove metadata-only partial cache directories during stale artifact cleanup.
-- Keep model registry descriptions keyed by `description_key`; let the frontend localize and fall back to backend `description`.
-- Keep engine default tests config-driven; do not hardcode `small`, `default`, or device defaults.
-- Keep execution option metadata in `/api/config.engine.schema`; do not require the frontend to mirror backend engine option lists.
-- Keep worker engine reload at task boundaries; do not switch engine while `transcribe()` is running.
-- Close the loaded transcription engine before replacing it; do not rely on reassignment or garbage collection as the only release path for model runtime resources.
-- Treat engine construction failures as retryable task-start failures; keep validation and missing-cache failures non-retryable.
-- Keep `model_id`, `device`, and `compute_type` out of `TranscribeOptions` and task `options` JSON.
-- Persist a complete task `runtime_config` snapshot at task creation; make the worker prefer that snapshot over current `transcription.` defaults.
-- Persist Task `request_overrides` from accepted user request values only. Do not reconstruct it from `runtime_config`, task `options`, or current defaults.
-- Reject incomplete or malformed task `runtime_config` snapshots as non-retryable task data failures; do not fill missing fields from current dataclass defaults.
-- Keep legacy task fallback only for rows with no `runtime_config`.
-- Keep `restart_required` as a compatibility field returning `False` while task-boundary engine reload is supported; do not use it to signal manual worker restart.
-- Keep VAD fields gated by the installed `faster-whisper` `VadOptions`; do not expose fields only present in local source unless the installed package supports them.
-- Treat transcription progress as segment output coverage, not faster-whisper internal progress.
-- Keep the Windows `CT2_CUDA_ALLOCATOR=cub_caching` compatibility default in `nola/__init__.py` until CTranslate2 fixes CUDA model cleanup crashes and `base -> release -> small -> release` passes without it.
-- Keep Live as an independent backend subsystem. Do not write Live session, track, or segment data into `transcription_tasks`.
-- Keep `/api/live/*` as the Live REST resource namespace. Do not overload `/api/transcription-tasks/*` for realtime session lifecycle.
-- Keep Live routes as adapters for parsing, dependency injection, response models, and `LiveUseCaseError` mapping; put lifecycle and payload behavior in `nola/application/live`.
-- Keep Live history list responses summary-only. Return `request_overrides` and `runtime_config` only from detail and creation/finish snapshots.
-- Persist Live `request_overrides` from accepted user request values only. Do not reconstruct it from `runtime_config`, `session_overrides`, or current defaults.
-- Keep Live export and delete business behavior in `nola/application/live/exports` and `nola/application/live/actions`; keep routes as HTTP adapters.
-- Keep Live WebSocket business state in `nola/application/live/realtime`. Routes may accept sockets, map protocol errors, inject dependencies, and send/close frames only.
-- Keep `/api/live/sessions/{session_id}/stream` as the Live WebSocket endpoint. Use JSON text frames for control/events and binary frames for PCM payloads.
-- Keep realtime audio input at PCM16LE, 16 kHz, mono. Default runtime must not denoise, gain-normalize, compress, EQ, or trim content.
-- Keep diagnostics WAV capture explicit and default-off. Write files only to a backend-controlled directory outside the repository or a test temporary directory.
-- Do not expose server absolute paths in Live WebSocket diagnostics events. Return `capture_id`, `manifest_name`, and `file_name`; keep absolute paths only in backend internals, manifests, or local logs.
-- Keep diagnostics capture directories collision-resistant with a unique suffix; do not reuse same-second session directories.
-- Stop diagnostics capture on limit or write failure by emitting `diagnostics.wav.stopped`; do not fail the Live WebSocket session for optional diagnostics capture.
-- Close open Live tracks when finishing a realtime session so finished sessions do not keep `ended_at = NULL` tracks.
-- Keep realtime runtime release idempotent because route cleanup may call it after normal finish or disconnect handling.
-- Keep realtime transcript semantics explicit: `preview` and `committed_partial` are WebSocket-only runtime feedback; only `final` is persisted in `live_segments`.
-- Use persisted final Live segments only for Live history details and exports; do not export preview or committed partial transcripts.
-- Select the Live realtime transcriber through `NOLA_LIVE_REALTIME_TRANSCRIBER` values `mock` or `whisper_streaming`; reject unsupported values with `runtime_config_invalid`.
-- Keep Live realtime defaults under the `live_realtime.` app-config prefix; do not read or write `transcription.` or Workbench Session defaults for Live runtime options.
-- Resolve Live realtime config precedence as `built-in defaults < persisted Live realtime defaults < per-session runtime_overrides`.
-- Persist the resolved Live realtime `runtime_config` snapshot when creating a session; make WebSocket runtime use the session snapshot, not current defaults.
-- Return a stable runtime config error for an active Live session with no snapshot; do not reconstruct history from current defaults.
-- Ignore persisted `live_realtime.*` defaults in `mock` mode; reject only explicit per-session runtime overrides for mock sessions.
-- Keep static prompt context out of Live realtime schema, frontend controls, and per-session overrides. Treat compatibility `context_prompt` values as ignored inputs.
-- Keep `word_timestamps=True`, local model path loading, `local_files_only`, and the PCM16LE 16 kHz mono contract non-configurable from clients.
-- Normalize blank Live realtime `language` values to `None` before inference.
-- Keep WhisperStreaming runtime code in `nola/application/live/realtime/whisper_streaming`. Do not move Live runtime ownership into `nola/engines` or `nola/services`.
-- Load Live WhisperStreaming models through the Live loader/backend boundary. Reuse model registry, configured model id, configured model directory, and cache inspection; do not auto-download models from the WebSocket path.
-- Use settings-backed `EngineConfig` values for current Live WhisperStreaming device and compute-type defaults. Do not silently reuse Workbench Session defaults for Live.
-- Offload Live transcriber factory creation from the WebSocket route through a threadpool because WhisperStreaming mode may load a model.
-- Close flushed WhisperStreaming processors when a track is removed or all tracks are flushed; keep adapter `release()` idempotent.
-- Keep WhisperStreaming boundary confirmation track-scoped and processor-local. Do not add process-wide transcript memory or cross-track anchor state.
-- Skip silent WhisperStreaming inference windows only when no speech or pending transcript exists.
-- Treat the in-memory Live stream connection registry as single-process coordination only. Use distributed coordination before running multiple API workers for Live WebSockets.
-- Keep Live timestamps timezone-aware UTC ISO strings.
-- Keep Live session list and detail segment reads paginated; reject invalid `limit`/`offset` values before repository calls.
-- Keep Live history list filtering and sorting validated through status/sort/order allowlists before repository SQL.
-- Delete only terminal Live sessions (`finished` / `failed`) and rely on SQLite foreign-key cascade for child tracks and segments.
-- Keep batch Live export item failures sanitized in `_errors.txt`; preserve `500` semantics when every failure is internal.
-- Return a stable current snapshot for repeated Live finish requests. Do not turn an already-terminal session into an error when the session exists.
-- Do not add backend device enumeration APIs for browser or desktop user devices. Device inventory belongs to the client runtime adapters.
+### Layer Ownership
 
----
+- API route layer: FastAPI adapters for query/path/body parsing, dependency injection, `response_model`, error mapping.
+- File application layer: `nola/application/files`; upload, list, integrity, cleanup, single delete, batch delete orchestration.
+- Task application layer: `nola/application/tasks`; creation, cancellation, retry, deletion, payloads, runtime snapshots, exports.
+- Live REST application layer: `nola/application/live`; lifecycle, payload validation, pagination, export, delete orchestration.
+- Live realtime runtime layer: `nola/application/live/realtime`; WebSocket state, PCM validation, diagnostics, Mock transcript orchestration, WhisperStreaming runtime.
+- Model application layer: `nola/application/models`; list, detail, settings, download, cancellation, deletion, selection orchestration.
+- Model hub layer: `nola/model_hub`; registry, cache inspection, storage cleanup, Hugging Face download wrappers, downloader IPC.
+- Offline engine runtime: `nola/engines`; `FasterWhisperEngine` and neutral faster-whisper lifecycle helpers.
+- Live WhisperStreaming runtime: `nola/application/live/realtime/whisper_streaming`; Live-specific ownership. Placement in `nola/engines` or `nola/services` unsupported.
+- Worker runtime: `nola/services/worker.py`, `nola/services/worker_engine.py`; queued task execution and task-boundary engine reload.
+- Shared helper layer: `nola/common` for cross-domain helpers; `nola/utils` for generic utilities.
 
-## Database Conventions
+### API Namespaces and Adapters
 
-> [!IMPORTANT]
-> **Database Operations Must Follow:**
-> 1.  **Connection Lifetime**: Do not rely on `with sqlite3.connect(...) as conn:` to close connections. Explicitly close SQLite connections, and preserve transaction semantics for write operations.
-> 2.  **Atomic Updates**: Use `UPDATE ... WHERE ... RETURNING` for queue operations to avoid race conditions.
-> 3.  **Poison Pill Protection**: Increment `retry_count` even when requeuing timeout/dead tasks.
-> 4.  **Environment Check**: Verify `sqlite3` version >= 3.35.0 on startup.
-> 5.  **Live Integrity**: Keep Live foreign keys enabled, ensure a segment `track_id` belongs to the same `session_id`, and do not return unbounded segment lists.
-> 6.  **Runtime Snapshots**: Store Live session and transcription task `runtime_config` values as JSON snapshots; preserve `NULL` for legacy rows instead of fabricating current-default history.
-> 7.  **Request Override Snapshots**: Store `request_overrides` as accepted user override JSON only; return `NULL` rather than deriving missing history from resolved runtime snapshots.
+- Task runtime namespace: `/api/transcription-tasks/*`.
+- Unsupported task runtime aliases: `/api/transcriptions/*`.
+- Live namespace: `/api/live/*`; Live REST and WebSocket APIs.
+- Unsupported Live lifecycle aliases: `/api/transcription-tasks/*`.
+- Workbench defaults endpoint: `/api/config/session-defaults`.
+- Unsupported parallel engine write path: `/api/config/engine`.
+- Execution option metadata source: `/api/config.engine.schema`; `device` and `compute_type` options.
+- Task detail/create response snapshots: persisted `request_overrides`, persisted `runtime_config`.
+- Task list response state: summary-only.
+- Live create/detail/finish response snapshots: `request_overrides`, `runtime_config`.
+- Live list response state: summary-only.
+- Route error payloads: mapped HTTP responses; raw Python exception text unsupported in clients.
+- Live WebSocket endpoint: `/api/live/sessions/{session_id}/stream`.
+- Live WebSocket frames: JSON text frames for control/events; binary frames for PCM payloads.
+
+### Persistence and Snapshot Contracts
+
+- Task runtime snapshots: complete resolved transcription `runtime_config` on new tasks; worker execution source.
+- Task default recomputation: unsupported for rows with task runtime snapshots.
+- Task request override snapshots: accepted request values only.
+- Unsupported Task request override sources: `runtime_config`, task `options`, current defaults.
+- Legacy task fallback: rows with no `runtime_config` only.
+- Malformed task snapshots: non-retryable task data failure.
+- Task execution config columns: resolved `model_id`, `engine_device`, `engine_compute_type` on new tasks.
+- Queued task immutability: later default changes outside already queued task snapshots.
+- Live runtime snapshots: resolved Live realtime `runtime_config` on session creation; WebSocket construction source.
+- Live request override snapshots: accepted request values only.
+- Unsupported Live request override sources: `runtime_config`, session overrides, current defaults.
+- Active Live session without snapshot: structured runtime config error; no rebuild from current defaults.
+- Live storage: independent `live_*` tables; no Live data in `transcription_tasks`.
+- Live timestamps: timezone-aware UTC ISO strings.
+- Live segment `track_id`: optional; same-session ownership requirement when present.
+- SQLite integrity: Live foreign keys enabled; bounded segment reads.
+
+### Transcription Task Contracts
+
+- Defaults precedence: `engine defaults < persisted app defaults < task overrides`.
+- Execution precedence: request values, then Session defaults, then settings fallbacks.
+- Request validation failures: unknown top-level options and unknown `vad_parameters` keys with `422`.
+- Device and compute type validation: task and Session default boundary checks; stale read-path override fallback allowed.
+- Engine initialization fields: `model_id`, `device`, `compute_type`; outside `TranscribeOptions` and task `options` JSON.
+- Engine default test source: `EngineConfig` and settings; hardcoded `small`, `default`, or device defaults unsupported.
+- API numeric guards: boundary validation.
+- UI schema ranges: UI constraint source; subset of API acceptance.
+- Exact API/UI numeric-range equality: unsupported requirement.
+- Infinity API representation: `"inf"`; deserialization before engine invocation.
+- Failure categories: configuration validation failures separate from runtime engine load failures.
+- Runtime engine construction failure before transcription start: retryable category.
+- Worker reload timing: task boundaries only.
+- Engine replacement sequence: current transcription engine closed before new fingerprint load.
+- Worker runtime state fields: `worker.last_loaded_*`; last loaded state, not desired defaults.
+- `restart_required`: compatibility field; `false` under task-boundary reload.
+- Progress callback meaning: segment output coverage estimate; not faster-whisper internal progress.
+- Windows CUDA cleanup setting: `CT2_CUDA_ALLOCATOR=cub_caching` default in `nola/__init__.py` until CTranslate2 CUDA cleanup stability.
+
+### Live Realtime Contracts
+
+- Runtime mode source: `NOLA_LIVE_REALTIME_TRANSCRIBER`; supported values `mock`, `whisper_streaming`.
+- Unsupported runtime modes: `runtime_config_invalid`.
+- Mock mode state: independent from persisted Live realtime defaults; explicit per-session runtime overrides rejected.
+- Live realtime defaults prefix: `live_realtime.`.
+- Unsupported Live defaults sources: Workbench Session defaults, transcription task defaults.
+- Live realtime override precedence: `built-in defaults < persisted Live realtime defaults < per-session runtime_overrides`.
+- Static prompt controls: absent from Live realtime schemas and runtime overrides.
+- Faster-whisper `initial_prompt`: internal dynamic WhisperStreaming context only.
+- Non-configurable frontend override fields: `word_timestamps`, audio contract fields, model paths, cache roots, arbitrary Hugging Face ids, `local_files_only`.
+- Blank Live realtime language: `None` before inference.
+- Audio input contract: PCM16LE, 16 kHz, mono.
+- Unsupported default audio processing: denoise, gain normalization, compression, EQ, trimming.
+- Protocol state: versioned structured events.
+- Transcript event names: `transcript.preview`, `transcript.committed_partial`, `transcript.final`.
+- Persisted transcript history: final Live segments only.
+- WebSocket-only transcript feedback: preview and committed partials.
+- Diagnostics controls: explicit `diagnostics.wav.start` and `diagnostics.wav.stop`; default-off.
+- Diagnostics storage: backend-controlled directory outside repository or test temporary directory; collision-resistant unique suffix.
+- Diagnostics event metadata: `capture_id`, `manifest_name`, `file_name`.
+- Unsupported diagnostics event fields: `output_dir`, `manifest_path`, WAV paths, server absolute paths.
+- Diagnostics write/limit failure: `diagnostics.wav.stopped`; realtime session continuation.
+- Session finish track state: open tracks closed; no finished-session tracks with `ended_at = NULL`.
+- WhisperStreaming track state: processor state, hypothesis buffers, audio buffers, silence state, boundary confirmation all track-scoped.
+- Silent inference skip condition: no speech and no pending transcript.
+- Model ownership: one connection-local transcriber instance.
+- Unsupported model ownership: process-wide model pool without explicit ref-count and release design.
+- Model loading sources: model registry, configured model id, configured model directory, cache inspection.
+- Unsupported WebSocket path behavior: model auto-download.
+- Live WhisperStreaming device and compute-type defaults: settings-backed `EngineConfig` values; no Workbench Session default reuse.
+- Transcriber factory construction: threadpool boundary for WhisperStreaming model loading.
+- Processor release: flushed processors closed on track removal or all-track flush; idempotent adapter `release()`.
+- Connection registry scope: single API worker process coordination only.
+- Multi-worker Live WebSockets: distributed coordination requirement.
+- Realtime release: idempotent route cleanup target.
+- Backend device enumeration APIs: unsupported for browser or desktop user devices.
+- Device inventory owner: client runtime adapters.
+
+### File, Export, and Model Contracts
+
+- File deletion conflict: `409` when transcription tasks reference the file.
+- File disappearing during delete: `404`; no unlink success response.
+- Post-database filesystem cleanup: best-effort unlink; no API failure after deleted row.
+- Upload validation source: resolved content type after filename inference.
+- Partial upload cleanup cases: stream read, write, size-limit, cancellation failures.
+- Upload stream close failure: suppressed outcome replacement.
+- Blocking upload work: thread offload for file writes and metadata writes.
+- File and task search helpers: shared SQLite contains-search helpers.
+- Model registry search: in-memory inside `application/models` until another in-memory search domain exists.
+- Model operation lock scope: canonical model id; download start and cache deletion.
+- Download conflict responses: `409` for duplicate active downloads and already-cached models.
+- OpenAPI download conflict metadata: both conflict cases.
+- Hugging Face revision cache state: tracked revisions as downloaded state.
+- Partial cache cleanup: metadata-only repo cache directories without revisions.
+- Full cache incomplete-file scan after tracked revisions: unsupported.
+- Model descriptions: `description_key`; frontend localization with backend `description` fallback.
+- Export defaults precedence: `built-in export defaults < persisted export defaults < request overrides`.
+- Export filename helpers: shared Task and Live helpers; path segment stripping; endpoint-selected extension.
+- Export write-path mapped failures: `OSError`, `UnicodeError`.
+- Export catch-all write failure mapping: unsupported.
+- Batch export error archive: sanitized `_errors.txt`; no raw exception text.
+- Batch task export all-fail status: `400` only when every selected task has task-level failures such as `no_segments`.
+
+## Database Contracts
+
+> **SQLite and persistence invariants**
+>
+> - Connection lifetime: explicit SQLite connection close.
+> - Write transactions: preserved transaction semantics.
+> - Queue atomic updates: `UPDATE ... WHERE ... RETURNING`.
+> - Timeout/dead-task requeue: `retry_count` increment.
+> - SQLite minimum version: `3.35.0`.
+> - Live foreign keys: enabled.
+> - Live segment integrity: segment `track_id` within the same `session_id`.
+> - Segment reads: bounded pagination.
+> - Runtime snapshots: JSON snapshots for Live sessions and transcription tasks.
+> - Legacy runtime snapshots: `NULL`, no fabricated current-default history.
+> - Request override snapshots: accepted user override JSON only.
+> - Missing request override snapshots: `NULL`, no derivation from runtime snapshots.
 
 ---
 
@@ -444,335 +496,154 @@ Keep generated or local-runtime directories such as `data/`, `__pycache__/`, `.p
 
 ---
 
-## Detailed Module Overview
+## Module Extension Notes
 
-### nola/models/
-Data persistence layer (SQLite):
-- `database.py`: Schema initialization, connection management, foreign key enforcement, Live table/index creation, task execution config migrations, and Task/Live request override columns.
-- `app_config.py`: `AppConfigDatabase` for persisted application defaults under `app_config`.
-- `files.py`: `FileDatabase` for managing audio file metadata. Uses `FileRow` TypedDict.
-- `live.py`: `LiveDatabase` for Live session, track, and segment persistence. Keep sessions newest-first, tracks creation-ordered, segments sequence-ordered and paginated, final-segment export reads bounded, list filters allowlisted, terminal deletes guarded, and invalid JSON snapshots nulled with warnings.
-- `query_helpers.py`: Share SQLite `LIKE` escape and contains-pattern helpers across file and task repositories.
-- `tasks.py`: Keep `TaskDatabase` as facade and delegate to split repositories.
-- `taskdb/task_queue.py`: Handle enqueue/dequeue/heartbeat/complete/fail/requeue flows; persist task `model_id`, `engine_device`, `engine_compute_type`, `runtime_config`, and `request_overrides`; clear stale `error` on successful completion; reset `progress` when requeueing failed/timeout/dead-worker tasks.
-- `taskdb/task_store.py`: Handle get/list/count/cancel/delete persistence queries and decode task runtime/request JSON snapshots.
-- `taskdb/query_helpers.py`: Keep query helper functions isolated from repository classes; validate decoded JSON shapes for `segments`, `options`, `runtime_config`, and `request_overrides` before casting task rows.
-- `taskdb/types.py`: Keep shared task statuses, sort fields, and task row TypedDict contracts including persisted execution config and request override fields.
-- `utils/db.py`: Database utilities (e.g., `ensure_sqlite_version`).
+Directory tree: file-level location map. This section: module boundaries, data flow, runtime state, and cross-layer relationships.
 
-### nola/common/
-Shared backend helper layer:
-- `merge.py`: Provide recursive deep-merge behavior for defaults composition.
-- `types.py`: Provide recursive JSON-compatible type aliases for shared config code.
-- `event_bus.py`: Publish and subscribe process-wide model-download events for SSE streaming.
+### nola/models
 
-### nola/model_hub/
-Model lifecycle management:
-- `registry.py`: Keep the curated model registry and canonical/alias lookup helpers.
-- `storage.py`: Resolve model cache roots, inspect Hugging Face cache state, short-circuit revision-backed repos as downloaded, and delete full or partial cache artifacts.
-- Treat metadata-only repo cache directories with no revisions as partial artifacts; remove them during stale-artifact cleanup.
-- Do not scan the full cache tree for incomplete files once tracked revisions exist.
-- `downloader.py`: Run subprocess-backed downloads, aggregate real byte progress and speed, and expose active download snapshots.
-- `contracts.py`: Keep shared model metadata and download/runtime value objects.
-- `errors.py`: Define model-hub domain errors for API mapping and worker startup guards.
+- Layer: SQLite persistence.
+- Main facade: `TaskDatabase` over split `taskdb` repositories.
+- Task queue: queue transitions, worker coordination, heartbeat, timeout/dead-worker recovery.
+- Task store: list, detail, count, cancel, terminal-record delete persistence.
+- Task JSON fields: `segments`, `options`, `runtime_config`, `request_overrides`; decoded shape validation before row casting.
+- Live repository: sessions, tracks, segments, list filters, terminal deletes, paginated final-segment reads.
+- Live JSON fields: invalid runtime/request snapshots nulled with warnings.
+- Config persistence: `AppConfigDatabase` under `app_config`.
+- File persistence: uploaded file metadata and integrity state.
+- Shared search: SQLite contains-search helpers.
+- SQLite utilities: version checks and connection helpers.
 
-### nola/engines/
-Transcription engine layer:
-- `EngineDevice` / `EngineComputeType`: Literal engine initialization option contracts. Keep allowed values centralized in `engines/base.py`.
-- `DEFAULT_ENGINE_DEVICE`: Keep the safe fallback as `auto`.
-- `DEFAULT_ENGINE_COMPUTE_TYPE`: Keep the safe fallback as `default`.
-- `Segment`: Data class for transcribed segment with timing.
-- `EngineConfig`: Engine initialization configuration. Keep model size, model directory, device, and compute type here.
-- `TranscribeOptions`: Full transcription options passed to `WhisperModel.transcribe(...)`; do not add engine initialization parameters here.
-- `TranscriptionEngine`: Abstract interface for transcription engines, including explicit resource release through `close()`.
-- `faster_whisper_defaults.py`: Inspect installed faster-whisper defaults and supported VAD keys without depending on config persistence or application layers.
-- `faster_whisper_runtime.py`: Create and close faster-whisper model handles through neutral lifecycle helpers shared by `FasterWhisperEngine` and the Live WhisperStreaming backend.
-- `FasterWhisperEngine`: Faster-Whisper implementation. Report progress as segment output coverage only, raise immediately when closed, and unload the underlying CTranslate2 model on close through the shared lifecycle helper.
-- `nola/__init__.py`: Set `CT2_CUDA_ALLOCATOR=cub_caching` by default on Windows before any faster-whisper import to avoid CTranslate2 CUDA model cleanup aborts. Keep user overrides intact with `setdefault`.
+### nola/common and nola/utils
 
-### nola/api/
-API adapter layer:
-- `deps.py`: Dependency injection for database singletons, Live DB, Live diagnostics output path, Live stream connection registry, Live realtime transcriber factory, shared model storage, downloader, and event-bus singletons.
-- `routes/config.py`: Aggregated config endpoints, session defaults management, transcription defaults management, Live realtime defaults/schema management, and export defaults management.
-- `routes/files.py`: File upload/list/delete HTTP adapter. Delegate list, upload, integrity, cleanup, single delete, and batch delete orchestration to `application/files`; keep explicit `response_model`.
-- `routes/_live_realtime_events.py`: Build Live WebSocket server events, including preview/committed/final transcript events, from application payloads without putting event assembly in the router.
-- `routes/live.py`: Live REST and WebSocket adapter for create/list/detail/finish/export/delete session endpoints plus `/api/live/sessions/{session_id}/stream`. Resolve dependencies through FastAPI dependency injection, create blocking realtime transcribers through `run_in_threadpool()`, and keep business behavior in `application/live`.
-- `routes/models.py`: Model HTTP adapter for list/detail/download/cancel/delete/select/settings, SSE event stream, active-download runtime summary, and `409` responses for both active downloads and already-downloaded models.
-- `routes/transcriptions.py`: Canonical task router composition entry. Mount read/actions/export task route modules under `/api/transcription-tasks`.
-- `routes/tasks/read.py`: Read endpoints for task list/detail; keep sync handlers for sync DB dependencies.
-- `routes/tasks/actions.py`: Mutation endpoints for create, cancel, batch cancel/retry/delete-records, and single delete-record; resolve task execution config before task creation.
-- `routes/tasks/export.py`: Single/batch export endpoints and OpenAPI response metadata; map use-case output to FastAPI `Response`/`StreamingResponse`.
-- `routes/tasks/_errors.py`: Convert task use-case errors into HTTP exceptions.
-- `schemas/config.py`: Config request/response schemas for session defaults, Live realtime defaults/schema, and export defaults.
-- `schemas/files.py`: Pydantic file request/response models (`FileResponse`, `FileListResponse`, batch delete, integrity, cleanup, etc.)
-- `schemas/live.py`: Pydantic Live request/response models for session creation overrides, request override snapshots, runtime snapshots, summaries, detail payloads, tracks, segments, list pagination, export requests, and delete action results.
-- `schemas/live_realtime.py`: Pydantic Live WebSocket JSON control, server event, transcript preview/committed/final, diagnostics, error, and audio metadata schemas.
-- `schemas/live_realtime_config.py`: Pydantic Live realtime defaults, VAD parameter, and per-session runtime override schemas.
-- `schemas/models.py`: Model management request/response models for list/detail/settings/download runtime. Include download conflict metadata in route OpenAPI responses.
-- `schemas/responses.py`: Task response models (`TaskDetailResponse`, `CreateTaskResponse`, etc.); task detail responses expose persisted request override and runtime snapshot context.
-- `schemas/transcriptions.py`: Request models (`TranscriptionRequest`, `TaskEngineRequest`, `BatchTaskActionRequest`, `BatchExportRequest`, `TranscriptionDefaultsUpdateRequest`) with typed `VadParametersRequest` and `extra=forbid`
-- `schemas/validators.py`: Reusable validation functions for language, task options, temperature, and nested `vad_parameters` keys
+- `nola/common/merge.py`: recursive defaults merge behavior.
+- `nola/common/types.py`: recursive JSON-compatible aliases.
+- `nola/common/event_bus.py`: process-wide model-download SSE event bus.
+- `nola/utils/mime.py`: MIME inference from filename extension.
 
-### nola/application/
-Application-layer orchestration:
-- `files/contracts.py`: Protocol contracts for file stores and upload streams used by file use-cases.
-- `files/types.py`: TypedDict payload contracts for file list/detail/upload/integrity/delete results.
-- `files/payloads.py`: File payload builders; avoid serializing missing values as string `"None"`.
-- `files/actions/`: File write-side use-cases (`upload_uploaded_file`, `delete_uploaded_file`, `batch_delete_uploaded_files`, `cleanup_orphan_files`).
-- `files/queries/`: File read-side use-cases (`list_uploaded_files`, `get_uploaded_file`, `check_file_integrity`).
-- `live/contracts.py`: Protocol contracts for Live session, track, segment, and aggregate repository stores.
-- `live/types.py`: TypedDict payload contracts, Live literals, and session/segment pagination limits.
-- `live/values.py`: Validate Live modes, statuses, and pagination windows before payload or repository output.
-- `live/payloads.py`: Build Live session summary/detail/list payloads, include detail-only request/runtime snapshots, and validate stored enum values on read paths.
-- `live/runtime_config.py`: Resolve Live realtime built-in defaults, persisted defaults, per-session overrides, model cache state, and API-safe runtime snapshots.
-- `live/_clock.py`: Generate timezone-aware UTC timestamps for Live lifecycle changes.
-- `live/actions/`: Live write-side use-cases (`create_live_session`, `finish_live_session`, `fail_live_session`, `delete_live_session`, `batch_delete_live_sessions`); repeated finish returns the existing terminal snapshot when present.
-- `live/queries/`: Live read-side use-cases (`get_live_session`, `list_live_sessions`) with bounded session/segment pagination and validated search/filter/sort inputs.
-- `live/exports/`: Live export use-cases (`export_live_session`, `batch_export_live_sessions`) that read final persisted segments, reuse formatter/config helpers, and return framework-neutral payloads for routes.
-- `live/realtime/protocol.py`: Keep Live WebSocket protocol version, event ordering, audio contract constants, transcript/runtime error codes, and stable error codes.
-- `live/realtime/session.py`: Own per-connection realtime state, track lifecycle, frame validation, transcriber dispatch, diagnostics control, final-only persistence, track/session flush, finish/failure cleanup, and open-track closeout.
-- `live/realtime/audio.py`: Validate PCM16LE frame metadata/payload length and convert PCM16LE to 16 kHz mono float32 waveform.
-- `live/realtime/diagnostics.py`: Write explicit diagnostics WAV files and manifests to safe repository-external directories, return opaque capture metadata for protocol events, and keep absolute paths internal.
-- `live/realtime/mock_transcriber.py`: Generate deterministic committed/final transcript events from track-scoped audio duration.
-- `live/realtime/transcriber.py`: Define realtime transcriber input/result contracts for preview, committed partial, and final candidates plus track/session flush.
-- `live/realtime/connection_registry.py`: Prevent concurrent writers for one Live session inside one API worker process.
-- `live/realtime/errors.py`: Define realtime runtime errors for route mapping.
-- `live/realtime/whisper_streaming/adapter.py`: Map Live waveform frames to track-scoped WhisperStreaming processors and Live transcriber results.
-- `live/realtime/whisper_streaming/backend.py`: Adapt faster-whisper inference output into timestamped words and segment boundaries using dynamic WhisperStreaming prompt history only.
-- `live/realtime/whisper_streaming/config.py`: Validate WhisperStreaming runtime snapshots for chunking, dynamic prompt length, trimming, decoding, VAD pass-through, silence close, context reset, and blank-language normalization.
-- `live/realtime/whisper_streaming/hypothesis.py`: Maintain LocalAgreement hypothesis state and upstream-compatible duplicate handling.
-- `live/realtime/whisper_streaming/loader.py`: Resolve configured model id, model directory, cache state, and Live backend creation without using the offline worker.
-- `live/realtime/whisper_streaming/processor.py`: Manage one track's audio buffer, prompt/context split, LocalAgreement processing, boundary confirmation, segment trimming, final close, and context reset.
-- `live/realtime/whisper_streaming/silence.py`: Track silence decisions for segment close and context reset without altering audio samples.
-- `live/realtime/whisper_streaming/types.py`: Keep internal word, chunk, processor update, model output, and backend contracts.
-- `models/contracts.py`: Protocol contracts for model registry, storage, downloader, config store, and operation locks.
-- `models/operation_locks.py`: Provide per-model locks shared by download start and cache deletion.
-- `models/actions/`: Model write-side use-cases (`start_model_download`, `cancel_model_download`, `delete_model_cache`, `select_configured_model`, `update_model_settings`).
-- `models/queries/`: Model read-side use-cases (`list_models`, `get_model_detail`, `get_model_settings`, `list_active_downloads`).
-- `tasks/contracts.py`: Protocol contracts for task/file gateways used by use-cases.
-- `tasks/types.py`: TypedDict payload contracts for task use-case outputs and resolved task execution config.
-- `tasks/execution_config.py`: Resolve task execution config from request values, Session defaults, settings, and model aliases before enqueue.
-- `tasks/runtime_config.py`: Build complete task runtime snapshots, build accepted request override snapshots, and convert stored snapshots back to `TranscribeOptions`.
-- `tasks/payloads.py`: Shared task payload builders (`to_task_summary_payload`, batch summary builder); preserve task `model_id` across list/detail/cancel responses.
-- `tasks/actions/`: Write-side use-cases (`create_task`, `cancel_task`, `batch_cancel_tasks`, `batch_retry_tasks`, `batch_delete_task_records`, `delete_task_record`); create/retry paths preserve persisted execution config, runtime snapshots, and request overrides.
-- `tasks/actions/_batch_action.py`: Reuse batch execution skeleton; keep per-task result semantics; return item-level failures instead of aborting whole batch.
-- `tasks/queries/`: Read-side use-cases (`list_tasks`, `get_task`).
-- `tasks/exports/`: Keep export use-cases (`export_task`, `batch_export_tasks`) and export option resolver; return framework-agnostic `BatchExportArchive` from batch use-case; map `save=true` write-path I/O failures to stable `TaskUseCaseError` details.
+### nola/model_hub
 
-### nola/services/
-Background services:
-- `worker.py`: Independent worker process that dequeues and executes transcription tasks
-  - Enters the queue loop without preloading an engine
-  - Resolves the desired engine state before each claimed task
-  - Releases the previous engine before loading a different fingerprint
-  - Calls `worker_engine.ensure_engine_loaded()` after task-boundary reload checks
-  - Prefers stored task `runtime_config` snapshots when present
-  - `build_transcribe_options()` keeps legacy fallback merging for tasks without runtime snapshots
-  - Rejects malformed runtime snapshots as non-retryable task data failures
-  - JSON options parsing with error handling
-  - Rejects implicit model auto-download and requires cached models from model management
-  - Persists canonical `worker.last_loaded_model_id`, `worker.last_loaded_model_dir`, `worker.last_loaded_device`, and `worker.last_loaded_compute_type` after engine load
-  - Fails only the current task when engine resolution, model cache validation, engine release, or engine load fails
-  - Marks dequeued tasks retryable when unexpected Python errors occur during engine preparation
-- `worker_engine.py`: Task-boundary engine reload helper
-  - Build desired engine state from persisted task execution config and current model directory settings.
-  - Fallback legacy tasks through configured model/settings when persisted execution columns are missing.
-  - Validate downloaded model cache before loading.
-  - Close loaded engines before replacing a runtime fingerprint.
-  - Reuse a loaded engine when the fingerprint matches.
-  - Reload only between tasks when model, model directory, device, or compute type changes.
-  - Ignore runtime state write failures after successful engine load.
-- `formatters/`: Subtitle export formatters (SRT, VTT, TXT, ASS)
-  - `get_formatter(format, include_timestamps)` factory function
-  - Static registry pattern for format discovery
+- Layer: model registry, local cache state, download runtime.
+- Registry: curated model metadata, canonical ids, aliases, description keys.
+- Storage: cache root resolution, Hugging Face cache inspection, full/partial cache deletion.
+- Revision-backed repositories: downloaded state through tracked revisions.
+- Partial artifact cleanup: metadata-only cache directories without revisions.
+- Downloader: subprocess-backed downloads, byte progress, speed snapshots, IPC messages.
+- Domain errors: API mapping and worker startup guards.
+
+### nola/engines
+
+- Layer: offline transcription engine contracts and neutral faster-whisper helpers.
+- `EngineConfig`: model size, model directory, device, compute type.
+- `TranscribeOptions`: transcription options only; engine initialization fields outside this object.
+- `FasterWhisperEngine`: faster-whisper implementation, segment output coverage progress, explicit close behavior.
+- Faster-whisper defaults: installed package default and VAD key introspection.
+- Faster-whisper runtime helpers: shared model creation and close lifecycle for offline and Live backend runtimes.
+- Windows CTranslate2 compatibility: `CT2_CUDA_ALLOCATOR=cub_caching` default in `nola/__init__.py`.
+
+### nola/api
+
+- Layer: HTTP/WebSocket adapter surface.
+- `deps.py`: database singletons, model storage/downloader, event bus, Live diagnostics path, Live stream registry, Live transcriber factory.
+- Config routes: aggregated config, transcription defaults, Session defaults, Live realtime defaults/schema, export defaults.
+- File routes: upload, list, detail, integrity, cleanup, single delete, batch delete adapters.
+- Task routes: canonical `/api/transcription-tasks` composition through read/actions/export modules.
+- Live routes: REST session lifecycle, export/delete, WebSocket stream adapter.
+- Model routes: registry list/detail, settings, downloads, cancel/delete/select, SSE events.
+- Schemas: Pydantic request/response models and Live WebSocket protocol models.
+- Error mapping: workflow errors to HTTP responses; raw Python exception text outside client payloads.
+
+### nola/application
+
+- Layer: framework-independent orchestration.
+- Files area: upload validation/storage, list/detail, integrity, cleanup, single delete, batch delete.
+- Tasks area: execution config resolution, runtime snapshot creation, request override snapshots, create/cancel/retry/delete/list/detail/export.
+- Live area: runtime config resolution, create/list/detail/finish/fail/delete/export, paginated segment payloads.
+- Models area: registry queries, settings, active downloads, start/cancel download, cache delete, configured model selection.
+- Payloads: TypedDict contracts and framework-neutral response builders.
+- Contracts: protocols for repositories, file stores, model storage/downloader, config stores, operation locks.
+- Batch actions: item-level results and per-item failure preservation.
+
+### nola/application/live/realtime
+
+- Runtime scope: per-WebSocket Live realtime session.
+- Protocol: versioned JSON control/events plus binary PCM payloads.
+- Audio contract: PCM16LE, 16 kHz, mono; float32 waveform conversion for inference.
+- Transcript classes: preview, committed partial, final.
+- Persistence boundary: final transcript segments only.
+- Diagnostics: explicit WAV capture and opaque artifact metadata.
+- Connection coordination: single-process Live stream registry.
+- Mock transcriber: deterministic committed/final output for tests and mock mode.
+- WhisperStreaming adapter: track-scoped processors and connection-local model ownership.
+- WhisperStreaming backend: faster-whisper inference over accumulated waveform chunks.
+- WhisperStreaming processor: LocalAgreement state, trimming, silence handling, context reset.
+- Loader boundary: configured model id, model directory, cache state, Live backend construction.
+
+### nola/services
+
+- Worker process: independent transcription task consumer.
+- Engine load timing: before each claimed task.
+- Reload boundary: task boundary.
+- Runtime fingerprint: model id, model directory, device, compute type.
+- Engine reuse state: matching runtime fingerprint.
+- Snapshot preference: stored task `runtime_config`.
+- Legacy fallback scope: tasks without runtime snapshots.
+- Failure scope: current task for engine resolution, cache validation, release, or load failures.
+- Formatter registry: SRT, VTT, TXT, ASS subtitle formatters.
 
 ### nola/main.py
-FastAPI entry point with lifespan management:
-- `GET /` - API info
-- `GET /health` - Health check
-- `GET /api/config` - Aggregated frontend-facing configuration
-- `GET /api/config/transcription/engine-defaults` - Raw engine defaults
-- `PATCH /api/config/transcription/defaults` - Persist transcription default overrides
-- `DELETE /api/config/transcription/defaults` - Reset persisted transcription defaults
-- `GET /api/config/session-defaults` - Get Workbench session defaults
-- `PATCH /api/config/session-defaults` - Persist Workbench session defaults
-- `GET /api/config/export` - Get effective export defaults
-- `PATCH /api/config/export/defaults` - Persist export default overrides
-- `DELETE /api/config/export/defaults` - Reset persisted export defaults
-- `GET /api/models` - List registered models with search/filter/sort query support and local/download state
-- `GET /api/models/downloads` - List active downloads with real current speed
-- `GET /api/models/settings` - Read model directory and configured-model settings
-- `PATCH /api/models/settings` - Update model directory settings
-- `GET /api/models/events` - Stream model download SSE events
-- `GET /api/models/{model_id}` - Get one model detail
-- `POST /api/models/{model_id}/download` - Start model download; return `409` when the model is already downloading or already cached
-- `POST /api/models/{model_id}/cancel` - Cancel active model download
-- `DELETE /api/models/{model_id}` - Delete local model cache
-- `POST /api/models/{model_id}/select` - Select the configured default model for future tasks without forcing worker restart
-- `POST /api/files/` - Upload audio file
-- `GET /api/files/` - List files with search/filter/sort/pagination query support
-- `POST /api/files/batch/delete` - Batch delete uploaded files with per-file results
-- `GET /api/files/{file_id}` - Get file metadata
-- `DELETE /api/files/{file_id}` - Delete file only when no transcription task still references it
-- `GET /api/files/check-integrity` - Check database-file consistency
-- `POST /api/files/cleanup` - Remove orphan database records
-- `POST /api/live/sessions` - Create a Live session
-- `GET /api/live/sessions` - List Live sessions with search, status, sorting, and pagination
-- `GET /api/live/sessions/{session_id}` - Get one Live session with tracks and paged segments
-- `GET /api/live/sessions/{session_id}/export` - Export one finished Live session
-- `POST /api/live/sessions/export/batch` - Batch export finished Live sessions as ZIP
-- `POST /api/live/sessions/{session_id}/finish` - Finish one Live session and return its snapshot
-- `DELETE /api/live/sessions/{session_id}/record` - Delete one terminal Live session record
-- `POST /api/live/sessions/batch/delete-records` - Batch delete terminal Live session records
-- `WebSocket /api/live/sessions/{session_id}/stream` - Stream Live realtime control events, PCM audio frames, and preview/committed/final transcript events
-- `POST /api/transcription-tasks/` - Create transcription task
-- `GET /api/transcription-tasks/` - List tasks with status/search/sort/pagination
-- `GET /api/transcription-tasks/{task_id}` - Get task status/result
-- `DELETE /api/transcription-tasks/{task_id}` - Cancel task
-- `POST /api/transcription-tasks/batch/cancel` - Batch cancel tasks
-- `POST /api/transcription-tasks/batch/retry` - Batch retry tasks
-- `POST /api/transcription-tasks/batch/delete-records` - Batch delete terminal task records
-- `DELETE /api/transcription-tasks/{task_id}/record` - Delete terminal task record
-- `GET /api/transcription-tasks/{task_id}/export` - Export as subtitle (SRT/VTT/TXT/ASS)
-- `POST /api/transcription-tasks/export/batch` - Batch export as ZIP
 
-### nola/config/
-Configuration and constants:
-- `settings.py`: Pydantic Settings (data_dir, exports_dir, max_file_size, model defaults, Live realtime transcriber mode, host/port)
-- `constants.py`: Validation constants (MIME/extension allowlists, language set, batch limits via `MAX_BATCH_TASK_IDS`)
-- `common/`: Shared config patch helper and config value types
-- `live_realtime/`: Resolve Live realtime built-in/effective defaults, supported adapter metadata, schema-driven field groups, and `live_realtime.` prefix behavior without exposing static prompt controls.
-- `transcription/contracts.py`: Keep shared option keys/contracts for API validators and schema assembly.
-- `transcription/schema/models.py`: Keep field/group schema models; enforce numeric invariants (`min <= max`, `step > 0`) and select option-source one-of rules.
-- `transcription/schema/registry.py`: Build transcription schema registry and grouped response view.
-- `transcription/schema/responses.py`: Assemble config response models and defaults response payloads.
-- `transcription/defaults.py` + `transcription/languages.py`: Resolve effective defaults and effective language list.
-- `export/types.py`: Keep shared `ExportFormat` enum for config and formatter layers.
-- `export/`: Keep export defaults, safe download/archive filenames, UTF-8 Content-Disposition handling, and unique saved export paths without introducing `config -> services` reverse dependency.
-- `session/defaults.py`: Resolve Workbench session defaults by combining execution defaults and transcription defaults.
-- `session/schema.py`: Publish execution control metadata for device and compute type through aggregated config responses.
+- Role: FastAPI entry point and lifespan management.
+- Root endpoints: `/`, `/health`.
+- Config endpoints: app config, transcription defaults, Session defaults, Live realtime defaults/schema, export defaults.
+- File endpoints: upload, list, detail, integrity, cleanup, single delete, batch delete.
+- Model endpoints: list, detail, settings, active downloads, SSE events, download/cancel/delete/select.
+- Live endpoints: sessions list/create/detail/finish/export/delete, batch export/delete, WebSocket stream.
+- Task endpoints: create/list/detail/cancel, batch cancel/retry/delete-records, single export, batch export.
 
-### Transcription Rules
-Apply config-driven schema as the only source for frontend option metadata and task option values.
-Apply transcription defaults precedence as `engine defaults < persisted app defaults < task overrides` at task creation.
-Persist complete resolved transcription runtime snapshots on new tasks; make workers execute snapshots instead of recomputing from current defaults.
-Persist Task request override snapshots from accepted request values only; do not fill missing snapshots from resolved runtime config or legacy task options.
-Reject incomplete task runtime snapshots instead of filling them from current defaults; keep fallback recomputation only for legacy rows with no snapshot.
-Apply execution config precedence as request values, then Session defaults, then settings fallbacks.
-Publish execution `device` and `compute_type` options through `/api/config.engine.schema`; keep frontend option labels and values derived from this metadata.
-Derive engine default assertions from `EngineConfig`/settings in tests; do not hardcode `small`, `default`, or device defaults.
-Treat explicit `null` in `PATCH /api/config/transcription/defaults` as remove-override semantics.
-Treat explicit `null` in `PATCH /api/config/session-defaults` execution fields as clear-override semantics.
-Merge nested defaults objects in PATCH flows without replacing untouched subkeys.
-Reject unknown top-level options and unknown `vad_parameters` keys at request validation with `422`.
-Reject invalid task or Session default `device` / `compute_type` values at the boundary; read paths may ignore stale invalid persisted overrides and fall back safely.
-Treat invalid process settings `device` / `compute_type` as warning-worthy fallback inputs for legacy tasks; keep explicit task execution values strict.
-Separate configuration validation failures from runtime engine load failures; make runtime engine construction retryable when the task has not started transcription.
-Keep `engines/base.py` as pass-through for option values; do not add engine-side strict range enforcement.
-Keep `api/schemas/*` as coarse guard; block clearly invalid payloads and return `422`.
-Keep `config/transcription/schema/*` as UI constraint source; ensure UI ranges remain a subset of API acceptance.
-Keep API coarse guards and UI schema constraints independent; do not force exact numeric-range equality across both layers.
-Serialize infinity as `"inf"` at API boundaries and deserialize it back before engine invocation.
-Use only `/api/transcription-tasks/*` for task APIs; do not add `/api/transcriptions/*` runtime aliases.
-Use `/api/config/session-defaults` for Workbench execution defaults; do not add `/api/config/engine` as a parallel write path.
-Persist resolved `model_id`, `engine_device`, `engine_compute_type`, and `runtime_config` on new tasks; do not let later default changes mutate already queued tasks.
-Treat `worker.last_loaded_*` fields as recently loaded runtime state, not desired defaults.
-Treat Default and Running model mismatch as normal after task-boundary reload.
-Treat `restart_required` as a compatibility field that remains `false` under the current task-boundary reload architecture.
-Close the current transcription engine before loading a different engine fingerprint.
-Gate local-source-only VAD fields with the installed `faster-whisper` `VadOptions`.
-Treat `FasterWhisperEngine` progress callbacks as output coverage estimates; do not call them faster-whisper internal progress.
-Apply export defaults precedence as `built-in export defaults < persisted export defaults < request overrides`.
-Use shared export filename helpers for Task and Live downloads, archives, and saved files; strip path segments and apply the endpoint-selected extension.
-Map export write-path `OSError` and `UnicodeError` failures to stable API error details; do not widen this mapping to catch-all exceptions.
-Keep batch export error output sanitized; write stable task-level reasons to `_errors.txt` and do not write raw exception text into archives.
-Record `no_segments` as task-level batch export failure; return `400` only when every selected task fails.
+### nola/config
 
-### Live Rules
-Use `/api/live/*` for Live session REST and WebSocket APIs; do not add Live lifecycle aliases under `/api/transcription-tasks/*`.
-Keep Live session, track, and segment data in independent `live_*` tables.
-Treat Live tracks as source metadata for microphone/system audio. Do not persist browser device inventory in the backend.
-Validate stored Live `mode`, `status`, and track/segment source values before emitting response payloads.
-Keep Live session list pagination bounded by `DEFAULT_LIVE_SESSION_LIMIT` and `MAX_LIVE_SESSION_LIMIT`.
-Validate Live session list search, status, sort field, and order before repository access; map sort fields through a SQL allowlist.
-Keep Live detail and finish segment pagination bounded by `DEFAULT_LIVE_SEGMENT_LIMIT` and `MAX_LIVE_SEGMENT_LIMIT`.
-Keep `track_id` optional on segments, but require same-session ownership when a segment references a track.
-Store Live lifecycle timestamps with timezone-aware UTC ISO strings.
-Keep Live realtime protocol events versioned and structured. Do not send raw Python exception text to clients.
-Keep Live realtime transcript events split as `transcript.preview`, `transcript.committed_partial`, and `transcript.final`.
-Keep Live realtime diagnostics default-off and explicit through `diagnostics.wav.start` / `diagnostics.wav.stop`.
-Keep Live realtime diagnostics protocol output opaque; do not expose `output_dir`, `manifest_path`, or WAV `path` fields over WebSocket.
-Keep diagnostics WAV limit and write-failure stops non-fatal; emit `diagnostics.wav.stopped` and continue the realtime session.
-Keep Live realtime final segments as the only persisted transcript history; preview and committed partials are WebSocket-only runtime feedback.
-Apply Live realtime config precedence as `built-in defaults < persisted Live realtime defaults < per-session runtime_overrides`.
-Keep Live realtime defaults under `live_realtime.`; do not mix them with Workbench Session defaults or transcription task defaults.
-Persist resolved Live realtime snapshots on session creation and use those snapshots for WebSocket runtime construction.
-Persist Live request override snapshots from accepted request values only; do not fill missing snapshots from resolved runtime config or session overrides.
-Reject active Live sessions without runtime snapshots with a stable config error; do not rebuild missing snapshots from current defaults.
-Keep `mock` runtime independent from persisted Live realtime defaults; reject only explicit per-session runtime overrides in mock mode.
-Keep static user prompt context out of Live realtime schemas and runtime overrides; keep faster-whisper `initial_prompt` internal and composed from dynamic WhisperStreaming context only.
-Keep `word_timestamps`, audio contract fields, model paths, cache roots, arbitrary Hugging Face ids, and `local_files_only` unavailable to frontend overrides.
-Normalize blank Live realtime `language` values to `None` before calling faster-whisper.
-Keep WhisperStreaming processor state track-scoped. Do not share hypothesis buffers, audio buffers, or silence state across microphone and system tracks.
-Keep WhisperStreaming boundary confirmation track-scoped and processor-local. Do not add process-wide transcript memory or cross-track anchor state.
-Skip silent WhisperStreaming inference windows only when no speech or pending transcript exists.
-Keep WhisperStreaming model ownership connection-local through one transcriber instance. Do not add a process-wide model pool without explicit ref-count and release design.
-Keep Live WhisperStreaming loader/backend independent from `FasterWhisperEngine`, `worker.py`, and `worker_engine.py`; share only neutral faster-whisper lifecycle helpers.
-Export only finished Live sessions and persisted final segments. Return controlled errors for active sessions and sessions without final segments.
-Delete only terminal Live sessions and preserve item-level results for batch delete.
-
-### File and Model Rules
-Keep FastAPI routes as adapters for query/path/body parsing, dependency injection, `response_model`, and error mapping.
-Put file upload/list/integrity/cleanup/delete orchestration in `nola/application/files`.
-Put Live REST lifecycle, payload validation, pagination, export, and delete orchestration in `nola/application/live`.
-Put Live WebSocket runtime state, PCM validation, diagnostics, Mock transcript orchestration, and WhisperStreaming realtime runtime in `nola/application/live/realtime`.
-Put model list/detail/settings/download/cancel/delete/select orchestration in `nola/application/models`.
-Validate upload files against the resolved content type after filename inference.
-Clean up partial upload files on stream read, write, size-limit, and cancellation failures.
-Suppress upload stream close failures so they do not replace the original upload outcome.
-Use best-effort unlink after successful database file deletion; do not turn a deleted row into an API failure because filesystem cleanup failed.
-Use shared SQLite contains-search helpers for file and task repository search; keep model registry in-memory search inside `application/models` until another in-memory search domain needs it.
-Serialize model download start and cache deletion with `ModelOperationLocks` by canonical model id.
-Put shared faster-whisper model creation and close helpers in `nola/engines/faster_whisper_runtime.py`; keep Live-specific runtime code out of `nola/engines`.
-
-### nola/utils/
-Utility functions:
-- `mime.py`: MIME type inference from file extension
-
----
+- Layer: settings, defaults, schema metadata, patch semantics.
+- Settings: data paths, export paths, limits, model defaults, Live realtime transcriber mode, host/port.
+- Constants: MIME and extension allowlists, language set, batch limits.
+- Common config helpers: recursive patch semantics and config value aliases.
+- Transcription config: option contracts, schema registry, effective defaults, effective language list.
+- Session config: Workbench execution and transcription defaults aggregation; execution option metadata.
+- Live realtime config: built-in/effective defaults, adapter metadata, schema groups, `live_realtime.` prefix.
+- Export config: export formats, defaults, safe filenames, UTF-8 Content-Disposition, saved export paths.
 
 ## Dev Commands
 
 ```bash
-# Install dependencies
+# Dependencies
 poetry install
 
-# Start dev server
+# Dev server
 poetry run uvicorn nola.main:app --reload
 
-# Run linter
+# Lint
 poetry run ruff check nola tests
 
-# Check format (same as CI)
+# Format check
 poetry run ruff format --check nola tests
 
-# Run type checker
+# Type check
 poetry run mypy nola
 
-# Run tests
+# Tests
 poetry run pytest tests -v --tb=short
 
-# Auto-fix lint issues
+# Lint fixes
 poetry run ruff check nola tests --fix
 
-# Format code
+# Formatting
 poetry run ruff format nola tests
 
-# Start worker (in a separate terminal)
+# Worker process
 poetry run python -m nola.services.worker
 ```
 
-> From repository root, use `poetry -C core run ...` equivalents.
+> Repository-root command shape: `poetry -C core run ...`.
 
 ---
 
@@ -793,7 +664,7 @@ poetry run python -m nola.services.worker
 ## Architecture
 
 ```text
-Client ──▶ FastAPI routes ──▶ application use-cases ──▶ SQLite DB ◀── Worker Process
+Client ──▶ FastAPI routes ──▶ application workflows ──▶ SQLite DB ◀── Worker Process
                                    │                          │              │
                                    │                          │       FasterWhisperEngine
                                    │                          ▼
@@ -843,7 +714,10 @@ Client ──▶ FastAPI routes ──▶ application use-cases ──▶ SQLite
 | `/api/files/check-integrity` | GET | - | `IntegrityCheckResponse` |
 | `/api/files/cleanup` | POST | - | `CleanupResponse` |
 
-File deletion contract: return `409` when transcription tasks still reference the file; return `404` when the row disappears before delete finishes; treat post-database unlink failures as best-effort cleanup.
+File deletion contract:
+- Transcription task references: HTTP `409`.
+- Row disappearance before delete completion: HTTP `404`.
+- Post-database unlink failure: best-effort filesystem cleanup.
 
 ### Models API
 
@@ -860,7 +734,11 @@ File deletion contract: return `409` when transcription tasks still reference th
 | `/api/models/{model_id}` | DELETE | - | `ModelDeleteResponse` |
 | `/api/models/{model_id}/select` | POST | - | `ModelSelectResponse` |
 
-Model download contract: return `409` for both duplicate active downloads and already-cached models; expose both cases in OpenAPI route metadata; share the same per-model operation lock with cache deletion.
+Model download contract:
+- Duplicate active download: HTTP `409`.
+- Already-cached model: HTTP `409`.
+- OpenAPI metadata: both conflict cases.
+- Mutation lock scope: shared per-model operation lock with cache deletion.
 
 ### Live API
 
@@ -876,9 +754,25 @@ Model download contract: return `409` for both duplicate active downloads and al
 | `/api/live/sessions/batch/delete-records` | POST | `BatchLiveSessionActionRequest` | `BatchLiveSessionActionResponse` |
 | `/api/live/sessions/{session_id}/stream` | WebSocket | JSON control/events + binary PCM payloads | Live realtime protocol events |
 
-Live REST contract: keep session data independent from transcription tasks; resolve per-session runtime overrides during session creation; persist `request_overrides` and `runtime_config`; return snapshots from detail/create/finish responses, not list responses; return paged segments in detail/finish responses; export only finished sessions with final segments; delete only terminal sessions; keep repeated finish idempotent for existing terminal sessions.
+Live REST contract:
+- Storage: independent from transcription tasks.
+- Runtime override resolution: session creation.
+- Persisted snapshots: `request_overrides`, `runtime_config`.
+- Snapshot response scope: create, detail, finish.
+- List response scope: summary-only.
+- Segment response scope: paged detail/finish segments.
+- Export scope: finished sessions with final segments.
+- Delete scope: terminal sessions.
+- Repeated finish: idempotent terminal snapshot.
 
-Live realtime contract: require `client.hello` before runtime events; create tracks through `track.start`; send audio as JSON metadata followed by binary PCM16LE payload; emit `transcript.preview`, `transcript.committed_partial`, and `transcript.final`; persist only final transcripts; reject malformed JSON and non-text JSON frames as `invalid_event`; return diagnostics artifacts as opaque metadata, not absolute paths.
+Live realtime contract:
+- Handshake: `client.hello` before runtime events.
+- Track creation event: `track.start`.
+- Audio frame shape: JSON metadata followed by binary PCM16LE payload.
+- Transcript events: `transcript.preview`, `transcript.committed_partial`, `transcript.final`.
+- Persisted transcript scope: final transcripts only.
+- Invalid frame result: `invalid_event` for malformed JSON and non-text JSON frames.
+- Diagnostics artifacts: opaque metadata, not absolute paths.
 
 ### Transcription Tasks API
 
@@ -895,7 +789,10 @@ Live realtime contract: require `client.hello` before runtime events; create tra
 | `/api/transcription-tasks/{task_id}/export` | GET | `?format=&include_timestamps=&filename=&save=` | Binary or `SavedExportResponse` |
 | `/api/transcription-tasks/export/batch` | POST | `BatchExportRequest` | ZIP binary |
 
-Task response contract: expose persisted `request_overrides` and `runtime_config` for task detail and creation responses; return `null` when no user overrides or no stored snapshot exists; keep list responses summary-only.
+Task response contract:
+- Detail/create snapshots: persisted `request_overrides`, persisted `runtime_config`.
+- Missing overrides or snapshots: `null`.
+- List response scope: summary-only.
 
 ---
 
