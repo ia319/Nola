@@ -580,12 +580,10 @@ app/                          # Frontend workspace root
 - Cross-feature deep imports: unsupported, except helper-only folders without public barrels.
 - Common components: no `@/features/*` imports.
 - Settings helper exception: `@/features/settings/lib/ui-preferences`; settings-page compatibility helper.
-- Removed feature roots: `src/features/history`, `src/features/transcription`; unsupported roots.
 - Task feature scope: `src/features/tasks`; reusable lifecycle, polling, detail, action APIs.
 - History hook scope: `src/pages/history-center/hooks`; page-specific hooks.
 - Transcription options scope: `src/features/transcription-options`; option composition and defaults patch logic.
 - Subdomain composition: `transcription-options` plus `tasks` only in `src/pages/*` and `src/shell/*` containers.
-- Legacy compatibility modules: removed feature root re-export modules unsupported.
 
 ### Routing, Layout, and Settings
 
@@ -608,7 +606,6 @@ app/                          # Frontend workspace root
 - Engine defaults source: `GET /api/config/transcription/engine-defaults`.
 - Session defaults source: `GET /api/config/session-defaults`.
 - Live realtime config source: `/api/config/live-realtime/*`.
-- Deprecated defaults endpoint: `/api/transcriptions/options/defaults`; frontend calls unsupported.
 - Workbench execution options source: `/api/config.engine.schema`; no hardcoded `device` or `compute_type` options or label keys.
 - Schema-driven control sources: backend schema metadata for language, task, prompt context, advanced controls, Live realtime defaults, engine execution selects.
 - Workbench task payload boundary: `model_id` and `engine` composition in Workbench/page container; outside `useTranscriptionOptions`.
