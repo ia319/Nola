@@ -606,7 +606,7 @@ app/                          # Frontend workspace root
 - Engine defaults source: `GET /api/config/transcription/engine-defaults`.
 - Session defaults source: `GET /api/config/session-defaults`.
 - Live realtime config source: `/api/config/live-realtime/*`.
-- Workbench execution options source: `/api/config.engine.schema`; no hardcoded `device` or `compute_type` options or label keys.
+- Workbench execution options source: `GET /api/config` response field `engine.schema`; no hardcoded `device` or `compute_type` options or label keys.
 - Schema-driven control sources: backend schema metadata for language, task, prompt context, advanced controls, Live realtime defaults, engine execution selects.
 - Workbench task payload boundary: `model_id` and `engine` composition in Workbench/page container; outside `useTranscriptionOptions`.
 - Workbench model candidates: downloaded models only.
@@ -675,7 +675,7 @@ app/                          # Frontend workspace root
 - Capture failure state: no backend Live session; separate attempt/audit model for persisted failed attempts.
 - Runtime settings panel scope: advanced schema fields only.
 - Unsupported runtime settings duplicates: model, task, language, device, compute type, microphone, system audio.
-- Static prompt controls: absent; no `context_prompt` exposure or submission from Live Workbench.
+- Live Workbench static prompt controls: absent from option metadata and UI; `context_prompt` submission unsupported.
 - Timing display helper: `src/shared/lib/time-format.ts`.
 - Live route search scope: main-page view state such as `view=transcript-focus`.
 - Unsupported compact-close behavior: route search mutation.
@@ -1009,7 +1009,7 @@ Runtime config access and fallback constants.
 
 - **api.ts**: Config endpoints (`fetchAppConfig`, `fetchEngineDefaults`, `fetchSessionDefaults`, `patchSessionDefaults`, transcription defaults `PATCH`/`DELETE`, Live realtime defaults `GET/PATCH/DELETE`, Live realtime schema `GET`, export defaults `GET/PATCH/DELETE`).
 - **cache-invalidation.ts**: Refresh shared config and all config query caches after mutations.
-- **engine-options.ts**: Engine device and compute-type select options from `/api/config.engine.schema`; resolved value fallback only when schema metadata is unavailable.
+- **engine-options.ts**: Engine device and compute-type select options from `GET /api/config` response field `engine.schema`; resolved value fallback only when schema metadata is unavailable.
 - **use-app-config.ts**: Shared config singleton store based on `useSyncExternalStore`, plus `refreshAppConfig()`; mounted consumer notification after shared snapshot changes.
 - **ui-preferences.ts**: Normalize and validate language/theme/unit preferences from unknown persisted values.
 - **ui-preferences-storage.ts**: Load unified UI preferences first, fall back to legacy `nola-*` keys, and swallow browser storage write failures.

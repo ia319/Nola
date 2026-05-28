@@ -342,7 +342,7 @@ core/
 - Unsupported Live lifecycle aliases: `/api/transcription-tasks/*`.
 - Workbench defaults endpoint: `/api/config/session-defaults`.
 - Unsupported parallel engine write path: `/api/config/engine`.
-- Execution option metadata source: `/api/config.engine.schema`; `device` and `compute_type` options.
+- Execution option metadata source: `GET /api/config` response field `engine.schema`; `device` and `compute_type` options.
 - Task detail/create response snapshots: persisted `request_overrides`, persisted `runtime_config`.
 - Task list response state: summary-only.
 - Live create/detail/finish response snapshots: `request_overrides`, `runtime_config`.
@@ -399,7 +399,7 @@ core/
 - Live realtime defaults prefix: `live_realtime.`.
 - Unsupported Live defaults sources: Workbench Session defaults, transcription task defaults.
 - Live realtime override precedence: `built-in defaults < persisted Live realtime defaults < per-session runtime_overrides`.
-- Static prompt controls: absent from Live realtime schemas and runtime overrides.
+- Live Workbench static prompt controls: absent from option metadata and UI; `context_prompt` session overrides ignored.
 - Faster-whisper `initial_prompt`: internal dynamic WhisperStreaming context only.
 - Non-configurable frontend override fields: `word_timestamps`, audio contract fields, model paths, cache roots, arbitrary Hugging Face ids, `local_files_only`.
 - Blank Live realtime language: `None` before inference.
@@ -539,7 +539,6 @@ Directory tree: file-level location map. This section: module boundaries, data f
 - `FasterWhisperEngine`: faster-whisper implementation, segment output coverage progress, explicit close behavior.
 - Faster-whisper defaults: installed package default and VAD key introspection.
 - Faster-whisper runtime helpers: shared model creation and close lifecycle for offline and Live backend runtimes.
-- Windows CTranslate2 compatibility: `CT2_CUDA_ALLOCATOR=cub_caching` default in `nola/__init__.py`.
 
 ### nola/api
 
