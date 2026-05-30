@@ -11,7 +11,7 @@ describe('createAudioDeviceRepository', () => {
     )
   })
 
-  it('creates the tauri placeholder repository for the tauri runtime', async () => {
+  it('creates the tauri repository for the tauri runtime', async () => {
     await expect(createAudioDeviceRepository('tauri')).resolves.toBeInstanceOf(
       TauriAudioDeviceRepository,
     )
