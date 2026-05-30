@@ -1,3 +1,5 @@
+pub mod audio;
+
 const NATIVE_AUDIO_SUPPORT_NOT_IMPLEMENTED: &str = "not_implemented";
 
 #[derive(serde::Serialize)]
@@ -23,10 +25,28 @@ fn build_desktop_runtime_info(app_version: String) -> DesktopRuntimeInfo {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let audio_state = audio::DesktopAudioState::default();
+    let window_audio_cleanup_state = audio_state.clone();
+    let app_audio_cleanup_state = audio_state.clone();
+
+    let app = tauri::Builder::default()
+        .manage(audio_state)
+        .on_window_event(move |_window, event| match event {
+            tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed => {
+                window_audio_cleanup_state.release_active_sessions();
+            }
+            _ => {}
+        })
         .invoke_handler(tauri::generate_handler![desktop_runtime_info])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(move |_app_handle, event| match event {
+        tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
+            app_audio_cleanup_state.release_active_sessions();
+        }
+        _ => {}
+    });
 }
 
 #[cfg(test)]
