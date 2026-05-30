@@ -31,6 +31,12 @@ impl CaptureSessionRegistry {
 
         let mut sessions = self.lock_sessions();
         if let Some(existing_session) = sessions.get(&descriptor.session_id) {
+            if existing_session.source != descriptor.source
+                || existing_session.device_id != descriptor.device_id
+            {
+                return Err(NativeAudioErrorDto::session_params_mismatch());
+            }
+
             return Ok(existing_session.clone());
         }
 
@@ -130,18 +136,69 @@ mod tests {
         }
     }
 
+    fn start_descriptor_with_device(
+        session_id: &str,
+        source: NativeAudioSource,
+        device_id: Option<&str>,
+    ) -> CaptureSessionStartDescriptor {
+        CaptureSessionStartDescriptor {
+            session_id: session_id.to_string(),
+            source,
+            device_id: device_id.map(str::to_string),
+            started_at_ms: 42,
+        }
+    }
+
     #[test]
-    fn start_session_returns_existing_session_for_repeated_start() {
+    fn start_session_returns_existing_session_for_matching_repeated_start() {
         let registry = CaptureSessionRegistry::default();
 
         let first = registry
             .start_session(start_descriptor("capture-1", NativeAudioSource::Microphone))
             .expect("session should start");
         let second = registry
-            .start_session(start_descriptor("capture-1", NativeAudioSource::System))
+            .start_session(start_descriptor("capture-1", NativeAudioSource::Microphone))
             .expect("repeated start should be idempotent");
 
         assert_eq!(first, second);
+        assert_eq!(registry.active_session_count(), 1);
+    }
+
+    #[test]
+    fn start_session_rejects_repeated_start_with_different_source() {
+        let registry = CaptureSessionRegistry::default();
+        registry
+            .start_session(start_descriptor("capture-1", NativeAudioSource::Microphone))
+            .expect("session should start");
+
+        let error = registry
+            .start_session(start_descriptor("capture-1", NativeAudioSource::System))
+            .expect_err("conflicting source should fail");
+
+        assert_eq!(error, NativeAudioErrorDto::session_params_mismatch());
+        assert_eq!(registry.active_session_count(), 1);
+    }
+
+    #[test]
+    fn start_session_rejects_repeated_start_with_different_device() {
+        let registry = CaptureSessionRegistry::default();
+        registry
+            .start_session(start_descriptor_with_device(
+                "capture-1",
+                NativeAudioSource::Microphone,
+                Some("device-1"),
+            ))
+            .expect("session should start");
+
+        let error = registry
+            .start_session(start_descriptor_with_device(
+                "capture-1",
+                NativeAudioSource::Microphone,
+                Some("device-2"),
+            ))
+            .expect_err("conflicting device should fail");
+
+        assert_eq!(error, NativeAudioErrorDto::session_params_mismatch());
         assert_eq!(registry.active_session_count(), 1);
     }
 

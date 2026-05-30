@@ -180,6 +180,7 @@ pub struct NativeAudioLevelEventDto {
 pub enum NativeAudioErrorCode {
     CommandNotImplemented,
     SessionIdInvalid,
+    SessionParamsMismatch,
     SessionNotFound,
     SessionStateInvalid,
     DeviceNotFound,
@@ -217,6 +218,14 @@ impl NativeAudioErrorDto {
         Self::new(
             NativeAudioErrorCode::SessionNotFound,
             "Capture session was not found",
+            false,
+        )
+    }
+
+    pub fn session_params_mismatch() -> Self {
+        Self::new(
+            NativeAudioErrorCode::SessionParamsMismatch,
+            "Capture session parameters do not match the active session",
             false,
         )
     }
