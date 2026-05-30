@@ -8,6 +8,10 @@ vi.mock('@/config/logger', () => ({
   default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
+vi.mock('@/config/backend', () => ({
+  getApiBaseUrl: () => 'http://127.0.0.1:8000',
+}))
+
 interface ResponseInterceptorManager {
   handlers: Array<{ rejected?: (error: AxiosError<ApiError>) => Promise<never> }>
 }
@@ -28,6 +32,10 @@ function getRejectedInterceptor(): (error: AxiosError<ApiError>) => Promise<neve
 describe('apiClient response interceptor', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it('uses the runtime-resolved API base URL', () => {
+    expect(apiClient.defaults.baseURL).toBe('http://127.0.0.1:8000')
   })
 
   it('preserves canceled errors for caller-specific handling', async () => {

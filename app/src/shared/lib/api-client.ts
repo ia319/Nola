@@ -1,13 +1,13 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
-import env from '@/config/env'
+import { getApiBaseUrl } from '@/config/backend'
 import logger from '@/config/logger'
 import { formatApiError, getApiErrorCode } from '@/shared/lib/error-utils'
 import { createApiError, createNetworkError } from '@/shared/lib/error-factory'
 import type { ApiError } from '@/shared/types'
 
 const apiClient = axios.create({
-  baseURL: env.apiBaseUrl,
+  baseURL: getApiBaseUrl(),
   timeout: 30_000,
   // Omit global Content-Type to let Axios auto-detect:
   // - JSON requests  -> application/json

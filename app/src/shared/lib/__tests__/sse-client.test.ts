@@ -2,10 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createSSEConnection } from '../sse-client'
 
-vi.mock('@/config/env', () => ({
-  default: {
-    apiBaseUrl: 'http://127.0.0.1:8000/',
-  },
+vi.mock('@/config/backend', () => ({
+  getApiBaseUrl: () => 'http://127.0.0.1:8000/',
 }))
 
 class FakeEventSource {
