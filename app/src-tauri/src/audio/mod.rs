@@ -1,8 +1,11 @@
+pub mod device_inventory;
 pub mod dto;
 pub mod events;
 pub mod registry;
+pub mod windows_devices;
 
 pub use registry::CaptureSessionRegistry;
+pub use windows_devices::list_native_audio_devices;
 
 #[derive(Clone, Default)]
 pub struct DesktopAudioState {

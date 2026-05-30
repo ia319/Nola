@@ -15,6 +15,13 @@ fn desktop_runtime_info(app_handle: tauri::AppHandle) -> DesktopRuntimeInfo {
     build_desktop_runtime_info(app_handle.package_info().version.to_string())
 }
 
+#[tauri::command]
+fn list_native_audio_devices(
+    current: audio::dto::NativeCurrentDevicesDto,
+) -> Result<audio::dto::NativeAudioInventoryDto, audio::dto::NativeAudioErrorDto> {
+    audio::list_native_audio_devices(current)
+}
+
 fn build_desktop_runtime_info(app_version: String) -> DesktopRuntimeInfo {
     DesktopRuntimeInfo {
         platform: std::env::consts::OS,
@@ -37,7 +44,10 @@ pub fn run() {
             }
             _ => {}
         })
-        .invoke_handler(tauri::generate_handler![desktop_runtime_info])
+        .invoke_handler(tauri::generate_handler![
+            desktop_runtime_info,
+            list_native_audio_devices
+        ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
@@ -60,5 +70,20 @@ mod tests {
         assert_eq!(info.platform, std::env::consts::OS);
         assert_eq!(info.app_version, "0.1.0");
         assert_eq!(info.native_audio_support, "not_implemented");
+    }
+
+    #[test]
+    fn list_native_audio_devices_accepts_empty_current_state() {
+        let current = audio::dto::NativeCurrentDevicesDto::default();
+        let result = list_native_audio_devices(current.clone());
+
+        match result {
+            Ok(inventory) => {
+                assert_eq!(inventory.current, current);
+            }
+            Err(error) => {
+                assert_eq!(error.code, audio::dto::NativeAudioErrorCode::InternalError);
+            }
+        }
     }
 }
