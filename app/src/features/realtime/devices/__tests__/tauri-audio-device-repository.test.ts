@@ -145,8 +145,12 @@ describe('TauriAudioDeviceRepository', () => {
     })
   })
 
-  it('returns an unavailable inventory when the native command fails', async () => {
-    listNativeAudioDevicesMock.mockRejectedValue(new Error('HRESULT 0x80000000'))
+  it('returns a not-implemented inventory when the native command is unavailable', async () => {
+    listNativeAudioDevicesMock.mockRejectedValue({
+      code: 'command_not_implemented',
+      message: 'Native device inventory is not implemented',
+      retryable: false,
+    })
     const repository = new TauriAudioDeviceRepository()
 
     await expect(repository.listDevices({ selectedMicrophoneId: 'mic-1' })).resolves.toEqual({
@@ -167,12 +171,24 @@ describe('TauriAudioDeviceRepository', () => {
         speakerSelection: 'unsupported',
       },
       capabilities: {
-        microphoneCapture: 'unsupported',
-        speakerSelection: 'unsupported',
-        systemAudioCapture: 'unsupported',
+        microphoneCapture: 'not_implemented',
+        speakerSelection: 'not_implemented',
+        systemAudioCapture: 'not_implemented',
       },
-      warnings: ['media_devices_unsupported'],
+      warnings: ['tauri_device_inventory_not_implemented'],
     })
+  })
+
+  it('rejects retryable native inventory failures', async () => {
+    const error = {
+      code: 'internal_error',
+      message: 'Audio device enumeration failed',
+      retryable: true,
+    }
+    listNativeAudioDevicesMock.mockRejectedValue(error)
+    const repository = new TauriAudioDeviceRepository()
+
+    await expect(repository.listDevices()).rejects.toBe(error)
   })
 
   it('maps native microphone permission to a granted result', async () => {
@@ -186,15 +202,31 @@ describe('TauriAudioDeviceRepository', () => {
     })
   })
 
-  it('maps native command failures to a stable permission warning', async () => {
-    listNativeAudioDevicesMock.mockRejectedValue(new Error('HRESULT 0x80000000'))
+  it('maps unavailable native commands to a stable permission warning', async () => {
+    listNativeAudioDevicesMock.mockRejectedValue({
+      code: 'command_not_implemented',
+      message: 'Native device inventory is not implemented',
+      retryable: false,
+    })
     const repository = new TauriAudioDeviceRepository()
 
     await expect(repository.requestMicrophonePermission('mic-1')).resolves.toEqual({
       state: 'unknown',
       granted: false,
-      warning: 'media_devices_unsupported',
+      warning: 'tauri_device_inventory_not_implemented',
     })
+  })
+
+  it('rejects permission requests when native inventory fails', async () => {
+    const error = {
+      code: 'internal_error',
+      message: 'Audio device enumeration failed',
+      retryable: true,
+    }
+    listNativeAudioDevicesMock.mockRejectedValue(error)
+    const repository = new TauriAudioDeviceRepository()
+
+    await expect(repository.requestMicrophonePermission('mic-1')).rejects.toBe(error)
   })
 
   it('reports unavailable microphones without exposing native command details', async () => {

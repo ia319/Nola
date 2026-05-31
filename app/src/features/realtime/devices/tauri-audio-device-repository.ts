@@ -1,5 +1,7 @@
 import type {
   NativeAudioDeviceDto,
+  NativeAudioErrorCode,
+  NativeAudioErrorDto,
   NativeAudioInventoryDto,
   NativeCurrentDevicesDto,
   NativeDevicePermissionState,
@@ -38,6 +40,7 @@ function buildCurrentState(state: LiveDeviceSelectionState = {}): NativeCurrentD
 function buildUnavailableInventory(
   state: LiveDeviceSelectionState,
   warning: LiveDeviceWarningCode,
+  capability: LiveDeviceCapabilityState = 'unsupported',
 ): LiveDeviceInventory {
   return {
     microphones: [],
@@ -48,12 +51,40 @@ function buildUnavailableInventory(
       speakerSelection: 'unsupported',
     },
     capabilities: {
-      microphoneCapture: 'unsupported',
-      speakerSelection: 'unsupported',
-      systemAudioCapture: 'unsupported',
+      microphoneCapture: capability,
+      speakerSelection: capability,
+      systemAudioCapture: capability,
     },
     warnings: [warning],
   }
+}
+
+const NATIVE_AUDIO_ERROR_CODES: ReadonlySet<NativeAudioErrorCode> = new Set([
+  'command_not_implemented',
+  'session_id_invalid',
+  'session_params_mismatch',
+  'session_not_found',
+  'session_state_invalid',
+  'device_not_found',
+  'device_disconnected',
+  'system_audio_unavailable',
+  'permission_denied',
+  'capture_failed',
+  'internal_error',
+])
+
+function isNativeAudioError(error: unknown): error is NativeAudioErrorDto {
+  if (typeof error !== 'object' || error === null) {
+    return false
+  }
+
+  const candidate = error as Partial<NativeAudioErrorDto>
+  return (
+    typeof candidate.code === 'string' &&
+    NATIVE_AUDIO_ERROR_CODES.has(candidate.code) &&
+    typeof candidate.message === 'string' &&
+    typeof candidate.retryable === 'boolean'
+  )
 }
 
 function mapDeviceKind(kind: NativeAudioDeviceDto['kind']): LiveDeviceKind {
@@ -130,6 +161,10 @@ function getMicrophonePermissionWarning(
     return 'media_devices_unsupported'
   }
 
+  if (inventory.warnings.includes('tauri_device_inventory_not_implemented')) {
+    return 'tauri_device_inventory_not_implemented'
+  }
+
   if (deviceId && !inventory.microphones.some((device) => device.id === deviceId)) {
     return 'microphone_device_unavailable'
   }
@@ -158,8 +193,16 @@ export class TauriAudioDeviceRepository implements LiveAudioDeviceRepository {
     try {
       const inventory = await listNativeAudioDevices(buildCurrentState(state))
       return mapNativeInventory(inventory)
-    } catch {
-      return buildUnavailableInventory(state, 'media_devices_unsupported')
+    } catch (error) {
+      if (isNativeAudioError(error) && error.code === 'command_not_implemented') {
+        return buildUnavailableInventory(
+          state,
+          'tauri_device_inventory_not_implemented',
+          'not_implemented',
+        )
+      }
+
+      throw error
     }
   }
 
