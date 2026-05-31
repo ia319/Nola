@@ -118,7 +118,11 @@ fn build_capabilities(has_microphones: bool, has_speakers: bool) -> NativeAudioC
         } else {
             NativeRuntimeCapabilityState::Unsupported
         },
-        system_audio_capture: NativeRuntimeCapabilityState::NotImplemented,
+        system_audio_capture: if has_speakers {
+            NativeRuntimeCapabilityState::Available
+        } else {
+            NativeRuntimeCapabilityState::Unsupported
+        },
     }
 }
 
@@ -174,6 +178,10 @@ mod tests {
         assert!(inventory.speakers[0].is_selected);
         assert_eq!(
             inventory.capabilities.microphone_capture,
+            NativeRuntimeCapabilityState::Available
+        );
+        assert_eq!(
+            inventory.capabilities.system_audio_capture,
             NativeRuntimeCapabilityState::Available
         );
         assert_eq!(

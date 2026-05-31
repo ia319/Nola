@@ -98,6 +98,14 @@ impl CaptureSessionRegistry {
         })
     }
 
+    pub fn fail_session(&self, session_id: &str) -> Option<NativeCaptureSessionDto> {
+        let mut sessions = self.lock_sessions();
+        sessions.remove(session_id).map(|mut session| {
+            session.state = NativeCaptureState::Failed;
+            session
+        })
+    }
+
     pub fn get_session(&self, session_id: &str) -> Option<NativeCaptureSessionDto> {
         self.lock_sessions().get(session_id).cloned()
     }
@@ -259,6 +267,22 @@ mod tests {
         assert_eq!(registry.release_all(), 2);
         assert_eq!(registry.active_session_count(), 0);
         assert_eq!(registry.release_all(), 0);
+    }
+
+    #[test]
+    fn fail_session_removes_session_with_failed_state() {
+        let registry = CaptureSessionRegistry::default();
+        registry
+            .start_session(start_descriptor("capture-1", NativeAudioSource::Microphone))
+            .expect("session should start");
+
+        let failed = registry
+            .fail_session("capture-1")
+            .expect("session should fail");
+
+        assert_eq!(failed.state, NativeCaptureState::Failed);
+        assert_eq!(registry.active_session_count(), 0);
+        assert!(registry.fail_session("capture-1").is_none());
     }
 
     #[test]

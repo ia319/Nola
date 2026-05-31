@@ -16,7 +16,6 @@ mod platform {
         core::PWSTR,
         Win32::{
             Devices::FunctionDiscovery::PKEY_Device_FriendlyName,
-            Foundation::RPC_E_CHANGED_MODE,
             Media::Audio::{
                 eCapture, eConsole, eRender, EDataFlow, IMMDevice, IMMDeviceEnumerator,
                 MMDeviceEnumerator, DEVICE_STATE_ACTIVE,
@@ -24,12 +23,11 @@ mod platform {
             System::Com::StructuredStorage::{
                 PropVariantClear, PropVariantToStringAlloc, PROPVARIANT,
             },
-            System::Com::{
-                CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, CLSCTX_ALL,
-                COINIT_APARTMENTTHREADED, STGM_READ,
-            },
+            System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_ALL, STGM_READ},
         },
     };
+
+    use crate::audio::windows_com::ComApartment;
 
     use super::*;
 
@@ -41,7 +39,7 @@ mod platform {
     }
 
     fn enumerate_windows_audio_endpoints() -> Result<NativeAudioEndpointInventory, ()> {
-        let _apartment = ComApartment::initialize()?;
+        let _apartment = ComApartment::initialize().map_err(|_| ())?;
 
         unsafe {
             let enumerator: IMMDeviceEnumerator =
@@ -142,40 +140,6 @@ mod platform {
             "Audio device enumeration failed",
             true,
         )
-    }
-
-    struct ComApartment {
-        should_uninitialize: bool,
-    }
-
-    impl ComApartment {
-        fn initialize() -> Result<Self, ()> {
-            let result = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
-
-            if result.is_ok() {
-                return Ok(Self {
-                    should_uninitialize: true,
-                });
-            }
-
-            if result == RPC_E_CHANGED_MODE {
-                return Ok(Self {
-                    should_uninitialize: false,
-                });
-            }
-
-            Err(())
-        }
-    }
-
-    impl Drop for ComApartment {
-        fn drop(&mut self) {
-            if self.should_uninitialize {
-                unsafe {
-                    CoUninitialize();
-                }
-            }
-        }
     }
 
     #[cfg(test)]

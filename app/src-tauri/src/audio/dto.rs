@@ -150,6 +150,19 @@ pub struct NativeCaptureSessionDto {
     pub started_at_ms: u64,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeStartCaptureRequestDto {
+    pub session_id: String,
+    pub device_id: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeCaptureSessionControlDto {
+    pub session_id: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeAudioFrameEventDto {
@@ -235,6 +248,30 @@ impl NativeAudioErrorDto {
             NativeAudioErrorCode::SessionStateInvalid,
             "Capture session state is invalid",
             false,
+        )
+    }
+
+    pub fn device_not_found() -> Self {
+        Self::new(
+            NativeAudioErrorCode::DeviceNotFound,
+            "Audio capture device was not found",
+            true,
+        )
+    }
+
+    pub fn permission_denied() -> Self {
+        Self::new(
+            NativeAudioErrorCode::PermissionDenied,
+            "Audio capture permission was denied",
+            false,
+        )
+    }
+
+    pub fn capture_failed() -> Self {
+        Self::new(
+            NativeAudioErrorCode::CaptureFailed,
+            "Audio capture failed",
+            true,
         )
     }
 }

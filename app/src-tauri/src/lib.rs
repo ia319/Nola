@@ -1,7 +1,5 @@
 pub mod audio;
 
-const NATIVE_AUDIO_SUPPORT_NOT_IMPLEMENTED: &str = "not_implemented";
-
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopRuntimeInfo {
@@ -22,12 +20,83 @@ fn list_native_audio_devices(
     audio::list_native_audio_devices(current)
 }
 
+#[tauri::command]
+fn start_native_microphone_capture(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, audio::DesktopAudioState>,
+    request: audio::dto::NativeStartCaptureRequestDto,
+) -> Result<audio::dto::NativeCaptureSessionDto, audio::dto::NativeAudioErrorDto> {
+    state.runtime().start_capture(
+        app_handle,
+        state.registry().clone(),
+        audio::dto::NativeAudioSource::Microphone,
+        request,
+    )
+}
+
+#[tauri::command]
+fn start_native_system_capture(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, audio::DesktopAudioState>,
+    request: audio::dto::NativeStartCaptureRequestDto,
+) -> Result<audio::dto::NativeCaptureSessionDto, audio::dto::NativeAudioErrorDto> {
+    state.runtime().start_capture(
+        app_handle,
+        state.registry().clone(),
+        audio::dto::NativeAudioSource::System,
+        request,
+    )
+}
+
+#[tauri::command]
+fn pause_native_capture(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, audio::DesktopAudioState>,
+    control: audio::dto::NativeCaptureSessionControlDto,
+) -> Result<audio::dto::NativeCaptureSessionDto, audio::dto::NativeAudioErrorDto> {
+    state
+        .runtime()
+        .pause_capture(&app_handle, state.registry(), &control.session_id)
+}
+
+#[tauri::command]
+fn resume_native_capture(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, audio::DesktopAudioState>,
+    control: audio::dto::NativeCaptureSessionControlDto,
+) -> Result<audio::dto::NativeCaptureSessionDto, audio::dto::NativeAudioErrorDto> {
+    state
+        .runtime()
+        .resume_capture(&app_handle, state.registry(), &control.session_id)
+}
+
+#[tauri::command]
+fn stop_native_capture(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, audio::DesktopAudioState>,
+    control: audio::dto::NativeCaptureSessionControlDto,
+) -> Result<audio::dto::NativeCaptureSessionDto, audio::dto::NativeAudioErrorDto> {
+    state
+        .runtime()
+        .stop_capture(&app_handle, state.registry(), &control.session_id)
+}
+
 fn build_desktop_runtime_info(app_version: String) -> DesktopRuntimeInfo {
     DesktopRuntimeInfo {
         platform: std::env::consts::OS,
         app_version,
-        native_audio_support: NATIVE_AUDIO_SUPPORT_NOT_IMPLEMENTED,
+        native_audio_support: native_audio_support(),
     }
+}
+
+#[cfg(target_os = "windows")]
+fn native_audio_support() -> &'static str {
+    "available"
+}
+
+#[cfg(not(target_os = "windows"))]
+fn native_audio_support() -> &'static str {
+    "unsupported"
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -46,7 +115,12 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             desktop_runtime_info,
-            list_native_audio_devices
+            list_native_audio_devices,
+            start_native_microphone_capture,
+            start_native_system_capture,
+            pause_native_capture,
+            resume_native_capture,
+            stop_native_capture
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
@@ -69,7 +143,7 @@ mod tests {
 
         assert_eq!(info.platform, std::env::consts::OS);
         assert_eq!(info.app_version, "0.1.0");
-        assert_eq!(info.native_audio_support, "not_implemented");
+        assert_eq!(info.native_audio_support, native_audio_support());
     }
 
     #[test]
