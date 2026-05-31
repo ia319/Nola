@@ -119,17 +119,10 @@ fn native_audio_support() -> &'static str {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let audio_state = audio::DesktopAudioState::default();
-    let window_audio_cleanup_state = audio_state.clone();
     let app_audio_cleanup_state = audio_state.clone();
 
     let app = tauri::Builder::default()
         .manage(audio_state)
-        .on_window_event(move |_window, event| match event {
-            tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed => {
-                window_audio_cleanup_state.release_active_sessions();
-            }
-            _ => {}
-        })
         .invoke_handler(tauri::generate_handler![
             desktop_runtime_info,
             list_native_audio_devices,
@@ -140,13 +133,13 @@ pub fn run() {
             stop_native_capture
         ])
         .build(tauri::generate_context!())
-        .expect("error while building tauri application");
+        .expect("failed to build Nola desktop application");
 
-    app.run(move |_app_handle, event| match event {
-        tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
+    app.run(move |_app_handle, event| {
+        if let tauri::RunEvent::Exit = event {
+            // Native capture is app-global; window close events may be cancelled or target child windows.
             app_audio_cleanup_state.release_active_sessions();
         }
-        _ => {}
     });
 }
 
