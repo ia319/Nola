@@ -21,31 +21,48 @@ fn list_native_audio_devices(
 }
 
 #[tauri::command]
-fn start_native_microphone_capture(
+async fn start_native_microphone_capture(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, audio::DesktopAudioState>,
     request: audio::dto::NativeStartCaptureRequestDto,
 ) -> Result<audio::dto::NativeCaptureSessionDto, audio::dto::NativeAudioErrorDto> {
-    state.runtime().start_capture(
+    start_native_capture(
         app_handle,
-        state.registry().clone(),
+        state.inner().clone(),
         audio::dto::NativeAudioSource::Microphone,
         request,
     )
+    .await
 }
 
 #[tauri::command]
-fn start_native_system_capture(
+async fn start_native_system_capture(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, audio::DesktopAudioState>,
     request: audio::dto::NativeStartCaptureRequestDto,
 ) -> Result<audio::dto::NativeCaptureSessionDto, audio::dto::NativeAudioErrorDto> {
-    state.runtime().start_capture(
+    start_native_capture(
         app_handle,
-        state.registry().clone(),
+        state.inner().clone(),
         audio::dto::NativeAudioSource::System,
         request,
     )
+    .await
+}
+
+async fn start_native_capture(
+    app_handle: tauri::AppHandle,
+    state: audio::DesktopAudioState,
+    source: audio::dto::NativeAudioSource,
+    request: audio::dto::NativeStartCaptureRequestDto,
+) -> Result<audio::dto::NativeCaptureSessionDto, audio::dto::NativeAudioErrorDto> {
+    tauri::async_runtime::spawn_blocking(move || {
+        state
+            .runtime()
+            .start_capture(app_handle, state.registry().clone(), source, request)
+    })
+    .await
+    .unwrap_or_else(|_| Err(audio::dto::NativeAudioErrorDto::capture_failed()))
 }
 
 #[tauri::command]
@@ -143,7 +160,12 @@ mod tests {
 
         assert_eq!(info.platform, std::env::consts::OS);
         assert_eq!(info.app_version, "0.1.0");
-        assert_eq!(info.native_audio_support, native_audio_support());
+
+        #[cfg(target_os = "windows")]
+        assert_eq!(info.native_audio_support, "available");
+
+        #[cfg(not(target_os = "windows"))]
+        assert_eq!(info.native_audio_support, "unsupported");
     }
 
     #[test]

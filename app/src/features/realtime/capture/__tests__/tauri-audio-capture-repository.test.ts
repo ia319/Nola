@@ -210,6 +210,51 @@ describe('TauriAudioCaptureRepository', () => {
     expect(unlisteners.every((unlisten) => unlisten.mock.calls.length === 1)).toBe(true)
   })
 
+  it('clears subscriptions when pause fails', async () => {
+    startNativeMicrophoneCaptureMock.mockImplementation(async (request) =>
+      nativeSession(request.sessionId, 'microphone'),
+    )
+    pauseNativeCaptureMock.mockRejectedValueOnce({
+      code: 'device_disconnected',
+      message: 'Audio capture device disconnected',
+      retryable: true,
+    })
+
+    const repository = new TauriAudioCaptureRepository()
+    const session = await repository.startMicrophoneCapture({ deviceId: 'mic-1' })
+
+    await expect(session.pause()).rejects.toMatchObject({
+      code: 'microphone_device_disconnected',
+    })
+    expect(session.state).toBe('failed')
+    expect(unlisteners.every((unlisten) => unlisten.mock.calls.length === 1)).toBe(true)
+  })
+
+  it('clears subscriptions when resume fails', async () => {
+    startNativeMicrophoneCaptureMock.mockImplementation(async (request) =>
+      nativeSession(request.sessionId, 'microphone'),
+    )
+    pauseNativeCaptureMock.mockImplementation(async (control) => ({
+      ...nativeSession(control.sessionId, 'microphone'),
+      state: 'paused',
+    }))
+    resumeNativeCaptureMock.mockRejectedValueOnce({
+      code: 'device_disconnected',
+      message: 'Audio capture device disconnected',
+      retryable: true,
+    })
+
+    const repository = new TauriAudioCaptureRepository()
+    const session = await repository.startMicrophoneCapture({ deviceId: 'mic-1' })
+
+    await session.pause()
+    await expect(session.resume()).rejects.toMatchObject({
+      code: 'microphone_device_disconnected',
+    })
+    expect(session.state).toBe('failed')
+    expect(unlisteners.every((unlisten) => unlisten.mock.calls.length === 1)).toBe(true)
+  })
+
   it('maps native permission errors into capture errors and clears subscriptions', async () => {
     startNativeMicrophoneCaptureMock.mockRejectedValueOnce({
       code: 'permission_denied',

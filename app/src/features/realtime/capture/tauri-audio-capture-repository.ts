@@ -253,6 +253,7 @@ class TauriLiveCaptureSession implements LiveCaptureSession {
     } catch (error) {
       const code = mapNativeCaptureError(error, this.sourceKind)
       this.setState('failed', code)
+      await this.cleanup()
       throw new LiveCaptureError(code)
     }
   }
@@ -268,6 +269,7 @@ class TauriLiveCaptureSession implements LiveCaptureSession {
     } catch (error) {
       const code = mapNativeCaptureError(error, this.sourceKind)
       this.setState('failed', code)
+      await this.cleanup()
       throw new LiveCaptureError(code)
     }
   }

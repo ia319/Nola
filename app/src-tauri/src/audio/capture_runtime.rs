@@ -43,13 +43,10 @@ impl NativeCaptureRuntime {
             started_at_ms: now_epoch_ms(),
         };
 
-        self.prune_finished_session(&descriptor.session_id);
-        if self.has_session(&descriptor.session_id) {
-            return registry.start_session(descriptor);
-        }
-
         let session = registry.start_session(descriptor)?;
-        let control = CaptureControl::default();
+        let Some(control) = self.reserve_handle(&session.session_id) else {
+            return Ok(session);
+        };
         let (startup_sender, startup_receiver) = mpsc::channel();
 
         windows_capture::spawn_capture_worker(
@@ -62,17 +59,18 @@ impl NativeCaptureRuntime {
 
         match startup_receiver.recv_timeout(CAPTURE_START_TIMEOUT) {
             Ok(Ok(())) => {
-                self.insert_handle(session.session_id.clone(), control);
                 let _ = events::emit_capture_state(&app_handle, session.clone());
                 Ok(session)
             }
             Ok(Err(error)) => {
                 control.request_stop();
+                let _ = self.take_control(&session.session_id);
                 let _ = registry.stop_session(&session.session_id);
                 Err(error)
             }
             Err(_) => {
                 control.request_stop();
+                let _ = self.take_control(&session.session_id);
                 let _ = registry.stop_session(&session.session_id);
                 Err(NativeAudioErrorDto::capture_failed())
             }
@@ -144,13 +142,27 @@ impl NativeCaptureRuntime {
         registry.release_all()
     }
 
-    fn has_session(&self, session_id: &str) -> bool {
-        self.lock_handles().contains_key(session_id)
-    }
+    fn reserve_handle(&self, session_id: &str) -> Option<CaptureControl> {
+        let mut handles = self.lock_handles();
+        if handles
+            .get(session_id)
+            .is_some_and(|handle| handle.control.is_finished())
+        {
+            handles.remove(session_id);
+        }
 
-    fn insert_handle(&self, session_id: String, control: CaptureControl) {
-        self.lock_handles()
-            .insert(session_id, CaptureWorkerHandle { control });
+        if handles.contains_key(session_id) {
+            return None;
+        }
+
+        let control = CaptureControl::default();
+        handles.insert(
+            session_id.to_string(),
+            CaptureWorkerHandle {
+                control: control.clone(),
+            },
+        );
+        Some(control)
     }
 
     fn get_control(&self, session_id: &str) -> Option<CaptureControl> {
@@ -163,16 +175,6 @@ impl NativeCaptureRuntime {
         self.lock_handles()
             .remove(session_id)
             .map(|handle| handle.control)
-    }
-
-    fn prune_finished_session(&self, session_id: &str) {
-        let mut handles = self.lock_handles();
-        if handles
-            .get(session_id)
-            .is_some_and(|handle| handle.control.is_finished())
-        {
-            handles.remove(session_id);
-        }
     }
 
     fn lock_handles(&self) -> std::sync::MutexGuard<'_, HashMap<String, CaptureWorkerHandle>> {
@@ -267,23 +269,44 @@ mod tests {
                 started_at_ms: 1,
             })
             .expect("session should start");
-        runtime.insert_handle("capture-1".to_string(), control.clone());
+        runtime.lock_handles().insert(
+            "capture-1".to_string(),
+            CaptureWorkerHandle {
+                control: control.clone(),
+            },
+        );
 
         assert_eq!(runtime.release_all(&registry), 1);
         assert!(control.is_stop_requested());
         assert_eq!(registry.active_session_count(), 0);
-        assert!(!runtime.has_session("capture-1"));
+        assert!(!runtime.lock_handles().contains_key("capture-1"));
     }
 
     #[test]
-    fn prune_finished_session_removes_stale_handle() {
+    fn reserve_handle_allows_one_active_control_per_session() {
         let runtime = NativeCaptureRuntime::default();
-        let control = CaptureControl::default();
-        runtime.insert_handle("capture-1".to_string(), control.clone());
+        let first = runtime
+            .reserve_handle("capture-1")
+            .expect("first reservation should succeed");
 
-        control.mark_finished();
-        runtime.prune_finished_session("capture-1");
+        assert!(runtime.reserve_handle("capture-1").is_none());
 
-        assert!(!runtime.has_session("capture-1"));
+        first.mark_finished();
+        let second = runtime
+            .reserve_handle("capture-1")
+            .expect("finished reservation should be replaced");
+
+        assert!(!second.is_finished());
+    }
+
+    #[test]
+    fn take_control_removes_reserved_handle() {
+        let runtime = NativeCaptureRuntime::default();
+        runtime
+            .reserve_handle("capture-1")
+            .expect("reservation should succeed");
+
+        assert!(runtime.take_control("capture-1").is_some());
+        assert!(runtime.reserve_handle("capture-1").is_some());
     }
 }
