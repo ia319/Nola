@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 
-import { TauriRealtimeTransport } from '../tauri-realtime-transport'
 import { createRealtimeTransport } from '../realtime-transport'
 import { WebLiveRealtimeTransport } from '../web-realtime-transport'
 
@@ -39,14 +38,20 @@ describe('createRealtimeTransport', () => {
     ).resolves.toBeInstanceOf(WebLiveRealtimeTransport)
   })
 
-  it('creates the tauri placeholder transport for the tauri runtime', async () => {
-    await expect(createRealtimeTransport({ environment: 'tauri' })).resolves.toBeInstanceOf(
-      TauriRealtimeTransport,
-    )
+  it('reuses the web transport for the tauri runtime', async () => {
+    await expect(
+      createRealtimeTransport({
+        environment: 'tauri',
+        WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+      }),
+    ).resolves.toBeInstanceOf(WebLiveRealtimeTransport)
   })
 
-  it('allows tauri placeholder teardown before implementation exists', async () => {
-    const transport = await createRealtimeTransport({ environment: 'tauri' })
+  it('allows tauri web transport teardown before connection', async () => {
+    const transport = await createRealtimeTransport({
+      environment: 'tauri',
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+    })
 
     expect(() => transport.disconnect()).not.toThrow()
     expect(() => transport.close()).not.toThrow()

@@ -236,6 +236,19 @@ describe('live workbench selectors', () => {
       descriptionKey: 'live.workbench.errors.runtimeModelNotDownloaded.description',
     })
   })
+
+  it('maps native capture errors to source-specific copy keys', () => {
+    expect(
+      selectLiveWorkbenchErrorCopy({
+        code: 'system_audio_unavailable',
+        message: 'Windows HRESULT 0x88890004',
+        retryable: true,
+      }),
+    ).toEqual({
+      titleKey: 'live.workbench.errors.systemAudioUnavailable.title',
+      descriptionKey: 'live.workbench.errors.systemAudioUnavailable.description',
+    })
+  })
 })
 
 function previewTranscript(trackId: string, startMs: number): LiveRealtimeTranscriptPreviewPayload {

@@ -107,4 +107,32 @@ describe('live device store', () => {
       state: 'stopped',
     })
   })
+
+  it('keeps unavailable capture errors as failures', () => {
+    const store = useLiveDeviceStore.getState()
+
+    store.setMicrophoneCaptureFailure('microphone_device_unavailable')
+    store.setSystemAudioCaptureFailure('system_audio_unavailable')
+
+    const state = useLiveDeviceStore.getState()
+    expect(state.microphoneCapture).toMatchObject({
+      state: 'failed',
+      errorCode: 'microphone_device_unavailable',
+    })
+    expect(state.systemAudioCapture).toMatchObject({
+      state: 'failed',
+      errorCode: 'system_audio_unavailable',
+    })
+  })
+
+  it('keeps unsupported capture errors in unsupported state', () => {
+    const store = useLiveDeviceStore.getState()
+
+    store.setMicrophoneCaptureFailure('microphone_capture_unsupported')
+    store.setSystemAudioCaptureFailure('system_audio_capture_unsupported')
+
+    const state = useLiveDeviceStore.getState()
+    expect(state.microphoneCapture.state).toBe('unsupported')
+    expect(state.systemAudioCapture.state).toBe('unsupported')
+  })
 })

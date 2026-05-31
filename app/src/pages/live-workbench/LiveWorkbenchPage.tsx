@@ -335,6 +335,20 @@ function getCaptureStateStatus(
     }
   }
 
+  if (source === 'microphone' && capture.errorCode === 'microphone_device_unavailable') {
+    return {
+      i18nKey: 'live.workbench.sessionSetup.microphone.status.noDevice',
+      tone: 'warning',
+    }
+  }
+
+  if (source === 'microphone' && capture.errorCode === 'microphone_device_disconnected') {
+    return {
+      i18nKey: 'live.workbench.sessionSetup.microphone.status.deviceDisconnected',
+      tone: 'danger',
+    }
+  }
+
   if (source === 'systemAudio' && capture.errorCode === 'system_audio_permission_denied') {
     return {
       i18nKey: 'live.workbench.sessionSetup.systemAudio.status.permissionDenied',
@@ -346,6 +360,20 @@ function getCaptureStateStatus(
     return {
       i18nKey: 'live.workbench.sessionSetup.systemAudio.status.trackMissing',
       tone: 'warning',
+    }
+  }
+
+  if (source === 'systemAudio' && capture.errorCode === 'system_audio_unavailable') {
+    return {
+      i18nKey: 'live.workbench.sessionSetup.systemAudio.status.unavailable',
+      tone: 'warning',
+    }
+  }
+
+  if (source === 'systemAudio' && capture.errorCode === 'system_audio_device_disconnected') {
+    return {
+      i18nKey: 'live.workbench.sessionSetup.systemAudio.status.deviceDisconnected',
+      tone: 'danger',
     }
   }
 

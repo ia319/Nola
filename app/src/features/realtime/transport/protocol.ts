@@ -1,4 +1,4 @@
-import env from '@/config/env'
+import { getRealtimeWebSocketBaseUrl } from '@/config/backend'
 
 import type {
   LiveRealtimeAudioEncoding,
@@ -158,7 +158,7 @@ export function parseLiveRealtimeServerEvent(data: string): LiveRealtimeServerEv
 
 export function buildLiveRealtimeWebSocketUrl(sessionId: string, baseUrl?: string): string {
   const path = `/api/live/sessions/${encodeURIComponent(sessionId)}/stream`
-  const configuredBaseUrl = baseUrl ?? (env.wsBaseUrl || env.apiBaseUrl)
+  const configuredBaseUrl = baseUrl ?? getRealtimeWebSocketBaseUrl()
 
   if (!configuredBaseUrl) {
     const location = getBrowserLocation()

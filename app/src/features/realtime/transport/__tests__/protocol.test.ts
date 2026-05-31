@@ -6,11 +6,8 @@ import {
   parseLiveRealtimeServerEvent,
 } from '../protocol'
 
-vi.mock('@/config/env', () => ({
-  default: {
-    apiBaseUrl: 'http://127.0.0.1:8000/',
-    wsBaseUrl: '',
-  },
+vi.mock('@/config/backend', () => ({
+  getRealtimeWebSocketBaseUrl: () => 'http://127.0.0.1:8000/',
 }))
 
 describe('live realtime protocol helpers', () => {

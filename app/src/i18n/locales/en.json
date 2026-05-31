@@ -697,6 +697,7 @@
             "paused": "Paused",
             "stopping": "Stopping",
             "stopped": "Stopped",
+            "deviceDisconnected": "Device disconnected",
             "failed": "Capture failed"
           }
         },
@@ -727,6 +728,8 @@
             "stopped": "Stopped",
             "permissionDenied": "Permission denied",
             "trackMissing": "No audio track selected",
+            "unavailable": "System audio unavailable",
+            "deviceDisconnected": "Audio device disconnected",
             "failed": "Capture failed"
           }
         }
@@ -848,7 +851,15 @@
         },
         "microphonePermissionDenied": {
           "title": "Microphone permission denied",
-          "description": "Enable microphone permission for this site in the browser settings."
+          "description": "Enable microphone permission for this app or site."
+        },
+        "microphoneDeviceUnavailable": {
+          "title": "Microphone unavailable",
+          "description": "Connect or choose an input device, then try again."
+        },
+        "microphoneDeviceDisconnected": {
+          "title": "Microphone disconnected",
+          "description": "Reconnect the selected input device, then try again."
         },
         "microphoneCaptureUnsupported": {
           "title": "Microphone capture unsupported",
@@ -864,15 +875,23 @@
         },
         "systemAudioPermissionDenied": {
           "title": "System audio permission denied",
-          "description": "Start browser capture again and choose a source that includes audio."
+          "description": "Start system-audio capture again and allow access if prompted."
         },
         "systemAudioTrackMissing": {
           "title": "No system audio track",
           "description": "Choose a browser capture source that exposes audio."
         },
+        "systemAudioUnavailable": {
+          "title": "System audio unavailable",
+          "description": "Connect an output device and make sure system audio is available, then try again."
+        },
+        "systemAudioDeviceDisconnected": {
+          "title": "System audio device disconnected",
+          "description": "Reconnect the output device, then try again."
+        },
         "systemAudioCaptureFailed": {
           "title": "System audio capture failed",
-          "description": "Start browser system-audio capture again."
+          "description": "Start system-audio capture again."
         },
         "websocketUnavailable": {
           "title": "Realtime connection unavailable",

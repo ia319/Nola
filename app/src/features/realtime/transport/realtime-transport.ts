@@ -10,13 +10,13 @@ export interface CreateRealtimeTransportOptions extends WebLiveRealtimeTransport
 export async function createRealtimeTransport(
   options: CreateRealtimeTransportOptions = {},
 ): Promise<LiveRealtimeTransport> {
-  const environment = options.environment ?? getRealtimeRuntimeEnvironment()
+  const { environment: configuredEnvironment, ...webTransportOptions } = options
+  const environment = configuredEnvironment ?? getRealtimeRuntimeEnvironment()
+  const { createWebRealtimeTransport } = await import('./web-realtime-transport')
 
   if (environment === 'tauri') {
-    const { createTauriRealtimeTransport } = await import('./tauri-realtime-transport')
-    return createTauriRealtimeTransport()
+    return createWebRealtimeTransport(webTransportOptions)
   }
 
-  const { createWebRealtimeTransport } = await import('./web-realtime-transport')
-  return createWebRealtimeTransport(options)
+  return createWebRealtimeTransport(webTransportOptions)
 }

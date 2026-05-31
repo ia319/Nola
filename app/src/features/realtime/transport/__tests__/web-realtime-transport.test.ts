@@ -12,11 +12,8 @@ import type {
 } from '../types'
 import type { LiveSessionDetail, LiveTrack, LiveTrackSource } from '@/shared/types'
 
-vi.mock('@/config/env', () => ({
-  default: {
-    apiBaseUrl: 'http://127.0.0.1:8000/',
-    wsBaseUrl: '',
-  },
+vi.mock('@/config/backend', () => ({
+  getRealtimeWebSocketBaseUrl: () => 'http://127.0.0.1:8000/',
 }))
 
 type WebSocketSendData = Parameters<WebSocket['send']>[0]

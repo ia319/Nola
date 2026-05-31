@@ -92,10 +92,14 @@ function isActiveCaptureState(state: LiveCaptureState): boolean {
   return state === 'starting' || state === 'capturing' || state === 'paused' || state === 'stopping'
 }
 
+const UNSUPPORTED_CAPTURE_ERROR_CODES = new Set<LiveCaptureErrorCode>([
+  'microphone_capture_unsupported',
+  'system_audio_capture_unsupported',
+  'tauri_capture_not_implemented',
+])
+
 function getFailureState(errorCode: LiveCaptureErrorCode): LiveCaptureState {
-  return errorCode.endsWith('_unsupported') || errorCode === 'tauri_capture_not_implemented'
-    ? 'unsupported'
-    : 'failed'
+  return UNSUPPORTED_CAPTURE_ERROR_CODES.has(errorCode) ? 'unsupported' : 'failed'
 }
 
 function getInitialLiveDeviceState(): Pick<

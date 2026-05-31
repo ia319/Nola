@@ -7,7 +7,7 @@
 | Key   | Value                                                                       |
 | ----- | --------------------------------------------------------------------------- |
 | Name  | Nola - Frontend Workspace                                                   |
-| Stack | React 19 + TypeScript + Vite + TailwindCSS v4 + shadcn/ui + TanStack Router/Query + Zustand + i18next + Axios |
+| Stack | React 19 + TypeScript + Vite + TailwindCSS v4 + shadcn/ui + TanStack Router/Query + Zustand + i18next + Axios + Tauri v2 + Rust native audio |
 
 ## Code Style
 
@@ -40,6 +40,29 @@ app/                          # Frontend workspace root
 │   ├── apple-touch-icon.png  # Apple touch icon
 │   ├── manifest.webmanifest  # PWA metadata
 │   └── web-app-manifest-*.png # PWA icon assets
+├── src-tauri/                # Tauri v2 desktop shell and Rust native audio runtime
+│   ├── .gitignore            # Ignore Cargo target and generated Tauri schemas
+│   ├── build.rs              # Tauri build script
+│   ├── Cargo.lock            # Locked Rust dependency graph for desktop shell
+│   ├── Cargo.toml            # `nola_desktop` Rust package manifest
+│   ├── tauri.conf.json       # Desktop window, hooks, CSP, and bundle config
+│   ├── capabilities/         # Tauri permission configuration
+│   │   └── default.json      # Main-window core runtime permissions
+│   ├── icons/                # Desktop bundle icon assets
+│   └── src/                  # Rust source code
+│       ├── main.rs           # Native binary entry point
+│       ├── lib.rs            # Tauri builder, commands, managed state, exit cleanup
+│       └── audio/            # Desktop native audio module
+│           ├── mod.rs        # Audio module exports and shared desktop state
+│           ├── dto.rs        # Stable native audio DTO and error contracts
+│           ├── events.rs     # Tauri audio event names and emit helpers
+│           ├── device_inventory.rs # Native inventory DTO builders
+│           ├── windows_devices.rs # Windows Core Audio endpoint enumeration
+│           ├── registry.rs   # Active capture session registry
+│           ├── capture_runtime.rs # Capture worker control and cleanup
+│           ├── windows_capture.rs # Windows WASAPI capture worker
+│           ├── processing.rs # Decode, downmix, resample, PCM, and level processing
+│           └── windows_com.rs # COM initialization guard
 ├── tsconfig.json             # TypeScript 5.9 project references
 ├── tsconfig.app.json         # App-level TS config (src/)
 ├── tsconfig.node.json        # Node-level TS config (vite.config.ts)
@@ -255,8 +278,9 @@ app/                          # Frontend workspace root
 │   │   │   │   ├── capture-session.ts # Capture session state, cleanup, and subscriptions
 │   │   │   │   ├── errors.ts # Structured capture errors
 │   │   │   │   ├── pcm.ts # PCM16LE/downmix/resample pure helpers
+│   │   │   │   ├── session-id.ts # Build stable capture session IDs
 │   │   │   │   ├── session-utils.ts # Shared capture session predicates
-│   │   │   │   ├── tauri-audio-capture-repository.ts # Tauri capture placeholder adapter
+│   │   │   │   ├── tauri-audio-capture-repository.ts # Tauri native capture adapter
 │   │   │   │   ├── types.ts # Capture source, state, level, frame, and option contracts
 │   │   │   │   ├── web-audio-capture-repository.ts # Web capture adapter composition
 │   │   │   │   ├── web-microphone-capture.ts # Web microphone capture entry
@@ -265,6 +289,7 @@ app/                          # Frontend workspace root
 │   │   │   │       ├── audio-capture-repository.test.ts # Verify runtime capture factory
 │   │   │   │       ├── audio-frame-emitter.test.ts # Verify frame listener isolation
 │   │   │   │       ├── pcm.test.ts # Verify PCM conversion helpers
+│   │   │   │       ├── tauri-audio-capture-repository.test.ts # Verify Tauri native capture mapping
 │   │   │   │       ├── web-microphone-capture.test.ts # Verify microphone capture behavior
 │   │   │   │       └── web-system-audio-capture.test.ts # Verify system audio capture behavior
 │   │   │   ├── config/       # Schema-driven Live realtime form and draft helpers
@@ -275,13 +300,13 @@ app/                          # Frontend workspace root
 │   │   │   ├── devices/      # Device inventory repositories and diagnostics
 │   │   │   │   ├── audio-device-repository.ts # Runtime factory and selection contracts
 │   │   │   │   ├── diagnostics.ts # Dev-only inventory logging helpers
-│   │   │   │   ├── tauri-audio-device-repository.ts # Tauri inventory placeholder adapter
+│   │   │   │   ├── tauri-audio-device-repository.ts # Tauri native inventory adapter
 │   │   │   │   ├── types.ts # Device, permission, capability, and warning contracts
 │   │   │   │   ├── web-audio-device-repository.ts # Browser device inventory implementation
 │   │   │   │   └── __tests__/ # Device repository and diagnostics tests
 │   │   │   │       ├── audio-device-repository.test.ts # Verify runtime device factory
 │   │   │   │       ├── diagnostics.test.ts # Verify diagnostics install/cleanup
-│   │   │   │       ├── tauri-audio-device-repository.test.ts # Verify Tauri placeholder output
+│   │   │   │       ├── tauri-audio-device-repository.test.ts # Verify Tauri native inventory mapping
 │   │   │   │       └── web-audio-device-repository.test.ts # Verify browser inventory behavior
 │   │   │   ├── hooks/        # Realtime orchestration hooks
 │   │   │   │   ├── useLiveDeviceInventory.ts # Own inventory subscription and capture sessions
@@ -368,9 +393,11 @@ app/                          # Frontend workspace root
 │   │
 │   ├── lib/                  # App/platform-level helpers
 │   │   ├── runtime-environment.ts # Detect Web/Tauri runtime environment
+│   │   ├── tauri-api.ts      # Central Tauri invoke/event API boundary
 │   │   ├── utils.ts          # Canonical shadcn `cn()` helper
 │   │   └── __tests__/
-│   │       └── runtime-environment.test.ts # Verify runtime detection
+│   │       ├── runtime-environment.test.ts # Verify runtime detection
+│   │       └── tauri-api.test.ts # Verify Tauri API boundary behavior
 │   │
 │   ├── shared/               # Cross-feature shared code
 │   │   ├── lib/              # Shared runtime helpers
@@ -550,7 +577,7 @@ app/                          # Frontend workspace root
 
 ### Workspace Exclusions
 
-- Excluded generated/runtime directories: `node_modules/`, `dist/`, `.idea/`.
+- Excluded generated/runtime directories: `node_modules/`, `dist/`, `.idea/`, `src-tauri/target/`, `src-tauri/gen/schemas/`.
 - Storybook story placement: colocated under `src` beside the owner component or page.
 - Unsupported Storybook placement: mirrored `stories/` directory, `src/components/ui/`.
 
@@ -569,6 +596,8 @@ app/                          # Frontend workspace root
 - Cross-feature composite UI: `src/components/common/*`; feature-agnostic components such as `InteractiveTable` and `JsonPropertiesBlock`.
 - App/platform helpers: `src/lib/*`; runtime detection and canonical `cn()` utility.
 - Cross-feature runtime helpers: `src/shared/lib/*`; API client, query helpers, formatters, SSE, status, option helpers.
+- Desktop shell: `src-tauri/*`; Tauri config, Rust commands, native desktop state, and bundle metadata.
+- Native desktop audio: `src-tauri/src/audio/*`; Windows endpoint enumeration, WASAPI capture, DTO mapping, Tauri events, and capture session registry.
 - Feature-private helpers: `src/features/<name>/lib/*`; owner-feature-only helpers.
 - Shared helper promotion threshold: reuse by at least one other feature.
 - Feature public surface: `src/features/<name>/index.ts`.
@@ -698,6 +727,12 @@ app/                          # Frontend workspace root
 - Transport failure state: terminal failure even without error payload; pending waits rejected before `track.ready` or `session.finished`.
 - Platform-neutral realtime imports: no static imports from `web-*`, `tauri-*`, browser-only, desktop-native modules.
 - Tauri adapters: runtime factories or dynamic imports.
+- Tauri API boundary: `src/lib/tauri-api.ts`; route invoke commands and event subscriptions through this module.
+- Tauri device inventory: call `list_native_audio_devices` through `TauriAudioDeviceRepository`; map native DTOs into `LiveDeviceInventory`.
+- Native inventory failures: map only `command_not_implemented` to `tauri_device_inventory_not_implemented`; surface other native failures through inventory error handling.
+- Tauri capture: call native start/stop/pause/resume commands through `TauriAudioCaptureRepository`; subscribe to `native_audio_frame`, `native_audio_level`, and `native_audio_state` events.
+- Desktop capture cleanup: release active native capture sessions on final Tauri app `Exit`; avoid cleanup on cancelable close or exit-request events.
+- Tauri realtime transport: WebSocket transport factory for default desktop Live sessions; inactive not-implemented `TauriRealtimeTransport` adapter outside the default path.
 
 ### API Type Strategy
 
@@ -737,6 +772,7 @@ Backend (Pydantic) ──► openapi.json ──► openapi.d.ts ──► domai
 | @tanstack/react-router  | ^1.162.8      |
 | zustand                 | ^5.0.11       |
 | axios                   | ^1.13.5       |
+| @tauri-apps/api         | 2.10.1        |
 | shadcn/ui (radix-ui)    | latest        |
 | next-themes             | ^0.4.6 (installed only; app theme state unsupported) |
 | i18next / react-i18next | ^25.8 / ^16.5 |
@@ -752,12 +788,17 @@ Backend (Pydantic) ──► openapi.json ──► openapi.d.ts ──► domai
 | ESLint                            | ^9.39.1          |
 | Vitest                            | ^4.0.18          |
 | openapi-typescript                | ^7.13.0          |
+| @tauri-apps/cli                   | 2.10.1           |
 
 ---
 
 ## Detailed Module Overview
 
-### src/features/
+### src/
+
+Frontend source modules. Feature-first ownership; shared-code promotion only across real reuse boundaries.
+
+#### src/features/
 
 Separate business domain logic by feature. Expose every feature public surface through `index.ts`.
 
@@ -857,7 +898,7 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `devices/types.ts`: Microphone/speaker inventory, permission, capability, temporary-device, warning code contracts.
   - `devices/audio-device-repository.ts`: Define the device repository contract and dynamically load Web or Tauri implementations.
   - `devices/web-audio-device-repository.ts`: Browser microphone/speaker inventory, permission/capability classification, stable warnings, inventory refresh without implicit permission prompts.
-  - `devices/tauri-audio-device-repository.ts`: Return structured placeholder output for Tauri until native device enumeration is implemented.
+  - `devices/tauri-audio-device-repository.ts`: Invoke native desktop inventory, map device/permission/capability DTOs, return not-implemented inventory only for `command_not_implemented`, and propagate retryable native failures.
   - `devices/diagnostics.ts`: Provide dev-only console helpers for manual inventory validation.
   - `capture/types.ts`: Capture source, session, level, frame, state, error contracts.
   - `capture/audio-capture-repository.ts`: Define the capture repository contract and dynamically load Web or Tauri implementations.
@@ -865,12 +906,13 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `capture/web-microphone-capture.ts`: Start explicit Web microphone capture and expose audio level plus PCM frame events.
   - `capture/web-system-audio-capture.ts`: Start explicit Web display/system-audio capture and expose system-source level plus PCM frame events when an audio track exists.
   - `capture/capture-session.ts`: Own capture state transitions, listener cleanup, frame subscriptions, track stopping, and level/frame emitter cleanup.
+  - `capture/session-id.ts`: Build source-prefixed capture session ids for native and Web capture adapters.
   - `capture/session-utils.ts`: Reusable capture-session predicates shared across inventory and session orchestration.
   - `capture/audio-frame-emitter.ts`: Emit PCM16LE, 16 kHz, mono frames and isolate listener failures.
   - `capture/audio-level-meter.ts`: Measure Web Audio level and peak values.
   - `capture/pcm.ts`: Pure tested downmix, resample, PCM sizing, and float-to-PCM conversion.
   - `capture/errors.ts`: Expose structured capture errors with stable codes.
-  - `capture/tauri-audio-capture-repository.ts`: Return structured placeholder errors for desktop capture until native adapters exist.
+  - `capture/tauri-audio-capture-repository.ts`: Invoke native desktop microphone/system capture, map native state/level/frame events, and expose the existing `LiveCaptureSession` contract.
   - `store/live-device-store.ts`: Store serializable inventory, selected/active devices, capture states, and latest level snapshots; normalize `temp-*` device IDs to `null`.
   - `store/live-realtime-store.ts`: Store current Live session, connection state, active tracks, current previews, latest committed partials, capped final transcripts, diagnostics state, and last runtime error.
   - `hooks/useLiveDeviceInventory.ts`: Own repository creation, `devicechange` subscriptions, reusable capture session lookup, capture lifecycle, cleanup on teardown, and store updates.
@@ -878,10 +920,11 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `transport/types.ts`: Hand-maintained Live WebSocket event, transcript, audio frame, diagnostics, and state contracts.
   - `transport/protocol.ts`: Server event validation, including preview/committed/final transcript payloads; WebSocket URL builder from origins; protocol constants.
   - `transport/web-realtime-transport.ts`: Implement browser WebSocket handshake, control event sending, JSON metadata plus binary payload audio frames, and state changes.
-  - `transport/tauri-realtime-transport.ts`: Structured not-implemented errors for unsupported operations; idempotent teardown methods.
+  - `transport/realtime-transport.ts`: Select WebSocket transport for Web and Tauri runtimes through dynamic import.
+  - `transport/tauri-realtime-transport.ts`: Structured not-implemented adapter outside the default transport factory.
   - `**/__tests__/*`: Cover runtime selection, inventory behavior, warnings, permission failures, capture cleanup, PCM conversion, transport protocol, transcript event handling, diagnostics, store transitions, session service lifecycle, and hook lifecycle.
 
-### src/components/common/
+#### src/components/common/
 
 Cross-feature composite components with feature-agnostic behavior.
 
@@ -893,7 +936,7 @@ Cross-feature composite components with feature-agnostic behavior.
 - **interactive-table/__tests__/**: Cover table rendering, selection reset semantics, pagination, local query, row actions, and batch action behavior.
 - **index.ts**: Barrel entry for common components. Prefer importing via `@/components/common`.
 
-### src/components/ui/
+#### src/components/ui/
 
 Shared primitives and Nola design-system components.
 
@@ -903,7 +946,7 @@ Shared primitives and Nola design-system components.
 - **MetricCard.tsx**, **ProgressBar.tsx**, **EmptyState.tsx**: Provide shared page primitives for metrics, progress, and empty/error states.
 - **sonner.tsx**: Render Sonner with the app-owned theme context.
 
-### src/layouts/
+#### src/layouts/
 
 Page-level layout primitives.
 
@@ -912,7 +955,7 @@ Page-level layout primitives.
 - **FormRow.tsx** and **SectionHeader.tsx**: Continuous compact settings rows with lightweight section labels.
 - **PageHeader.tsx** and **TwoColumnLayout.tsx**: Compose page headers and Task Workbench columns.
 
-### src/pages/
+#### src/pages/
 
 Route page implementations.
 
@@ -923,7 +966,7 @@ Route page implementations.
 - **settings/**: General, Transcription, Live Realtime, Export, Model Storage, and System Info tabs; direct settings content without subpage titles; read-only engine resources; task-boundary reload wording instead of restart-required wording.
 - **settings/LiveRealtimeTab.tsx**: Live realtime defaults from backend schema metadata, persisted patches through config API helpers, special-value token state consistent with local validation.
 
-### src/shell/
+#### src/shell/
 
 Application shell.
 
@@ -932,7 +975,7 @@ Application shell.
 - **ActivityCenterSheet.tsx**: Render needs-attention, in-progress, and recent activity from structured store items.
 - **AppSidebar.tsx** and **AppTopBar.tsx**: Render primary navigation, theme action, activity badge, and shell actions.
 
-### src/app/locale/
+#### src/app/locale/
 
 Locale routing and persisted UI preferences.
 
@@ -940,7 +983,7 @@ Locale routing and persisted UI preferences.
 - **ui-preferences-store.ts**: Hydrate preferences once, serialize writes, and persist language/theme/units.
 - **use-active-locale.ts**: Read active locale from the current route.
 
-### src/shared/
+#### src/shared/
 
 Cross-feature shared code, split into `lib/` and `types/`.
 
@@ -979,7 +1022,7 @@ Cross-feature shared code, split into `lib/` and `types/`.
 - **types/task-query.ts**: Shared query model for list toolbar and pagination contracts.
 - **types/index.ts**: Barrel re-export for `import type { ... } from '@/shared/types'`.
 
-### src/routes/
+#### src/routes/
 
 Route adapters and search-model helpers belong in this directory. Page implementations belong in `src/pages/*`.
 
@@ -988,14 +1031,15 @@ Route adapters and search-model helpers belong in this directory. Page implement
 - **live-workbench-search.ts**: Normalize Live Workbench view search params and omit the default view from URLs.
 - **__tests__/router.test.ts**: Verify route tree behavior.
 
-### src/lib/
+#### src/lib/
 
 App/platform-level helpers.
 
 - **runtime-environment.ts**: Detect Web/Tauri runtime once for app-level consumers. Realtime wraps this helper instead of checking Tauri globals directly.
+- **tauri-api.ts**: Centralize dynamic `@tauri-apps/api` imports, desktop runtime info, native audio invoke commands, and native audio event subscriptions.
 - **utils.ts**: Canonical `cn()` utility for merging Tailwind classes with `clsx` and `tailwind-merge`; duplicate `cn` in `shared/lib` unsupported.
 
-### src/i18n/
+#### src/i18n/
 
 i18next bootstrap and locale dictionaries.
 
@@ -1003,7 +1047,7 @@ i18next bootstrap and locale dictionaries.
 - **locales/en.json**, **locales/zh.json**: Locale resource files.
 Route-prefix language behavior and Settings-triggered persistent language changes: `src/app/locale/*`.
 
-### src/config/
+#### src/config/
 
 Runtime config access and fallback constants.
 
@@ -1018,11 +1062,33 @@ Runtime config access and fallback constants.
 - **test-env.ts**: Shared test-runtime detection and `NOLA_TEST_LOG` opt-in switch.
 - **logger.ts**: Lightweight logger prefixing output with `[Nola]`. Mute logs by default in tests unless `NOLA_TEST_LOG=1`.
 
-### src/test/
+#### src/test/
 
 Shared Vitest bootstrap.
 
 - **setup.ts**: Register `@testing-library/jest-dom/vitest`, provide a `ResizeObserver` mock, and silence `console.warn`/`console.error` in tests unless `NOLA_TEST_LOG=1`.
+
+### src-tauri/
+
+Desktop shell and Rust native code. Tauri commands, Tauri events, and stable DTOs form the desktop-native capability boundary.
+
+- **src/main.rs**: Start the native binary through the library entry point.
+- **src/lib.rs**: Register desktop runtime info and native audio commands, manage `DesktopAudioState`, and release active capture sessions on final app exit.
+
+#### src-tauri/src/audio/
+
+Rust desktop audio module. `mod.rs` exposes the module surface to Tauri command handlers.
+
+- **mod.rs**: Desktop audio module exports and shared state.
+- **dto.rs**: Stable native audio DTOs, warning codes, capture states, and error contracts.
+- **events.rs**: Native audio event names and emit helpers for capture frame, level, and state events.
+- **device_inventory.rs**: Native inventory DTO builders from enumerated endpoints and current selection state.
+- **windows_devices.rs**: Windows Core Audio microphone and speaker endpoint enumeration.
+- **registry.rs**: Active capture session state and idempotent start/stop/pause/resume transitions.
+- **capture_runtime.rs**: Capture worker handles, startup timeout, pause/resume/stop controls, and app-exit cleanup.
+- **windows_capture.rs**: Windows WASAPI microphone input and default output loopback capture workers.
+- **processing.rs**: Input sample decode, mono downmix, 16 kHz resample, PCM16LE frame output, and level calculation.
+- **windows_com.rs**: COM initialization guard for Windows audio calls.
 
 ---
 
@@ -1064,6 +1130,18 @@ pnpm gen:types:check
 # Production app bundle
 pnpm build
 
+# Tauri desktop dev shell (start FastAPI backend separately)
+pnpm tauri:dev
+pnpm tauri:info
+
+# Tauri desktop bundle
+pnpm tauri:build
+
+# Rust native desktop checks
+cargo fmt --manifest-path src-tauri/Cargo.toml --check
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+cargo test --manifest-path src-tauri/Cargo.toml
+
 # Storybook static site
 pnpm build-storybook
 ```
@@ -1089,7 +1167,10 @@ pnpm build-storybook
 ## Client-Server Architecture
 
 ```text
-Frontend (Vite/React) ───[ HTTP Proxy /api/* ]───▶ Backend (FastAPI, localhost:8000)
+Browser Frontend (Vite/React) ───[ HTTP Proxy /api/* ]───▶ Backend (FastAPI, localhost:8000)
+Tauri Desktop WebView ───────────[ HTTP/WS 127.0.0.1:8000 ]──▶ Backend (manual process)
+       │
+       ├── Tauri invoke/event bridge ──▶ src-tauri/src/audio (Windows Core Audio / WASAPI)
        │
    Axios (API Client)
    ├── shared/types/   (openapi-typescript → domain aliases/contracts)
@@ -1110,9 +1191,12 @@ Frontend (Vite/React) ───[ HTTP Proxy /api/* ]───▶ Backend (FastAP
 | Polling Interval | 2000 ms foreground, 6000 ms background (hidden document)     |
 | Theme            | App-owned `ThemeProvider` drives light/dark/system and persists via UI preferences |
 | Live Devices     | Client-runtime only; Web inventory cannot report system-global device usage and may expose temporary `temp-*` IDs before permission |
+| Desktop Devices  | Windows Tauri inventory uses Core Audio endpoint enumeration; empty device lists mean no current device, not unsupported runtime |
 | Live Audio Frames | PCM16LE, 16 kHz, mono; default capture path does not denoise, gain-normalize, compress, EQ, or trim content |
+| Desktop Audio Capture | Windows Tauri capture uses WASAPI microphone input and default output loopback; app exit releases active native sessions |
 | Live Transcript Events | `preview` and `committed_partial` stay WebSocket-only; `final` enters capped runtime output and backend history |
 | Live Diagnostics | Explicit WebSocket control only; frontend receives `capture_id`, `manifest_name`, and `file_name`, not server absolute paths |
 | Live Realtime Settings | Separate Settings tab after Transcription; render persisted defaults from backend schema and i18n keys |
 | Live Timing | Display session duration and transcript ranges with shared millisecond clock formatting |
 | Live Compact View | Web Document Picture-in-Picture when supported; close independent from route search and session stop |
+| Desktop Backend  | Tauri dev shell starts frontend only; start FastAPI separately on `127.0.0.1:8000` |

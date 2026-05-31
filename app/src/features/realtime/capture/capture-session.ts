@@ -10,6 +10,7 @@ import type {
   RealtimeAudioFrame,
 } from './types'
 import type { LiveDurationMs, LiveTimestampMs, LiveUnsubscribe } from '../types'
+import { createLiveCaptureSessionId } from './session-id'
 
 interface CreateLiveCaptureSessionOptions {
   sourceKind: LiveAudioSourceKind
@@ -17,13 +18,6 @@ interface CreateLiveCaptureSessionOptions {
   stream: MediaStream
   levelSampleIntervalMs?: LiveDurationMs
   audioFrameDurationMs?: LiveDurationMs
-}
-
-let captureSessionSequence = 0
-
-function createCaptureSessionId(sourceKind: LiveAudioSourceKind): string {
-  captureSessionSequence += 1
-  return `live-${sourceKind}-${Date.now()}-${captureSessionSequence}`
 }
 
 function getStreamTracks(stream: MediaStream): MediaStreamTrack[] {
@@ -52,7 +46,7 @@ export class WebLiveCaptureSession implements LiveCaptureSession {
   state: LiveCaptureState = 'capturing'
 
   constructor(options: CreateLiveCaptureSessionOptions) {
-    this.id = createCaptureSessionId(options.sourceKind)
+    this.id = createLiveCaptureSessionId(options.sourceKind)
     this.sourceKind = options.sourceKind
     this.deviceId = options.deviceId
     this.startedAt = Date.now()

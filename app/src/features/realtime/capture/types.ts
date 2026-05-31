@@ -15,12 +15,16 @@ export type LiveCaptureState =
 export type LiveCaptureErrorCode =
   | 'microphone_permission_required'
   | 'microphone_permission_denied'
+  | 'microphone_device_unavailable'
+  | 'microphone_device_disconnected'
   | 'microphone_capture_unsupported'
   | 'microphone_capture_failed'
   | 'capture_interrupted'
   | 'system_audio_capture_unsupported'
   | 'system_audio_permission_denied'
   | 'system_audio_track_missing'
+  | 'system_audio_unavailable'
+  | 'system_audio_device_disconnected'
   | 'system_audio_capture_failed'
   | 'tauri_capture_not_implemented'
 
