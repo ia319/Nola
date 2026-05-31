@@ -31,15 +31,11 @@ pub fn build_native_audio_inventory(
         warnings.push(NativeDeviceWarningCode::MicrophoneDeviceUnavailable);
     }
 
-    if speakers.is_empty() {
-        warnings.push(NativeDeviceWarningCode::SpeakerEnumerationUnsupported);
-    }
-
     warnings.push(NativeDeviceWarningCode::DevicechangeUnsupported);
 
     NativeAudioInventoryDto {
-        permissions: build_permissions(!microphones.is_empty(), !speakers.is_empty()),
-        capabilities: build_capabilities(!microphones.is_empty(), !speakers.is_empty()),
+        permissions: build_supported_permissions(),
+        capabilities: build_supported_capabilities(),
         microphones,
         speakers,
         current,
@@ -91,38 +87,18 @@ fn build_devices(
         .collect()
 }
 
-fn build_permissions(has_microphones: bool, has_speakers: bool) -> NativeDevicePermissionsDto {
+fn build_supported_permissions() -> NativeDevicePermissionsDto {
     NativeDevicePermissionsDto {
-        microphone: if has_microphones {
-            NativeDevicePermissionState::Granted
-        } else {
-            NativeDevicePermissionState::Unsupported
-        },
-        speaker_selection: if has_speakers {
-            NativeDevicePermissionState::Granted
-        } else {
-            NativeDevicePermissionState::Unsupported
-        },
+        microphone: NativeDevicePermissionState::Granted,
+        speaker_selection: NativeDevicePermissionState::Granted,
     }
 }
 
-fn build_capabilities(has_microphones: bool, has_speakers: bool) -> NativeAudioCapabilitiesDto {
+fn build_supported_capabilities() -> NativeAudioCapabilitiesDto {
     NativeAudioCapabilitiesDto {
-        microphone_capture: if has_microphones {
-            NativeRuntimeCapabilityState::Available
-        } else {
-            NativeRuntimeCapabilityState::Unsupported
-        },
-        speaker_selection: if has_speakers {
-            NativeRuntimeCapabilityState::Available
-        } else {
-            NativeRuntimeCapabilityState::Unsupported
-        },
-        system_audio_capture: if has_speakers {
-            NativeRuntimeCapabilityState::Available
-        } else {
-            NativeRuntimeCapabilityState::Unsupported
-        },
+        microphone_capture: NativeRuntimeCapabilityState::Available,
+        speaker_selection: NativeRuntimeCapabilityState::Available,
+        system_audio_capture: NativeRuntimeCapabilityState::Available,
     }
 }
 
@@ -191,7 +167,7 @@ mod tests {
     }
 
     #[test]
-    fn build_inventory_reports_empty_device_lists_with_stable_warnings() {
+    fn build_inventory_keeps_support_available_when_device_lists_are_empty() {
         let inventory =
             build_native_audio_inventory(NativeCurrentDevicesDto::default(), Default::default());
 
@@ -199,17 +175,16 @@ mod tests {
         assert!(inventory.speakers.is_empty());
         assert_eq!(
             inventory.permissions.microphone,
-            NativeDevicePermissionState::Unsupported
+            NativeDevicePermissionState::Granted
         );
         assert_eq!(
             inventory.capabilities.microphone_capture,
-            NativeRuntimeCapabilityState::Unsupported
+            NativeRuntimeCapabilityState::Available
         );
         assert_eq!(
             inventory.warnings,
             vec![
                 NativeDeviceWarningCode::MicrophoneDeviceUnavailable,
-                NativeDeviceWarningCode::SpeakerEnumerationUnsupported,
                 NativeDeviceWarningCode::DevicechangeUnsupported,
             ]
         );
