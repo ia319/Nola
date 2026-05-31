@@ -6,8 +6,14 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build"
+    "beforeDevCommand": {
+      "script": "pnpm dev",
+      "cwd": ".."
+    },
+    "beforeBuildCommand": {
+      "script": "pnpm build",
+      "cwd": ".."
+    }
   },
   "app": {
     "windows": [
@@ -22,7 +28,44 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": [
+          "'self'",
+          "ipc:",
+          "http://ipc.localhost",
+          "http://127.0.0.1:8000",
+          "ws://127.0.0.1:8000"
+        ],
+        "img-src": ["'self'", "data:", "blob:"],
+        "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        "font-src": ["'self'", "data:", "https://fonts.gstatic.com"],
+        "script-src": "'self'",
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "frame-ancestors": "'none'"
+      },
+      "devCsp": {
+        "default-src": "'self'",
+        "connect-src": [
+          "'self'",
+          "ipc:",
+          "http://ipc.localhost",
+          "http://127.0.0.1:8000",
+          "ws://127.0.0.1:8000",
+          "http://localhost:5173",
+          "ws://localhost:5173",
+          "http://127.0.0.1:5173",
+          "ws://127.0.0.1:5173"
+        ],
+        "img-src": ["'self'", "data:", "blob:"],
+        "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        "font-src": ["'self'", "data:", "https://fonts.gstatic.com"],
+        "script-src": ["'self'", "'unsafe-eval'"],
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "frame-ancestors": "'none'"
+      }
     }
   },
   "bundle": {
