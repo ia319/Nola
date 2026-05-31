@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Nola desktop shell"
 authors = ["Nola Team"]
 license = ""
-repository = ""
+repository = "https://github.com/ia319/Nola"
 edition = "2021"
 rust-version = "1.77.2"
 
@@ -15,11 +15,11 @@ name = "nola_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "=2.5.6" }
+tauri-build = { version = "=2.5.6", features = [] }
 
 [dependencies]
 serde = { version = "=1.0.228", features = ["derive"] }
-tauri = { version = "=2.10.3" }
+tauri = { version = "=2.10.3", features = [] }
 windows = { version = "=0.61.3", features = [
     "Win32_Devices_FunctionDiscovery",
     "Win32_Foundation",
