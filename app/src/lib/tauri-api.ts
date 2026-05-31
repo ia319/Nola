@@ -49,6 +49,8 @@ export type NativeAudioErrorCode =
   | 'session_not_found'
   | 'session_state_invalid'
   | 'device_not_found'
+  | 'device_disconnected'
+  | 'system_audio_unavailable'
   | 'permission_denied'
   | 'capture_failed'
   | 'internal_error'
@@ -113,6 +115,7 @@ export interface NativeCaptureSessionDto {
   deviceId: string | null
   state: NativeCaptureState
   startedAtMs: number
+  error?: NativeAudioErrorDto | null
 }
 
 export interface NativeAudioFrameEventDto {

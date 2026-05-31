@@ -46,6 +46,7 @@ impl CaptureSessionRegistry {
             device_id: descriptor.device_id,
             state: NativeCaptureState::Capturing,
             started_at_ms: descriptor.started_at_ms,
+            error: None,
         };
         sessions.insert(session.session_id.clone(), session.clone());
 
@@ -94,14 +95,20 @@ impl CaptureSessionRegistry {
         let mut sessions = self.lock_sessions();
         sessions.remove(session_id).map(|mut session| {
             session.state = NativeCaptureState::Stopped;
+            session.error = None;
             session
         })
     }
 
-    pub fn fail_session(&self, session_id: &str) -> Option<NativeCaptureSessionDto> {
+    pub fn fail_session(
+        &self,
+        session_id: &str,
+        error: NativeAudioErrorDto,
+    ) -> Option<NativeCaptureSessionDto> {
         let mut sessions = self.lock_sessions();
         sessions.remove(session_id).map(|mut session| {
             session.state = NativeCaptureState::Failed;
+            session.error = Some(error);
             session
         })
     }
@@ -277,12 +284,18 @@ mod tests {
             .expect("session should start");
 
         let failed = registry
-            .fail_session("capture-1")
+            .fail_session("capture-1", NativeAudioErrorDto::device_disconnected())
             .expect("session should fail");
 
         assert_eq!(failed.state, NativeCaptureState::Failed);
+        assert_eq!(
+            failed.error,
+            Some(NativeAudioErrorDto::device_disconnected())
+        );
         assert_eq!(registry.active_session_count(), 0);
-        assert!(registry.fail_session("capture-1").is_none());
+        assert!(registry
+            .fail_session("capture-1", NativeAudioErrorDto::capture_failed())
+            .is_none());
     }
 
     #[test]

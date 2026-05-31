@@ -302,6 +302,14 @@ const LIVE_WORKBENCH_ERROR_COPY: Partial<
     titleKey: 'live.workbench.errors.microphonePermissionDenied.title',
     descriptionKey: 'live.workbench.errors.microphonePermissionDenied.description',
   },
+  microphone_device_unavailable: {
+    titleKey: 'live.workbench.errors.microphoneDeviceUnavailable.title',
+    descriptionKey: 'live.workbench.errors.microphoneDeviceUnavailable.description',
+  },
+  microphone_device_disconnected: {
+    titleKey: 'live.workbench.errors.microphoneDeviceDisconnected.title',
+    descriptionKey: 'live.workbench.errors.microphoneDeviceDisconnected.description',
+  },
   microphone_capture_unsupported: {
     titleKey: 'live.workbench.errors.microphoneCaptureUnsupported.title',
     descriptionKey: 'live.workbench.errors.microphoneCaptureUnsupported.description',
@@ -321,6 +329,14 @@ const LIVE_WORKBENCH_ERROR_COPY: Partial<
   system_audio_track_missing: {
     titleKey: 'live.workbench.errors.systemAudioTrackMissing.title',
     descriptionKey: 'live.workbench.errors.systemAudioTrackMissing.description',
+  },
+  system_audio_unavailable: {
+    titleKey: 'live.workbench.errors.systemAudioUnavailable.title',
+    descriptionKey: 'live.workbench.errors.systemAudioUnavailable.description',
+  },
+  system_audio_device_disconnected: {
+    titleKey: 'live.workbench.errors.systemAudioDeviceDisconnected.title',
+    descriptionKey: 'live.workbench.errors.systemAudioDeviceDisconnected.description',
   },
   system_audio_capture_failed: {
     titleKey: 'live.workbench.errors.systemAudioCaptureFailed.title',

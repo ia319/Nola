@@ -696,6 +696,7 @@
             "paused": "已暂停",
             "stopping": "正在停止",
             "stopped": "已停止",
+            "deviceDisconnected": "设备已断开",
             "failed": "采集失败"
           }
         },
@@ -726,6 +727,8 @@
             "stopped": "已停止",
             "permissionDenied": "权限被拒绝",
             "trackMissing": "未选择音频轨道",
+            "unavailable": "系统音频不可用",
+            "deviceDisconnected": "音频设备已断开",
             "failed": "采集失败"
           }
         }
@@ -847,7 +850,15 @@
         },
         "microphonePermissionDenied": {
           "title": "麦克风权限被拒绝",
-          "description": "在浏览器站点设置中启用麦克风权限。"
+          "description": "在系统或站点设置中启用麦克风权限。"
+        },
+        "microphoneDeviceUnavailable": {
+          "title": "麦克风不可用",
+          "description": "连接或选择输入设备后重试。"
+        },
+        "microphoneDeviceDisconnected": {
+          "title": "麦克风已断开",
+          "description": "重新连接所选输入设备后重试。"
         },
         "microphoneCaptureUnsupported": {
           "title": "不支持麦克风采集",
@@ -863,15 +874,23 @@
         },
         "systemAudioPermissionDenied": {
           "title": "系统音频权限被拒绝",
-          "description": "重新开始浏览器采集，并选择包含音频的来源。"
+          "description": "重新开始系统音频采集，并在提示时允许访问。"
         },
         "systemAudioTrackMissing": {
           "title": "没有系统音频轨道",
           "description": "请选择暴露音频轨道的浏览器采集来源。"
         },
+        "systemAudioUnavailable": {
+          "title": "系统音频不可用",
+          "description": "连接输出设备，并确认系统音频可用后重试。"
+        },
+        "systemAudioDeviceDisconnected": {
+          "title": "系统音频设备已断开",
+          "description": "重新连接输出设备后重试。"
+        },
         "systemAudioCaptureFailed": {
           "title": "系统音频采集失败",
-          "description": "重新开始浏览器系统音频采集。"
+          "description": "重新开始系统音频采集。"
         },
         "websocketUnavailable": {
           "title": "实时连接不可用",

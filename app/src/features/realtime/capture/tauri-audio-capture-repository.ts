@@ -70,20 +70,45 @@ function mapNativeCaptureError(
   sourceKind: LiveAudioSourceKind,
 ): LiveCaptureErrorCode {
   if (isNativeAudioError(error)) {
-    if (error.code === 'permission_denied') {
-      return sourceKind === 'microphone'
-        ? 'microphone_permission_denied'
-        : 'system_audio_permission_denied'
-    }
-
-    if (error.code === 'command_not_implemented') {
-      return sourceKind === 'microphone'
-        ? 'microphone_capture_unsupported'
-        : 'system_audio_capture_unsupported'
+    switch (error.code) {
+      case 'permission_denied':
+        return sourceKind === 'microphone'
+          ? 'microphone_permission_denied'
+          : 'system_audio_permission_denied'
+      case 'command_not_implemented':
+        return sourceKind === 'microphone'
+          ? 'microphone_capture_unsupported'
+          : 'system_audio_capture_unsupported'
+      case 'device_not_found':
+        return sourceKind === 'microphone'
+          ? 'microphone_device_unavailable'
+          : 'system_audio_unavailable'
+      case 'device_disconnected':
+        return sourceKind === 'microphone'
+          ? 'microphone_device_disconnected'
+          : 'system_audio_device_disconnected'
+      case 'system_audio_unavailable':
+        return 'system_audio_unavailable'
     }
   }
 
   return sourceKind === 'microphone' ? 'microphone_capture_failed' : 'system_audio_capture_failed'
+}
+
+function mapNativeSessionError(
+  state: LiveCaptureState,
+  error: NativeAudioErrorDto | null | undefined,
+  sourceKind: LiveAudioSourceKind,
+): LiveCaptureErrorCode | null {
+  if (state !== 'failed') {
+    return null
+  }
+
+  return error
+    ? mapNativeCaptureError(error, sourceKind)
+    : sourceKind === 'microphone'
+      ? 'microphone_capture_failed'
+      : 'system_audio_capture_failed'
 }
 
 function isNativeAudioError(error: unknown): error is NativeAudioErrorDto {
@@ -98,6 +123,8 @@ function isNativeAudioError(error: unknown): error is NativeAudioErrorDto {
     error.code === 'session_not_found' ||
     error.code === 'session_state_invalid' ||
     error.code === 'device_not_found' ||
+    error.code === 'device_disconnected' ||
+    error.code === 'system_audio_unavailable' ||
     error.code === 'permission_denied' ||
     error.code === 'capture_failed' ||
     error.code === 'internal_error'
@@ -187,7 +214,8 @@ class TauriLiveCaptureSession implements LiveCaptureSession {
 
     this.deviceId = session.deviceId
     this.startedAt = session.startedAtMs
-    this.setState(mapNativeCaptureState(session.state), null)
+    const state = mapNativeCaptureState(session.state)
+    this.setState(state, mapNativeSessionError(state, session.error, this.sourceKind))
   }
 
   async dispose(): Promise<void> {
@@ -297,12 +325,7 @@ class TauriLiveCaptureSession implements LiveCaptureSession {
     }
 
     const state = mapNativeCaptureState(session.state)
-    const errorCode =
-      state === 'failed'
-        ? this.sourceKind === 'microphone'
-          ? 'microphone_capture_failed'
-          : 'system_audio_capture_failed'
-        : null
+    const errorCode = mapNativeSessionError(state, session.error, this.sourceKind)
 
     this.deviceId = session.deviceId
     this.startedAt = session.startedAtMs

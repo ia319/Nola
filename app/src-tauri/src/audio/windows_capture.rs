@@ -66,9 +66,8 @@ mod platform {
 
                     if let Err(error) = result {
                         if !control.is_stop_requested() {
-                            emit_failed_state(&app_handle, &registry, &session.session_id);
+                            emit_failed_state(&app_handle, &registry, &session.session_id, error);
                         }
-                        let _ = error;
                     }
                 }
                 Err(error) => {
@@ -95,13 +94,13 @@ mod platform {
             unsafe {
                 let enumerator: IMMDeviceEnumerator =
                     CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
-                        .map_err(map_windows_error)?;
+                        .map_err(|error| map_windows_error_for_source(error, &session.source))?;
                 let device =
                     get_capture_device(&enumerator, &session.source, session.device_id.as_deref())?;
                 let audio_client: IAudioClient = device
                     .Activate(CLSCTX_ALL, None)
-                    .map_err(map_windows_error)?;
-                let mix_format = MixFormat::read(&audio_client)?;
+                    .map_err(|error| map_windows_error_for_source(error, &session.source))?;
+                let mix_format = MixFormat::read(&audio_client, &session.source)?;
 
                 audio_client
                     .Initialize(
@@ -112,11 +111,14 @@ mod platform {
                         mix_format.as_ptr(),
                         None,
                     )
-                    .map_err(map_windows_error)?;
+                    .map_err(|error| map_windows_error_for_source(error, &session.source))?;
 
-                let capture_client: IAudioCaptureClient =
-                    audio_client.GetService().map_err(map_windows_error)?;
-                audio_client.Start().map_err(map_windows_error)?;
+                let capture_client: IAudioCaptureClient = audio_client
+                    .GetService()
+                    .map_err(|error| map_windows_error_for_source(error, &session.source))?;
+                audio_client
+                    .Start()
+                    .map_err(|error| map_windows_error_for_source(error, &session.source))?;
 
                 Ok(Self {
                     audio_client,
@@ -171,7 +173,9 @@ mod platform {
             }
 
             unsafe {
-                self.audio_client.Stop().map_err(map_windows_error)?;
+                self.audio_client
+                    .Stop()
+                    .map_err(|error| map_windows_error_for_source(error, &self.source))?;
             }
             Ok(())
         }
@@ -180,7 +184,7 @@ mod platform {
             unsafe {
                 self.capture_client
                     .GetNextPacketSize()
-                    .map_err(map_windows_error)
+                    .map_err(|error| map_windows_error_for_source(error, &self.source))
             }
         }
 
@@ -192,7 +196,7 @@ mod platform {
 
                 self.capture_client
                     .GetBuffer(&mut data, &mut frame_count, &mut flags, None, None)
-                    .map_err(map_windows_error)?;
+                    .map_err(|error| map_windows_error_for_source(error, &self.source))?;
 
                 let silent = flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32 != 0;
                 let packet_len = frame_count as usize * self.format.block_align as usize;
@@ -207,7 +211,7 @@ mod platform {
 
                 self.capture_client
                     .ReleaseBuffer(frame_count)
-                    .map_err(map_windows_error)?;
+                    .map_err(|error| map_windows_error_for_source(error, &self.source))?;
 
                 decode_result.map_err(|_| NativeAudioErrorDto::capture_failed())
             }
@@ -220,8 +224,13 @@ mod platform {
     }
 
     impl MixFormat {
-        unsafe fn read(audio_client: &IAudioClient) -> Result<Self, NativeAudioErrorDto> {
-            let ptr = audio_client.GetMixFormat().map_err(map_windows_error)?;
+        unsafe fn read(
+            audio_client: &IAudioClient,
+            source: &NativeAudioSource,
+        ) -> Result<Self, NativeAudioErrorDto> {
+            let ptr = audio_client
+                .GetMixFormat()
+                .map_err(|error| map_windows_error_for_source(error, source))?;
             let format = parse_wave_format(ptr)?;
             Ok(Self { ptr, format })
         }
@@ -300,12 +309,12 @@ mod platform {
             let wide_id = to_wide_null(device_id);
             return enumerator
                 .GetDevice(PCWSTR(wide_id.as_ptr()))
-                .map_err(|_| NativeAudioErrorDto::device_not_found());
+                .map_err(|_| endpoint_unavailable(source));
         }
 
         enumerator
             .GetDefaultAudioEndpoint(data_flow(source), eConsole)
-            .map_err(|_| NativeAudioErrorDto::device_not_found())
+            .map_err(|_| endpoint_unavailable(source))
     }
 
     fn stream_flags(source: &NativeAudioSource) -> u32 {
@@ -322,15 +331,22 @@ mod platform {
         }
     }
 
-    fn map_windows_error(error: WindowsError) -> NativeAudioErrorDto {
+    fn map_windows_error_for_source(
+        error: WindowsError,
+        source: &NativeAudioSource,
+    ) -> NativeAudioErrorDto {
         let code = error.code();
 
         if code == E_ACCESSDENIED {
             return NativeAudioErrorDto::permission_denied();
         }
 
-        if code == AUDCLNT_E_DEVICE_INVALIDATED || code == AUDCLNT_E_ENDPOINT_CREATE_FAILED {
-            return NativeAudioErrorDto::device_not_found();
+        if code == AUDCLNT_E_DEVICE_INVALIDATED {
+            return NativeAudioErrorDto::device_disconnected();
+        }
+
+        if code == AUDCLNT_E_ENDPOINT_CREATE_FAILED {
+            return endpoint_unavailable(source);
         }
 
         if code == AUDCLNT_E_UNSUPPORTED_FORMAT || code == AUDCLNT_E_SERVICE_NOT_RUNNING {
@@ -344,12 +360,20 @@ mod platform {
         NativeAudioErrorDto::capture_failed()
     }
 
+    fn endpoint_unavailable(source: &NativeAudioSource) -> NativeAudioErrorDto {
+        match source {
+            NativeAudioSource::Microphone => NativeAudioErrorDto::device_not_found(),
+            NativeAudioSource::System => NativeAudioErrorDto::system_audio_unavailable(),
+        }
+    }
+
     fn emit_failed_state<R: Runtime>(
         app_handle: &AppHandle<R>,
         registry: &CaptureSessionRegistry,
         session_id: &str,
+        error: NativeAudioErrorDto,
     ) {
-        if let Some(session) = registry.fail_session(session_id) {
+        if let Some(session) = registry.fail_session(session_id, error) {
             let _ = events::emit_capture_state(app_handle, session);
         }
     }
@@ -384,6 +408,18 @@ mod platform {
             let value = to_wide_null("device");
 
             assert_eq!(value.last(), Some(&0));
+        }
+
+        #[test]
+        fn endpoint_lookup_errors_are_source_specific() {
+            assert_eq!(
+                endpoint_unavailable(&NativeAudioSource::Microphone),
+                NativeAudioErrorDto::device_not_found()
+            );
+            assert_eq!(
+                endpoint_unavailable(&NativeAudioSource::System),
+                NativeAudioErrorDto::system_audio_unavailable()
+            );
         }
     }
 }

@@ -176,7 +176,7 @@ describe('TauriAudioCaptureRepository', () => {
     expect(unlisteners.every((unlisten) => unlisten.mock.calls.length === 1)).toBe(true)
   })
 
-  it('starts system capture and maps failed state events to system capture failure', async () => {
+  it('starts system capture and maps failed state events to stable native errors', async () => {
     startNativeSystemCaptureMock.mockImplementation(async (request) =>
       nativeSession(request.sessionId, 'system'),
     )
@@ -189,6 +189,11 @@ describe('TauriAudioCaptureRepository', () => {
     stateListeners[0]?.({
       ...nativeSession(session.id, 'system'),
       state: 'failed',
+      error: {
+        code: 'device_disconnected',
+        message: 'Audio capture device disconnected',
+        retryable: true,
+      },
     })
 
     expect(startNativeSystemCaptureMock).toHaveBeenCalledWith({
@@ -199,7 +204,7 @@ describe('TauriAudioCaptureRepository', () => {
     expect(stateCallback).toHaveBeenCalledWith(
       expect.objectContaining({
         state: 'failed',
-        errorCode: 'system_audio_capture_failed',
+        errorCode: 'system_audio_device_disconnected',
       }),
     )
     expect(unlisteners.every((unlisten) => unlisten.mock.calls.length === 1)).toBe(true)
@@ -216,6 +221,29 @@ describe('TauriAudioCaptureRepository', () => {
 
     await expect(repository.startMicrophoneCapture()).rejects.toMatchObject({
       code: 'microphone_permission_denied',
+    })
+    expect(unlisteners.every((unlisten) => unlisten.mock.calls.length === 1)).toBe(true)
+  })
+
+  it('maps native device lookup errors into source-specific capture errors', async () => {
+    startNativeMicrophoneCaptureMock.mockRejectedValueOnce({
+      code: 'device_not_found',
+      message: 'Audio capture device was not found',
+      retryable: true,
+    })
+    startNativeSystemCaptureMock.mockRejectedValueOnce({
+      code: 'system_audio_unavailable',
+      message: 'System audio capture is unavailable',
+      retryable: true,
+    })
+
+    const repository = new TauriAudioCaptureRepository()
+
+    await expect(repository.startMicrophoneCapture()).rejects.toMatchObject({
+      code: 'microphone_device_unavailable',
+    })
+    await expect(repository.startSystemAudioCapture()).rejects.toMatchObject({
+      code: 'system_audio_unavailable',
     })
     expect(unlisteners.every((unlisten) => unlisten.mock.calls.length === 1)).toBe(true)
   })

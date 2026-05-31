@@ -148,6 +148,8 @@ pub struct NativeCaptureSessionDto {
     pub device_id: Option<String>,
     pub state: NativeCaptureState,
     pub started_at_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<NativeAudioErrorDto>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -197,6 +199,8 @@ pub enum NativeAudioErrorCode {
     SessionNotFound,
     SessionStateInvalid,
     DeviceNotFound,
+    DeviceDisconnected,
+    SystemAudioUnavailable,
     PermissionDenied,
     CaptureFailed,
     InternalError,
@@ -255,6 +259,22 @@ impl NativeAudioErrorDto {
         Self::new(
             NativeAudioErrorCode::DeviceNotFound,
             "Audio capture device was not found",
+            true,
+        )
+    }
+
+    pub fn device_disconnected() -> Self {
+        Self::new(
+            NativeAudioErrorCode::DeviceDisconnected,
+            "Audio capture device disconnected",
+            true,
+        )
+    }
+
+    pub fn system_audio_unavailable() -> Self {
+        Self::new(
+            NativeAudioErrorCode::SystemAudioUnavailable,
+            "System audio capture is unavailable",
             true,
         )
     }
