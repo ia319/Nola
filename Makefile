@@ -60,7 +60,7 @@ help:
 	@echo "  make typecheck            Run type checks"
 	@echo "  make test                 Run tests"
 	@echo "  make test-ci              Run CI-style tests"
-	@echo "  make build                Build app and Windows desktop bundle"
+	@echo "  make build                Build app bundle"
 	@echo "  make check                Run all local checks"
 	@echo ""
 	@echo "Runtime:"
@@ -193,7 +193,7 @@ test: core-test app-test desktop-test
 
 test-ci: core-test app-test-ci desktop-test
 
-build: app-build desktop-build-windows
+build: app-build
 
 check: core-check app-check desktop-check
 
