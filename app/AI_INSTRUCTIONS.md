@@ -1072,6 +1072,7 @@ Shared Vitest bootstrap.
 
 Desktop shell and Rust native code. Tauri commands, Tauri events, and stable DTOs form the desktop-native capability boundary.
 
+- **Cargo.toml**: Windows API crates under `target.'cfg(windows)'.dependencies`; Linux CI scope limited to non-Windows desktop stubs and target-neutral dependencies.
 - **src/main.rs**: Start the native binary through the library entry point.
 - **src/lib.rs**: Register desktop runtime info and native audio commands, manage `DesktopAudioState`, and release active capture sessions on final app exit.
 
@@ -1109,6 +1110,7 @@ pnpm gen:types
 
 # Format with Prettier (automatic Tailwind class sorting)
 pnpm format
+pnpm format:check
 
 # Run ESLint (checks unused vars, type imports)
 pnpm lint
@@ -1131,13 +1133,25 @@ pnpm gen:types:check
 pnpm build
 
 # Tauri desktop dev shell (start FastAPI backend separately)
+pnpm tauri
 pnpm tauri:dev
 pnpm tauri:info
 
-# Tauri desktop bundle
+# Tauri current-platform desktop bundle
 pnpm tauri:build
 
-# Rust native desktop checks
+# Desktop command wrappers
+pnpm desktop:format
+pnpm desktop:format:check
+pnpm desktop:lint
+pnpm desktop:test
+pnpm desktop:check
+
+# Windows desktop bundle
+pnpm desktop:build:windows
+
+# Equivalent Cargo commands
+cargo fmt --manifest-path src-tauri/Cargo.toml
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
@@ -1145,6 +1159,8 @@ cargo test --manifest-path src-tauri/Cargo.toml
 # Storybook static site
 pnpm build-storybook
 ```
+
+Repository root command map: `make help` for mirrored `app-*`, `desktop-*`, and unified command targets.
 
 ---
 
@@ -1158,9 +1174,21 @@ pnpm build-storybook
   - `pnpm build`
   - `pnpm build-storybook`
 - App test command: `pnpm test:ci`
+- Desktop Rust check job:
+  - Job: `desktop-rust-check`
+  - Runner: `ubuntu-24.04`
+  - Command: `pnpm --dir app desktop:check`
+  - Tauri Linux system dependencies before Rust checks
+- Desktop Windows build job:
+  - Job: `desktop-windows-build`
+  - Runner: `windows-latest`
+  - Needs: `app-test`, `core-test`, `desktop-rust-check`
+  - Command: `pnpm --dir app desktop:build:windows`
+  - Windows target: `x86_64-pc-windows-msvc`
 - Schema drift command path:
   - `pnpm --dir app gen:types`
   - `git diff --exit-code -- app/src/shared/types/openapi.d.ts`
+- Desktop artifact upload and release creation: unsupported in CI.
 
 ---
 
@@ -1192,6 +1220,7 @@ Tauri Desktop WebView ───────────[ HTTP/WS 127.0.0.1:8000 
 | Theme            | App-owned `ThemeProvider` drives light/dark/system and persists via UI preferences |
 | Live Devices     | Client-runtime only; Web inventory cannot report system-global device usage and may expose temporary `temp-*` IDs before permission |
 | Desktop Devices  | Windows Tauri inventory uses Core Audio endpoint enumeration; empty device lists mean no current device, not unsupported runtime |
+| Desktop Dependencies | Windows API crates: `cfg(windows)` target gate; Linux checks: non-Windows stubs |
 | Live Audio Frames | PCM16LE, 16 kHz, mono; default capture path does not denoise, gain-normalize, compress, EQ, or trim content |
 | Desktop Audio Capture | Windows Tauri capture uses WASAPI microphone input and default output loopback; app exit releases active native sessions |
 | Live Transcript Events | `preview` and `committed_partial` stay WebSocket-only; `final` enters capped runtime output and backend history |
