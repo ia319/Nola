@@ -193,3 +193,73 @@ jobs:
           if [ -f /tmp/nola/uvicorn.pid ]; then
             kill "$(cat /tmp/nola/uvicorn.pid)" || true
           fi
+
+  desktop-rust-check:
+    name: run desktop rust checks
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Setup app runtime
+        uses: ./.github/actions/setup-app-node
+        with:
+          node-version: '24.x'
+          pnpm-version: '10'
+          project-dir: app
+          install-deps: 'true'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+
+      - name: Run desktop checks
+        run: pnpm --dir app desktop:check
+
+  desktop-windows-build:
+    name: build Windows desktop bundle
+    needs:
+      - app-test
+      - core-test
+      - desktop-rust-check
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup app runtime
+        uses: ./.github/actions/setup-app-node
+        with:
+          node-version: '24.x'
+          pnpm-version: '10'
+          project-dir: app
+          install-deps: 'true'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+
+      - name: Build Windows desktop bundle
+        run: pnpm --dir app desktop:build:windows

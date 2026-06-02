@@ -2,12 +2,7 @@ use tauri::{AppHandle, Runtime};
 
 use super::{
     capture_runtime::{CaptureControl, CaptureStartupSender},
-    dto::{NativeAudioErrorCode, NativeAudioErrorDto, NativeAudioSource, NativeCaptureSessionDto},
-    events,
-    processing::{
-        decode_interleaved_to_mono, CaptureSignalProcessor, NativeAudioProcessingError,
-        NativeInputAudioFormat, NativeSampleFormat,
-    },
+    dto::{NativeAudioErrorCode, NativeAudioErrorDto, NativeCaptureSessionDto},
     registry::CaptureSessionRegistry,
 };
 
@@ -37,7 +32,15 @@ mod platform {
         },
     };
 
-    use crate::audio::windows_com::ComApartment;
+    use crate::audio::{
+        dto::NativeAudioSource,
+        events,
+        processing::{
+            decode_interleaved_to_mono, CaptureSignalProcessor, NativeAudioProcessingError,
+            NativeInputAudioFormat, NativeSampleFormat,
+        },
+        windows_com::ComApartment,
+    };
 
     use super::*;
 
