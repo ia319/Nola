@@ -236,6 +236,10 @@ jobs:
 
   desktop-windows-build:
     name: build Windows desktop bundle
+    needs:
+      - app-test
+      - core-test
+      - desktop-rust-check
     runs-on: windows-latest
     steps:
       - name: Checkout
