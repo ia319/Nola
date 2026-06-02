@@ -25,6 +25,18 @@ repos:
         language: system
         files: ^app/(src/.*\.(ts|tsx|css)|[^/]+\.(js|ts|json|yml|yaml))$
         pass_filenames: false
+      - id: desktop-format-check
+        name: Rust format check (desktop)
+        entry: pnpm --dir app desktop:format:check
+        language: system
+        files: ^app/src-tauri/(src/.*\.rs|build\.rs)$
+        pass_filenames: false
+      - id: desktop-lint
+        name: Clippy (desktop)
+        entry: pnpm --dir app desktop:lint
+        language: system
+        files: ^app/src-tauri/(src/.*\.rs|build\.rs|Cargo\.(toml|lock))$
+        pass_filenames: false
       - id: frontend-typecheck
         name: TypeScript typecheck (app)
         entry: pnpm --dir app typecheck
