@@ -1,12 +1,4 @@
-use super::{
-    device_inventory::{
-        build_native_audio_inventory, NativeAudioEndpoint, NativeAudioEndpointInventory,
-    },
-    dto::{
-        NativeAudioDeviceKind, NativeAudioErrorCode, NativeAudioErrorDto, NativeAudioInventoryDto,
-        NativeCurrentDevicesDto,
-    },
-};
+use super::dto::{NativeAudioErrorDto, NativeAudioInventoryDto, NativeCurrentDevicesDto};
 
 #[cfg(target_os = "windows")]
 mod platform {
@@ -27,7 +19,13 @@ mod platform {
         },
     };
 
-    use crate::audio::windows_com::ComApartment;
+    use crate::audio::{
+        device_inventory::{
+            build_native_audio_inventory, NativeAudioEndpoint, NativeAudioEndpointInventory,
+        },
+        dto::{NativeAudioDeviceKind, NativeAudioErrorCode},
+        windows_com::ComApartment,
+    };
 
     use super::*;
 
