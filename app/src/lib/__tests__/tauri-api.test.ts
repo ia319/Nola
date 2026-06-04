@@ -1,13 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  clearDesktopConnectionConfig,
+  getDesktopConnectionRuntimeOptions,
   getDesktopRuntimeInfo,
   invokeTauriCommand,
   listenNativeAudioFrames,
   listenTauriEvent,
+  loadDesktopConnectionConfig,
   listNativeAudioDevices,
   pauseNativeCapture,
   resumeNativeCapture,
+  saveDesktopConnectionConfig,
   startNativeMicrophoneCapture,
   startNativeSystemCapture,
   stopNativeCapture,
@@ -72,6 +76,32 @@ describe('tauri-api boundary', () => {
 
     await expect(getDesktopRuntimeInfo()).resolves.toEqual(runtimeInfo)
     expect(invokeMock).toHaveBeenCalledWith('desktop_runtime_info', undefined)
+  })
+
+  it('invokes desktop connection config commands through stable command names', async () => {
+    invokeMock
+      .mockResolvedValueOnce({
+        backendUrl: 'https://nola.example.com',
+        managedLocalHttpOrigin: null,
+      })
+      .mockResolvedValueOnce('{"version":1}')
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+
+    await expect(getDesktopConnectionRuntimeOptions()).resolves.toEqual({
+      backendUrl: 'https://nola.example.com',
+      managedLocalHttpOrigin: null,
+    })
+    await expect(loadDesktopConnectionConfig()).resolves.toBe('{"version":1}')
+    await expect(saveDesktopConnectionConfig('{"version":1}')).resolves.toBeUndefined()
+    await expect(clearDesktopConnectionConfig()).resolves.toBeUndefined()
+
+    expect(invokeMock).toHaveBeenNthCalledWith(1, 'desktop_connection_runtime_options', undefined)
+    expect(invokeMock).toHaveBeenNthCalledWith(2, 'load_desktop_connection_config', undefined)
+    expect(invokeMock).toHaveBeenNthCalledWith(3, 'save_desktop_connection_config', {
+      payload: '{"version":1}',
+    })
+    expect(invokeMock).toHaveBeenNthCalledWith(4, 'clear_desktop_connection_config', undefined)
   })
 
   it('fetches native audio devices with the current selection state', async () => {
