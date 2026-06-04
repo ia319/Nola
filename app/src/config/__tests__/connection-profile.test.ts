@@ -31,6 +31,17 @@ describe('connection profile helpers', () => {
     })
   })
 
+  it('builds external local profiles from custom loopback origins', () => {
+    expect(
+      createExternalLocalConnectionProfile(' http://localhost:8123/ ', 'runtime-override'),
+    ).toEqual({
+      mode: 'external-local',
+      httpOrigin: 'http://localhost:8123',
+      wsOrigin: 'ws://localhost:8123',
+      source: 'runtime-override',
+    })
+  })
+
   it('returns a desktop default profile and keeps web same-origin unconfigured', () => {
     expect(getDefaultConnectionProfile('tauri')).toMatchObject({
       mode: 'external-local',
@@ -63,6 +74,14 @@ describe('connection profile helpers', () => {
       httpOrigin: 'https://nola.example.com',
       wsOrigin: 'wss://nola.example.com',
       source: 'user-config',
+    })
+    expect(
+      createRemoteConnectionProfile('https://override.example.com', 'runtime-override'),
+    ).toEqual({
+      mode: 'remote',
+      httpOrigin: 'https://override.example.com',
+      wsOrigin: 'wss://override.example.com',
+      source: 'runtime-override',
     })
   })
 

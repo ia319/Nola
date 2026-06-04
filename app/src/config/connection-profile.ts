@@ -14,7 +14,11 @@ export const CONNECTION_STATUSES = [
 export type ConnectionMode = (typeof CONNECTION_MODES)[number]
 export type ConnectionStatus = (typeof CONNECTION_STATUSES)[number]
 
-export type ConnectionProfileSource = 'tauri-sidecar' | 'default-local' | 'user-config'
+export type ConnectionProfileSource =
+  | 'tauri-sidecar'
+  | 'runtime-override'
+  | 'default-local'
+  | 'user-config'
 
 export interface BaseConnectionProfile {
   mode: ConnectionMode
@@ -30,12 +34,12 @@ export interface ManagedLocalConnectionProfile extends BaseConnectionProfile {
 
 export interface ExternalLocalConnectionProfile extends BaseConnectionProfile {
   mode: 'external-local'
-  source: 'default-local'
+  source: 'runtime-override' | 'default-local' | 'user-config'
 }
 
 export interface RemoteConnectionProfile extends BaseConnectionProfile {
   mode: 'remote'
-  source: 'user-config'
+  source: 'runtime-override' | 'user-config'
 }
 
 export type ConnectionProfile =
@@ -106,12 +110,19 @@ export function deriveWebSocketOrigin(httpOrigin: string): string {
   return url.origin
 }
 
-export function createExternalLocalConnectionProfile(): ExternalLocalConnectionProfile {
+export function createExternalLocalConnectionProfile(
+  httpOrigin: string = DEFAULT_EXTERNAL_LOCAL_HTTP_ORIGIN,
+  source: ExternalLocalConnectionProfile['source'] = 'default-local',
+): ExternalLocalConnectionProfile {
+  const normalizedHttpOrigin = normalizeLocalHttpOrigin(httpOrigin)
   return {
     mode: 'external-local',
-    httpOrigin: DEFAULT_EXTERNAL_LOCAL_HTTP_ORIGIN,
-    wsOrigin: DEFAULT_EXTERNAL_LOCAL_WS_ORIGIN,
-    source: 'default-local',
+    httpOrigin: normalizedHttpOrigin,
+    wsOrigin:
+      normalizedHttpOrigin === DEFAULT_EXTERNAL_LOCAL_HTTP_ORIGIN
+        ? DEFAULT_EXTERNAL_LOCAL_WS_ORIGIN
+        : deriveWebSocketOrigin(normalizedHttpOrigin),
+    source,
   }
 }
 
@@ -127,14 +138,31 @@ export function createManagedLocalConnectionProfile(
   }
 }
 
-export function createRemoteConnectionProfile(httpOrigin: string): RemoteConnectionProfile {
+export function createRemoteConnectionProfile(
+  httpOrigin: string,
+  source: RemoteConnectionProfile['source'] = 'user-config',
+): RemoteConnectionProfile {
   const normalizedHttpOrigin = normalizeRemoteHttpOrigin(httpOrigin)
   return {
     mode: 'remote',
     httpOrigin: normalizedHttpOrigin,
     wsOrigin: deriveWebSocketOrigin(normalizedHttpOrigin),
-    source: 'user-config',
+    source,
   }
+}
+
+export function createConnectionProfileFromHttpOrigin(
+  httpOrigin: string,
+  source: 'runtime-override' | 'user-config',
+): ExternalLocalConnectionProfile | RemoteConnectionProfile {
+  const url = parseUrl(httpOrigin, 'Backend')
+  if (url.protocol === 'http:') {
+    return createExternalLocalConnectionProfile(httpOrigin, source)
+  }
+  if (url.protocol === 'https:') {
+    return createRemoteConnectionProfile(httpOrigin, source)
+  }
+  throw new Error('Backend URL must use local http:// or remote https://')
 }
 
 export function getDefaultConnectionProfile(
