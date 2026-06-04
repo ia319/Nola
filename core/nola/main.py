@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from nola import __version__
 from nola.api.routes import (
@@ -32,7 +33,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Register routers
+if settings.cors_origin_list:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origin_list,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_credentials=False,
+    )
+
 app.include_router(config_router)
 app.include_router(models_router)
 app.include_router(transcriptions_router)

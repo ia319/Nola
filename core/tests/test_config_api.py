@@ -6,6 +6,7 @@ from unittest.mock import PropertyMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from nola.api.deps import get_app_config_db, get_file_db, get_task_db
 from nola.config.settings import Settings, settings
@@ -60,6 +61,51 @@ def client() -> TestClient:
 
 class TestConfigAPI:
     """Test aggregated config and defaults-management endpoints."""
+
+    def test_cors_origins_parse_comma_delimited_setting(self) -> None:
+        """CORS origin settings should support deploy-friendly env strings."""
+        configured = Settings(
+            cors_origins=(
+                " http://localhost:5173, , https://nola.example, tauri://localhost "
+            )
+        )
+
+        assert configured.cors_origin_list == [
+            "http://localhost:5173",
+            "https://nola.example",
+            "tauri://localhost",
+        ]
+
+    def test_cors_origins_require_scheme(self) -> None:
+        """Invalid origins should fail with a clear configuration error."""
+        with pytest.raises(ValidationError, match="CORS origins"):
+            Settings(cors_origins="localhost:5173")
+
+    def test_config_request_includes_cors_header_for_tauri_dev_origin(
+        self, client: TestClient
+    ) -> None:
+        """Regular requests should allow the Tauri dev frontend origin."""
+        origin = "http://localhost:5173"
+
+        response = client.get("/api/config", headers={"Origin": origin})
+
+        assert response.status_code == 200
+        assert response.headers["access-control-allow-origin"] == origin
+
+    def test_config_preflight_allows_tauri_dev_origin(self, client: TestClient) -> None:
+        """Preflight requests should pass before API route dispatch."""
+        origin = "http://localhost:5173"
+
+        response = client.options(
+            "/api/config",
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.headers["access-control-allow-origin"] == origin
 
     def test_get_config_returns_aggregated_payload(self, client: TestClient):
         """Get /api/config should expose the frontend-facing config contract."""

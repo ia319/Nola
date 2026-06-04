@@ -8,6 +8,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LiveRealtimeTranscriberSetting: TypeAlias = Literal["mock", "whisper_streaming"]
 
+DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+
+
+def _parse_cors_origins(value: str) -> list[str]:
+    """Return normalized CORS origins from a comma-delimited setting value."""
+    return [origin.strip() for origin in value.split(",") if origin.strip()]
+
 
 class Settings(BaseSettings):
     """Store application settings loaded from environment variables."""
@@ -26,10 +33,16 @@ class Settings(BaseSettings):
     # Server settings
     host: str = "127.0.0.1"
     port: int = 8000
+    cors_origins: str = DEFAULT_CORS_ORIGINS
 
     # Data paths
     data_dir: Path = Path("data")
     max_file_size: int = 500 * 1024 * 1024  # 500 MB
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        """Allowed browser origins for cross-origin frontend runtimes."""
+        return _parse_cors_origins(self.cors_origins)
 
     @property
     def upload_dir(self) -> Path:
@@ -57,6 +70,22 @@ class Settings(BaseSettings):
         """Normalize the Live realtime transcriber before Literal validation."""
         if isinstance(value, str):
             return value.strip().casefold()
+        return value
+
+    @field_validator("cors_origins")
+    @classmethod
+    def validate_cors_origins(cls, value: str) -> str:
+        """Validate comma-delimited CORS origins."""
+        invalid_origins = [
+            origin for origin in _parse_cors_origins(value) if "://" not in origin
+        ]
+        if invalid_origins:
+            invalid_display = ", ".join(invalid_origins)
+            msg = (
+                "CORS origins must include a scheme such as http:// or "
+                f"tauri://: {invalid_display}"
+            )
+            raise ValueError(msg)
         return value
 
 
