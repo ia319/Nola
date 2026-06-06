@@ -23,7 +23,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isPersistedConnectionMode(value: unknown): value is PersistedConnectionMode {
-  return typeof value === 'string' && PERSISTED_CONNECTION_MODES.includes(value)
+  return typeof value === 'string' && PERSISTED_CONNECTION_MODES.some((mode) => mode === value)
 }
 
 export function normalizeStoredConnectionConfig(value: unknown): StoredConnectionConfig | null {
