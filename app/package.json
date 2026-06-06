@@ -10,7 +10,7 @@
     "lint:fix": "eslint src .storybook vite.config.ts eslint.config.js --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \".storybook/**/*.{ts,tsx,js}\" \"*.{js,ts,json,yml,yaml}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \".storybook/**/*.{ts,tsx,js}\" \"*.{js,ts,json,yml,yaml}\"",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "test:ci": "vitest run --reporter=dot",
