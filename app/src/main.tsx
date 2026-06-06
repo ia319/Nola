@@ -7,6 +7,8 @@ import { getLocaleFromPath } from '@/app/locale/locale-routing'
 import { hydrateUiPreferences } from '@/app/locale/ui-preferences-store'
 import { BootstrapErrorFallback } from '@/components/bootstrap-error-fallback'
 import { ThemeProvider } from '@/components/theme-provider'
+import { resolveConnectionProfile } from '@/config/connection-profile-resolver'
+import { setActiveConnectionProfile } from '@/config/connection-runtime'
 import { installLiveDeviceDiagnostics } from '@/features/realtime'
 import { initializeI18n } from '@/i18n'
 import './index.css'
@@ -34,6 +36,9 @@ function renderBootstrapError(root: Root): void {
 }
 
 async function bootstrapApplication(root: Root): Promise<void> {
+  const connectionProfile = await resolveConnectionProfile()
+  setActiveConnectionProfile(connectionProfile)
+
   const preferences = await hydrateUiPreferences()
   const routeLocale = getLocaleFromPath(window.location.pathname)
   await initializeI18n(routeLocale ?? preferences.language)
