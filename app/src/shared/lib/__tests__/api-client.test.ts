@@ -1,6 +1,11 @@
-import axios, { type AxiosError } from 'axios'
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createExternalLocalConnectionProfile } from '@/config/connection-profile'
+import {
+  resetActiveConnectionProfile,
+  setActiveConnectionProfile,
+} from '@/config/connection-runtime'
 import apiClient from '@/shared/lib/api-client'
 import type { ApiError, AppError } from '@/shared/types'
 
@@ -8,12 +13,26 @@ vi.mock('@/config/logger', () => ({
   default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
-vi.mock('@/config/backend', () => ({
-  getApiBaseUrl: () => 'http://127.0.0.1:8000',
-}))
-
+interface RequestInterceptorManager {
+  handlers: Array<{
+    fulfilled?: (
+      config: InternalAxiosRequestConfig,
+    ) => InternalAxiosRequestConfig | Promise<InternalAxiosRequestConfig>
+  }>
+}
 interface ResponseInterceptorManager {
   handlers: Array<{ rejected?: (error: AxiosError<ApiError>) => Promise<never> }>
+}
+
+function getRequestInterceptor(): (
+  config: InternalAxiosRequestConfig,
+) => InternalAxiosRequestConfig | Promise<InternalAxiosRequestConfig> {
+  const manager = apiClient.interceptors.request as unknown as RequestInterceptorManager
+  const fulfilled = manager.handlers.at(-1)?.fulfilled
+  if (!fulfilled) {
+    throw new Error('request interceptor is not registered')
+  }
+  return fulfilled
 }
 
 /**
@@ -32,10 +51,21 @@ function getRejectedInterceptor(): (error: AxiosError<ApiError>) => Promise<neve
 describe('apiClient response interceptor', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resetActiveConnectionProfile('web')
   })
 
-  it('uses the runtime-resolved API base URL', () => {
-    expect(apiClient.defaults.baseURL).toBe('http://127.0.0.1:8000')
+  it('uses the active runtime API base URL for new requests', async () => {
+    const fulfilled = getRequestInterceptor()
+    setActiveConnectionProfile(
+      createExternalLocalConnectionProfile('http://127.0.0.1:8123', 'user-config'),
+    )
+
+    const config = await fulfilled({
+      method: 'get',
+      url: '/api/config',
+    } as InternalAxiosRequestConfig)
+
+    expect(config.baseURL).toBe('http://127.0.0.1:8123')
   })
 
   it('preserves canceled errors for caller-specific handling', async () => {

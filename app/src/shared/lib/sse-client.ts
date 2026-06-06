@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from '@/config/backend'
+import { getActiveApiBaseUrl } from '@/config/connection-runtime'
 
 export interface SSEvent<T = unknown> {
   event: string
@@ -24,7 +24,7 @@ function buildSSEUrl(baseUrl: string, path: string): string {
  * Auto-reconnect relies on browser-native EventSource behaviour.
  */
 export function createSSEConnection<T = unknown>(path: string, options: SSEOptions<T>): () => void {
-  const url = buildSSEUrl(getApiBaseUrl(), path)
+  const url = buildSSEUrl(getActiveApiBaseUrl(), path)
   const source = new EventSource(url)
 
   const eventNames = options.eventNames ?? ['message']

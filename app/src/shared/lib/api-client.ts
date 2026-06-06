@@ -1,13 +1,12 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
-import { getApiBaseUrl } from '@/config/backend'
+import { getActiveApiBaseUrl } from '@/config/connection-runtime'
 import logger from '@/config/logger'
 import { formatApiError, getApiErrorCode } from '@/shared/lib/error-utils'
 import { createApiError, createNetworkError } from '@/shared/lib/error-factory'
 import type { ApiError } from '@/shared/types'
 
 const apiClient = axios.create({
-  baseURL: getApiBaseUrl(),
   timeout: 30_000,
   // Omit global Content-Type to let Axios auto-detect:
   // - JSON requests  -> application/json
@@ -16,6 +15,7 @@ const apiClient = axios.create({
 
 // Request interceptor: log outgoing requests, extend for auth later.
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  config.baseURL = config.baseURL ?? getActiveApiBaseUrl()
   logger.debug(`[API] ${config.method?.toUpperCase()} ${config.url}`)
   return config
 })

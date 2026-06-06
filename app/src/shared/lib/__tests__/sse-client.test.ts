@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createExternalLocalConnectionProfile } from '@/config/connection-profile'
+import {
+  resetActiveConnectionProfile,
+  setActiveConnectionProfile,
+} from '@/config/connection-runtime'
 import { createSSEConnection } from '../sse-client'
-
-vi.mock('@/config/backend', () => ({
-  getApiBaseUrl: () => 'http://127.0.0.1:8000/',
-}))
 
 class FakeEventSource {
   static lastInstance: FakeEventSource | null = null
@@ -37,6 +38,10 @@ class FakeEventSource {
 
 beforeEach(() => {
   FakeEventSource.lastInstance = null
+  resetActiveConnectionProfile('web')
+  setActiveConnectionProfile(
+    createExternalLocalConnectionProfile('http://127.0.0.1:8000', 'user-config'),
+  )
   vi.unstubAllGlobals()
   vi.stubGlobal('EventSource', FakeEventSource)
 })
