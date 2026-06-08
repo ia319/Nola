@@ -42,6 +42,7 @@ vi.mock('react-i18next', () => ({
         'settings.description': 'Review and adjust product-level configuration.',
         'settings.navigationLabel': 'Settings sections',
         'settings.tabs.general': 'General',
+        'settings.tabs.connection': 'Connection',
         'settings.tabs.transcription': 'Transcription',
         'settings.tabs.liveRealtime': 'Live Realtime',
         'settings.tabs.export': 'Export',
@@ -265,6 +266,7 @@ describe('SettingsLayout', () => {
     expect(screen.getByRole('navigation', { name: 'Settings sections' })).toBeTruthy()
     expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
       'General',
+      'Connection',
       'Transcription',
       'Live Realtime',
       'Export',
