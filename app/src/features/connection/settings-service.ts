@@ -108,10 +108,10 @@ function buildEndpoint(origin: string, path: string): string {
   return url.toString()
 }
 
-function isCspViolationForOrigin(event: Event, origin: string): boolean {
+export function isCspViolationForOrigin(event: Event, origin: string): boolean {
   if (!CSP_EVENT_TYPES.has(event.type)) return false
   const violation = event as SecurityPolicyViolationEvent
-  if (!violation.blockedURI) return true
+  if (!violation.blockedURI) return false
 
   try {
     return new URL(violation.blockedURI).origin === origin
