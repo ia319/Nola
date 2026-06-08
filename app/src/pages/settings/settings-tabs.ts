@@ -5,6 +5,11 @@ export const SETTINGS_TABS = [
     labelKey: 'settings.tabs.general',
   },
   {
+    key: 'connection',
+    href: '/settings/connection',
+    labelKey: 'settings.tabs.connection',
+  },
+  {
     key: 'transcription',
     href: '/settings/transcription',
     labelKey: 'settings.tabs.transcription',

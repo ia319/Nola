@@ -1215,6 +1215,7 @@
     "navigationLabel": "Settings sections",
     "tabs": {
       "general": "General",
+      "connection": "Connection",
       "transcription": "Transcription",
       "liveRealtime": "Live Realtime",
       "export": "Export",
@@ -1264,6 +1265,75 @@
         "title": "Keep these preferences local",
         "description": "Store language, appearance, and units in this browser only.",
         "detail": "Configure the same preferences again when you switch to another browser profile or machine."
+      }
+    },
+    "connection": {
+      "loading": "Loading connection settings...",
+      "sections": {
+        "target": {
+          "label": "Connection Target"
+        }
+      },
+      "modes": {
+        "externalLocal": {
+          "label": "Local backend",
+          "description": "Use the Nola API running on this computer."
+        },
+        "remote": {
+          "label": "Remote backend",
+          "description": "Use a self-hosted Nola Node over HTTPS."
+        }
+      },
+      "fields": {
+        "mode": {
+          "label": "Backend Mode",
+          "description": "Choose where this client sends API, download, and realtime requests."
+        },
+        "backendUrl": {
+          "label": "Backend URL",
+          "localDescription": "Local mode uses the standard loopback API address.",
+          "remoteDescription": "Remote mode requires a HTTPS origin such as https://nola.example.com.",
+          "placeholder": "https://nola.example.com",
+          "localHint": "Start the local API separately in development builds."
+        },
+        "status": {
+          "label": "Connection Status",
+          "description": "Check /health and /api/config before starting work against this backend."
+        }
+      },
+      "status": {
+        "not-checked": "Not checked",
+        "unconfigured": "Not configured",
+        "checking": "Checking...",
+        "available": "Available",
+        "unreachable": "Unreachable",
+        "api-unavailable": "API unavailable",
+        "cors-blocked": "CORS blocked",
+        "csp-blocked": "Desktop policy blocked",
+        "realtime-failed": "Realtime channel failed"
+      },
+      "remoteNotice": {
+        "title": "Remote realtime sends local audio to this backend",
+        "description": "Live Realtime captures audio on this computer and streams it to the remote URL configured here."
+      },
+      "errors": {
+        "title": "Connection setting failed",
+        "load": "Connection settings could not be loaded.",
+        "save": "Connection settings could not be saved.",
+        "reset": "Connection settings could not be reset.",
+        "check": "Connection health check failed."
+      },
+      "actions": {
+        "reset": "Reset",
+        "resetting": "Resetting...",
+        "check": "Check",
+        "checking": "Checking...",
+        "save": "Save Changes",
+        "saving": "Saving..."
+      },
+      "toast": {
+        "saved": "Connection settings updated",
+        "reset": "Connection settings reset"
       }
     },
     "transcription": {
