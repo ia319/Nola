@@ -16,6 +16,7 @@ describe('connection profile helpers', () => {
       'checking',
       'available',
       'unreachable',
+      'api-unavailable',
       'cors-blocked',
       'csp-blocked',
       'realtime-failed',

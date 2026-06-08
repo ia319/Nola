@@ -6,6 +6,7 @@ export const CONNECTION_STATUSES = [
   'checking',
   'available',
   'unreachable',
+  'api-unavailable',
   'cors-blocked',
   'csp-blocked',
   'realtime-failed',
