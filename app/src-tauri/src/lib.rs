@@ -1,5 +1,5 @@
 pub mod audio;
-pub mod connection_config;
+pub mod connection;
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -121,15 +121,17 @@ fn native_audio_support() -> &'static str {
 pub fn run() {
     let audio_state = audio::DesktopAudioState::default();
     let app_audio_cleanup_state = audio_state.clone();
+    let gateway_state = connection::gateway::DesktopGatewayState::default();
 
     let app = tauri::Builder::default()
         .manage(audio_state)
+        .manage(gateway_state)
         .invoke_handler(tauri::generate_handler![
             desktop_runtime_info,
-            connection_config::desktop_connection_runtime_options,
-            connection_config::load_desktop_connection_config,
-            connection_config::save_desktop_connection_config,
-            connection_config::clear_desktop_connection_config,
+            connection::config::desktop_connection_runtime_options,
+            connection::config::load_desktop_connection_config,
+            connection::config::save_desktop_connection_config,
+            connection::config::clear_desktop_connection_config,
             list_native_audio_devices,
             start_native_microphone_capture,
             start_native_system_capture,
