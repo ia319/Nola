@@ -13,6 +13,7 @@ import {
   type ConnectionProfile,
   type ConnectionStatus,
 } from '@/config/connection-profile'
+import { resolveConnectionProfile } from '@/config/connection-profile-resolver'
 import { getActiveConnectionProfile, setActiveConnectionProfile } from '@/config/connection-runtime'
 import {
   createConnectionConfigRepository,
@@ -41,6 +42,8 @@ export interface ConnectionSettingsServiceOptions {
 }
 
 export interface ConnectionHealthCheckOptions {
+  environment?: RuntimeEnvironment
+  repository?: ConnectionConfigRepository
   fetchImpl?: typeof fetch
 }
 
@@ -50,12 +53,15 @@ export interface ConnectionHealthCheckResult {
 
 const CSP_EVENT_TYPES = new Set(['securitypolicyviolation'])
 
-function getRepository(repository?: ConnectionConfigRepository): ConnectionConfigRepository {
-  return repository ?? createConnectionConfigRepository()
-}
-
 function getEnvironment(environment?: RuntimeEnvironment): RuntimeEnvironment {
   return environment ?? getRuntimeEnvironment()
+}
+
+function getRepository(
+  repository?: ConnectionConfigRepository,
+  environment?: RuntimeEnvironment,
+): ConnectionConfigRepository {
+  return repository ?? createConnectionConfigRepository(getEnvironment(environment))
 }
 
 function profileToDraft(profile: ConnectionProfile | null): ConnectionSettingsDraft {
@@ -115,6 +121,73 @@ function createActiveProfileFromConfig(config: StoredConnectionConfig): Connecti
   }
 
   return createConnectionProfileFromConfig(config)
+}
+
+async function resolveSavedActiveProfile(
+  config: StoredConnectionConfig,
+  options: ConnectionSettingsServiceOptions,
+): Promise<ConnectionProfile> {
+  const environment = getEnvironment(options.environment)
+  if (environment === 'tauri') {
+    const resolvedProfile = await resolveConnectionProfile({
+      environment,
+      repository: getRepository(options.repository, options.environment),
+    })
+    return resolvedProfile ?? createActiveProfileFromConfig(config)
+  }
+
+  return createConnectionProfileFromConfig(config)
+}
+
+async function resolveDefaultActiveProfile(
+  options: ConnectionSettingsServiceOptions,
+): Promise<ConnectionProfile | null> {
+  const environment = getEnvironment(options.environment)
+  if (environment === 'tauri') {
+    return resolveConnectionProfile({
+      environment,
+      repository: getRepository(options.repository, options.environment),
+    })
+  }
+
+  return getDefaultConnectionProfile(environment)
+}
+
+function createProfileFromDraft(draft: ConnectionSettingsDraft): ConnectionProfile {
+  return draft.mode === 'remote'
+    ? createRemoteConnectionProfile(draft.httpOrigin, 'user-config')
+    : createExternalLocalConnectionProfile(draft.httpOrigin, 'user-config')
+}
+
+async function createHealthCheckProfile(
+  draft: ConnectionSettingsDraft,
+  options: ConnectionHealthCheckOptions,
+): Promise<ConnectionProfile> {
+  const profile = createProfileFromDraft(draft)
+  const environment = getEnvironment(options.environment)
+  if (environment !== 'tauri' || profile.mode !== 'remote') {
+    return profile
+  }
+
+  const currentProfile = getActiveConnectionProfile()
+  if (
+    currentProfile?.mode === 'remote' &&
+    currentProfile.transport === 'desktop-gateway' &&
+    currentProfile.targetHttpOrigin === profile.httpOrigin
+  ) {
+    return currentProfile
+  }
+
+  const repository = getRepository(options.repository, options.environment)
+  const storedConfig = await repository.load()
+  if (
+    storedConfig &&
+    isSameDraft(configToDraft(storedConfig), configToDraft(toStoredConnectionConfig(draft)))
+  ) {
+    return (await resolveConnectionProfile({ environment, repository })) ?? profile
+  }
+
+  return profile
 }
 
 function isSameDraft(left: ConnectionSettingsDraft, right: ConnectionSettingsDraft): boolean {
@@ -192,7 +265,7 @@ async function checkEndpoint(
 export async function loadConnectionSettingsSnapshot(
   options: ConnectionSettingsServiceOptions = {},
 ): Promise<ConnectionSettingsSnapshot> {
-  const repository = getRepository(options.repository)
+  const repository = getRepository(options.repository, options.environment)
   const environment = getEnvironment(options.environment)
   const storedConfig = await repository.load()
   let fallbackProfile = getDefaultConnectionProfile(environment)
@@ -238,10 +311,10 @@ export async function saveConnectionSettings(
   draft: ConnectionSettingsDraft,
   options: ConnectionSettingsServiceOptions = {},
 ): Promise<ConnectionSettingsSnapshot> {
-  const repository = getRepository(options.repository)
+  const repository = getRepository(options.repository, options.environment)
   const config = toStoredConnectionConfig(draft)
   await repository.save(config)
-  const activeProfile = createActiveProfileFromConfig(config)
+  const activeProfile = await resolveSavedActiveProfile(config, options)
   setActiveConnectionProfile(activeProfile)
 
   return {
@@ -254,9 +327,9 @@ export async function saveConnectionSettings(
 export async function resetConnectionSettings(
   options: ConnectionSettingsServiceOptions = {},
 ): Promise<ConnectionSettingsSnapshot> {
-  const repository = getRepository(options.repository)
+  const repository = getRepository(options.repository, options.environment)
   await repository.clear()
-  const activeProfile = getDefaultConnectionProfile(getEnvironment(options.environment))
+  const activeProfile = await resolveDefaultActiveProfile(options)
   setActiveConnectionProfile(activeProfile)
 
   return {
@@ -270,10 +343,7 @@ export async function checkConnectionHealth(
   draft: ConnectionSettingsDraft,
   options: ConnectionHealthCheckOptions = {},
 ): Promise<ConnectionHealthCheckResult> {
-  const profile =
-    draft.mode === 'remote'
-      ? createRemoteConnectionProfile(draft.httpOrigin, 'user-config')
-      : createExternalLocalConnectionProfile(draft.httpOrigin, 'user-config')
+  const profile = await createHealthCheckProfile(draft, options)
   const fetchImpl = options.fetchImpl ?? fetch
   const healthStatus = await checkEndpoint(fetchImpl, profile.httpOrigin, '/health')
 

@@ -180,7 +180,7 @@ export function useConnectionSettings(
 
     try {
       const normalizedDraft = normalizeConnectionSettingsDraft(draft)
-      const result = await checkConnectionHealth(normalizedDraft)
+      const result = await checkConnectionHealth(normalizedDraft, serviceOptions)
       setDraft(normalizedDraft)
       setStatus(result.status)
     } catch (error) {
@@ -191,7 +191,7 @@ export function useConnectionSettings(
     } finally {
       setIsChecking(false)
     }
-  }, [draft, t])
+  }, [draft, serviceOptions, t])
 
   return {
     draft,
