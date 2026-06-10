@@ -67,6 +67,7 @@ export interface DesktopRuntimeInfo {
 
 export interface DesktopConnectionRuntimeOptionsDto {
   backendUrl: string | null
+  gatewayHttpOrigin: string | null
   managedLocalHttpOrigin: string | null
 }
 

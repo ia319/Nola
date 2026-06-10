@@ -7,6 +7,7 @@ const DESKTOP_CONNECTION_CONFIG_FILE: &str = "connection-config.json";
 #[serde(rename_all = "camelCase")]
 pub struct DesktopConnectionRuntimeOptions {
     backend_url: Option<String>,
+    gateway_http_origin: Option<String>,
     managed_local_http_origin: Option<String>,
 }
 
@@ -72,6 +73,7 @@ where
 {
     DesktopConnectionRuntimeOptions {
         backend_url: parse_backend_url_arg(args),
+        gateway_http_origin: None,
         managed_local_http_origin: None,
     }
 }
@@ -116,6 +118,7 @@ mod tests {
             options.backend_url.as_deref(),
             Some("https://nola.example.com")
         );
+        assert_eq!(options.gateway_http_origin, None);
         assert_eq!(options.managed_local_http_origin, None);
     }
 

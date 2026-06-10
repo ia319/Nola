@@ -37,9 +37,7 @@
           "http://127.0.0.1:*",
           "http://localhost:*",
           "ws://127.0.0.1:*",
-          "ws://localhost:*",
-          "https:",
-          "wss:"
+          "ws://localhost:*"
         ],
         "img-src": ["'self'", "data:", "blob:"],
         "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
@@ -58,9 +56,7 @@
           "http://127.0.0.1:*",
           "http://localhost:*",
           "ws://127.0.0.1:*",
-          "ws://localhost:*",
-          "https:",
-          "wss:"
+          "ws://localhost:*"
         ],
         "img-src": ["'self'", "data:", "blob:"],
         "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],

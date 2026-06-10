@@ -82,6 +82,7 @@ describe('tauri-api boundary', () => {
     invokeMock
       .mockResolvedValueOnce({
         backendUrl: 'https://nola.example.com',
+        gatewayHttpOrigin: null,
         managedLocalHttpOrigin: null,
       })
       .mockResolvedValueOnce('{"version":1}')
@@ -90,6 +91,7 @@ describe('tauri-api boundary', () => {
 
     await expect(getDesktopConnectionRuntimeOptions()).resolves.toEqual({
       backendUrl: 'https://nola.example.com',
+      gatewayHttpOrigin: null,
       managedLocalHttpOrigin: null,
     })
     await expect(loadDesktopConnectionConfig()).resolves.toBe('{"version":1}')
