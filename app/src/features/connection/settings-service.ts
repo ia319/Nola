@@ -5,6 +5,7 @@ import {
   type StoredConnectionConfig,
 } from '@/config/connection-config'
 import {
+  createDesktopGatewayRemoteConnectionProfile,
   createExternalLocalConnectionProfile,
   createRemoteConnectionProfile,
   DEFAULT_EXTERNAL_LOCAL_HTTP_ORIGIN,
@@ -61,7 +62,7 @@ function profileToDraft(profile: ConnectionProfile | null): ConnectionSettingsDr
   if (profile?.mode === 'remote') {
     return {
       mode: 'remote',
-      httpOrigin: profile.httpOrigin,
+      httpOrigin: profile.targetHttpOrigin,
     }
   }
 
@@ -97,6 +98,23 @@ function toStoredConnectionConfig(draft: ConnectionSettingsDraft): StoredConnect
     mode: 'external-local',
     httpOrigin: profile.httpOrigin,
   }
+}
+
+function createActiveProfileFromConfig(config: StoredConnectionConfig): ConnectionProfile {
+  const currentProfile = getActiveConnectionProfile()
+  if (
+    config.mode === 'remote' &&
+    currentProfile?.mode === 'remote' &&
+    currentProfile.transport === 'desktop-gateway'
+  ) {
+    return createDesktopGatewayRemoteConnectionProfile(
+      config.httpOrigin,
+      currentProfile.httpOrigin,
+      'user-config',
+    )
+  }
+
+  return createConnectionProfileFromConfig(config)
 }
 
 function isSameDraft(left: ConnectionSettingsDraft, right: ConnectionSettingsDraft): boolean {
@@ -175,11 +193,18 @@ export async function loadConnectionSettingsSnapshot(
   options: ConnectionSettingsServiceOptions = {},
 ): Promise<ConnectionSettingsSnapshot> {
   const repository = getRepository(options.repository)
+  const environment = getEnvironment(options.environment)
   const storedConfig = await repository.load()
-  const fallbackProfile = storedConfig
-    ? createConnectionProfileFromConfig(storedConfig)
-    : getDefaultConnectionProfile(getEnvironment(options.environment))
-  const activeProfile = getActiveConnectionProfile() ?? fallbackProfile
+  let fallbackProfile = getDefaultConnectionProfile(environment)
+  if (storedConfig) {
+    try {
+      fallbackProfile = createConnectionProfileFromConfig(storedConfig)
+    } catch {
+      fallbackProfile = getDefaultConnectionProfile(environment)
+    }
+  }
+  const currentProfile = getActiveConnectionProfile()
+  const activeProfile = currentProfile ?? fallbackProfile
 
   return {
     activeProfile,
@@ -216,7 +241,7 @@ export async function saveConnectionSettings(
   const repository = getRepository(options.repository)
   const config = toStoredConnectionConfig(draft)
   await repository.save(config)
-  const activeProfile = createConnectionProfileFromConfig(config)
+  const activeProfile = createActiveProfileFromConfig(config)
   setActiveConnectionProfile(activeProfile)
 
   return {

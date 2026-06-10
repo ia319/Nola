@@ -101,9 +101,21 @@ describe('ConnectionTab', () => {
     expect(screen.getByRole('button', { name: 'Save Changes' })).toBeDisabled()
   })
 
-  it('validates and saves a remote HTTPS backend URL', async () => {
+  it('allows desktop users to configure a remote backend target', async () => {
+    render(
+      <ConnectionTab environment="tauri" repository={new MemoryConnectionConfigRepository()} />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('radio', { name: /Remote backend/ })).toBeTruthy()
+    })
+
+    expect(screen.getByRole('radio', { name: /Remote backend/ })).not.toBeDisabled()
+  })
+
+  it('validates and saves a remote HTTPS backend URL for web clients', async () => {
     const repository = new MemoryConnectionConfigRepository()
-    render(<ConnectionTab environment="tauri" repository={repository} />)
+    render(<ConnectionTab environment="web" repository={repository} />)
 
     await waitFor(() => {
       expect(screen.getByRole('radio', { name: /Remote backend/ })).toBeTruthy()

@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input'
 import type { ConnectionConfigRepository } from '@/config/connection-config-storage'
 import { useConnectionSettings, type ConnectionSettingsMode } from '@/features/connection'
 import { FormRow } from '@/layouts'
+import { getRuntimeEnvironment, type RuntimeEnvironment } from '@/lib/runtime-environment'
 import { cn } from '@/lib/utils'
-import type { RuntimeEnvironment } from '@/lib/runtime-environment'
 
 interface ConnectionTabProps {
   environment?: RuntimeEnvironment
@@ -41,7 +41,8 @@ function StatusValue({ status }: { status: string }) {
 
 export function ConnectionTab({ environment, repository }: ConnectionTabProps) {
   const { t } = useTranslation()
-  const settings = useConnectionSettings({ environment, repository })
+  const effectiveEnvironment = environment ?? getRuntimeEnvironment()
+  const settings = useConnectionSettings({ environment: effectiveEnvironment, repository })
   const controlsDisabled =
     settings.isLoading || settings.isSaving || settings.isResetting || settings.isChecking
   const remoteMode = settings.draft.mode === 'remote'
