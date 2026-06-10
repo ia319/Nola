@@ -73,6 +73,12 @@ interface ActiveCaptureSession {
   ownedByService: boolean
 }
 
+interface ActiveTrackRuntime {
+  track: LiveTrack
+  nextFrameSequence: number
+  firstCapturedAtMs: LiveDurationMs | null
+}
+
 export class LiveRealtimeSessionError extends Error implements LiveRealtimeRuntimeError {
   readonly code: LiveRealtimeRuntimeErrorCode
   readonly retryable: boolean
@@ -96,7 +102,7 @@ export class LiveRealtimeSessionService {
   private readonly trackReadyTimeoutMs: LiveDurationMs
   private readonly sessionFinishTimeoutMs: LiveDurationMs
   private readonly captureSessions = new Map<LiveAudioSourceKind, ActiveCaptureSession>()
-  private readonly tracksBySource = new Map<LiveAudioSourceKind, LiveTrack>()
+  private readonly tracksBySource = new Map<LiveAudioSourceKind, ActiveTrackRuntime>()
   private readonly captureUnsubscribers: LiveUnsubscribe[] = []
   private readonly transportUnsubscribers: LiveUnsubscribe[] = []
   private transport: LiveRealtimeTransport | null = null
@@ -127,11 +133,12 @@ export class LiveRealtimeSessionService {
     this.requireState('idle', 'Live realtime session has already started')
 
     const sources = normalizeSources(options.sources)
+    const payload = buildCreateLiveSessionPayload(options)
     this.runState = 'starting'
     useLiveRealtimeStore.getState().setLiveRealtimeStarting()
 
     try {
-      const session = await this.createLiveSession(buildCreateLiveSessionPayload(options))
+      const session = await this.createLiveSession(payload)
       this.session = session
       useLiveRealtimeStore.getState().setLiveRealtimeSession(session)
 
@@ -265,7 +272,7 @@ export class LiveRealtimeSessionService {
       channelCount: LIVE_REALTIME_AUDIO_CHANNEL_COUNT,
     })
     const track = await trackReadyPromise
-    this.tracksBySource.set(source, track)
+    this.tracksBySource.set(source, createActiveTrackRuntime(track))
     useLiveRealtimeStore.getState().setLiveRealtimeTrack(track)
 
     this.captureUnsubscribers.push(
@@ -374,24 +381,31 @@ export class LiveRealtimeSessionService {
 
   private sendCaptureFrame(frame: RealtimeAudioFrame): void {
     const transport = this.transport
-    const track = this.tracksBySource.get(frame.source)
+    const trackRuntime = this.tracksBySource.get(frame.source)
 
-    if (!transport || !track || this.runState === 'finishing' || this.runState === 'finished') {
+    if (
+      !transport ||
+      !trackRuntime ||
+      this.runState === 'finishing' ||
+      this.runState === 'finished'
+    ) {
       return
     }
 
     try {
+      const outboundFrame = mapCaptureFrameToTrackFrame(frame, trackRuntime)
       transport.sendAudioFrame({
-        trackId: track.track_id,
+        trackId: trackRuntime.track.track_id,
         source: frame.source,
-        sequence: frame.sequence,
-        capturedAtMs: frame.capturedAtMs,
+        sequence: outboundFrame.sequence,
+        capturedAtMs: outboundFrame.capturedAtMs,
         durationMs: frame.durationMs,
         payload: frame.payload,
         encoding: frame.format,
         sampleRate: frame.sampleRate,
         channelCount: frame.channelCount,
       })
+      trackRuntime.nextFrameSequence += 1
     } catch (error) {
       this.handleRuntimeFailure(error)
     }
@@ -423,7 +437,7 @@ export class LiveRealtimeSessionService {
         this.tracksBySource.delete(event.track.source)
         useLiveRealtimeStore.getState().removeLiveRealtimeTrack(event.track.source)
       } else {
-        this.tracksBySource.set(event.track.source, event.track)
+        this.tracksBySource.set(event.track.source, createActiveTrackRuntime(event.track))
         useLiveRealtimeStore.getState().setLiveRealtimeTrack(event.track)
       }
     } else if (event.type === 'transcript.preview') {
@@ -635,10 +649,10 @@ export class LiveRealtimeSessionService {
   private stopTracks(transport: LiveRealtimeTransport): void {
     let firstError: unknown = null
 
-    for (const track of this.tracksBySource.values()) {
+    for (const trackRuntime of this.tracksBySource.values()) {
       try {
-        transport.stopTrack(track.track_id)
-        useLiveRealtimeStore.getState().removeLiveRealtimeTrack(track.source)
+        transport.stopTrack(trackRuntime.track.track_id)
+        useLiveRealtimeStore.getState().removeLiveRealtimeTrack(trackRuntime.track.source)
       } catch (error) {
         firstError ??= error
       }
@@ -700,6 +714,26 @@ function createStoppedCaptureStateChange(): LiveCaptureStateChange {
     state: 'stopped',
     changedAt: Date.now(),
     errorCode: null,
+  }
+}
+
+function createActiveTrackRuntime(track: LiveTrack): ActiveTrackRuntime {
+  return {
+    track,
+    nextFrameSequence: 0,
+    firstCapturedAtMs: null,
+  }
+}
+
+function mapCaptureFrameToTrackFrame(
+  frame: RealtimeAudioFrame,
+  trackRuntime: ActiveTrackRuntime,
+): Pick<RealtimeAudioFrame, 'sequence' | 'capturedAtMs'> {
+  trackRuntime.firstCapturedAtMs ??= frame.capturedAtMs
+
+  return {
+    sequence: trackRuntime.nextFrameSequence,
+    capturedAtMs: Math.max(0, frame.capturedAtMs - trackRuntime.firstCapturedAtMs),
   }
 }
 
