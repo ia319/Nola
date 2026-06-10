@@ -102,7 +102,10 @@ describe('connection config model', () => {
       mode: 'remote',
       httpOrigin: 'https://nola.example.com',
       wsOrigin: 'wss://nola.example.com',
+      targetHttpOrigin: 'https://nola.example.com',
+      targetWsOrigin: 'wss://nola.example.com',
       source: 'user-config',
+      transport: 'direct',
     })
   })
 })

@@ -1,6 +1,7 @@
 import { type RuntimeEnvironment } from '@/lib/runtime-environment'
 
 export const CONNECTION_MODES = ['managed-local', 'external-local', 'remote'] as const
+export const CONNECTION_TRANSPORTS = ['direct', 'desktop-gateway'] as const
 export const CONNECTION_STATUSES = [
   'unconfigured',
   'checking',
@@ -13,6 +14,7 @@ export const CONNECTION_STATUSES = [
 ] as const
 
 export type ConnectionMode = (typeof CONNECTION_MODES)[number]
+export type ConnectionTransport = (typeof CONNECTION_TRANSPORTS)[number]
 export type ConnectionStatus = (typeof CONNECTION_STATUSES)[number]
 
 export type ConnectionProfileSource =
@@ -25,7 +27,10 @@ export interface BaseConnectionProfile {
   mode: ConnectionMode
   httpOrigin: string
   wsOrigin: string
+  targetHttpOrigin: string
+  targetWsOrigin: string
   source: ConnectionProfileSource
+  transport: ConnectionTransport
 }
 
 export interface ManagedLocalConnectionProfile extends BaseConnectionProfile {
@@ -116,14 +121,18 @@ export function createExternalLocalConnectionProfile(
   source: ExternalLocalConnectionProfile['source'] = 'default-local',
 ): ExternalLocalConnectionProfile {
   const normalizedHttpOrigin = normalizeLocalHttpOrigin(httpOrigin)
+  const normalizedWsOrigin =
+    normalizedHttpOrigin === DEFAULT_EXTERNAL_LOCAL_HTTP_ORIGIN
+      ? DEFAULT_EXTERNAL_LOCAL_WS_ORIGIN
+      : deriveWebSocketOrigin(normalizedHttpOrigin)
   return {
     mode: 'external-local',
     httpOrigin: normalizedHttpOrigin,
-    wsOrigin:
-      normalizedHttpOrigin === DEFAULT_EXTERNAL_LOCAL_HTTP_ORIGIN
-        ? DEFAULT_EXTERNAL_LOCAL_WS_ORIGIN
-        : deriveWebSocketOrigin(normalizedHttpOrigin),
+    wsOrigin: normalizedWsOrigin,
+    targetHttpOrigin: normalizedHttpOrigin,
+    targetWsOrigin: normalizedWsOrigin,
     source,
+    transport: 'direct',
   }
 }
 
@@ -131,11 +140,15 @@ export function createManagedLocalConnectionProfile(
   httpOrigin: string,
 ): ManagedLocalConnectionProfile {
   const normalizedHttpOrigin = normalizeLocalHttpOrigin(httpOrigin)
+  const normalizedWsOrigin = deriveWebSocketOrigin(normalizedHttpOrigin)
   return {
     mode: 'managed-local',
     httpOrigin: normalizedHttpOrigin,
-    wsOrigin: deriveWebSocketOrigin(normalizedHttpOrigin),
+    wsOrigin: normalizedWsOrigin,
+    targetHttpOrigin: normalizedHttpOrigin,
+    targetWsOrigin: normalizedWsOrigin,
     source: 'tauri-sidecar',
+    transport: 'direct',
   }
 }
 
@@ -144,11 +157,35 @@ export function createRemoteConnectionProfile(
   source: RemoteConnectionProfile['source'] = 'user-config',
 ): RemoteConnectionProfile {
   const normalizedHttpOrigin = normalizeRemoteHttpOrigin(httpOrigin)
+  const normalizedWsOrigin = deriveWebSocketOrigin(normalizedHttpOrigin)
   return {
     mode: 'remote',
     httpOrigin: normalizedHttpOrigin,
-    wsOrigin: deriveWebSocketOrigin(normalizedHttpOrigin),
+    wsOrigin: normalizedWsOrigin,
+    targetHttpOrigin: normalizedHttpOrigin,
+    targetWsOrigin: normalizedWsOrigin,
     source,
+    transport: 'direct',
+  }
+}
+
+export function createDesktopGatewayRemoteConnectionProfile(
+  targetHttpOrigin: string,
+  gatewayHttpOrigin: string,
+  source: RemoteConnectionProfile['source'],
+): RemoteConnectionProfile {
+  const normalizedTargetHttpOrigin = normalizeRemoteHttpOrigin(targetHttpOrigin)
+  const normalizedGatewayHttpOrigin = normalizeLocalHttpOrigin(gatewayHttpOrigin)
+  const normalizedGatewayWsOrigin = deriveWebSocketOrigin(normalizedGatewayHttpOrigin)
+  const normalizedTargetWsOrigin = deriveWebSocketOrigin(normalizedTargetHttpOrigin)
+  return {
+    mode: 'remote',
+    httpOrigin: normalizedGatewayHttpOrigin,
+    wsOrigin: normalizedGatewayWsOrigin,
+    targetHttpOrigin: normalizedTargetHttpOrigin,
+    targetWsOrigin: normalizedTargetWsOrigin,
+    source,
+    transport: 'desktop-gateway',
   }
 }
 

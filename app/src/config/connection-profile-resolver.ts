@@ -3,6 +3,7 @@ import { getDesktopConnectionRuntimeOptions } from '@/lib/tauri-api'
 
 import { createConnectionProfileFromConfig } from './connection-config'
 import {
+  createDesktopGatewayRemoteConnectionProfile,
   createConnectionProfileFromHttpOrigin,
   createManagedLocalConnectionProfile,
   getDefaultConnectionProfile,
@@ -15,6 +16,7 @@ import {
 
 export interface ConnectionRuntimeOverrides {
   managedLocalHttpOrigin?: string | null
+  gatewayHttpOrigin?: string | null
   backendUrl?: string | null
 }
 
@@ -26,6 +28,26 @@ export interface ResolveConnectionProfileOptions {
 
 function hasConfiguredValue(value: string | null | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0
+}
+
+function applyDesktopGatewayIfAvailable(
+  profile: ConnectionProfile,
+  environment: RuntimeEnvironment,
+  runtimeOverrides: ConnectionRuntimeOverrides,
+): ConnectionProfile {
+  if (
+    environment === 'tauri' &&
+    profile.mode === 'remote' &&
+    hasConfiguredValue(runtimeOverrides.gatewayHttpOrigin)
+  ) {
+    return createDesktopGatewayRemoteConnectionProfile(
+      profile.targetHttpOrigin,
+      runtimeOverrides.gatewayHttpOrigin,
+      profile.source,
+    )
+  }
+
+  return profile
 }
 
 async function loadRuntimeOverrides(
@@ -53,13 +75,18 @@ export async function resolveConnectionProfile(
   }
 
   if (hasConfiguredValue(runtimeOverrides.backendUrl)) {
-    return createConnectionProfileFromHttpOrigin(runtimeOverrides.backendUrl, 'runtime-override')
+    const profile = createConnectionProfileFromHttpOrigin(
+      runtimeOverrides.backendUrl,
+      'runtime-override',
+    )
+    return applyDesktopGatewayIfAvailable(profile, environment, runtimeOverrides)
   }
 
   const repository = options.repository ?? createConnectionConfigRepository(environment)
   const storedConfig = await repository.load()
   if (storedConfig) {
-    return createConnectionProfileFromConfig(storedConfig)
+    const profile = createConnectionProfileFromConfig(storedConfig)
+    return applyDesktopGatewayIfAvailable(profile, environment, runtimeOverrides)
   }
 
   return getDefaultConnectionProfile(environment)

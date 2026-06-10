@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   CONNECTION_STATUSES,
+  createDesktopGatewayRemoteConnectionProfile,
   createExternalLocalConnectionProfile,
   createManagedLocalConnectionProfile,
   createRemoteConnectionProfile,
@@ -28,7 +29,10 @@ describe('connection profile helpers', () => {
       mode: 'external-local',
       httpOrigin: 'http://127.0.0.1:8000',
       wsOrigin: 'ws://127.0.0.1:8000',
+      targetHttpOrigin: 'http://127.0.0.1:8000',
+      targetWsOrigin: 'ws://127.0.0.1:8000',
       source: 'default-local',
+      transport: 'direct',
     })
   })
 
@@ -39,7 +43,10 @@ describe('connection profile helpers', () => {
       mode: 'external-local',
       httpOrigin: 'http://localhost:8123',
       wsOrigin: 'ws://localhost:8123',
+      targetHttpOrigin: 'http://localhost:8123',
+      targetWsOrigin: 'ws://localhost:8123',
       source: 'runtime-override',
+      transport: 'direct',
     })
   })
 
@@ -56,7 +63,10 @@ describe('connection profile helpers', () => {
       mode: 'managed-local',
       httpOrigin: 'http://localhost:8123',
       wsOrigin: 'ws://localhost:8123',
+      targetHttpOrigin: 'http://localhost:8123',
+      targetWsOrigin: 'ws://localhost:8123',
       source: 'tauri-sidecar',
+      transport: 'direct',
     })
   })
 
@@ -74,7 +84,10 @@ describe('connection profile helpers', () => {
       mode: 'remote',
       httpOrigin: 'https://nola.example.com',
       wsOrigin: 'wss://nola.example.com',
+      targetHttpOrigin: 'https://nola.example.com',
+      targetWsOrigin: 'wss://nola.example.com',
       source: 'user-config',
+      transport: 'direct',
     })
     expect(
       createRemoteConnectionProfile('https://override.example.com', 'runtime-override'),
@@ -82,7 +95,28 @@ describe('connection profile helpers', () => {
       mode: 'remote',
       httpOrigin: 'https://override.example.com',
       wsOrigin: 'wss://override.example.com',
+      targetHttpOrigin: 'https://override.example.com',
+      targetWsOrigin: 'wss://override.example.com',
       source: 'runtime-override',
+      transport: 'direct',
+    })
+  })
+
+  it('builds desktop gateway profiles with separate target and connection origins', () => {
+    expect(
+      createDesktopGatewayRemoteConnectionProfile(
+        'https://nola.example.com',
+        'http://127.0.0.1:4132',
+        'user-config',
+      ),
+    ).toEqual({
+      mode: 'remote',
+      httpOrigin: 'http://127.0.0.1:4132',
+      wsOrigin: 'ws://127.0.0.1:4132',
+      targetHttpOrigin: 'https://nola.example.com',
+      targetWsOrigin: 'wss://nola.example.com',
+      source: 'user-config',
+      transport: 'desktop-gateway',
     })
   })
 
