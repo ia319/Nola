@@ -1309,7 +1309,7 @@
         "unreachable": "Unreachable",
         "api-unavailable": "API unavailable",
         "cors-blocked": "CORS blocked",
-        "csp-blocked": "Desktop policy blocked",
+        "csp-blocked": "Content Security Policy blocked",
         "realtime-failed": "Realtime channel failed"
       },
       "remoteNotice": {

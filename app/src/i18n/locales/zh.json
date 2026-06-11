@@ -1308,7 +1308,7 @@
         "unreachable": "不可达",
         "api-unavailable": "API 不可用",
         "cors-blocked": "CORS 阻止",
-        "csp-blocked": "桌面策略阻止",
+        "csp-blocked": "内容安全策略阻止",
         "realtime-failed": "实时通道失败"
       },
       "remoteNotice": {
