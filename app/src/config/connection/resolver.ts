@@ -1,18 +1,15 @@
 import { getRuntimeEnvironment, type RuntimeEnvironment } from '@/lib/runtime-environment'
 import { getDesktopConnectionRuntimeOptions } from '@/lib/tauri-api'
 
-import { createConnectionProfileFromConfig } from './connection-config'
+import { createConnectionProfileFromConfig } from './config'
 import {
   createDesktopGatewayRemoteConnectionProfile,
   createConnectionProfileFromHttpOrigin,
   createManagedLocalConnectionProfile,
   getDefaultConnectionProfile,
   type ConnectionProfile,
-} from './connection-profile'
-import {
-  createConnectionConfigRepository,
-  type ConnectionConfigRepository,
-} from './connection-config-storage'
+} from './profile'
+import { createConnectionConfigRepository, type ConnectionConfigRepository } from './storage'
 
 export interface ConnectionRuntimeOverrides {
   managedLocalHttpOrigin?: string | null

@@ -4,9 +4,9 @@ import {
   DEFAULT_EXTERNAL_LOCAL_HTTP_ORIGIN,
   DEFAULT_EXTERNAL_LOCAL_WS_ORIGIN,
   getDefaultConnectionProfile,
-} from './connection-profile'
-import { getActiveApiBaseUrl, getActiveWebSocketBaseUrl } from './connection-runtime'
-import env from './env'
+} from './profile'
+import { getActiveApiBaseUrl, getActiveWebSocketBaseUrl } from './runtime'
+import env from '../env'
 
 export const DESKTOP_BACKEND_HTTP_ORIGIN = DEFAULT_EXTERNAL_LOCAL_HTTP_ORIGIN
 export const DESKTOP_BACKEND_WS_ORIGIN = DEFAULT_EXTERNAL_LOCAL_WS_ORIGIN

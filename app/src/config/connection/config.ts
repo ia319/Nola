@@ -3,7 +3,7 @@ import {
   createExternalLocalConnectionProfile,
   createRemoteConnectionProfile,
   type ConnectionProfile,
-} from './connection-profile'
+} from './profile'
 
 export const CONNECTION_CONFIG_VERSION = 1
 export const CONNECTION_CONFIG_STORAGE_KEY = 'nola-connection-config'

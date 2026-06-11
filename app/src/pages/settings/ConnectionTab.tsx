@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import type { ConnectionConfigRepository } from '@/config/connection-config-storage'
+import type { ConnectionConfigRepository } from '@/config/connection/storage'
 import { useConnectionSettings, type ConnectionSettingsMode } from '@/features/connection'
 import { FormRow } from '@/layouts'
 import { getRuntimeEnvironment, type RuntimeEnvironment } from '@/lib/runtime-environment'

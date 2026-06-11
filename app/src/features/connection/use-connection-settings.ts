@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 
-import type { StoredConnectionConfig } from '@/config/connection-config'
+import type { StoredConnectionConfig } from '@/config/connection/config'
 import {
   DEFAULT_EXTERNAL_LOCAL_HTTP_ORIGIN,
   type ConnectionProfile,
-} from '@/config/connection-profile'
-import type { ConnectionConfigRepository } from '@/config/connection-config-storage'
+} from '@/config/connection/profile'
+import type { ConnectionConfigRepository } from '@/config/connection/storage'
 import type { RuntimeEnvironment } from '@/lib/runtime-environment'
 
 import {

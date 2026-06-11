@@ -8,7 +8,7 @@ import {
   createRemoteConnectionProfile,
   deriveWebSocketOrigin,
   getDefaultConnectionProfile,
-} from '../connection-profile'
+} from '../profile'
 
 describe('connection profile helpers', () => {
   it('defines connection statuses for the current unauthenticated connection flow', () => {

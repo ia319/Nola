@@ -2,13 +2,13 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { CONNECTION_CONFIG_STORAGE_KEY, CONNECTION_CONFIG_VERSION } from '../connection-config'
+import { CONNECTION_CONFIG_STORAGE_KEY, CONNECTION_CONFIG_VERSION } from '../config'
 import {
   BrowserConnectionConfigRepository,
   createConnectionConfigRepository,
   DesktopConnectionConfigRepository,
   MemoryConnectionConfigRepository,
-} from '../connection-config-storage'
+} from '../storage'
 
 const loadDesktopConnectionConfigMock = vi.hoisted(() => vi.fn())
 const saveDesktopConnectionConfigMock = vi.hoisted(() => vi.fn())

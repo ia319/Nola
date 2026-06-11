@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createExternalLocalConnectionProfile } from '@/config/connection-profile'
+import { createExternalLocalConnectionProfile } from '@/config/connection/profile'
 import {
   resetActiveConnectionProfile,
   setActiveConnectionProfile,
-} from '@/config/connection-runtime'
+} from '@/config/connection/runtime'
 import { createSSEConnection } from '../sse-client'
 
 class FakeEventSource {

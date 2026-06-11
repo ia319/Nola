@@ -3,7 +3,7 @@ import {
   createConnectionProfileFromConfig,
   type PersistedConnectionMode,
   type StoredConnectionConfig,
-} from '@/config/connection-config'
+} from '@/config/connection/config'
 import {
   createDesktopGatewayRemoteConnectionProfile,
   createExternalLocalConnectionProfile,
@@ -12,17 +12,17 @@ import {
   getDefaultConnectionProfile,
   type ConnectionProfile,
   type ConnectionStatus,
-} from '@/config/connection-profile'
+} from '@/config/connection/profile'
 import {
   resolveConnectionProfile,
   resolveConnectionProfileWithDiagnostics,
   type ConnectionProfileResolutionWarning,
-} from '@/config/connection-profile-resolver'
-import { getActiveConnectionProfile, setActiveConnectionProfile } from '@/config/connection-runtime'
+} from '@/config/connection/resolver'
+import { getActiveConnectionProfile, setActiveConnectionProfile } from '@/config/connection/runtime'
 import {
   createConnectionConfigRepository,
   type ConnectionConfigRepository,
-} from '@/config/connection-config-storage'
+} from '@/config/connection/storage'
 import { getRuntimeEnvironment, type RuntimeEnvironment } from '@/lib/runtime-environment'
 
 export type ConnectionSettingsMode = PersistedConnectionMode

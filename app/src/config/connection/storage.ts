@@ -11,7 +11,7 @@ import {
   parseStoredConnectionConfig,
   serializeStoredConnectionConfig,
   type StoredConnectionConfig,
-} from './connection-config'
+} from './config'
 
 export interface ConnectionConfigRepository {
   load(): Promise<StoredConnectionConfig | null>

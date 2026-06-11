@@ -1,11 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { CONNECTION_CONFIG_VERSION } from '../connection-config'
-import { MemoryConnectionConfigRepository } from '../connection-config-storage'
-import {
-  resolveConnectionProfile,
-  resolveConnectionProfileWithDiagnostics,
-} from '../connection-profile-resolver'
+import { CONNECTION_CONFIG_VERSION } from '../config'
+import { MemoryConnectionConfigRepository } from '../storage'
+import { resolveConnectionProfile, resolveConnectionProfileWithDiagnostics } from '../resolver'
 
 const getDesktopConnectionRuntimeOptionsMock = vi.hoisted(() => vi.fn())
 

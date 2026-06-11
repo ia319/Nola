@@ -1,4 +1,4 @@
-import { getActiveApiBaseUrl } from '@/config/connection-runtime'
+import { getActiveApiBaseUrl } from '@/config/connection/runtime'
 
 export interface SSEvent<T = unknown> {
   event: string

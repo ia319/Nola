@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { createExternalLocalConnectionProfile } from '@/config/connection-profile'
+import { createExternalLocalConnectionProfile } from '@/config/connection/profile'
 import {
   resetActiveConnectionProfile,
   setActiveConnectionProfile,
-} from '@/config/connection-runtime'
+} from '@/config/connection/runtime'
 import { buildLiveRealtimeWebSocketUrl } from '../websocket-url'
 
 describe('live realtime websocket URL builder', () => {

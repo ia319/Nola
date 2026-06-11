@@ -1,4 +1,4 @@
-import { getActiveWebSocketBaseUrl } from '@/config/connection-runtime'
+import { getActiveWebSocketBaseUrl } from '@/config/connection/runtime'
 
 export function buildLiveRealtimeWebSocketUrl(sessionId: string, baseUrl?: string): string {
   const path = `/api/live/sessions/${encodeURIComponent(sessionId)}/stream`

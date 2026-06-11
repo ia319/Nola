@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { createExternalLocalConnectionProfile } from '../connection-profile'
+import { createExternalLocalConnectionProfile } from '../profile'
 import {
   getActiveApiBaseUrl,
   getActiveConnectionProfile,
@@ -8,9 +8,9 @@ import {
   resetActiveConnectionProfile,
   setActiveConnectionProfile,
   subscribeActiveConnectionProfile,
-} from '../connection-runtime'
+} from '../runtime'
 
-vi.mock('../env', () => ({
+vi.mock('../../env', () => ({
   default: {
     apiBaseUrl: '',
     wsBaseUrl: 'wss://example.test/realtime',

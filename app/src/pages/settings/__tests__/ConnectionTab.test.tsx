@@ -3,9 +3,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { CONNECTION_CONFIG_VERSION } from '@/config/connection-config'
-import { MemoryConnectionConfigRepository } from '@/config/connection-config-storage'
-import { resetActiveConnectionProfile } from '@/config/connection-runtime'
+import { CONNECTION_CONFIG_VERSION } from '@/config/connection/config'
+import { MemoryConnectionConfigRepository } from '@/config/connection/storage'
+import { resetActiveConnectionProfile } from '@/config/connection/runtime'
 
 const connectionTabMocks = vi.hoisted(() => ({
   toastSuccessMock: vi.fn(),

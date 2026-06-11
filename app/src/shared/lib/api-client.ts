@@ -1,6 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
-import { getActiveApiBaseUrl } from '@/config/connection-runtime'
+import { getActiveApiBaseUrl } from '@/config/connection/runtime'
 import logger from '@/config/logger'
 import { formatApiError, getApiErrorCode } from '@/shared/lib/error-utils'
 import { createApiError, createNetworkError } from '@/shared/lib/error-factory'

@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { CONNECTION_CONFIG_VERSION } from '@/config/connection-config'
-import { MemoryConnectionConfigRepository } from '@/config/connection-config-storage'
+import { CONNECTION_CONFIG_VERSION } from '@/config/connection/config'
+import { MemoryConnectionConfigRepository } from '@/config/connection/storage'
 import {
   createDesktopGatewayRemoteConnectionProfile,
   createExternalLocalConnectionProfile,
-} from '@/config/connection-profile'
+} from '@/config/connection/profile'
 import {
   resetActiveConnectionProfile,
   setActiveConnectionProfile,
-} from '@/config/connection-runtime'
+} from '@/config/connection/runtime'
 import {
   checkConnectionHealth,
   hasConnectionSettingsChanges,

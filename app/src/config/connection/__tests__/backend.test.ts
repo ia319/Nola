@@ -7,7 +7,7 @@ import {
   getRealtimeWebSocketBaseUrl,
 } from '../backend'
 
-vi.mock('../env', () => ({
+vi.mock('../../env', () => ({
   default: {
     apiBaseUrl: '',
     wsBaseUrl: 'wss://example.test/realtime',

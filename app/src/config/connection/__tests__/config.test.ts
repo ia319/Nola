@@ -6,7 +6,7 @@ import {
   normalizeStoredConnectionConfig,
   parseStoredConnectionConfig,
   serializeStoredConnectionConfig,
-} from '../connection-config'
+} from '../config'
 
 describe('connection config model', () => {
   it('normalizes external local configs to loopback origins', () => {

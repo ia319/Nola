@@ -1,11 +1,11 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createExternalLocalConnectionProfile } from '@/config/connection-profile'
+import { createExternalLocalConnectionProfile } from '@/config/connection/profile'
 import {
   resetActiveConnectionProfile,
   setActiveConnectionProfile,
-} from '@/config/connection-runtime'
+} from '@/config/connection/runtime'
 import apiClient from '@/shared/lib/api-client'
 import type { ApiError, AppError } from '@/shared/types'
 

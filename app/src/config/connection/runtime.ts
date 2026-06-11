@@ -1,7 +1,7 @@
 import { getRuntimeEnvironment, type RuntimeEnvironment } from '@/lib/runtime-environment'
 
-import { getDefaultConnectionProfile, type ConnectionProfile } from './connection-profile'
-import env from './env'
+import { getDefaultConnectionProfile, type ConnectionProfile } from './profile'
+import env from '../env'
 
 export type ConnectionProfileListener = (profile: ConnectionProfile | null) => void
 
