@@ -2,6 +2,7 @@ use std::{
     convert::Infallible,
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
+    time::Duration,
 };
 
 use bytes::Bytes;
@@ -22,7 +23,13 @@ use hyper_util::rt::TokioIo;
 use tokio::{net::TcpListener, sync::Mutex, sync::RwLock};
 use tokio_tungstenite::{
     connect_async,
-    tungstenite::{handshake::derive_accept_key, protocol::Role},
+    tungstenite::{
+        handshake::derive_accept_key,
+        protocol::{
+            frame::{coding::CloseCode, CloseFrame},
+            Role,
+        },
+    },
     WebSocketStream,
 };
 use url::Url;
@@ -33,6 +40,8 @@ type ProxyBody = BoxBody<Bytes, ProxyError>;
 const LOCAL_GATEWAY_HOST: Ipv4Addr = Ipv4Addr::LOCALHOST;
 const SEC_WEBSOCKET_KEY: &str = "sec-websocket-key";
 const SEC_WEBSOCKET_ACCEPT: &str = "sec-websocket-accept";
+const UPSTREAM_HTTP_TIMEOUT: Duration = Duration::from_secs(60);
+const UPSTREAM_WEBSOCKET_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Clone)]
 pub struct DesktopGatewayState {
@@ -224,7 +233,8 @@ async fn proxy_http_request(
 
     let mut outbound = client
         .request(reqwest_method, target_url)
-        .body(reqwest::Body::wrap_stream(body_stream));
+        .body(reqwest::Body::wrap_stream(body_stream))
+        .timeout(UPSTREAM_HTTP_TIMEOUT);
 
     for (name, value) in headers.iter() {
         if should_forward_request_header(name) {
@@ -285,11 +295,25 @@ async fn handle_websocket_request(
 
 async fn proxy_websocket(upgraded: hyper::upgrade::Upgraded, target_url: String) {
     let client_io = TokioIo::new(upgraded);
-    let client_ws = WebSocketStream::from_raw_socket(client_io, Role::Server, None).await;
+    let mut client_ws = WebSocketStream::from_raw_socket(client_io, Role::Server, None).await;
     // The current desktop remote mode trusts the configured Nola Node. A future
     // remote auth flow should add a short-lived live-session token here.
-    let Ok((upstream_ws, _response)) = connect_async(target_url).await else {
-        return;
+    let upstream_result = tokio::time::timeout(
+        UPSTREAM_WEBSOCKET_CONNECT_TIMEOUT,
+        connect_async(target_url),
+    )
+    .await;
+    let upstream_ws = match upstream_result {
+        Ok(Ok((upstream_ws, _response))) => upstream_ws,
+        _ => {
+            let _ = client_ws
+                .close(Some(CloseFrame {
+                    code: CloseCode::Policy,
+                    reason: "Upstream WebSocket unavailable".into(),
+                }))
+                .await;
+            return;
+        }
     };
 
     let (mut client_sink, mut client_stream) = client_ws.split();
