@@ -159,6 +159,19 @@ export function ConnectionTab({ environment, repository }: ConnectionTabProps) {
         </section>
       ) : null}
 
+      {settings.warningMessages.length > 0 ? (
+        <section className="border-warning/20 bg-warning-container/30 rounded-md border p-4">
+          <p className="text-foreground text-sm font-medium">
+            {t('settings.connection.warnings.title')}
+          </p>
+          <ul className="text-muted-foreground mt-2 list-disc space-y-1 pl-5 text-sm leading-6">
+            {settings.warningMessages.map((message, index) => (
+              <li key={`${index}-${message}`}>{message}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {settings.errorMessage ? (
         <section className="border-destructive/20 bg-destructive/5 rounded-md border p-4">
           <p className="text-destructive text-sm font-medium">

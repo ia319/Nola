@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { CONNECTION_CONFIG_VERSION } from '../connection-config'
 import { MemoryConnectionConfigRepository } from '../connection-config-storage'
-import { resolveConnectionProfile } from '../connection-profile-resolver'
+import {
+  resolveConnectionProfile,
+  resolveConnectionProfileWithDiagnostics,
+} from '../connection-profile-resolver'
 
 const getDesktopConnectionRuntimeOptionsMock = vi.hoisted(() => vi.fn())
 
@@ -214,6 +217,93 @@ describe('connection profile resolver', () => {
       source: 'runtime-override',
     })
     expect(getDesktopConnectionRuntimeOptionsMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores invalid managed-local runtime origins and keeps resolving other sources', async () => {
+    const repository = new MemoryConnectionConfigRepository({
+      version: CONNECTION_CONFIG_VERSION,
+      mode: 'remote',
+      httpOrigin: 'https://saved.example.com',
+    })
+
+    await expect(
+      resolveConnectionProfileWithDiagnostics({
+        environment: 'tauri',
+        repository,
+        runtimeOverrides: {
+          managedLocalHttpOrigin: 'https://localhost:9000',
+          backendUrl: 'https://override.example.com',
+        },
+      }),
+    ).resolves.toMatchObject({
+      profile: {
+        mode: 'remote',
+        httpOrigin: 'https://override.example.com',
+        source: 'runtime-override',
+      },
+      warnings: [
+        {
+          code: 'invalid-managed-local-runtime-origin',
+          reason: 'Local backend URL must use http://',
+        },
+      ],
+    })
+  })
+
+  it('ignores invalid backend runtime URLs and falls back to saved config', async () => {
+    const repository = new MemoryConnectionConfigRepository({
+      version: CONNECTION_CONFIG_VERSION,
+      mode: 'remote',
+      httpOrigin: 'https://saved.example.com',
+    })
+
+    await expect(
+      resolveConnectionProfileWithDiagnostics({
+        environment: 'tauri',
+        repository,
+        runtimeOverrides: {
+          backendUrl: 'http://nola.example.com',
+        },
+      }),
+    ).resolves.toMatchObject({
+      profile: {
+        mode: 'remote',
+        httpOrigin: 'https://saved.example.com',
+        source: 'user-config',
+      },
+      warnings: [
+        {
+          code: 'invalid-backend-runtime-url',
+          reason: 'Local backend URL must use localhost or 127.0.0.1',
+        },
+      ],
+    })
+  })
+
+  it('keeps remote profiles direct when the desktop gateway origin is invalid', async () => {
+    await expect(
+      resolveConnectionProfileWithDiagnostics({
+        environment: 'tauri',
+        repository: new MemoryConnectionConfigRepository(),
+        runtimeOverrides: {
+          gatewayHttpOrigin: 'https://localhost:4311',
+          backendUrl: 'https://override.example.com',
+        },
+      }),
+    ).resolves.toMatchObject({
+      profile: {
+        mode: 'remote',
+        httpOrigin: 'https://override.example.com',
+        targetHttpOrigin: 'https://override.example.com',
+        transport: 'direct',
+      },
+      warnings: [
+        {
+          code: 'invalid-desktop-gateway-runtime-origin',
+          reason: 'Local backend URL must use http://',
+        },
+      ],
+    })
   })
 
   it('routes desktop backend-url remote overrides through the native gateway when available', async () => {

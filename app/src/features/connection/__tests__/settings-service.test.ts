@@ -2,13 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CONNECTION_CONFIG_VERSION } from '@/config/connection-config'
 import { MemoryConnectionConfigRepository } from '@/config/connection-config-storage'
-import { createDesktopGatewayRemoteConnectionProfile } from '@/config/connection-profile'
+import {
+  createDesktopGatewayRemoteConnectionProfile,
+  createExternalLocalConnectionProfile,
+} from '@/config/connection-profile'
 import {
   resetActiveConnectionProfile,
   setActiveConnectionProfile,
 } from '@/config/connection-runtime'
 import {
   checkConnectionHealth,
+  hasConnectionSettingsChanges,
   isCspViolationForOrigin,
   loadConnectionSettingsSnapshot,
   saveConnectionSettings,
@@ -48,6 +52,7 @@ describe('connection settings service', () => {
 
   afterEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers()
     resetActiveConnectionProfile('web')
   })
 
@@ -180,12 +185,95 @@ describe('connection settings service', () => {
       method: 'GET',
       mode: 'cors',
       cache: 'no-store',
+      signal: expect.any(AbortSignal),
     })
     expect(fetchImpl).toHaveBeenCalledWith('http://127.0.0.1:4310/api/config', {
       method: 'GET',
       mode: 'cors',
       cache: 'no-store',
+      signal: expect.any(AbortSignal),
     })
+  })
+
+  it('reports runtime override warnings when loading settings falls back', async () => {
+    getDesktopConnectionRuntimeOptionsMock.mockResolvedValue({
+      managedLocalHttpOrigin: 'https://localhost:4310',
+      gatewayHttpOrigin: null,
+      backendUrl: null,
+    })
+
+    await expect(
+      loadConnectionSettingsSnapshot({
+        environment: 'tauri',
+        repository: new MemoryConnectionConfigRepository(),
+      }),
+    ).resolves.toMatchObject({
+      activeProfile: {
+        mode: 'external-local',
+        httpOrigin: 'http://127.0.0.1:8000',
+      },
+      warnings: [
+        {
+          code: 'invalid-managed-local-runtime-origin',
+          reason: 'Local backend URL must use http://',
+        },
+      ],
+    })
+  })
+
+  it('uses the active profile as the no-config dirty baseline', () => {
+    expect(
+      hasConnectionSettingsChanges(
+        {
+          mode: 'external-local',
+          httpOrigin: 'http://127.0.0.1:8000',
+        },
+        null,
+        null,
+      ),
+    ).toBe(true)
+
+    expect(
+      hasConnectionSettingsChanges(
+        {
+          mode: 'external-local',
+          httpOrigin: 'http://127.0.0.1:8000',
+        },
+        null,
+        createExternalLocalConnectionProfile(),
+      ),
+    ).toBe(false)
+  })
+
+  it('returns unreachable when a health probe reaches its deadline', async () => {
+    vi.useFakeTimers()
+    const fetchImpl = vi.fn<typeof fetch>(
+      (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          const signal = init?.signal
+          signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'))
+          })
+        }),
+    )
+
+    const result = checkConnectionHealth(
+      {
+        mode: 'external-local',
+        httpOrigin: 'http://127.0.0.1:8000',
+      },
+      {
+        environment: 'tauri',
+        repository: new MemoryConnectionConfigRepository(),
+        fetchImpl,
+        timeoutMs: 10,
+      },
+    )
+
+    await vi.advanceTimersByTimeAsync(10)
+    await vi.advanceTimersByTimeAsync(10)
+
+    await expect(result).resolves.toEqual({ status: 'unreachable' })
   })
 
   it('matches CSP violations only when blockedURI targets the checked origin', () => {

@@ -37,6 +37,11 @@ const connectionTabMocks = vi.hoisted(() => ({
       'settings.connection.status.realtime-failed': 'Realtime channel failed',
       'settings.connection.remoteNotice.title': 'Remote realtime sends local audio',
       'settings.connection.remoteNotice.description': 'Audio is sent to the remote URL.',
+      'settings.connection.warnings.title': 'Connection fallback is active',
+      'settings.connection.warnings.invalidManagedLocalRuntimeOrigin':
+        'Managed local override ignored.',
+      'settings.connection.warnings.invalidBackendRuntimeUrl': 'Runtime backend URL ignored.',
+      'settings.connection.warnings.invalidDesktopGatewayRuntimeOrigin': 'Gateway origin ignored.',
       'settings.connection.errors.title': 'Connection setting failed',
       'settings.connection.errors.load': 'Connection settings could not be loaded.',
       'settings.connection.errors.save': 'Connection settings could not be saved.',
@@ -165,16 +170,24 @@ describe('ConnectionTab', () => {
       expect(screen.getByText('Available')).toBeTruthy()
     })
 
-    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8000/health', {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'no-store',
-    })
-    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8000/api/config', {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'no-store',
-    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8000/health',
+      expect.objectContaining({
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-store',
+        signal: expect.any(AbortSignal),
+      }),
+    )
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8000/api/config',
+      expect.objectContaining({
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-store',
+        signal: expect.any(AbortSignal),
+      }),
+    )
   })
 
   it('reports API unavailable when health passes but config fails', async () => {

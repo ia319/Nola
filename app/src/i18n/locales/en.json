@@ -1316,6 +1316,12 @@
         "title": "Remote realtime sends local audio to this backend",
         "description": "Live Realtime captures audio on this computer and streams it to the remote URL configured here."
       },
+      "warnings": {
+        "title": "Connection fallback is active",
+        "invalidManagedLocalRuntimeOrigin": "The desktop managed-local backend address is invalid, so it was ignored. Reason: {{reason}}",
+        "invalidBackendRuntimeUrl": "The runtime backend URL is invalid, so it was ignored. Reason: {{reason}}",
+        "invalidDesktopGatewayRuntimeOrigin": "The desktop gateway address is invalid, so the remote target is not using the local gateway. Reason: {{reason}}"
+      },
       "errors": {
         "title": "Connection setting failed",
         "load": "Connection settings could not be loaded.",

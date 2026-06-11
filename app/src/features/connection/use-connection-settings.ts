@@ -3,7 +3,10 @@ import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 
 import type { StoredConnectionConfig } from '@/config/connection-config'
-import { DEFAULT_EXTERNAL_LOCAL_HTTP_ORIGIN } from '@/config/connection-profile'
+import {
+  DEFAULT_EXTERNAL_LOCAL_HTTP_ORIGIN,
+  type ConnectionProfile,
+} from '@/config/connection-profile'
 import type { ConnectionConfigRepository } from '@/config/connection-config-storage'
 import type { RuntimeEnvironment } from '@/lib/runtime-environment'
 
@@ -18,6 +21,7 @@ import {
   type ConnectionSettingsDraft,
   type ConnectionSettingsMode,
   type ConnectionSettingsSnapshot,
+  type ConnectionSettingsWarning,
 } from './settings-service'
 
 export interface UseConnectionSettingsOptions {
@@ -33,6 +37,7 @@ interface UseConnectionSettingsResult {
   isResetting: boolean
   isChecking: boolean
   errorMessage: string | null
+  warningMessages: string[]
   hasChanges: boolean
   setMode(mode: ConnectionSettingsMode): void
   setHttpOrigin(httpOrigin: string): void
@@ -52,18 +57,31 @@ function getStatusFromSnapshot(snapshot: ConnectionSettingsSnapshot): Connection
   return snapshot.activeProfile ? 'not-checked' : 'unconfigured'
 }
 
+function getWarningMessageKey(warning: ConnectionSettingsWarning): string {
+  switch (warning.code) {
+    case 'invalid-managed-local-runtime-origin':
+      return 'settings.connection.warnings.invalidManagedLocalRuntimeOrigin'
+    case 'invalid-backend-runtime-url':
+      return 'settings.connection.warnings.invalidBackendRuntimeUrl'
+    case 'invalid-desktop-gateway-runtime-origin':
+      return 'settings.connection.warnings.invalidDesktopGatewayRuntimeOrigin'
+  }
+}
+
 export function useConnectionSettings(
   options: UseConnectionSettingsOptions = {},
 ): UseConnectionSettingsResult {
   const { t } = useTranslation()
   const [draft, setDraft] = useState<ConnectionSettingsDraft>(() => createInitialDraft())
   const [storedConfig, setStoredConfig] = useState<StoredConnectionConfig | null>(null)
+  const [activeProfile, setActiveProfile] = useState<ConnectionProfile | null>(null)
   const [status, setStatus] = useState<ConnectionCheckStatus>('not-checked')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
   const [isChecking, setIsChecking] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [warningMessages, setWarningMessages] = useState<string[]>([])
 
   const serviceOptions = useMemo(
     () => ({
@@ -71,6 +89,12 @@ export function useConnectionSettings(
       repository: options.repository,
     }),
     [options.environment, options.repository],
+  )
+
+  const formatWarningMessages = useCallback(
+    (warnings: ConnectionSettingsWarning[]): string[] =>
+      warnings.map((warning) => t(getWarningMessageKey(warning), { reason: warning.reason })),
+    [t],
   )
 
   useEffect(() => {
@@ -85,13 +109,16 @@ export function useConnectionSettings(
         if (!mounted) return
         setDraft(snapshot.draft)
         setStoredConfig(snapshot.storedConfig)
+        setActiveProfile(snapshot.activeProfile)
         setStatus(getStatusFromSnapshot(snapshot))
+        setWarningMessages(formatWarningMessages(snapshot.warnings))
       } catch (error) {
         if (!mounted) return
         setErrorMessage(
           error instanceof Error ? error.message : t('settings.connection.errors.load'),
         )
         setStatus('unconfigured')
+        setWarningMessages([])
       } finally {
         if (mounted) {
           setIsLoading(false)
@@ -104,15 +131,15 @@ export function useConnectionSettings(
     return () => {
       mounted = false
     }
-  }, [serviceOptions, t])
+  }, [formatWarningMessages, serviceOptions, t])
 
   const hasChanges = useMemo(() => {
     try {
-      return hasConnectionSettingsChanges(draft, storedConfig)
+      return hasConnectionSettingsChanges(draft, storedConfig, activeProfile)
     } catch {
       return true
     }
-  }, [draft, storedConfig])
+  }, [activeProfile, draft, storedConfig])
 
   const setMode = useCallback((mode: ConnectionSettingsMode): void => {
     setDraft((current) => ({
@@ -145,14 +172,16 @@ export function useConnectionSettings(
       const snapshot = await saveConnectionSettings(draft, serviceOptions)
       setDraft(snapshot.draft)
       setStoredConfig(snapshot.storedConfig)
+      setActiveProfile(snapshot.activeProfile)
       setStatus(getStatusFromSnapshot(snapshot))
+      setWarningMessages(formatWarningMessages(snapshot.warnings))
       toast.success(t('settings.connection.toast.saved'))
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : t('settings.connection.errors.save'))
     } finally {
       setIsSaving(false)
     }
-  }, [draft, serviceOptions, t])
+  }, [draft, formatWarningMessages, serviceOptions, t])
 
   const reset = useCallback(async (): Promise<void> => {
     setIsResetting(true)
@@ -162,7 +191,9 @@ export function useConnectionSettings(
       const snapshot = await resetConnectionSettings(serviceOptions)
       setDraft(snapshot.draft)
       setStoredConfig(null)
+      setActiveProfile(snapshot.activeProfile)
       setStatus(getStatusFromSnapshot(snapshot))
+      setWarningMessages(formatWarningMessages(snapshot.warnings))
       toast.success(t('settings.connection.toast.reset'))
     } catch (error) {
       setErrorMessage(
@@ -171,7 +202,7 @@ export function useConnectionSettings(
     } finally {
       setIsResetting(false)
     }
-  }, [serviceOptions, t])
+  }, [formatWarningMessages, serviceOptions, t])
 
   const check = useCallback(async (): Promise<void> => {
     setIsChecking(true)
@@ -201,6 +232,7 @@ export function useConnectionSettings(
     isResetting,
     isChecking,
     errorMessage,
+    warningMessages,
     hasChanges,
     setMode,
     setHttpOrigin,

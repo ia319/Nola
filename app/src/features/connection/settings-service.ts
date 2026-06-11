@@ -13,7 +13,11 @@ import {
   type ConnectionProfile,
   type ConnectionStatus,
 } from '@/config/connection-profile'
-import { resolveConnectionProfile } from '@/config/connection-profile-resolver'
+import {
+  resolveConnectionProfile,
+  resolveConnectionProfileWithDiagnostics,
+  type ConnectionProfileResolutionWarning,
+} from '@/config/connection-profile-resolver'
 import { getActiveConnectionProfile, setActiveConnectionProfile } from '@/config/connection-runtime'
 import {
   createConnectionConfigRepository,
@@ -24,6 +28,7 @@ import { getRuntimeEnvironment, type RuntimeEnvironment } from '@/lib/runtime-en
 export type ConnectionSettingsMode = PersistedConnectionMode
 
 export type ConnectionCheckStatus = 'not-checked' | ConnectionStatus
+export type ConnectionSettingsWarning = ConnectionProfileResolutionWarning
 
 export interface ConnectionSettingsDraft {
   mode: ConnectionSettingsMode
@@ -34,6 +39,7 @@ export interface ConnectionSettingsSnapshot {
   activeProfile: ConnectionProfile | null
   storedConfig: StoredConnectionConfig | null
   draft: ConnectionSettingsDraft
+  warnings: ConnectionSettingsWarning[]
 }
 
 export interface ConnectionSettingsServiceOptions {
@@ -45,6 +51,7 @@ export interface ConnectionHealthCheckOptions {
   environment?: RuntimeEnvironment
   repository?: ConnectionConfigRepository
   fetchImpl?: typeof fetch
+  timeoutMs?: number
 }
 
 export interface ConnectionHealthCheckResult {
@@ -52,6 +59,7 @@ export interface ConnectionHealthCheckResult {
 }
 
 const CSP_EVENT_TYPES = new Set(['securitypolicyviolation'])
+const DEFAULT_HEALTH_CHECK_TIMEOUT_MS = 5_000
 
 function getEnvironment(environment?: RuntimeEnvironment): RuntimeEnvironment {
   return environment ?? getRuntimeEnvironment()
@@ -126,31 +134,44 @@ function createActiveProfileFromConfig(config: StoredConnectionConfig): Connecti
 async function resolveSavedActiveProfile(
   config: StoredConnectionConfig,
   options: ConnectionSettingsServiceOptions,
-): Promise<ConnectionProfile> {
+): Promise<Pick<ConnectionSettingsSnapshot, 'activeProfile' | 'warnings'>> {
   const environment = getEnvironment(options.environment)
   if (environment === 'tauri') {
-    const resolvedProfile = await resolveConnectionProfile({
+    const resolution = await resolveConnectionProfileWithDiagnostics({
       environment,
       repository: getRepository(options.repository, options.environment),
     })
-    return resolvedProfile ?? createActiveProfileFromConfig(config)
+    return {
+      activeProfile: resolution.profile ?? createActiveProfileFromConfig(config),
+      warnings: resolution.warnings,
+    }
   }
 
-  return createConnectionProfileFromConfig(config)
+  return {
+    activeProfile: createConnectionProfileFromConfig(config),
+    warnings: [],
+  }
 }
 
 async function resolveDefaultActiveProfile(
   options: ConnectionSettingsServiceOptions,
-): Promise<ConnectionProfile | null> {
+): Promise<Pick<ConnectionSettingsSnapshot, 'activeProfile' | 'warnings'>> {
   const environment = getEnvironment(options.environment)
   if (environment === 'tauri') {
-    return resolveConnectionProfile({
+    const resolution = await resolveConnectionProfileWithDiagnostics({
       environment,
       repository: getRepository(options.repository, options.environment),
     })
+    return {
+      activeProfile: resolution.profile,
+      warnings: resolution.warnings,
+    }
   }
 
-  return getDefaultConnectionProfile(environment)
+  return {
+    activeProfile: getDefaultConnectionProfile(environment),
+    warnings: [],
+  }
 }
 
 function createProfileFromDraft(draft: ConnectionSettingsDraft): ConnectionProfile {
@@ -215,17 +236,32 @@ async function fetchWithMode(
   fetchImpl: typeof fetch,
   url: string,
   mode: RequestMode,
+  timeoutMs: number,
 ): Promise<Response> {
-  return fetchImpl(url, {
-    method: 'GET',
-    mode,
-    cache: 'no-store',
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => {
+    controller.abort()
+  }, timeoutMs)
+
+  try {
+    return await fetchImpl(url, {
+      method: 'GET',
+      mode,
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
-async function isReachableWithoutCors(fetchImpl: typeof fetch, url: string): Promise<boolean> {
+async function isReachableWithoutCors(
+  fetchImpl: typeof fetch,
+  url: string,
+  timeoutMs: number,
+): Promise<boolean> {
   try {
-    await fetchWithMode(fetchImpl, url, 'no-cors')
+    await fetchWithMode(fetchImpl, url, 'no-cors', timeoutMs)
     return true
   } catch {
     return false
@@ -236,6 +272,7 @@ async function checkEndpoint(
   fetchImpl: typeof fetch,
   origin: string,
   path: string,
+  timeoutMs: number,
 ): Promise<ConnectionHealthCheckResult['status']> {
   const url = buildEndpoint(origin, path)
   let cspBlocked = false
@@ -250,11 +287,13 @@ async function checkEndpoint(
   }
 
   try {
-    const response = await fetchWithMode(fetchImpl, url, 'cors')
+    const response = await fetchWithMode(fetchImpl, url, 'cors', timeoutMs)
     return response.ok ? 'available' : 'unreachable'
   } catch {
     if (cspBlocked) return 'csp-blocked'
-    return (await isReachableWithoutCors(fetchImpl, url)) ? 'cors-blocked' : 'unreachable'
+    return (await isReachableWithoutCors(fetchImpl, url, timeoutMs))
+      ? 'cors-blocked'
+      : 'unreachable'
   } finally {
     if (typeof window !== 'undefined') {
       window.removeEventListener('securitypolicyviolation', handleCspViolation)
@@ -268,21 +307,15 @@ export async function loadConnectionSettingsSnapshot(
   const repository = getRepository(options.repository, options.environment)
   const environment = getEnvironment(options.environment)
   const storedConfig = await repository.load()
-  let fallbackProfile = getDefaultConnectionProfile(environment)
-  if (storedConfig) {
-    try {
-      fallbackProfile = createConnectionProfileFromConfig(storedConfig)
-    } catch {
-      fallbackProfile = getDefaultConnectionProfile(environment)
-    }
-  }
+  const resolution = await resolveConnectionProfileWithDiagnostics({ environment, repository })
   const currentProfile = getActiveConnectionProfile()
-  const activeProfile = currentProfile ?? fallbackProfile
+  const activeProfile = currentProfile ?? resolution.profile
 
   return {
     activeProfile,
     storedConfig,
     draft: profileToDraft(activeProfile),
+    warnings: resolution.warnings,
   }
 }
 
@@ -295,13 +328,11 @@ export function normalizeConnectionSettingsDraft(
 export function hasConnectionSettingsChanges(
   draft: ConnectionSettingsDraft,
   storedConfig: StoredConnectionConfig | null,
+  activeProfile: ConnectionProfile | null,
 ): boolean {
   const normalizedDraft = normalizeConnectionSettingsDraft(draft)
   if (!storedConfig) {
-    return !isSameDraft(normalizedDraft, {
-      mode: 'external-local',
-      httpOrigin: DEFAULT_EXTERNAL_LOCAL_HTTP_ORIGIN,
-    })
+    return activeProfile ? !isSameDraft(normalizedDraft, profileToDraft(activeProfile)) : true
   }
 
   return !isSameDraft(normalizedDraft, configToDraft(storedConfig))
@@ -314,13 +345,14 @@ export async function saveConnectionSettings(
   const repository = getRepository(options.repository, options.environment)
   const config = toStoredConnectionConfig(draft)
   await repository.save(config)
-  const activeProfile = await resolveSavedActiveProfile(config, options)
+  const { activeProfile, warnings } = await resolveSavedActiveProfile(config, options)
   setActiveConnectionProfile(activeProfile)
 
   return {
     activeProfile,
     storedConfig: config,
     draft: configToDraft(config),
+    warnings,
   }
 }
 
@@ -329,13 +361,14 @@ export async function resetConnectionSettings(
 ): Promise<ConnectionSettingsSnapshot> {
   const repository = getRepository(options.repository, options.environment)
   await repository.clear()
-  const activeProfile = await resolveDefaultActiveProfile(options)
+  const { activeProfile, warnings } = await resolveDefaultActiveProfile(options)
   setActiveConnectionProfile(activeProfile)
 
   return {
     activeProfile,
     storedConfig: null,
     draft: profileToDraft(activeProfile),
+    warnings,
   }
 }
 
@@ -345,13 +378,14 @@ export async function checkConnectionHealth(
 ): Promise<ConnectionHealthCheckResult> {
   const profile = await createHealthCheckProfile(draft, options)
   const fetchImpl = options.fetchImpl ?? fetch
-  const healthStatus = await checkEndpoint(fetchImpl, profile.httpOrigin, '/health')
+  const timeoutMs = options.timeoutMs ?? DEFAULT_HEALTH_CHECK_TIMEOUT_MS
+  const healthStatus = await checkEndpoint(fetchImpl, profile.httpOrigin, '/health', timeoutMs)
 
   if (healthStatus !== 'available') {
     return { status: healthStatus }
   }
 
-  const apiStatus = await checkEndpoint(fetchImpl, profile.httpOrigin, '/api/config')
+  const apiStatus = await checkEndpoint(fetchImpl, profile.httpOrigin, '/api/config', timeoutMs)
 
   return {
     status: apiStatus === 'unreachable' ? 'api-unavailable' : apiStatus,
