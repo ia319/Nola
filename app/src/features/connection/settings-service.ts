@@ -330,7 +330,13 @@ export function hasConnectionSettingsChanges(
   storedConfig: StoredConnectionConfig | null,
   activeProfile: ConnectionProfile | null,
 ): boolean {
-  const normalizedDraft = normalizeConnectionSettingsDraft(draft)
+  let normalizedDraft: ConnectionSettingsDraft
+  try {
+    normalizedDraft = normalizeConnectionSettingsDraft(draft)
+  } catch {
+    return true
+  }
+
   if (!storedConfig) {
     return activeProfile ? !isSameDraft(normalizedDraft, profileToDraft(activeProfile)) : true
   }

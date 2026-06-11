@@ -245,6 +245,19 @@ describe('connection settings service', () => {
     ).toBe(false)
   })
 
+  it('treats invalid drafts as dirty without throwing', () => {
+    expect(
+      hasConnectionSettingsChanges(
+        {
+          mode: 'remote',
+          httpOrigin: 'https://nola.example.com/typing',
+        },
+        null,
+        null,
+      ),
+    ).toBe(true)
+  })
+
   it('returns unreachable when a health probe reaches its deadline', async () => {
     vi.useFakeTimers()
     const fetchImpl = vi.fn<typeof fetch>(
