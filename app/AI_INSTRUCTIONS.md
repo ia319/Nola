@@ -4,9 +4,9 @@
 
 ## Project Overview
 
-| Key   | Value                                                                       |
-| ----- | --------------------------------------------------------------------------- |
-| Name  | Nola - Frontend Workspace                                                   |
+| Key   | Value                                                                                                                                        |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Name  | Nola - Frontend Workspace                                                                                                                    |
 | Stack | React 19 + TypeScript + Vite + TailwindCSS v4 + shadcn/ui + TanStack Router/Query + Zustand + i18next + Axios + Tauri v2 + Rust native audio |
 
 ## Code Style
@@ -52,6 +52,10 @@ app/                          # Frontend workspace root
 │   └── src/                  # Rust source code
 │       ├── main.rs           # Native binary entry point
 │       ├── lib.rs            # Tauri builder, commands, managed state, exit cleanup
+│       ├── connection/       # Desktop connection config and remote gateway module
+│       │   ├── mod.rs        # Connection module exports
+│       │   ├── config.rs     # Desktop connection config commands and runtime overrides
+│       │   └── gateway.rs    # Loopback HTTP/WebSocket gateway for desktop remote targets
 │       └── audio/            # Desktop native audio module
 │           ├── mod.rs        # Audio module exports and shared desktop state
 │           ├── dto.rs        # Stable native audio DTO and error contracts
@@ -94,6 +98,20 @@ app/                          # Frontend workspace root
 │   │   │   ├── ui-preferences-storage.test.ts # Storage migration/fallback tests
 │   │   │   ├── ui-preferences-storage-runtime.test.ts # Storage runtime fallback tests
 │   │   │   └── use-app-config.test.ts # Shared config cache/store tests
+│   │   ├── connection/       # Client connection profile, storage, and runtime state
+│   │   │   ├── backend.ts    # Legacy backend URL compatibility over connection runtime
+│   │   │   ├── config.ts     # Versioned client connection config model
+│   │   │   ├── profile.ts    # Connection profiles, URL normalization, and origin derivation
+│   │   │   ├── resolver.ts   # Runtime override, persisted config, and default profile resolution
+│   │   │   ├── runtime.ts    # Active connection profile state and base URL readers
+│   │   │   ├── storage.ts    # Browser, desktop, and memory connection config repositories
+│   │   │   └── __tests__/    # Connection config, profile, runtime, storage, and compatibility tests
+│   │   │       ├── backend.test.ts # Backend URL compatibility helper coverage
+│   │   │       ├── config.test.ts # Persisted connection config parsing coverage
+│   │   │       ├── profile.test.ts # Connection profile URL rule coverage
+│   │   │       ├── resolver.test.ts # Profile resolution coverage
+│   │   │       ├── runtime.test.ts # Active profile base URL state coverage
+│   │   │       └── storage.test.ts # Connection config repository coverage
 │   │   ├── constants.ts      # App constants (synced with backend)
 │   │   ├── engine-options.ts # Typed engine option defaults, constants, and guards
 │   │   ├── env.ts            # Typed environment variables (import.meta.env)
@@ -178,6 +196,12 @@ app/                          # Frontend workspace root
 │   │   │   │   ├── ActivityDataBridge.test.tsx # Verify activity data-source bridge behavior
 │   │   │   │   └── store.test.ts # Verify activity grouping, dismissal, and recent ordering
 │   │   │   └── index.ts      # Feature public exports
+│   │   ├── connection/       # Client connection settings feature
+│   │   │   ├── index.ts      # Connection feature public exports
+│   │   │   ├── settings-service.ts # Connection settings snapshots, health checks, and draft normalization
+│   │   │   ├── use-connection-settings.ts # React state adapter for connection settings
+│   │   │   └── __tests__/
+│   │   │       └── settings-service.test.ts # Settings snapshot, save, health-check, and warning coverage
 │   │   ├── export/           # Subtitle export & download
 │   │   │   ├── api.ts        # downloadExport, saveExport, batchExport, defaults APIs
 │   │   │   ├── components/   # Export dialog UI
@@ -328,15 +352,17 @@ app/                          # Frontend workspace root
 │   │   │   │       └── live-realtime-store.test.ts # Verify realtime runtime state transitions
 │   │   │   └── transport/    # Live WebSocket transport contract and implementations
 │   │   │       ├── errors.ts # Structured realtime transport errors
-│   │   │       ├── protocol.ts # Protocol constants, URL builder, and event guards
+│   │   │       ├── protocol.ts # Protocol constants and event guards
 │   │   │       ├── realtime-transport.ts # Runtime transport factory
 │   │   │       ├── tauri-realtime-transport.ts # Tauri transport placeholder adapter
 │   │   │       ├── types.ts # WebSocket event, transcript, audio frame, diagnostics, and state contracts
 │   │   │       ├── web-realtime-transport.ts # Browser WebSocket implementation
+│   │   │       ├── websocket-url.ts # Active-profile WebSocket URL builder
 │   │   │       └── __tests__/
-│   │   │           ├── protocol.test.ts # Verify protocol guards and URL builder
+│   │   │           ├── protocol.test.ts # Verify protocol guards
 │   │   │           ├── realtime-transport.test.ts # Verify runtime transport factory
-│   │   │           └── web-realtime-transport.test.ts # Verify WebSocket lifecycle and frame sending
+│   │   │           ├── web-realtime-transport.test.ts # Verify WebSocket lifecycle and frame sending
+│   │   │           └── websocket-url.test.ts # WebSocket URL construction coverage
 │   │   ├── transcription-options/ # Task option composition and defaults patch logic
 │   │   │   ├── index.ts      # Expose feature public exports
 │   │   │   ├── types.ts      # Option domain types and contracts
@@ -521,7 +547,8 @@ app/                          # Frontend workspace root
 │   │   │       ├── LiveWorkbenchSessionSetup.test.tsx # Verify setup controls
 │   │   │       ├── live-workbench-formatters.test.ts # Verify Live display formatting
 │   │   │       └── live-workbench-selectors.test.ts # Verify Live selectors
-│   │   ├── settings/         # General, Transcription, Live Realtime, Export, Model Storage, System Info
+│   │   ├── settings/         # General, Connection, Transcription, Live Realtime, Export, Model Storage, System Info
+│   │   │   ├── ConnectionTab.tsx # Client connection settings tab
 │   │   │   ├── ExportTab.tsx # Render export defaults settings
 │   │   │   ├── GeneralTab.tsx # Render language/theme/unit settings
 │   │   │   ├── LiveRealtimeTab.tsx # Render schema-driven Live realtime defaults settings
@@ -533,6 +560,7 @@ app/                          # Frontend workspace root
 │   │   │   ├── SystemInfoTab.tsx # Render system info and maintenance actions
 │   │   │   ├── TranscriptionTab.tsx # Render transcription defaults settings
 │   │   │   └── __tests__/    # Settings tab tests
+│   │   │       ├── ConnectionTab.test.tsx # Connection settings UI flow coverage
 │   │   │       ├── ExportTab.test.tsx # Verify export settings flows
 │   │   │       ├── GeneralTab.test.tsx # Verify general settings persistence
 │   │   │       ├── ModelStorageTab.test.tsx # Verify model storage settings
@@ -597,6 +625,7 @@ app/                          # Frontend workspace root
 - App/platform helpers: `src/lib/*`; runtime detection and canonical `cn()` utility.
 - Cross-feature runtime helpers: `src/shared/lib/*`; API client, query helpers, formatters, SSE, status, option helpers.
 - Desktop shell: `src-tauri/*`; Tauri config, Rust commands, native desktop state, and bundle metadata.
+- Desktop connection: `src-tauri/src/connection/*`; config commands, runtime overrides, loopback HTTP/WS gateway, remote HTTPS/WSS targets.
 - Native desktop audio: `src-tauri/src/audio/*`; Windows endpoint enumeration, WASAPI capture, DTO mapping, Tauri events, and capture session registry.
 - Feature-private helpers: `src/features/<name>/lib/*`; owner-feature-only helpers.
 - Shared helper promotion threshold: reuse by at least one other feature.
@@ -623,7 +652,7 @@ app/                          # Frontend workspace root
 - Theme owner: app-owned `ThemeProvider`, `useTheme`, UI preferences store.
 - Unsupported theme package usage: new `next-themes` theme state.
 - Settings tabs: compact continuous content; no page-level title or description blocks inside tab content.
-- Settings placement: General, Transcription, Live Realtime, Export, Model Storage, System Info inside Settings.
+- Settings placement: General, Connection, Transcription, Live Realtime, Export, Model Storage, System Info inside Settings.
 - Unsupported Settings placement: top-bar Settings subpages.
 - Live Realtime Settings: `/settings/live-realtime`; separate persisted-defaults tab adjacent to Transcription.
 - Unsupported Live Realtime Settings placement: nested Transcription content, production Live controls, sidebar entries.
@@ -632,6 +661,12 @@ app/                          # Frontend workspace root
 ### Config and Defaults Contracts
 
 - App config source: `GET /api/config`.
+- Client connection profile source: `resolveConnectionProfile()`; runtime overrides, persisted client config, environment default.
+- Active connection state: `config/connection/runtime.ts`; single REST, SSE, and WebSocket base URL source.
+- Network adapter boundary: API client, SSE client, and realtime WebSocket URL builder read active profile only.
+- Client connection storage: browser `localStorage`, Tauri app config directory, or test memory repository; backend SQLite unsupported.
+- Desktop remote target: user HTTPS/WSS Nola Node origin; WebView loopback HTTP/WS gateway origin.
+- Connection Settings health check: `/health`, then `/api/config`; CORS, CSP, API unavailable, unreachable statuses; request deadline required.
 - Engine defaults source: `GET /api/config/transcription/engine-defaults`.
 - Session defaults source: `GET /api/config/session-defaults`.
 - Live realtime config source: `/api/config/live-realtime/*`.
@@ -743,11 +778,11 @@ Backend (Pydantic) ──► openapi.json ──► openapi.d.ts ──► domai
    (Source)         (gen:types auto)   (generated types)   (typed functions)
 ```
 
-| Layer                    | Path                                                                           | Maintained by           | Edit?                                                               |
-| ------------------------ | ------------------------------------------------------------------------------ | ----------------------- | ------------------------------------------------------------------- |
-| Raw types                | `shared/types/openapi.d.ts`                                                    | `pnpm gen:types` (auto) | Generated only                                                      |
+| Layer                    | Path                                                                                      | Maintained by           | Edit?                                                               |
+| ------------------------ | ----------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------- |
+| Raw types                | `shared/types/openapi.d.ts`                                                               | `pnpm gen:types` (auto) | Generated only                                                      |
 | Domain aliases/contracts | `shared/types/config.ts`, `task.ts`, `file.ts`, `live.ts`, `api-error.ts`, `app-error.ts` | Developer               | Rarely (only if backend adds new schemas or error contract changes) |
-| Feature API              | `features/*/api.ts`                                                            | Developer               | Frequently                                                          |
+| Feature API              | `features/*/api.ts`                                                                       | Developer               | Frequently                                                          |
 
 **Key rules:**
 
@@ -766,16 +801,16 @@ Backend (Pydantic) ──► openapi.json ──► openapi.d.ts ──► domai
 
 ## Dependencies
 
-| Package                 | Version       |
-| ----------------------- | ------------- |
-| React / React DOM       | ^19.2.0       |
-| @tanstack/react-router  | ^1.162.8      |
-| zustand                 | ^5.0.11       |
-| axios                   | ^1.13.5       |
-| @tauri-apps/api         | 2.10.1        |
-| shadcn/ui (radix-ui)    | latest        |
+| Package                 | Version                                              |
+| ----------------------- | ---------------------------------------------------- |
+| React / React DOM       | ^19.2.0                                              |
+| @tanstack/react-router  | ^1.162.8                                             |
+| zustand                 | ^5.0.11                                              |
+| axios                   | ^1.13.5                                              |
+| @tauri-apps/api         | 2.10.1                                               |
+| shadcn/ui (radix-ui)    | latest                                               |
 | next-themes             | ^0.4.6 (installed only; app theme state unsupported) |
-| i18next / react-i18next | ^25.8 / ^16.5 |
+| i18next / react-i18next | ^25.8 / ^16.5                                        |
 
 ### Dev Dependencies
 
@@ -872,6 +907,11 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `lib/ui-preferences.ts`: Re-export UI preference helpers for settings-local tests and compatibility.
   - `lib/__tests__/locale-routing.test.ts`: Verify locale path parsing/localization edge cases.
   - `lib/__tests__/ui-preferences.test.ts`: Verify preference helper behavior from the settings boundary.
+- **connection**:
+  - `settings-service.ts`: Client connection settings snapshots, saves, resets, health checks, warnings, draft normalization, dirty checks.
+  - `use-connection-settings.ts`: React state adapter for connection settings, warnings, status, and save/reset/check actions.
+  - `index.ts`: Connection feature public exports.
+  - `__tests__/settings-service.test.ts`: Snapshot, save, gateway, health-check, warning, and dirty-check coverage.
 - **models**:
   - `api.ts`: Model list/detail/download/cancel/delete/select/settings/download-runtime endpoints.
   - `__tests__/api.test.ts`: Verify model API request wiring.
@@ -918,9 +958,10 @@ Separate business domain logic by feature. Expose every feature public surface t
   - `hooks/useLiveDeviceInventory.ts`: Own repository creation, `devicechange` subscriptions, reusable capture session lookup, capture lifecycle, cleanup on teardown, and store updates.
   - `session/live-realtime-session-service.ts`: Compose Live REST creation, optional runtime overrides, reusable capture sessions, WebSocket transport, diagnostics controls, transcript event store updates, track routing, stop/failure cleanup, closed-transport wait rejection, and server-finished cleanup without adding UI.
   - `transport/types.ts`: Hand-maintained Live WebSocket event, transcript, audio frame, diagnostics, and state contracts.
-  - `transport/protocol.ts`: Server event validation, including preview/committed/final transcript payloads; WebSocket URL builder from origins; protocol constants.
-  - `transport/web-realtime-transport.ts`: Implement browser WebSocket handshake, control event sending, JSON metadata plus binary payload audio frames, and state changes.
-  - `transport/realtime-transport.ts`: Select WebSocket transport for Web and Tauri runtimes through dynamic import.
+  - `transport/protocol.ts`: Server event validation for preview/committed/final transcript payloads; protocol constants.
+  - `transport/websocket-url.ts`: WebSocket URL construction from the active connection profile.
+  - `transport/web-realtime-transport.ts`: Browser WebSocket handshake, control event sending, JSON metadata plus binary payload audio frames, and state changes.
+  - `transport/realtime-transport.ts`: Runtime WebSocket transport selection for Web and Tauri through dynamic import.
   - `transport/tauri-realtime-transport.ts`: Structured not-implemented adapter outside the default transport factory.
   - `**/__tests__/*`: Cover runtime selection, inventory behavior, warnings, permission failures, capture cleanup, PCM conversion, transport protocol, transcript event handling, diagnostics, store transitions, session service lifecycle, and hook lifecycle.
 
@@ -932,8 +973,8 @@ Cross-feature composite components with feature-agnostic behavior.
 - **interactive-table/**: Compose feature-agnostic sortable headers, selection, batch action bar, row actions, pagination, and local full-set query behavior over `DataTable`.
 - **JsonPropertiesBlock.tsx**: Render bounded read-only JSON property blocks for request parameter snapshots and show `EmptyState` when no object is displayable.
 - **types.ts**: Shared task action callback contracts.
-- **__tests__/ErrorBoundary.test.tsx**: Component tests covering fallback rendering and retry recovery.
-- **interactive-table/__tests__/**: Cover table rendering, selection reset semantics, pagination, local query, row actions, and batch action behavior.
+- `__tests__/ErrorBoundary.test.tsx`: Component tests covering fallback rendering and retry recovery.
+- `interactive-table/__tests__/`: Table rendering, selection reset semantics, pagination, local query, row actions, and batch action behavior.
 - **index.ts**: Barrel entry for common components. Prefer importing via `@/components/common`.
 
 #### src/components/ui/
@@ -963,7 +1004,8 @@ Route page implementations.
 - **history-center/**: Compose Task and Live history modes, Task ID/Filename submodes, URL search state, pagination, task/live detail dialogs, live export/delete flows, and page-local history hooks.
 - **models-management/**: Compose model overview, model table, detail sheet, mutation de-duplication, canonical `configured_model_id` handling, Default/Running display, model refresh, and restart-free model selection feedback.
 - **live-workbench/**: Compose Live source setup, explicit capture preparation, session start/stop orchestration, runtime settings side panel, transcript focus mode, browser compact view, default transcript download, millisecond timing, and runtime error feedback.
-- **settings/**: General, Transcription, Live Realtime, Export, Model Storage, and System Info tabs; direct settings content without subpage titles; read-only engine resources; task-boundary reload wording instead of restart-required wording.
+- **settings/**: General, Connection, Transcription, Live Realtime, Export, Model Storage, and System Info tabs; direct settings content without subpage titles; read-only engine resources; task-boundary reload wording instead of restart-required wording.
+- **settings/ConnectionTab.tsx**: Client connection target, local/remote mode, health status, runtime fallback warnings, remote audio notice.
 - **settings/LiveRealtimeTab.tsx**: Live realtime defaults from backend schema metadata, persisted patches through config API helpers, special-value token state consistent with local validation.
 
 #### src/shell/
@@ -987,12 +1029,12 @@ Locale routing and persisted UI preferences.
 
 Cross-feature shared code, split into `lib/` and `types/`.
 
-- **lib/api-client.ts**: Axios instance (30s timeout, no global Content-Type). Request interceptor logs debug. Response interceptor converts HTTP errors to `AppError` via `createApiError` and network failures to `createNetworkError`. Preserve `CanceledError` for upload cancellation semantics.
-- **lib/__tests__/api-client.test.ts**: Interceptor tests covering cancel passthrough plus client, server, timeout, and offline mappings.
+- **lib/api-client.ts**: Axios instance with active connection runtime base URL, 30s timeout, no global `Content-Type`, debug request logging, HTTP-to-`AppError` mapping, network-to-`createNetworkError` mapping, and `CanceledError` passthrough for upload cancellation semantics.
+- `lib/__tests__/api-client.test.ts`: Interceptor tests covering cancel passthrough plus client, server, timeout, and offline mappings.
 - **lib/error-factory.ts**: Central factory functions for `AppError` (`createValidationError`, `createNetworkError`, `createApiError`, `isAppError`). Mark 408/429 as `retriable: true`; other 4xx as `retriable: false`; 5xx as `retriable: true`.
-- **lib/__tests__/error-factory.test.ts**: Factory contract tests for retry semantics and `isAppError`.
+- `lib/__tests__/error-factory.test.ts`: Factory contract tests for retry semantics and `isAppError`.
 - **lib/error-utils.ts**: `formatApiError()` converts FastAPI error payloads into readable messages.
-- **lib/__tests__/error-utils.test.ts**: Formatting tests for string and validation-array payloads.
+- `lib/__tests__/error-utils.test.ts`: Formatting tests for string and validation-array payloads.
 - **lib/content-disposition.ts**: `parseFilenameFromContentDisposition()` extracts UTF-8 and fallback attachment filenames for Task and Live downloads.
 - **lib/file-query-options.ts**: Centralize file list sort/order/filter option constants and guards.
 - **lib/file-validation.ts**: Pure function `validateFile(file, config)` with config injection. Checks extension, MIME, size, empty file, no extension. Returns `AppError` on failure.
@@ -1004,13 +1046,13 @@ Cross-feature shared code, split into `lib/` and `types/`.
 - **lib/query-client.ts**: TanStack Query retry/default behavior.
 - **lib/query-fetcher.ts**: Wrap API calls for Query consumers.
 - **lib/query-keys.ts**: Centralize query key factories for tasks, files, live sessions, models, and config.
-- **lib/sse-client.ts**: Shared EventSource wrapper with typed payloads and normalized API-base URL joining.
-- **lib/__tests__/sse-client.test.ts**: Verify SSE connection wiring, event parsing, and cleanup.
+- **lib/sse-client.ts**: Shared EventSource wrapper with active connection runtime base URL, typed payloads, and normalized API-base URL joining.
+- `lib/__tests__/sse-client.test.ts`: SSE connection wiring, event parsing, and cleanup coverage.
 - **lib/task-query-options.ts**: Centralize task filter/sort/order option constants and guards.
 - **lib/task-status.ts**: Centralize task status groups derived from OpenAPI `TaskStatus`.
 - **lib/time-format.ts**: Format millisecond clock values and ranges as `HH:MM:SS.mmm`.
 - **lib/utils.ts**: `downloadBlob()` triggers browser file download from Blob (appends `<a>` to DOM, defers `URL.revokeObjectURL`).
-- **lib/__tests__/**: Vitest unit tests for API-client mapping plus pure helpers (`error-factory`, `error-utils`, `file-validation`, `format`).
+- `lib/__tests__/**`: Vitest unit tests for API-client mapping plus pure helpers (`error-factory`, `error-utils`, `file-validation`, `format`).
 - **types/openapi.d.ts**: Auto-generated by `pnpm gen:types`; manual edits unsupported.
 - **types/api-error.ts**: Backend error payload contracts (`ApiError`, `ValidationErrorItem`).
 - **types/app-error.ts**: Frontend error contract (`AppError`: `code`, `i18nKey`, `params`, `retriable`).
@@ -1029,14 +1071,14 @@ Route adapters and search-model helpers belong in this directory. Page implement
 - **route-pages.tsx**: Lazy-load primary pages, Settings tabs including Live Realtime, and route loading fallbacks.
 - **history-search.ts**: Normalize route search params and build task, filename, and live history query models.
 - **live-workbench-search.ts**: Normalize Live Workbench view search params and omit the default view from URLs.
-- **__tests__/router.test.ts**: Verify route tree behavior.
+- `__tests__/router.test.ts`: Route tree behavior coverage.
 
 #### src/lib/
 
 App/platform-level helpers.
 
 - **runtime-environment.ts**: Detect Web/Tauri runtime once for app-level consumers. Realtime wraps this helper instead of checking Tauri globals directly.
-- **tauri-api.ts**: Centralize dynamic `@tauri-apps/api` imports, desktop runtime info, native audio invoke commands, and native audio event subscriptions.
+- **tauri-api.ts**: Central Tauri API boundary for dynamic `@tauri-apps/api` imports, desktop runtime info, connection config commands, native audio commands, and native audio event subscriptions.
 - **utils.ts**: Canonical `cn()` utility for merging Tailwind classes with `clsx` and `tailwind-merge`; duplicate `cn` in `shared/lib` unsupported.
 
 #### src/i18n/
@@ -1045,6 +1087,7 @@ i18next bootstrap and locale dictionaries.
 
 - **index.ts**: Initialize i18next + react-i18next once and return the initialization promise.
 - **locales/en.json**, **locales/zh.json**: Locale resource files.
+
 Route-prefix language behavior and Settings-triggered persistent language changes: `src/app/locale/*`.
 
 #### src/config/
@@ -1053,6 +1096,12 @@ Runtime config access and fallback constants.
 
 - **api.ts**: Config endpoints (`fetchAppConfig`, `fetchEngineDefaults`, `fetchSessionDefaults`, `patchSessionDefaults`, transcription defaults `PATCH`/`DELETE`, Live realtime defaults `GET/PATCH/DELETE`, Live realtime schema `GET`, export defaults `GET/PATCH/DELETE`).
 - **cache-invalidation.ts**: Refresh shared config and all config query caches after mutations.
+- **connection/backend.ts**: Backward-compatible API and realtime base URL helpers over the active connection runtime.
+- **connection/config.ts**: Versioned persisted client connection config, saved modes, parsing, serialization, profile conversion.
+- **connection/storage.ts**: Browser, Tauri, and memory connection config repositories.
+- **connection/profile.ts**: Connection modes, transports, statuses, origin validation, local/remote/gateway profile factories.
+- **connection/resolver.ts**: Runtime override, saved config, default profile precedence, diagnostics for invalid runtime overrides.
+- **connection/runtime.ts**: Active connection profile memory state, subscriptions, REST base URL, WebSocket base URL.
 - **engine-options.ts**: Engine device and compute-type select options from `GET /api/config` response field `engine.schema`; resolved value fallback only when schema metadata is unavailable.
 - **use-app-config.ts**: Shared config singleton store based on `useSyncExternalStore`, plus `refreshAppConfig()`; mounted consumer notification after shared snapshot changes.
 - **ui-preferences.ts**: Normalize and validate language/theme/unit preferences from unknown persisted values.
@@ -1073,8 +1122,10 @@ Shared Vitest bootstrap.
 Desktop shell and Rust native code. Tauri commands, Tauri events, and stable DTOs form the desktop-native capability boundary.
 
 - **Cargo.toml**: Windows API crates under `target.'cfg(windows)'.dependencies`; Linux CI scope limited to non-Windows desktop stubs and target-neutral dependencies.
-- **src/main.rs**: Start the native binary through the library entry point.
-- **src/lib.rs**: Register desktop runtime info and native audio commands, manage `DesktopAudioState`, and release active capture sessions on final app exit.
+- **src/main.rs**: Native binary entry point through the library entry.
+- **src/lib.rs**: Tauri builder, desktop runtime info, connection/native audio commands, managed desktop state, final-exit capture cleanup.
+- **src/connection/config.rs**: Desktop connection config JSON commands, Tauri app config directory storage, `--backend-url` runtime override, gateway target synchronization.
+- **src/connection/gateway.rs**: Dynamic loopback HTTP/WS gateway, HTTPS/WSS Nola Node forwarding, upstream request/connect deadlines.
 
 #### src-tauri/src/audio/
 
@@ -1195,8 +1246,9 @@ Repository root command map: `make help` for mirrored `app-*`, `desktop-*`, and 
 ## Client-Server Architecture
 
 ```text
-Browser Frontend (Vite/React) ───[ HTTP Proxy /api/* ]───▶ Backend (FastAPI, localhost:8000)
-Tauri Desktop WebView ───────────[ HTTP/WS 127.0.0.1:8000 ]──▶ Backend (manual process)
+Browser Frontend (Vite/React) ───[ HTTP Proxy /api/* ]────────▶ Backend (FastAPI, localhost:8000)
+Tauri Desktop WebView ───────────[ HTTP/WS loopback ]─────────▶ local backend or native gateway
+Native gateway ──────────────────[ HTTPS/WSS remote target ]──▶ Remote Nola Node
        │
        ├── Tauri invoke/event bridge ──▶ src-tauri/src/audio (Windows Core Audio / WASAPI)
        │
@@ -1212,20 +1264,21 @@ Tauri Desktop WebView ───────────[ HTTP/WS 127.0.0.1:8000 
 
 ## Limits & Notes
 
-| Item             | Limit/Detail                                                 |
-| ---------------- | ------------------------------------------------------------ |
-| Allowed Uploads  | mp3, wav, flac, m4a, ogg, webm, aac, mp4, wma                |
-| Max File Size    | 500 MB (Client-side validation required)                     |
-| Polling Interval | 2000 ms foreground, 6000 ms background (hidden document)     |
-| Theme            | App-owned `ThemeProvider` drives light/dark/system and persists via UI preferences |
-| Live Devices     | Client-runtime only; Web inventory cannot report system-global device usage and may expose temporary `temp-*` IDs before permission |
-| Desktop Devices  | Windows Tauri inventory uses Core Audio endpoint enumeration; empty device lists mean no current device, not unsupported runtime |
-| Desktop Dependencies | Windows API crates: `cfg(windows)` target gate; Linux checks: non-Windows stubs |
-| Live Audio Frames | PCM16LE, 16 kHz, mono; default capture path does not denoise, gain-normalize, compress, EQ, or trim content |
-| Desktop Audio Capture | Windows Tauri capture uses WASAPI microphone input and default output loopback; app exit releases active native sessions |
-| Live Transcript Events | `preview` and `committed_partial` stay WebSocket-only; `final` enters capped runtime output and backend history |
-| Live Diagnostics | Explicit WebSocket control only; frontend receives `capture_id`, `manifest_name`, and `file_name`, not server absolute paths |
-| Live Realtime Settings | Separate Settings tab after Transcription; render persisted defaults from backend schema and i18n keys |
-| Live Timing | Display session duration and transcript ranges with shared millisecond clock formatting |
-| Live Compact View | Web Document Picture-in-Picture when supported; close independent from route search and session stop |
-| Desktop Backend  | Tauri dev shell starts frontend only; start FastAPI separately on `127.0.0.1:8000` |
+| Item                   | Limit/Detail                                                                                                                        |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Allowed Uploads        | mp3, wav, flac, m4a, ogg, webm, aac, mp4, wma                                                                                       |
+| Max File Size          | 500 MB (Client-side validation required)                                                                                            |
+| Polling Interval       | 2000 ms foreground, 6000 ms background (hidden document)                                                                            |
+| Theme                  | App-owned `ThemeProvider` drives light/dark/system and persists via UI preferences                                                  |
+| Live Devices           | Client-runtime only; Web inventory cannot report system-global device usage and may expose temporary `temp-*` IDs before permission |
+| Desktop Devices        | Windows Tauri inventory uses Core Audio endpoint enumeration; empty device lists mean no current device, not unsupported runtime    |
+| Desktop Dependencies   | Windows API crates: `cfg(windows)` target gate; Linux checks: non-Windows stubs                                                     |
+| Live Audio Frames      | PCM16LE, 16 kHz, mono; default capture path does not denoise, gain-normalize, compress, EQ, or trim content                         |
+| Desktop Audio Capture  | Windows Tauri capture uses WASAPI microphone input and default output loopback; app exit releases active native sessions            |
+| Live Transcript Events | `preview` and `committed_partial` stay WebSocket-only; `final` enters capped runtime output and backend history                     |
+| Live Diagnostics       | Explicit WebSocket control only; frontend receives `capture_id`, `manifest_name`, and `file_name`, not server absolute paths        |
+| Live Realtime Settings | Separate Settings tab after Transcription; render persisted defaults from backend schema and i18n keys                              |
+| Live Timing            | Display session duration and transcript ranges with shared millisecond clock formatting                                             |
+| Live Compact View      | Web Document Picture-in-Picture when supported; close independent from route search and session stop                                |
+| Desktop Backend        | Tauri dev shell starts frontend only; start FastAPI separately on `127.0.0.1:8000`                                                  |
+| Desktop Remote Backend | Tauri WebView loopback gateway path; HTTP/WS traffic to the configured HTTPS/WSS Nola Node                                          |
