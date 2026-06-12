@@ -6,7 +6,7 @@ FastAPI, SQLite, Faster-Whisper, Hugging Face Hub, and Pydantic Settings stack; 
 
 ## Quick Start
 
-Prerequisites: `Requirements`.
+Prerequisites: [Requirements](#requirements).
 
 Run the API service and Worker in separate terminals.
 

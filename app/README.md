@@ -6,7 +6,7 @@ React, TypeScript, Vite, Tailwind CSS, TanStack Router, TanStack Query, Zustand,
 
 ## Quick Start
 
-Prerequisites: `Requirements`.
+Prerequisites: [Requirements](#requirements).
 
 ```bash
 # Frontend dependency installation
