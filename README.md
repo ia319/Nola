@@ -12,6 +12,8 @@ FastAPI, React, SQLite, Faster-Whisper, WhisperStreaming, and Tauri stack; offli
 
 [Transcription flow demo](./docs/media/nola-task-transcription-flow.gif)
 
+[Client and desktop docs](./app/README.md) · [Backend docs](./core/README.md)
+
 </div>
 
 ## Core Features
@@ -22,61 +24,24 @@ FastAPI, React, SQLite, Faster-Whisper, WhisperStreaming, and Tauri stack; offli
 - Model management: model list, model download, download progress, cache state, default model selection, model deletion
 - History management: transcription tasks, uploaded files, realtime session records
 - Subtitle export: SRT, VTT, TXT, ASS, single-item export, batch ZIP export
-- Configuration: transcription defaults, realtime transcription defaults, export defaults, model storage settings
-- Desktop support: Tauri desktop client, Windows audio device enumeration, WASAPI audio capture
+- Configuration: backend connection target, transcription defaults, realtime transcription defaults, export defaults, model storage settings
+- Desktop support: Tauri desktop client, Windows audio device enumeration, WASAPI audio capture, remote backend connection
 
-## Technical Details
+## Requirements
 
-### Transcription Engine
+- Python 3.10+
+- Poetry 2.x
+- GNU Make
+- Node.js 20.19+, 22.13+, or 24+
+- pnpm 10+
+- Rust stable
+- Windows 10/11 for desktop audio capture and Windows installer builds
+- CPU inference: no CUDA
+- NVIDIA GPU inference: CUDA 12.x, cuBLAS for CUDA 12, and cuDNN 9 for CUDA 12
 
-Current offline transcription engine: Faster-Whisper.
+## Quick Start
 
-Runtime management: unified model registry, model cache, task runtime configuration.
-Frontend model page: download state, cache state, default model selection.
-Extension boundary: future local or remote transcription backend integration.
-
-### Model Registry
-
-Current model registry: three Faster-Whisper model families.
-
-- Multilingual models: Tiny, Base, Small, Medium, Large V1, Large V2, Large V3, Large V3 Turbo
-- English-only models: Tiny English, Base English, Small English, Medium English
-- Distil Whisper models: Distil Small English, Distil Medium English, Distil Large V2, Distil Large V3, Distil Large V3.5
-
-Model management page: download state, cache state, download progress, default model selection, cache deletion.
-
-### Realtime Transcription
-
-Realtime transcription runtime: WhisperStreaming LocalAgreement behavior.
-Audio transport: 16 kHz mono PCM16LE frames; WebSocket JSON metadata and binary audio payloads.
-
-Result event classes:
-
-- `preview`: current hypothesis text
-- `committed_partial`: LocalAgreement stable text
-- `final`: final segment in realtime session history
-
-### WhisperStreaming Adapter
-
-Nola realtime module scope: algorithm state, buffer trimming, duplicate text suppression, segment commit, final-result persistence boundaries for local transcription.
-
-Upstream exclusions: WhisperStreaming CLI, TCP server, automatic model download, OpenAI API, MLX, `whisper_timestamped`.
-
-Full module details: [`core/nola/application/live/realtime/whisper_streaming/README.md`](core/nola/application/live/realtime/whisper_streaming/README.md).
-
-### Current Limits
-
-- Maximum file size: 500 MB
-- Upload formats: mp3, wav, flac, m4a, ogg, webm, aac, mp4, wma
-- Export formats: srt, vtt, txt, ass
-- Single batch task request limit: 500 task IDs
-- Single batch file request limit: 500 file IDs
-- Default backend address: `127.0.0.1:8000`
-- Frontend development address: `localhost:5173`
-
-## Quick Startup
-
-Prerequisites: `Requirements` section.
+Run long-lived services in separate terminals.
 
 ```bash
 # Backend and frontend dependency installation
@@ -114,18 +79,32 @@ make desktop-dev
 
 ```text
 Default desktop backend: http://127.0.0.1:8000
+Remote backend setup: app/README.md
 ```
 
-## Requirements
+## Running Modes
 
-- Python 3.10+
-- Poetry 2.x
-- Node.js 20.19+, 22.13+, or 24+
-- pnpm 10+
-- Rust stable
-- Windows 10/11 for desktop audio capture and Windows installer builds
-- CPU inference: no CUDA
-- NVIDIA GPU inference: CUDA 12.x, cuBLAS for CUDA 12, and cuDNN 9 for CUDA 12
+- Local Web: backend API, Worker, and Web frontend on one development machine
+- Local Desktop: Tauri desktop client with local backend
+- Desktop With Remote Backend: local desktop audio capture with configured remote backend
+- Backend Deployment: API service and Worker processes for Web or desktop clients
+
+## Current Limits
+
+- Maximum file size: 500 MB
+- Upload formats: mp3, wav, flac, m4a, ogg, webm, aac, mp4, wma
+- Export formats: srt, vtt, txt, ass
+- Desktop audio capture: Windows 10/11
+- Remote/public deployment boundary: trusted network or external authentication layer required
+
+## Project Shape
+
+Backend and client workspaces:
+
+- `core/`: FastAPI API, transcription worker, SQLite data, model cache, realtime transcription runtime
+- `app/`: React Web frontend, Tauri desktop client, realtime audio capture UI
+
+Root README: short project overview. Detailed client and backend docs: `app/README.md` and `core/README.md`.
 
 ## Development Commands
 
@@ -149,9 +128,13 @@ make app-gen-types
 make desktop-build-windows
 ```
 
-## Related Documentation
+## Development Documentation
 
-- `app/README.md`: frontend, desktop client, realtime audio client
-- `core/README.md`: backend API, worker, models, data, tests
+- `app/README.md`: client workspace setup, desktop client, connection settings
+- `core/README.md`: backend workspace setup, API, worker, deployment settings
 - `app/AI_INSTRUCTIONS.md`: frontend workspace structure, modules, command reference
 - `core/AI_INSTRUCTIONS.md`: backend workspace structure, modules, API reference
+
+## License
+
+MIT License: [LICENSE](./LICENSE)

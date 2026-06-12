@@ -2,11 +2,11 @@
 
 Nola frontend subproject
 
-React, TypeScript, Vite, Tailwind CSS, TanStack Router, TanStack Query, Zustand, i18next, Axios, and Tauri stack; Web frontend application, Tauri desktop client, realtime audio capture client, OpenAPI type consumption.
+React, TypeScript, Vite, Tailwind CSS, TanStack Router, TanStack Query, Zustand, i18next, Axios, and Tauri stack; Web frontend application, Tauri desktop client, realtime audio capture client, backend connection settings, OpenAPI type consumption.
 
-## Quick Startup
+## Quick Start
 
-Prerequisites: `Requirements` section.
+Prerequisites: `Requirements`.
 
 ```bash
 # Frontend dependency installation
@@ -20,7 +20,7 @@ pnpm dev
 
 ```text
 Frontend address: http://localhost:5173
-Default backend: http://127.0.0.1:8000
+Web development backend: http://localhost:8000 through the Vite proxy
 ```
 
 ```bash
@@ -30,7 +30,34 @@ pnpm tauri:dev
 
 ```text
 Default desktop backend: http://127.0.0.1:8000
+Remote backend: Settings > Connection or `--backend-url=https://nola.example.com`
 ```
+
+## Backend Connection
+
+| Runtime        | Default Target            | User Configuration                                   | Storage                    |
+| -------------- | ------------------------- | ---------------------------------------------------- | -------------------------- |
+| Web            | Same origin or Vite proxy | Settings > Connection, `VITE_API_URL`, `VITE_WS_URL` | Browser `localStorage`     |
+| Desktop local  | `http://127.0.0.1:8000`   | Settings > Connection                                | Tauri app config directory |
+| Desktop remote | HTTPS/WSS Nola Node       | Settings > Connection, `--backend-url`               | Tauri app config directory |
+
+Connection target rules:
+
+- Local backend origins: `http://localhost` or `http://127.0.0.1`
+- Remote backend origins: `https://`
+- WebSocket origin derivation: selected HTTP origin, `http` to `ws`, `https` to `wss`
+- Active connection profile: API, SSE, and realtime WebSocket clients
+
+Nola Node: deployed Nola backend API with Worker, data directory, and model cache.
+
+Desktop remote mode:
+
+- Tauri WebView: local loopback HTTP/WebSocket gateway
+- Native gateway: configured HTTPS/WSS Nola Node
+- Saved desktop connection settings: Tauri app config directory
+- `--backend-url`: current desktop launch override over saved settings
+
+Remote Web clients: backend CORS allow-list entry for the browser origin. Desktop remote mode: local gateway path. Backend deployment settings: `../core/README.md`.
 
 ## Requirements
 
@@ -93,7 +120,8 @@ pnpm desktop:build:windows
 ## Current Limits
 
 - Frontend development address: `localhost:5173`
-- Default backend address: `127.0.0.1:8000`
+- Default local backend address: `127.0.0.1:8000`
+- Remote desktop backend transport: HTTPS/WSS required
 - Realtime audio format: 16 kHz mono PCM16LE
 - Desktop audio capture platform: Windows
 - Frontend API type source: backend OpenAPI schema
