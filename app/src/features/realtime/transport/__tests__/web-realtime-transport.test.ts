@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import { LiveRealtimeTransportError } from '../errors'
 import { WebLiveRealtimeTransport } from '../web-realtime-transport'
@@ -11,10 +11,6 @@ import type {
   LiveRealtimeTrackReadyEvent,
 } from '../types'
 import type { LiveSessionDetail, LiveTrack, LiveTrackSource } from '@/shared/types'
-
-vi.mock('@/config/backend', () => ({
-  getRealtimeWebSocketBaseUrl: () => 'http://127.0.0.1:8000/',
-}))
 
 type WebSocketSendData = Parameters<WebSocket['send']>[0]
 

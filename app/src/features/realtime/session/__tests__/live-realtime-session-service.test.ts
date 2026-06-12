@@ -156,12 +156,21 @@ describe('LiveRealtimeSessionService', () => {
     })
     expect(useLiveDeviceStore.getState().systemAudioCapture.level).toBeNull()
 
-    systemSession.emitFrame(audioFrame('system', 0))
+    systemSession.emitFrame(audioFrame('system', 17))
+    systemSession.emitFrame(audioFrame('system', 18))
 
+    expect(setup.transport.audioFrames).toHaveLength(2)
     expect(setup.transport.audioFrames[0]).toMatchObject({
       trackId: 'track-system-1',
       source: 'system',
       sequence: 0,
+      capturedAtMs: 0,
+    })
+    expect(setup.transport.audioFrames[1]).toMatchObject({
+      trackId: 'track-system-1',
+      source: 'system',
+      sequence: 1,
+      capturedAtMs: 20,
     })
 
     await setup.service.stop()

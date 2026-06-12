@@ -41,13 +41,13 @@ repos:
         name: TypeScript typecheck (app)
         entry: pnpm --dir app typecheck
         language: system
-        always_run: true
+        files: ^app/(src/.*\.(ts|tsx)|tsconfig(\..*)?\.json|package\.json|pnpm-lock\.yaml|vite\.config\.ts)$
         pass_filenames: false
-        stages: [pre-push]
+        stages: [pre-commit]
       - id: backend-typecheck
         name: Mypy (core)
         entry: poetry -C core run mypy nola
         language: system
-        always_run: true
+        files: ^core/(nola/.*\.py|pyproject\.toml|poetry\.lock)$
         pass_filenames: false
-        stages: [pre-push]
+        stages: [pre-commit]

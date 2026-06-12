@@ -7,6 +7,10 @@ const GeneralTab = lazy(async () => {
   const module = await import('./GeneralTab')
   return { default: module.GeneralTab }
 })
+const ConnectionTab = lazy(async () => {
+  const module = await import('./ConnectionTab')
+  return { default: module.ConnectionTab }
+})
 const TranscriptionTab = lazy(async () => {
   const module = await import('./TranscriptionTab')
   return { default: module.TranscriptionTab }
@@ -32,6 +36,7 @@ type SettingsTabComponent = LazyExoticComponent<ComponentType>
 
 const SETTINGS_TAB_COMPONENTS = {
   general: GeneralTab,
+  connection: ConnectionTab,
   transcription: TranscriptionTab,
   'live-realtime': LiveRealtimeTab,
   export: ExportTab,

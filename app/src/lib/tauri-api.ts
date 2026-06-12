@@ -65,6 +65,12 @@ export interface DesktopRuntimeInfo {
   nativeAudioSupport: NativeAudioSupportStatus
 }
 
+export interface DesktopConnectionRuntimeOptionsDto {
+  backendUrl: string | null
+  gatewayHttpOrigin: string | null
+  managedLocalHttpOrigin: string | null
+}
+
 export interface NativeDeviceUseStateDto {
   selectedDeviceId: string | null
   activeDeviceId: string | null
@@ -184,6 +190,24 @@ export async function listenTauriEvent<TPayload>(
 /** Fetch static desktop runtime capabilities from the Tauri shell. */
 export function getDesktopRuntimeInfo(): Promise<DesktopRuntimeInfo> {
   return invokeTauriCommand<DesktopRuntimeInfo>('desktop_runtime_info')
+}
+
+export function getDesktopConnectionRuntimeOptions(): Promise<DesktopConnectionRuntimeOptionsDto> {
+  return invokeTauriCommand<DesktopConnectionRuntimeOptionsDto>(
+    'desktop_connection_runtime_options',
+  )
+}
+
+export function loadDesktopConnectionConfig(): Promise<string | null> {
+  return invokeTauriCommand<string | null>('load_desktop_connection_config')
+}
+
+export function saveDesktopConnectionConfig(payload: string): Promise<void> {
+  return invokeTauriCommand<void>('save_desktop_connection_config', { payload })
+}
+
+export function clearDesktopConnectionConfig(): Promise<void> {
+  return invokeTauriCommand<void>('clear_desktop_connection_config')
 }
 
 /** Fetch the native desktop audio device inventory through the Tauri shell. */

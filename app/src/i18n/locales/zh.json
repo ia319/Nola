@@ -1214,6 +1214,7 @@
     "navigationLabel": "设置分区",
     "tabs": {
       "general": "常规",
+      "connection": "连接",
       "transcription": "转写",
       "liveRealtime": "实时转写",
       "export": "导出",
@@ -1263,6 +1264,81 @@
         "title": "将这些偏好保留在本地",
         "description": "只在当前浏览器中存储语言、外观和单位设置。",
         "detail": "切换到其他浏览器配置文件或设备后，请重新配置相同的偏好。"
+      }
+    },
+    "connection": {
+      "loading": "正在加载连接设置...",
+      "sections": {
+        "target": {
+          "label": "连接目标"
+        }
+      },
+      "modes": {
+        "externalLocal": {
+          "label": "本机后端",
+          "description": "使用当前电脑上运行的 Nola API。"
+        },
+        "remote": {
+          "label": "远端后端",
+          "description": "通过 HTTPS 连接自托管的 Nola Node。"
+        }
+      },
+      "fields": {
+        "mode": {
+          "label": "后端模式",
+          "description": "选择当前客户端把 API、下载和实时请求发送到哪里。"
+        },
+        "backendUrl": {
+          "label": "后端 URL",
+          "localDescription": "本机模式使用标准 loopback API 地址。",
+          "remoteDescription": "远端模式需要 HTTPS origin，例如 https://nola.example.com。",
+          "placeholder": "https://nola.example.com",
+          "localHint": "开发构建中需要单独启动本机 API。"
+        },
+        "status": {
+          "label": "连接状态",
+          "description": "开始使用该后端前，检查 /health 和 /api/config。"
+        }
+      },
+      "status": {
+        "not-checked": "未检查",
+        "unconfigured": "未配置",
+        "checking": "检查中...",
+        "available": "可用",
+        "unreachable": "不可达",
+        "api-unavailable": "API 不可用",
+        "cors-blocked": "CORS 阻止",
+        "csp-blocked": "内容安全策略阻止",
+        "realtime-failed": "实时通道失败"
+      },
+      "remoteNotice": {
+        "title": "远端实时转写会把本机音频发送到该后端",
+        "description": "Live Realtime 会在当前电脑采集音频，并将音频流发送到这里配置的远端 URL。"
+      },
+      "warnings": {
+        "title": "当前正在使用连接回退",
+        "invalidManagedLocalRuntimeOrigin": "桌面托管本机后端地址无效，已忽略该配置。原因：{{reason}}",
+        "invalidBackendRuntimeUrl": "运行时后端 URL 无效，已忽略该配置。原因：{{reason}}",
+        "invalidDesktopGatewayRuntimeOrigin": "桌面网关地址无效，远端目标当前未通过本机网关连接。原因：{{reason}}"
+      },
+      "errors": {
+        "title": "连接设置失败",
+        "load": "无法加载连接设置。",
+        "save": "无法保存连接设置。",
+        "reset": "无法重置连接设置。",
+        "check": "连接健康检查失败。"
+      },
+      "actions": {
+        "reset": "重置",
+        "resetting": "重置中...",
+        "check": "检查",
+        "checking": "检查中...",
+        "save": "保存更改",
+        "saving": "保存中..."
+      },
+      "toast": {
+        "saved": "连接设置已更新",
+        "reset": "连接设置已重置"
       }
     },
     "transcription": {

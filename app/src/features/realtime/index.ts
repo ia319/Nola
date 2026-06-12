@@ -175,11 +175,11 @@ export {
   LIVE_REALTIME_AUDIO_SAMPLE_RATE,
   LIVE_REALTIME_DEFAULT_CLIENT_CAPABILITIES,
   LIVE_REALTIME_PROTOCOL_VERSION,
-  buildLiveRealtimeWebSocketUrl,
   isLiveRealtimeServerEvent,
   isLiveRealtimeServerEventType,
   parseLiveRealtimeServerEvent,
 } from './transport/protocol'
+export { buildLiveRealtimeWebSocketUrl } from './transport/websocket-url'
 export { LiveRealtimeTransportError, isLiveRealtimeTransportError } from './transport/errors'
 export type { CreateRealtimeTransportOptions } from './transport/realtime-transport'
 export { createRealtimeTransport } from './transport/realtime-transport'

@@ -1,26 +1,8 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
-import {
-  buildLiveRealtimeWebSocketUrl,
-  isLiveRealtimeServerEventType,
-  parseLiveRealtimeServerEvent,
-} from '../protocol'
-
-vi.mock('@/config/backend', () => ({
-  getRealtimeWebSocketBaseUrl: () => 'http://127.0.0.1:8000/',
-}))
+import { isLiveRealtimeServerEventType, parseLiveRealtimeServerEvent } from '../protocol'
 
 describe('live realtime protocol helpers', () => {
-  it('builds websocket URLs from explicit HTTP and WS bases', () => {
-    expect(buildLiveRealtimeWebSocketUrl('session 1', 'http://127.0.0.1:8000/')).toBe(
-      'ws://127.0.0.1:8000/api/live/sessions/session%201/stream',
-    )
-
-    expect(buildLiveRealtimeWebSocketUrl('session-2', 'wss://nola.test/ws')).toBe(
-      'wss://nola.test/api/live/sessions/session-2/stream',
-    )
-  })
-
   it('parses only versioned realtime server events', () => {
     const event = parseLiveRealtimeServerEvent(
       JSON.stringify({

@@ -5,7 +5,6 @@ import {
   LIVE_REALTIME_AUDIO_SAMPLE_RATE,
   LIVE_REALTIME_DEFAULT_CLIENT_CAPABILITIES,
   LIVE_REALTIME_PROTOCOL_VERSION,
-  buildLiveRealtimeWebSocketUrl,
   parseLiveRealtimeServerEvent,
 } from './protocol'
 import type {
@@ -26,6 +25,7 @@ import type {
   LiveRealtimeTransportStateCallback,
   LiveRealtimeTransportStateChange,
 } from './types'
+import { buildLiveRealtimeWebSocketUrl } from './websocket-url'
 
 const LIVE_REALTIME_CONNECT_TIMEOUT_MS = 10_000
 
@@ -88,6 +88,8 @@ export class WebLiveRealtimeTransport implements LiveRealtimeTransport {
     return new Promise<LiveRealtimeServerReadyEvent>((resolve, reject) => {
       try {
         const WebSocketCtor = this.resolveWebSocketCtor()
+        // Current WebSocket auth relies on trusted connection configuration until
+        // remote live tokens are introduced.
         const url = buildLiveRealtimeWebSocketUrl(sessionId, this.options.baseUrl)
         const socket = new WebSocketCtor(url)
         socket.binaryType = 'arraybuffer'

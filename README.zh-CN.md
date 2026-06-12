@@ -12,6 +12,8 @@ FastAPI、React、SQLite、Faster-Whisper、WhisperStreaming、Tauri 技术栈�
 
 [转录流程演示](./docs/media/nola-task-transcription-flow.gif)
 
+[客户端与桌面文档](./app/README.md) · [后端文档](./core/README.md)
+
 </div>
 
 ## 核心能力
@@ -22,61 +24,24 @@ FastAPI、React、SQLite、Faster-Whisper、WhisperStreaming、Tauri 技术栈�
 - 模型管理：模型列表、模型下载、下载进度、缓存状态、默认模型选择、模型删除
 - 历史管理：转写任务、上传文件、实时会话记录
 - 字幕导出：SRT、VTT、TXT、ASS、单项导出、批量 ZIP 导出
-- 配置管理：转写默认值、实时转写默认值、导出默认值、模型存储设置
-- 桌面能力：Tauri 桌面客户端、Windows 音频设备枚举、WASAPI 音频采集
+- 配置管理：后端连接目标、转写默认值、实时转写默认值、导出默认值、模型存储设置
+- 桌面能力：Tauri 桌面客户端、Windows 音频设备枚举、WASAPI 音频采集、远程后端连接
 
-## 技术细节
+## 环境要求
 
-### 转写引擎
+- Python 3.10+
+- Poetry 2.x
+- GNU Make
+- Node.js 20.19+、22.13+ 或 24+
+- pnpm 10+
+- Rust stable
+- Windows 10/11（桌面音频采集与 Windows 安装包构建）
+- CPU 推理：无需 CUDA
+- NVIDIA GPU 推理：CUDA 12.x、cuBLAS for CUDA 12、cuDNN 9 for CUDA 12
 
-当前离线转写引擎：Faster-Whisper。
+## 快速开始
 
-运行时管理：统一模型注册表、模型缓存、任务运行配置。
-前端模型页面：下载状态、缓存状态、默认模型选择。
-扩展边界：后续本地或远程转写后端接入。
-
-### 模型注册表
-
-当前模型注册表：三类 Faster-Whisper 模型。
-
-- 多语言模型：Tiny、Base、Small、Medium、Large V1、Large V2、Large V3、Large V3 Turbo
-- 英文专用模型：Tiny English、Base English、Small English、Medium English
-- Distil Whisper 模型：Distil Small English、Distil Medium English、Distil Large V2、Distil Large V3、Distil Large V3.5
-
-模型管理页面：下载状态、缓存状态、下载进度、默认模型选择、缓存删除。
-
-### 实时转写
-
-实时转写运行时：WhisperStreaming LocalAgreement 行为。
-音频传输：16 kHz mono PCM16LE 帧；WebSocket JSON 元数据与二进制音频载荷。
-
-结果事件类别：
-
-- `preview`：当前假设文本
-- `committed_partial`：LocalAgreement 稳定片段
-- `final`：实时会话历史中的最终分段
-
-### WhisperStreaming 适配
-
-Nola 实时模块范围：本地转写所需的算法状态、缓冲区裁剪、重复文本去重、分段提交、最终结果持久化边界。
-
-上游排除路径：WhisperStreaming CLI、TCP server、自动模型下载、OpenAI API、MLX、`whisper_timestamped`。
-
-完整模块说明：[`core/nola/application/live/realtime/whisper_streaming/README.md`](core/nola/application/live/realtime/whisper_streaming/README.md)。
-
-### 当前限制
-
-- 单文件大小上限：500 MB
-- 上传格式：mp3, wav, flac, m4a, ogg, webm, aac, mp4, wma
-- 导出格式：srt, vtt, txt, ass
-- 单次批量任务请求上限：500 个任务 ID
-- 单次批量文件请求上限：500 个文件 ID
-- 后端默认地址：`127.0.0.1:8000`
-- 前端开发地址：`localhost:5173`
-
-## 快速启动
-
-前置环境：`环境要求` 章节。
+在不同终端中运行长驻服务。
 
 ```bash
 # 后端与前端依赖安装
@@ -114,18 +79,32 @@ make desktop-dev
 
 ```text
 桌面客户端默认后端：http://127.0.0.1:8000
+远程后端配置：app/README.md
 ```
 
-## 环境要求
+## 运行模式
 
-- Python 3.10+
-- Poetry 2.x
-- Node.js 20.19+、22.13+ 或 24+
-- pnpm 10+
-- Rust stable
-- Windows 10/11（桌面音频采集与 Windows 安装包构建）
-- CPU 推理：无需 CUDA
-- NVIDIA GPU 推理：CUDA 12.x、cuBLAS for CUDA 12、cuDNN 9 for CUDA 12
+- 本地 Web：同一开发机器上的后端 API、Worker 与 Web 前端
+- 本地桌面：Tauri 桌面客户端与本机后端
+- 桌面连接远程后端：本机桌面音频采集与已配置远程后端
+- 后端独立部署：面向 Web 或桌面客户端的 API 服务与 Worker 进程
+
+## 当前限制
+
+- 单文件大小上限：500 MB
+- 上传格式：mp3, wav, flac, m4a, ogg, webm, aac, mp4, wma
+- 导出格式：srt, vtt, txt, ass
+- 桌面音频采集：Windows 10/11
+- 远程/公网部署边界：可信网络或外部认证层必需
+
+## 项目形态
+
+后端与客户端工作区：
+
+- `core/`：FastAPI API、转写 Worker、SQLite 数据、模型缓存、实时转写运行时
+- `app/`：React Web 前端、Tauri 桌面客户端、实时音频采集界面
+
+根 README：项目总览。客户端与后端细节：`app/README.md` 与 `core/README.md`。
 
 ## 开发命令
 
@@ -149,9 +128,13 @@ make app-gen-types
 make desktop-build-windows
 ```
 
-## 相关文档
+## 开发文档
 
-- `app/README.md`：前端、桌面客户端、实时音频客户端
-- `core/README.md`：后端 API、Worker、模型、数据与测试
+- `app/README.md`：客户端工作区、桌面客户端、连接配置
+- `core/README.md`：后端工作区、API、Worker、部署配置
 - `app/AI_INSTRUCTIONS.md`：前端工作区结构、模块与命令说明
 - `core/AI_INSTRUCTIONS.md`：后端工作区结构、模块与 API 说明
+
+## License
+
+MIT License：[LICENSE](./LICENSE)
