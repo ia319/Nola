@@ -4,8 +4,12 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CONNECTION_CONFIG_VERSION } from '@/config/connection/config'
+import { createDesktopGatewayRemoteConnectionProfile } from '@/config/connection/profile'
 import { MemoryConnectionConfigRepository } from '@/config/connection/storage'
-import { resetActiveConnectionProfile } from '@/config/connection/runtime'
+import {
+  resetActiveConnectionProfile,
+  setActiveConnectionProfile,
+} from '@/config/connection/runtime'
 
 const connectionTabMocks = vi.hoisted(() => ({
   toastSuccessMock: vi.fn(),
@@ -79,6 +83,14 @@ function createOkResponse(): Response {
   return new Response('{}', { status: 200 })
 }
 
+function renderTauriConnectionTab(
+  repository = new MemoryConnectionConfigRepository(),
+): MemoryConnectionConfigRepository {
+  resetActiveConnectionProfile('tauri')
+  render(<ConnectionTab environment="tauri" repository={repository} />)
+  return repository
+}
+
 describe('ConnectionTab', () => {
   beforeEach(() => {
     connectionTabMocks.toastSuccessMock.mockReset()
@@ -91,9 +103,7 @@ describe('ConnectionTab', () => {
   })
 
   it('renders local mode with a read-only loopback URL', async () => {
-    render(
-      <ConnectionTab environment="tauri" repository={new MemoryConnectionConfigRepository()} />,
-    )
+    renderTauriConnectionTab()
 
     await waitFor(() => {
       expect(screen.getByText('Connection Target')).toBeTruthy()
@@ -107,9 +117,7 @@ describe('ConnectionTab', () => {
   })
 
   it('allows desktop users to configure a remote backend target', async () => {
-    render(
-      <ConnectionTab environment="tauri" repository={new MemoryConnectionConfigRepository()} />,
-    )
+    renderTauriConnectionTab()
 
     await waitFor(() => {
       expect(screen.getByRole('radio', { name: /Remote backend/ })).toBeTruthy()
@@ -156,9 +164,7 @@ describe('ConnectionTab', () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(createOkResponse())
     vi.stubGlobal('fetch', fetchMock)
 
-    render(
-      <ConnectionTab environment="tauri" repository={new MemoryConnectionConfigRepository()} />,
-    )
+    renderTauriConnectionTab()
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Check' })).toBeTruthy()
@@ -190,6 +196,54 @@ describe('ConnectionTab', () => {
     )
   })
 
+  it('checks saved desktop remote targets through the active gateway profile', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(createOkResponse())
+    const targetOrigin = 'https://nola.example.com'
+    const gatewayOrigin = 'http://127.0.0.1:31000'
+    const repository = new MemoryConnectionConfigRepository({
+      version: CONNECTION_CONFIG_VERSION,
+      mode: 'remote',
+      httpOrigin: targetOrigin,
+    })
+    setActiveConnectionProfile(
+      createDesktopGatewayRemoteConnectionProfile(targetOrigin, gatewayOrigin, 'user-config'),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<ConnectionTab environment="tauri" repository={repository} />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Check' })).toBeTruthy()
+    })
+
+    expect(screen.getByLabelText('Backend URL')).toHaveValue(targetOrigin)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Available')).toBeTruthy()
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${gatewayOrigin}/health`,
+      expect.objectContaining({
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-store',
+        signal: expect.any(AbortSignal),
+      }),
+    )
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${gatewayOrigin}/api/config`,
+      expect.objectContaining({
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-store',
+        signal: expect.any(AbortSignal),
+      }),
+    )
+  })
+
   it('reports API unavailable when health passes but config fails', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
@@ -197,9 +251,7 @@ describe('ConnectionTab', () => {
       .mockResolvedValueOnce(new Response('{}', { status: 500 }))
     vi.stubGlobal('fetch', fetchMock)
 
-    render(
-      <ConnectionTab environment="tauri" repository={new MemoryConnectionConfigRepository()} />,
-    )
+    renderTauriConnectionTab()
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Check' })).toBeTruthy()
