@@ -60,6 +60,13 @@ yarn-error.log*
 /app/dist/
 /app/dist-ssr/
 
+# Release output
+/release-artifacts/
+/Nola-*-windows-*-setup.exe
+/Nola-*-windows-*-portable.zip
+/Nola-*-web.zip
+/Nola-*-checksums.sha256
+
 # =========================
 # Tauri
 # =========================
