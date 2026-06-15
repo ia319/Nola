@@ -4,6 +4,7 @@
 	core-lint core-lint-fix core-format core-format-check core-typecheck core-test core-check \
 	app-dev app-preview app-lint app-lint-fix app-format app-format-check app-typecheck app-test app-test-watch app-test-ci app-build app-storybook app-storybook-build app-gen-types app-gen-types-check app-check \
 	desktop-info desktop-dev desktop-build desktop-build-windows desktop-format desktop-format-check desktop-lint desktop-test desktop-check \
+	release-set-version release-check-version release-clean release-checksums \
 	lint lint-fix format format-check typecheck test test-ci build check \
 	api worker dev clean
 
@@ -51,6 +52,12 @@ help:
 	@echo "  make desktop-lint         Run desktop Rust Clippy"
 	@echo "  make desktop-test         Run desktop Rust tests"
 	@echo "  make desktop-check        Run desktop Rust checks"
+	@echo ""
+	@echo "Release:"
+	@echo "  make release-set-version VERSION=x.y.z  Update all project version files"
+	@echo "  make release-check-version  Check release version consistency"
+	@echo "  make release-clean        Rebuild release artifact staging directory"
+	@echo "  make release-checksums    Generate SHA256 checksums for staged artifacts"
 	@echo ""
 	@echo "Unified:"
 	@echo "  make lint                 Run lint checks"
@@ -177,6 +184,22 @@ desktop-test:
 
 desktop-check:
 	pnpm --dir app desktop:check
+
+# Release commands
+release-set-version:
+ifndef VERSION
+	$(error VERSION is required. Usage: make release-set-version VERSION=0.1.0)
+endif
+	node scripts/release/set-version.mjs $(VERSION)
+
+release-check-version:
+	node scripts/release/check-version.mjs
+
+release-clean:
+	node scripts/release/clean-artifacts.mjs
+
+release-checksums:
+	node scripts/release/generate-checksums.mjs
 
 # Unified repository commands
 lint: core-lint app-lint desktop-lint
