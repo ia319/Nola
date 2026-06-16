@@ -68,11 +68,13 @@ function updateTomlSectionVersion(relativePath, sectionName) {
       return line
     }
 
+    const versionMatch = line.match(/^(\s*version\s*=\s*)["'][^"']+["'](\s*)$/)
+    if (!versionMatch) {
+      throw new Error(`Invalid ${sectionName}.version in ${relativePath}`)
+    }
+
     updated = true
-    return line.replace(
-      /^(\s*version\s*=\s*)["'][^"']+["'](\s*)$/,
-      `$1"${releaseVersion}"$2`,
-    )
+    return `${versionMatch[1]}"${releaseVersion}"${versionMatch[2]}`
   })
 
   if (!updated) {
