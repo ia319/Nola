@@ -71,7 +71,10 @@ export function readReleaseTag(args = process.argv.slice(2), env = process.env) 
 
 export function normalizeVersion(value, sourceName) {
   const normalized = value?.trim().replace(/^v/, '')
-  if (!normalized || !/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(normalized)) {
+  if (
+    !normalized ||
+    !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(normalized)
+  ) {
     throw new Error(`Invalid release version from ${sourceName}: ${value}`)
   }
   return normalized
