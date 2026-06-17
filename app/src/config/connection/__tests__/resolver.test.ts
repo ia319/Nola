@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { DesktopCoreSidecarRuntimeStatusDto } from '@/lib/tauri-api'
+
 import { CONNECTION_CONFIG_VERSION } from '../config'
 import { MemoryConnectionConfigRepository } from '../storage'
 import { resolveConnectionProfile, resolveConnectionProfileWithDiagnostics } from '../resolver'
@@ -10,12 +12,27 @@ vi.mock('@/lib/tauri-api', () => ({
   getDesktopConnectionRuntimeOptions: getDesktopConnectionRuntimeOptionsMock,
 }))
 
+function createDesktopCoreSidecarStatus(
+  overrides: Partial<DesktopCoreSidecarRuntimeStatusDto> = {},
+): DesktopCoreSidecarRuntimeStatusDto {
+  return {
+    mode: 'unavailable',
+    httpOrigin: null,
+    apiStatus: 'failed',
+    workerStatus: 'not-started',
+    dataDir: null,
+    logDir: null,
+    error: 'desktop core sidecar executable was not found',
+    ...overrides,
+  }
+}
+
 describe('connection profile resolver', () => {
   afterEach(() => {
     vi.clearAllMocks()
   })
 
-  it('prefers managed local sidecar origins over every other source', async () => {
+  it('keeps backend-url runtime overrides ahead of managed local sidecar origins', async () => {
     const repository = new MemoryConnectionConfigRepository({
       version: CONNECTION_CONFIG_VERSION,
       mode: 'remote',
@@ -29,6 +46,44 @@ describe('connection profile resolver', () => {
         runtimeOverrides: {
           managedLocalHttpOrigin: 'http://localhost:9000',
           backendUrl: 'https://override.example.com',
+        },
+      }),
+    ).resolves.toMatchObject({
+      mode: 'remote',
+      httpOrigin: 'https://override.example.com',
+      source: 'runtime-override',
+    })
+  })
+
+  it('keeps saved config ahead of managed local sidecar origins', async () => {
+    const repository = new MemoryConnectionConfigRepository({
+      version: CONNECTION_CONFIG_VERSION,
+      mode: 'remote',
+      httpOrigin: 'https://saved.example.com',
+    })
+
+    await expect(
+      resolveConnectionProfile({
+        environment: 'tauri',
+        repository,
+        runtimeOverrides: {
+          managedLocalHttpOrigin: 'http://localhost:9000',
+        },
+      }),
+    ).resolves.toMatchObject({
+      mode: 'remote',
+      httpOrigin: 'https://saved.example.com',
+      source: 'user-config',
+    })
+  })
+
+  it('uses managed local sidecar origins when no higher-priority source exists', async () => {
+    await expect(
+      resolveConnectionProfile({
+        environment: 'tauri',
+        repository: new MemoryConnectionConfigRepository(),
+        runtimeOverrides: {
+          managedLocalHttpOrigin: 'http://localhost:9000',
         },
       }),
     ).resolves.toEqual({
@@ -217,31 +272,85 @@ describe('connection profile resolver', () => {
   })
 
   it('ignores invalid managed-local runtime origins and keeps resolving other sources', async () => {
-    const repository = new MemoryConnectionConfigRepository({
-      version: CONNECTION_CONFIG_VERSION,
-      mode: 'remote',
-      httpOrigin: 'https://saved.example.com',
-    })
-
     await expect(
       resolveConnectionProfileWithDiagnostics({
         environment: 'tauri',
-        repository,
+        repository: new MemoryConnectionConfigRepository(),
         runtimeOverrides: {
           managedLocalHttpOrigin: 'https://localhost:9000',
-          backendUrl: 'https://override.example.com',
         },
       }),
     ).resolves.toMatchObject({
       profile: {
-        mode: 'remote',
-        httpOrigin: 'https://override.example.com',
-        source: 'runtime-override',
+        mode: 'external-local',
+        httpOrigin: 'http://127.0.0.1:8000',
+        source: 'default-local',
       },
       warnings: [
         {
           code: 'invalid-managed-local-runtime-origin',
           reason: 'Local backend URL must use http://',
+        },
+      ],
+    })
+  })
+
+  it('reports unavailable desktop core sidecar status when falling back to local defaults', async () => {
+    await expect(
+      resolveConnectionProfileWithDiagnostics({
+        environment: 'tauri',
+        repository: new MemoryConnectionConfigRepository(),
+        runtimeOverrides: {
+          coreSidecarStatus: createDesktopCoreSidecarStatus({
+            logDir: 'C:/Users/example/AppData/Roaming/Nola/core/logs',
+          }),
+        },
+      }),
+    ).resolves.toMatchObject({
+      profile: {
+        mode: 'external-local',
+        httpOrigin: 'http://127.0.0.1:8000',
+        source: 'default-local',
+      },
+      warnings: [
+        {
+          code: 'desktop-core-sidecar-unavailable',
+          reason:
+            'desktop core sidecar executable was not found Logs: C:/Users/example/AppData/Roaming/Nola/core/logs',
+        },
+      ],
+    })
+  })
+
+  it('reports desktop core sidecar worker failures while keeping the managed API profile', async () => {
+    await expect(
+      resolveConnectionProfileWithDiagnostics({
+        environment: 'tauri',
+        repository: new MemoryConnectionConfigRepository(),
+        runtimeOverrides: {
+          managedLocalHttpOrigin: 'http://localhost:9000',
+          coreSidecarStatus: createDesktopCoreSidecarStatus({
+            mode: 'managed-local',
+            httpOrigin: 'http://localhost:9000',
+            apiStatus: 'available',
+            workerStatus: 'failed',
+            dataDir: 'C:/Users/example/AppData/Roaming/Nola/core',
+            logDir: 'C:/Users/example/AppData/Roaming/Nola/core/logs',
+            error: 'managed core worker process is unavailable',
+          }),
+        },
+      }),
+    ).resolves.toMatchObject({
+      profile: {
+        mode: 'managed-local',
+        httpOrigin: 'http://localhost:9000',
+        source: 'tauri-sidecar',
+      },
+      warnings: [
+        {
+          code: 'desktop-core-sidecar-degraded',
+          reason:
+            'managed core worker process is unavailable Logs: C:/Users/example/AppData/Roaming/Nola/core/logs',
         },
       ],
     })

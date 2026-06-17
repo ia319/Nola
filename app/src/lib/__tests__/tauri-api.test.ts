@@ -79,9 +79,19 @@ describe('tauri-api boundary', () => {
   })
 
   it('invokes desktop connection config commands through stable command names', async () => {
+    const coreSidecarStatus = {
+      mode: 'remote',
+      httpOrigin: null,
+      apiStatus: 'not-started',
+      workerStatus: 'not-started',
+      dataDir: null,
+      logDir: null,
+      error: null,
+    }
     invokeMock
       .mockResolvedValueOnce({
         backendUrl: 'https://nola.example.com',
+        coreSidecarStatus,
         gatewayHttpOrigin: null,
         managedLocalHttpOrigin: null,
       })
@@ -91,6 +101,7 @@ describe('tauri-api boundary', () => {
 
     await expect(getDesktopConnectionRuntimeOptions()).resolves.toEqual({
       backendUrl: 'https://nola.example.com',
+      coreSidecarStatus,
       gatewayHttpOrigin: null,
       managedLocalHttpOrigin: null,
     })
