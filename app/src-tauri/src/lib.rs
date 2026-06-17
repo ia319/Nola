@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod connection;
+pub mod core_sidecar;
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -121,10 +122,13 @@ fn native_audio_support() -> &'static str {
 pub fn run() {
     let audio_state = audio::DesktopAudioState::default();
     let app_audio_cleanup_state = audio_state.clone();
+    let core_sidecar_state = core_sidecar::DesktopCoreSidecarState::default();
+    let app_core_sidecar_cleanup_state = core_sidecar_state.clone();
     let gateway_state = connection::gateway::DesktopGatewayState::default();
 
     let app = tauri::Builder::default()
         .manage(audio_state)
+        .manage(core_sidecar_state)
         .manage(gateway_state)
         .invoke_handler(tauri::generate_handler![
             desktop_runtime_info,
@@ -146,6 +150,7 @@ pub fn run() {
         if let tauri::RunEvent::Exit = event {
             // Native capture is app-global; window close events may be cancelled or target child windows.
             app_audio_cleanup_state.release_active_sessions();
+            app_core_sidecar_cleanup_state.stop_all();
         }
     });
 }

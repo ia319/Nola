@@ -2,6 +2,7 @@ use std::{fs, io, path::PathBuf};
 use tauri::Manager;
 
 use super::gateway::{normalize_remote_http_origin, DesktopGatewayState};
+use crate::core_sidecar::{DesktopCoreSidecarRuntimeStatus, DesktopCoreSidecarState};
 
 const DESKTOP_CONNECTION_CONFIG_FILE: &str = "connection-config.json";
 const CONNECTION_CONFIG_VERSION: u8 = 1;
@@ -10,6 +11,7 @@ const CONNECTION_CONFIG_VERSION: u8 = 1;
 #[serde(rename_all = "camelCase")]
 pub struct DesktopConnectionRuntimeOptions {
     backend_url: Option<String>,
+    core_sidecar_status: DesktopCoreSidecarRuntimeStatus,
     gateway_http_origin: Option<String>,
     managed_local_http_origin: Option<String>,
 }
@@ -25,22 +27,30 @@ struct StoredConnectionConfigPayload {
 #[tauri::command]
 pub async fn desktop_connection_runtime_options(
     app_handle: tauri::AppHandle,
+    core_sidecar_state: tauri::State<'_, DesktopCoreSidecarState>,
     gateway_state: tauri::State<'_, DesktopGatewayState>,
 ) -> Result<DesktopConnectionRuntimeOptions, String> {
     let backend_url = parse_backend_url_arg(std::env::args().skip(1));
-    let saved_remote_target = if backend_url.is_none() {
-        load_saved_remote_target(&app_handle)?
+    let saved_target = if backend_url.is_none() {
+        load_saved_connection_target(&app_handle)?
     } else {
         None
     };
-    let gateway_target =
-        resolve_gateway_target(backend_url.as_deref(), saved_remote_target.as_deref());
+    let gateway_target = resolve_gateway_target(backend_url.as_deref(), saved_target.as_ref());
     let gateway_http_origin = gateway_state
         .set_remote_target(gateway_target.as_deref())
         .await?;
+    let core_sidecar_status = resolve_desktop_core_sidecar_status(
+        &app_handle,
+        core_sidecar_state.inner(),
+        backend_url.as_deref(),
+        saved_target.as_ref(),
+    )
+    .await;
 
     Ok(build_desktop_connection_runtime_options(
         backend_url,
+        core_sidecar_status,
         gateway_http_origin,
     ))
 }
@@ -108,12 +118,15 @@ fn desktop_connection_config_path(app_handle: &tauri::AppHandle) -> Result<PathB
 
 fn build_desktop_connection_runtime_options(
     backend_url: Option<String>,
+    core_sidecar_status: DesktopCoreSidecarRuntimeStatus,
     gateway_http_origin: Option<String>,
 ) -> DesktopConnectionRuntimeOptions {
+    let managed_local_http_origin = core_sidecar_status.managed_http_origin();
     DesktopConnectionRuntimeOptions {
         backend_url,
+        core_sidecar_status,
         gateway_http_origin,
-        managed_local_http_origin: None,
+        managed_local_http_origin,
     }
 }
 
@@ -125,7 +138,11 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<str>,
 {
-    build_desktop_connection_runtime_options(parse_backend_url_arg(args), None)
+    build_desktop_connection_runtime_options(
+        parse_backend_url_arg(args),
+        DesktopCoreSidecarRuntimeStatus::external_local(),
+        None,
+    )
 }
 
 fn parse_backend_url_arg<I, S>(args: I) -> Option<String>
@@ -153,10 +170,18 @@ fn non_empty_arg(value: &str) -> Option<String> {
     (!trimmed.is_empty()).then(|| trimmed.to_string())
 }
 
-fn load_saved_remote_target(app_handle: &tauri::AppHandle) -> Result<Option<String>, String> {
+#[derive(Debug, PartialEq, Eq)]
+enum SavedConnectionTarget {
+    ExternalLocal,
+    Remote(String),
+}
+
+fn load_saved_connection_target(
+    app_handle: &tauri::AppHandle,
+) -> Result<Option<SavedConnectionTarget>, String> {
     let path = desktop_connection_config_path(app_handle)?;
     match fs::read_to_string(path) {
-        Ok(payload) => Ok(remote_target_from_config_payload(&payload).ok().flatten()),
+        Ok(payload) => Ok(connection_target_from_config_payload(&payload).ok()),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(format!("failed to read desktop connection config: {error}")),
     }
@@ -164,16 +189,53 @@ fn load_saved_remote_target(app_handle: &tauri::AppHandle) -> Result<Option<Stri
 
 fn resolve_gateway_target(
     backend_url: Option<&str>,
-    saved_remote_target: Option<&str>,
+    saved_target: Option<&SavedConnectionTarget>,
 ) -> Option<String> {
     if let Some(backend_url) = backend_url {
         return normalize_remote_http_origin(backend_url).ok();
     }
 
-    saved_remote_target.map(ToOwned::to_owned)
+    match saved_target {
+        Some(SavedConnectionTarget::Remote(origin)) => Some(origin.clone()),
+        _ => None,
+    }
+}
+
+async fn resolve_desktop_core_sidecar_status(
+    app_handle: &tauri::AppHandle,
+    core_sidecar_state: &DesktopCoreSidecarState,
+    backend_url: Option<&str>,
+    saved_target: Option<&SavedConnectionTarget>,
+) -> DesktopCoreSidecarRuntimeStatus {
+    if let Some(backend_url) = backend_url {
+        return if normalize_remote_http_origin(backend_url).is_ok() {
+            DesktopCoreSidecarRuntimeStatus::remote()
+        } else {
+            DesktopCoreSidecarRuntimeStatus::external_local()
+        };
+    }
+
+    match saved_target {
+        Some(SavedConnectionTarget::Remote(_)) => DesktopCoreSidecarRuntimeStatus::remote(),
+        Some(SavedConnectionTarget::ExternalLocal) => {
+            DesktopCoreSidecarRuntimeStatus::external_local()
+        }
+        None => {
+            core_sidecar_state
+                .ensure_managed_core_sidecar(app_handle)
+                .await
+        }
+    }
 }
 
 fn remote_target_from_config_payload(payload: &str) -> Result<Option<String>, String> {
+    connection_target_from_config_payload(payload).map(|target| match target {
+        SavedConnectionTarget::Remote(origin) => Some(origin),
+        SavedConnectionTarget::ExternalLocal => None,
+    })
+}
+
+fn connection_target_from_config_payload(payload: &str) -> Result<SavedConnectionTarget, String> {
     let config: StoredConnectionConfigPayload = serde_json::from_str(payload)
         .map_err(|error| format!("desktop connection config payload is invalid: {error}"))?;
 
@@ -182,8 +244,10 @@ fn remote_target_from_config_payload(payload: &str) -> Result<Option<String>, St
     }
 
     match config.mode.as_str() {
-        "remote" => normalize_remote_http_origin(&config.http_origin).map(Some),
-        "external-local" => Ok(None),
+        "remote" => {
+            normalize_remote_http_origin(&config.http_origin).map(SavedConnectionTarget::Remote)
+        }
+        "external-local" => Ok(SavedConnectionTarget::ExternalLocal),
         _ => Err("desktop connection config mode is unsupported".to_string()),
     }
 }
@@ -229,30 +293,27 @@ mod tests {
 
     #[test]
     fn resolve_gateway_target_prefers_remote_backend_url() {
+        let saved = SavedConnectionTarget::Remote("https://saved.example.com".to_string());
         assert_eq!(
-            resolve_gateway_target(
-                Some("https://override.example.com/"),
-                Some("https://saved.example.com")
-            ),
+            resolve_gateway_target(Some("https://override.example.com/"), Some(&saved)),
             Some("https://override.example.com".to_string())
         );
     }
 
     #[test]
     fn resolve_gateway_target_ignores_local_backend_url() {
+        let saved = SavedConnectionTarget::Remote("https://saved.example.com".to_string());
         assert_eq!(
-            resolve_gateway_target(
-                Some("http://127.0.0.1:8123"),
-                Some("https://saved.example.com")
-            ),
+            resolve_gateway_target(Some("http://127.0.0.1:8123"), Some(&saved)),
             None
         );
     }
 
     #[test]
     fn resolve_gateway_target_uses_saved_remote_target_without_backend_url() {
+        let saved = SavedConnectionTarget::Remote("https://saved.example.com".to_string());
         assert_eq!(
-            resolve_gateway_target(None, Some("https://saved.example.com")),
+            resolve_gateway_target(None, Some(&saved)),
             Some("https://saved.example.com".to_string())
         );
     }
