@@ -4,7 +4,7 @@
 	core-lint core-lint-fix core-format core-format-check core-typecheck core-test core-check \
 	app-dev app-preview app-lint app-lint-fix app-format app-format-check app-typecheck app-test app-test-watch app-test-ci app-build app-storybook app-storybook-build app-gen-types app-gen-types-check app-check \
 	desktop-info desktop-dev desktop-build desktop-build-windows desktop-format desktop-format-check desktop-lint desktop-test desktop-check \
-	release-set-version release-check-version release-clean release-checksums \
+	release-set-version release-check-version release-clean release-build-core-windows release-checksums \
 	lint lint-fix format format-check typecheck test test-ci build check \
 	api worker dev clean
 
@@ -57,6 +57,7 @@ help:
 	@echo "  make release-set-version VERSION=x.y.z  Update all project version files"
 	@echo "  make release-check-version  Check release version consistency"
 	@echo "  make release-clean        Rebuild release artifact staging directory"
+	@echo "  make release-build-core-windows  Build Windows core sidecar"
 	@echo "  make release-checksums    Generate SHA256 checksums for staged artifacts"
 	@echo ""
 	@echo "Unified:"
@@ -197,6 +198,9 @@ release-check-version:
 
 release-clean:
 	node scripts/release/clean-artifacts.mjs
+
+release-build-core-windows:
+	node scripts/release/build-core-windows.mjs
 
 release-checksums:
 	node scripts/release/generate-checksums.mjs
