@@ -1,7 +1,7 @@
 use std::{
     fs,
     net::{Ipv4Addr, SocketAddrV4, TcpListener},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use tauri::Manager;
@@ -17,18 +17,7 @@ pub(crate) fn build_launch_plan(
     let Some(sidecar_path) = resolve_core_sidecar_path(app_handle)? else {
         return Ok(None);
     };
-    let data_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|error| format!("failed to resolve desktop data directory: {error}"))?
-        .join("core");
-    let model_dir = data_dir.join("models");
-    let log_dir = data_dir.join("logs");
-
-    fs::create_dir_all(&model_dir)
-        .map_err(|error| format!("failed to create managed core model directory: {error}"))?;
-    fs::create_dir_all(&log_dir)
-        .map_err(|error| format!("failed to create managed core log directory: {error}"))?;
+    let (data_dir, model_dir, log_dir) = resolve_data_directories(app_handle, &sidecar_path)?;
 
     Ok(Some(ManagedCoreSidecarLaunchPlan {
         sidecar_path,
@@ -67,6 +56,79 @@ fn resolve_core_sidecar_path(app_handle: &tauri::AppHandle) -> Result<Option<Pat
     }
 
     Ok(candidates.into_iter().find(|candidate| candidate.is_file()))
+}
+
+fn resolve_data_directories(
+    app_handle: &tauri::AppHandle,
+    sidecar_path: &Path,
+) -> Result<(PathBuf, PathBuf, PathBuf), String> {
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(exe_dir) = current_exe.parent() {
+            if is_exe_sibling_sidecar(exe_dir, sidecar_path) {
+                let portable_data_dir = exe_dir.join("data");
+                if let Ok(directories) = create_managed_core_directories(portable_data_dir) {
+                    return Ok(directories);
+                }
+            }
+        }
+    }
+
+    let data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("failed to resolve desktop data directory: {error}"))?
+        .join("core");
+    create_managed_core_directories(data_dir)
+}
+
+fn create_managed_core_directories(
+    data_dir: PathBuf,
+) -> Result<(PathBuf, PathBuf, PathBuf), String> {
+    let model_dir = data_dir.join("models");
+    let log_dir = data_dir.join("logs");
+
+    fs::create_dir_all(&model_dir)
+        .map_err(|error| format!("failed to create managed core model directory: {error}"))?;
+    fs::create_dir_all(&log_dir)
+        .map_err(|error| format!("failed to create managed core log directory: {error}"))?;
+
+    // Existing directories can pass create_dir_all while still denying writes.
+    ensure_directory_writable(&data_dir, "managed core data directory")?;
+    ensure_directory_writable(&model_dir, "managed core model directory")?;
+    ensure_directory_writable(&log_dir, "managed core log directory")?;
+
+    Ok((data_dir, model_dir, log_dir))
+}
+
+fn ensure_directory_writable(directory: &Path, label: &str) -> Result<(), String> {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    let probe_path = directory.join(format!(".nola-write-test-{}-{nonce}", std::process::id()));
+    let probe_file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&probe_path)
+        .map_err(|error| format!("failed to write {label}: {error}"))?;
+    drop(probe_file);
+    fs::remove_file(&probe_path)
+        .map_err(|error| format!("failed to remove {label} write probe: {error}"))?;
+    Ok(())
+}
+
+fn is_exe_sibling_sidecar(exe_dir: &Path, sidecar_path: &Path) -> bool {
+    let expected = exe_dir
+        .join("nola-core")
+        .join(core_sidecar_executable_name());
+    paths_match(&expected, sidecar_path)
+}
+
+fn paths_match(left: &Path, right: &Path) -> bool {
+    match (fs::canonicalize(left), fs::canonicalize(right)) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => left == right,
+    }
 }
 
 fn parse_core_sidecar_arg<I, S>(args: I) -> Option<PathBuf>
@@ -146,5 +208,23 @@ mod tests {
     #[test]
     fn parse_core_sidecar_arg_ignores_empty_value() {
         assert_eq!(parse_core_sidecar_arg(["--core-sidecar", "  "]), None);
+    }
+
+    #[test]
+    fn exe_sibling_sidecar_matches_expected_portable_layout() {
+        let exe_dir = PathBuf::from("C:/Nola");
+        let sidecar_path = exe_dir
+            .join("nola-core")
+            .join(core_sidecar_executable_name());
+
+        assert!(is_exe_sibling_sidecar(&exe_dir, &sidecar_path));
+    }
+
+    #[test]
+    fn exe_sibling_sidecar_rejects_other_locations() {
+        let exe_dir = PathBuf::from("C:/Nola");
+        let sidecar_path = PathBuf::from("C:/Other/nola-core/nola-core.exe");
+
+        assert!(!is_exe_sibling_sidecar(&exe_dir, &sidecar_path));
     }
 }
