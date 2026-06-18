@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import multiprocessing
 import os
 from collections.abc import MutableMapping, Sequence
 from pathlib import Path
@@ -162,6 +163,8 @@ def run_worker(args: argparse.Namespace) -> None:
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Dispatch nola-core subcommands."""
+    multiprocessing.freeze_support()
+
     parser = build_parser()
     args = parser.parse_args(argv)
     command = _namespace_command(args)
