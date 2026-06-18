@@ -183,7 +183,10 @@ fn spawn_sidecar_process(
     for key in CONTROLLED_CORE_ENV {
         command.env_remove(key);
     }
-    apply_platform_process_options(&mut command);
+    #[cfg(windows)]
+    apply_windows_process_options(&mut command);
+    #[cfg(not(windows))]
+    apply_process_options();
     command
         .spawn()
         .map_err(|error| format!("failed to spawn managed core sidecar: {error}"))
@@ -280,14 +283,17 @@ fn path_to_string(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
-fn apply_platform_process_options(command: &mut Command) {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
+#[cfg(windows)]
+fn apply_windows_process_options(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
 
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    command.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+fn apply_process_options() {
+    // Add Unix process-group or session handling in this platform hook.
 }
 
 #[derive(serde::Deserialize)]
