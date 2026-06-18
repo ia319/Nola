@@ -173,6 +173,10 @@ export function checksumFileNameFor(version) {
   return `Nola-${version}-checksums.sha256`
 }
 
+export function windowsPortableFileNameFor(version) {
+  return `Nola-${version}-windows-x64-portable.zip`
+}
+
 export function toRepoRelativePath(targetPath) {
   return path.relative(repositoryRoot, targetPath).replaceAll(path.sep, '/')
 }
