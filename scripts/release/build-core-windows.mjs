@@ -37,6 +37,7 @@ const workPath = path.join(coreArtifactsDir, 'build')
 const specPath = path.join(coreArtifactsDir, 'spec')
 const outputPath = path.join(distPath, 'nola-core')
 const entryScript = path.join(repositoryRoot, 'core', 'nola', 'launcher.py')
+const developmentOnlyModules = ['mypy', 'pytest', 'ruff', 'pre_commit']
 
 assertEmptyDirectory(outputPath)
 assertEmptyDirectory(workPath)
@@ -69,6 +70,10 @@ const result = spawnSync(
     path.join(repositoryRoot, 'core'),
     '--collect-submodules',
     'nola',
+    ...developmentOnlyModules.flatMap((moduleName) => [
+      '--exclude-module',
+      moduleName,
+    ]),
     entryScript,
   ],
   {
@@ -90,4 +95,44 @@ if (!fs.existsSync(executablePath)) {
   throw new Error(`Missing PyInstaller output: ${toRepoRelativePath(executablePath)}`)
 }
 
+assertDevelopmentModulesAbsent(outputPath, developmentOnlyModules)
+
 console.log(`Built Windows core sidecar: ${toRepoRelativePath(outputPath)}`)
+
+function assertDevelopmentModulesAbsent(rootPath, moduleNames) {
+  const internalPath = path.join(rootPath, '_internal')
+  if (!fs.existsSync(internalPath)) {
+    return
+  }
+
+  const unexpectedEntries = fs
+    .readdirSync(internalPath, { withFileTypes: true })
+    .map((entry) => entry.name)
+    .filter((entryName) =>
+      moduleNames.some((moduleName) => isModuleEntry(entryName, moduleName)),
+    )
+
+  if (unexpectedEntries.length === 0) {
+    return
+  }
+
+  throw new Error(
+    [
+      'Development-only modules were packaged:',
+      ...unexpectedEntries.map((entryName) =>
+        toRepoRelativePath(path.join(internalPath, entryName)),
+      ),
+    ].join('\n'),
+  )
+}
+
+function isModuleEntry(entryName, moduleName) {
+  const normalizedEntryName = entryName.toLowerCase().replaceAll('-', '_')
+  const normalizedModuleName = moduleName.toLowerCase().replaceAll('-', '_')
+
+  return (
+    normalizedEntryName === normalizedModuleName ||
+    normalizedEntryName.startsWith(`${normalizedModuleName}.`) ||
+    normalizedEntryName.startsWith(`${normalizedModuleName}_`)
+  )
+}
