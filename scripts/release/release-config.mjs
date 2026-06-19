@@ -177,6 +177,10 @@ export function windowsPortableFileNameFor(version) {
   return `Nola-${version}-windows-x64-portable.zip`
 }
 
+export function windowsSetupFileNameFor(version) {
+  return `Nola-${version}-windows-x64-setup.exe`
+}
+
 export function toRepoRelativePath(targetPath) {
   return path.relative(repositoryRoot, targetPath).replaceAll(path.sep, '/')
 }
