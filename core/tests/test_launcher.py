@@ -31,11 +31,15 @@ def test_runtime_environment_ignores_controlled_system_values() -> None:
         ]
     )
     environ = {
+        "NOLA_COMPUTE_TYPE": "int8",
         "NOLA_CORS_ORIGINS": "http://old.example",
         "NOLA_DATA_DIR": "system-data",
+        "NOLA_DEVICE": "cpu",
         "NOLA_HOST": "0.0.0.0",
         "NOLA_LIVE_REALTIME_TRANSCRIBER": "mock",
+        "NOLA_MAX_FILE_SIZE": "1024",
         "NOLA_MODEL_DIR": "system-models",
+        "NOLA_MODEL_SIZE": "large-v3",
         "NOLA_PORT": "8000",
         "NOLA_UNRELATED": "kept",
     }
@@ -49,6 +53,10 @@ def test_runtime_environment_ignores_controlled_system_values() -> None:
     assert environ["NOLA_MODEL_DIR"] == str(Path("portable/models"))
     assert environ["NOLA_PORT"] == "9123"
     assert environ["NOLA_UNRELATED"] == "kept"
+    assert "NOLA_COMPUTE_TYPE" not in environ
+    assert "NOLA_DEVICE" not in environ
+    assert "NOLA_MAX_FILE_SIZE" not in environ
+    assert "NOLA_MODEL_SIZE" not in environ
 
 
 def test_runtime_environment_preserves_system_values_without_isolation() -> None:

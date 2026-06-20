@@ -10,11 +10,15 @@ from pathlib import Path
 from typing import cast
 
 CONTROLLED_NOLA_ENV = (
+    "NOLA_COMPUTE_TYPE",
     "NOLA_CORS_ORIGINS",
     "NOLA_DATA_DIR",
+    "NOLA_DEVICE",
     "NOLA_HOST",
     "NOLA_LIVE_REALTIME_TRANSCRIBER",
+    "NOLA_MAX_FILE_SIZE",
     "NOLA_MODEL_DIR",
+    "NOLA_MODEL_SIZE",
     "NOLA_PORT",
 )
 
