@@ -1,0 +1,43 @@
+x-core-build: &core-build
+  context: ./core
+  dockerfile: Dockerfile
+
+x-core-environment: &core-environment
+  NOLA_CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+  NOLA_DATA_DIR: /data
+  NOLA_HOST: 0.0.0.0
+  NOLA_MODEL_DIR: /models
+  NOLA_PORT: "8000"
+
+x-core-volumes: &core-volumes
+  - nola-core-data:/data
+  - nola-core-models:/models
+
+services:
+  core-api:
+    build: *core-build
+    image: nola-core:0.1.0
+    init: true
+    restart: unless-stopped
+    environment: *core-environment
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes: *core-volumes
+
+  core-worker:
+    build: *core-build
+    image: nola-core:0.1.0
+    init: true
+    restart: unless-stopped
+    command: ["nola-core", "worker"]
+    depends_on:
+      core-api:
+        condition: service_healthy
+    environment: *core-environment
+    volumes: *core-volumes
+    healthcheck:
+      disable: true
+
+volumes:
+  nola-core-data:
+  nola-core-models:

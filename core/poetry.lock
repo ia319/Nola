@@ -896,7 +896,7 @@ version = "12.9.1.4"
 description = "CUBLAS native runtime libraries"
 optional = false
 python-versions = ">=3"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "nvidia_cublas_cu12-12.9.1.4-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:7a950dae01add3b415a5a5cdc4ec818fb5858263e9cca59004bb99fdbbd3a5d6"},
     {file = "nvidia_cublas_cu12-12.9.1.4-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:453611eb21a7c1f2c2156ed9f3a45b691deda0440ec550860290dc901af5b4c2"},
@@ -2048,4 +2048,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "ff3bfd5843fa379ea933c3be4aaba7ef2672771d5e7a976ae4d6cc5b7a07b774"
+content-hash = "01bca01eef39430df4b145b56db428eb4ead9fc0508b7283e3fb8714f538f0a3"
