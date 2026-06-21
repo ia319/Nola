@@ -5,7 +5,7 @@
 	app-dev app-preview app-lint app-lint-fix app-format app-format-check app-typecheck app-test app-test-watch app-test-ci app-build app-storybook app-storybook-build app-gen-types app-gen-types-check app-check \
 	desktop-info desktop-dev desktop-build desktop-build-windows desktop-format desktop-format-check desktop-lint desktop-test desktop-check \
 	core-docker-build core-docker-up core-docker-down \
-	release-set-version release-check-version release-clean release-install-core-build release-build-core-windows release-package-windows-portable release-package-windows-setup release-checksums \
+	release-set-version release-check-version release-clean release-install-core-build release-build-core-windows release-package-windows-portable release-package-windows-setup release-package-web release-checksums \
 	lint lint-fix format format-check typecheck test test-ci build check \
 	api worker dev clean
 
@@ -67,6 +67,7 @@ help:
 	@echo "  make release-build-core-windows  Build Windows core sidecar"
 	@echo "  make release-package-windows-portable  Stage Windows portable archive"
 	@echo "  make release-package-windows-setup  Stage Windows setup installer"
+	@echo "  make release-package-web  Build and stage Web static archive"
 	@echo "  make release-checksums    Generate SHA256 checksums for staged artifacts"
 	@echo ""
 	@echo "Unified:"
@@ -229,6 +230,9 @@ release-package-windows-portable:
 
 release-package-windows-setup:
 	node scripts/release/package-windows-setup.mjs
+
+release-package-web: app-build
+	node scripts/release/package-web.mjs
 
 release-checksums:
 	node scripts/release/generate-checksums.mjs

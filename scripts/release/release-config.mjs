@@ -181,6 +181,10 @@ export function windowsSetupFileNameFor(version) {
   return `Nola-${version}-windows-x64-setup.exe`
 }
 
+export function webFileNameFor(version) {
+  return `Nola-${version}-web.zip`
+}
+
 export function toRepoRelativePath(targetPath) {
   return path.relative(repositoryRoot, targetPath).replaceAll(path.sep, '/')
 }
