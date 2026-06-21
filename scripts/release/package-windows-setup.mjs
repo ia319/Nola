@@ -85,7 +85,6 @@ if (result.status !== 0) {
 
 const sourceSetupPath = await findNsisSetupInstaller()
 await fsp.copyFile(sourceSetupPath, targetSetupPath, fs.constants.COPYFILE_EXCL)
-await fsp.rm(path.join(releaseArtifactsDir, 'core'), { recursive: true, force: true })
 
 console.log(`Packaged Windows setup installer: ${toRepoRelativePath(targetSetupPath)}`)
 

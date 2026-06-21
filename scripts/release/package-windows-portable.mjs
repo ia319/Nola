@@ -42,6 +42,7 @@ const targetZipPath = path.join(
 
 await assertFile(desktopExePath, 'Windows desktop executable')
 await assertFile(path.join(coreSidecarDir, 'nola-core.exe'), 'Windows core sidecar')
+await assertTargetFileAbsent(targetZipPath)
 
 await fs.rm(stagingRoot, { recursive: true, force: true })
 await fs.mkdir(portableRoot, { recursive: true })
@@ -62,7 +63,6 @@ await fs.writeFile(
   'utf8',
 )
 
-await fs.rm(targetZipPath, { force: true })
 const result = spawnSync(
   'powershell.exe',
   [
@@ -70,7 +70,7 @@ const result = spawnSync(
     '-Command',
     `Compress-Archive -LiteralPath ${toPowerShellLiteral(
       portableRoot,
-    )} -DestinationPath ${toPowerShellLiteral(targetZipPath)} -Force`,
+    )} -DestinationPath ${toPowerShellLiteral(targetZipPath)}`,
   ],
   {
     cwd: repositoryRoot,
@@ -87,7 +87,6 @@ if (result.status !== 0) {
 }
 
 await fs.rm(stagingRoot, { recursive: true, force: true })
-await fs.rm(path.join(releaseArtifactsDir, 'core'), { recursive: true, force: true })
 
 console.log(`Packaged Windows portable archive: ${toRepoRelativePath(targetZipPath)}`)
 
@@ -104,6 +103,21 @@ async function assertFile(filePath, label) {
   }
 
   console.error(`Missing ${label}: ${toRepoRelativePath(filePath)}`)
+  process.exit(1)
+}
+
+async function assertTargetFileAbsent(filePath) {
+  try {
+    await fs.stat(filePath)
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return
+    }
+    throw error
+  }
+
+  console.error(`Release artifact already exists: ${toRepoRelativePath(filePath)}`)
+  console.error('Run release-clean before rebuilding final release artifacts.')
   process.exit(1)
 }
 
