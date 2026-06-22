@@ -4,6 +4,8 @@
 	core-lint core-lint-fix core-format core-format-check core-typecheck core-test core-check \
 	app-dev app-preview app-lint app-lint-fix app-format app-format-check app-typecheck app-test app-test-watch app-test-ci app-build app-storybook app-storybook-build app-gen-types app-gen-types-check app-check \
 	desktop-info desktop-dev desktop-build desktop-build-windows desktop-format desktop-format-check desktop-lint desktop-test desktop-check \
+	core-docker-build core-docker-up core-docker-down \
+	release-set-version release-check-version release-clean release-install-core-build release-build-core-windows release-package-windows-portable release-package-windows-setup release-package-web release-checksums \
 	lint lint-fix format format-check typecheck test test-ci build check \
 	api worker dev clean
 
@@ -51,6 +53,22 @@ help:
 	@echo "  make desktop-lint         Run desktop Rust Clippy"
 	@echo "  make desktop-test         Run desktop Rust tests"
 	@echo "  make desktop-check        Run desktop Rust checks"
+	@echo ""
+	@echo "Docker:"
+	@echo "  make core-docker-build    Build Core Docker image"
+	@echo "  make core-docker-up       Start Core API and Worker with Docker Compose"
+	@echo "  make core-docker-down     Stop Core Docker Compose services"
+	@echo ""
+	@echo "Release:"
+	@echo "  make release-set-version VERSION=x.y.z  Update all project version files"
+	@echo "  make release-check-version  Check release version consistency"
+	@echo "  make release-clean        Rebuild release artifact staging directory"
+	@echo "  make release-install-core-build  Install core release build dependencies"
+	@echo "  make release-build-core-windows  Build Windows core sidecar"
+	@echo "  make release-package-windows-portable  Stage Windows portable archive"
+	@echo "  make release-package-windows-setup  Stage Windows setup installer"
+	@echo "  make release-package-web  Build and stage Web static archive"
+	@echo "  make release-checksums    Generate SHA256 checksums for staged artifacts"
 	@echo ""
 	@echo "Unified:"
 	@echo "  make lint                 Run lint checks"
@@ -177,6 +195,47 @@ desktop-test:
 
 desktop-check:
 	pnpm --dir app desktop:check
+
+# Docker commands
+core-docker-build:
+	docker build -t nola-core:0.1.0 ./core
+
+core-docker-up:
+	docker compose up --build
+
+core-docker-down:
+	docker compose down
+
+# Release commands
+release-set-version:
+ifndef VERSION
+	$(error VERSION is required. Usage: make release-set-version VERSION=0.1.0)
+endif
+	node scripts/release/set-version.mjs $(VERSION)
+
+release-check-version:
+	node scripts/release/check-version.mjs
+
+release-clean:
+	node scripts/release/clean-artifacts.mjs
+
+release-install-core-build:
+	poetry -C core install --only main,build
+
+release-build-core-windows:
+	node scripts/release/build-core-windows.mjs
+
+release-package-windows-portable:
+	node scripts/release/package-windows-portable.mjs
+
+release-package-windows-setup:
+	node scripts/release/package-windows-setup.mjs
+
+release-package-web: app-build
+	node scripts/release/package-web.mjs
+
+release-checksums:
+	node scripts/release/generate-checksums.mjs
 
 # Unified repository commands
 lint: core-lint app-lint desktop-lint

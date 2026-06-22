@@ -1316,10 +1316,12 @@
         "description": "Live Realtime 会在当前电脑采集音频，并将音频流发送到这里配置的远端 URL。"
       },
       "warnings": {
-        "title": "当前正在使用连接回退",
+        "title": "连接诊断",
         "invalidManagedLocalRuntimeOrigin": "桌面托管本机后端地址无效，已忽略该配置。原因：{{reason}}",
         "invalidBackendRuntimeUrl": "运行时后端 URL 无效，已忽略该配置。原因：{{reason}}",
-        "invalidDesktopGatewayRuntimeOrigin": "桌面网关地址无效，远端目标当前未通过本机网关连接。原因：{{reason}}"
+        "invalidDesktopGatewayRuntimeOrigin": "桌面网关地址无效，远端目标当前未通过本机网关连接。原因：{{reason}}",
+        "desktopCoreSidecarUnavailable": "内置本机后端不可用，桌面端正在使用标准本机后端地址。原因：{{reason}}",
+        "desktopCoreSidecarDegraded": "内置本机后端 API 可用，但工作进程不可用。原因：{{reason}}"
       },
       "errors": {
         "title": "连接设置失败",

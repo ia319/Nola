@@ -65,8 +65,22 @@ export interface DesktopRuntimeInfo {
   nativeAudioSupport: NativeAudioSupportStatus
 }
 
+export type DesktopCoreSidecarMode = 'managed-local' | 'external-local' | 'remote' | 'unavailable'
+export type DesktopCoreSidecarProcessStatus = 'not-started' | 'available' | 'failed' | 'stopped'
+
+export interface DesktopCoreSidecarRuntimeStatusDto {
+  mode: DesktopCoreSidecarMode
+  httpOrigin: string | null
+  apiStatus: DesktopCoreSidecarProcessStatus
+  workerStatus: DesktopCoreSidecarProcessStatus
+  dataDir: string | null
+  logDir: string | null
+  error: string | null
+}
+
 export interface DesktopConnectionRuntimeOptionsDto {
   backendUrl: string | null
+  coreSidecarStatus: DesktopCoreSidecarRuntimeStatusDto
   gatewayHttpOrigin: string | null
   managedLocalHttpOrigin: string | null
 }

@@ -46,6 +46,15 @@ describe('connection settings service', () => {
       managedLocalHttpOrigin: null,
       gatewayHttpOrigin: null,
       backendUrl: null,
+      coreSidecarStatus: {
+        mode: 'external-local',
+        httpOrigin: null,
+        apiStatus: 'not-started',
+        workerStatus: 'not-started',
+        dataDir: null,
+        logDir: null,
+        error: null,
+      },
     })
     resetActiveConnectionProfile('web')
   })
@@ -216,6 +225,42 @@ describe('connection settings service', () => {
         {
           code: 'invalid-managed-local-runtime-origin',
           reason: 'Local backend URL must use http://',
+        },
+      ],
+    })
+  })
+
+  it('reports desktop core sidecar startup diagnostics when loading settings', async () => {
+    getDesktopConnectionRuntimeOptionsMock.mockResolvedValue({
+      managedLocalHttpOrigin: null,
+      gatewayHttpOrigin: null,
+      backendUrl: null,
+      coreSidecarStatus: {
+        mode: 'unavailable',
+        httpOrigin: null,
+        apiStatus: 'failed',
+        workerStatus: 'not-started',
+        dataDir: null,
+        logDir: 'C:/Users/example/AppData/Roaming/Nola/core/logs',
+        error: 'desktop core sidecar executable was not found',
+      },
+    })
+
+    await expect(
+      loadConnectionSettingsSnapshot({
+        environment: 'tauri',
+        repository: new MemoryConnectionConfigRepository(),
+      }),
+    ).resolves.toMatchObject({
+      activeProfile: {
+        mode: 'external-local',
+        httpOrigin: 'http://127.0.0.1:8000',
+      },
+      warnings: [
+        {
+          code: 'desktop-core-sidecar-unavailable',
+          reason:
+            'desktop core sidecar executable was not found Logs: C:/Users/example/AppData/Roaming/Nola/core/logs',
         },
       ],
     })

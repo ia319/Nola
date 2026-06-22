@@ -65,6 +65,10 @@ function getWarningMessageKey(warning: ConnectionSettingsWarning): string {
       return 'settings.connection.warnings.invalidBackendRuntimeUrl'
     case 'invalid-desktop-gateway-runtime-origin':
       return 'settings.connection.warnings.invalidDesktopGatewayRuntimeOrigin'
+    case 'desktop-core-sidecar-unavailable':
+      return 'settings.connection.warnings.desktopCoreSidecarUnavailable'
+    case 'desktop-core-sidecar-degraded':
+      return 'settings.connection.warnings.desktopCoreSidecarDegraded'
   }
 }
 

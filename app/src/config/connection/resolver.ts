@@ -1,5 +1,8 @@
 import { getRuntimeEnvironment, type RuntimeEnvironment } from '@/lib/runtime-environment'
-import { getDesktopConnectionRuntimeOptions } from '@/lib/tauri-api'
+import {
+  getDesktopConnectionRuntimeOptions,
+  type DesktopCoreSidecarRuntimeStatusDto,
+} from '@/lib/tauri-api'
 
 import { createConnectionProfileFromConfig } from './config'
 import {
@@ -15,6 +18,7 @@ export interface ConnectionRuntimeOverrides {
   managedLocalHttpOrigin?: string | null
   gatewayHttpOrigin?: string | null
   backendUrl?: string | null
+  coreSidecarStatus?: DesktopCoreSidecarRuntimeStatusDto | null
 }
 
 export interface ResolveConnectionProfileOptions {
@@ -27,6 +31,8 @@ export type ConnectionProfileResolutionWarningCode =
   | 'invalid-managed-local-runtime-origin'
   | 'invalid-backend-runtime-url'
   | 'invalid-desktop-gateway-runtime-origin'
+  | 'desktop-core-sidecar-unavailable'
+  | 'desktop-core-sidecar-degraded'
 
 export interface ConnectionProfileResolutionWarning {
   code: ConnectionProfileResolutionWarningCode
@@ -53,6 +59,44 @@ function createResolutionWarning(
   return {
     code,
     reason: getErrorReason(error),
+  }
+}
+
+function createDesktopCoreSidecarReason(status: DesktopCoreSidecarRuntimeStatusDto): string {
+  const statusSummary = `API=${status.apiStatus}, worker=${status.workerStatus}`
+  const reason = status.error ?? statusSummary
+  return status.logDir ? `${reason} Logs: ${status.logDir}` : reason
+}
+
+function addDesktopCoreSidecarWarnings(
+  status: DesktopCoreSidecarRuntimeStatusDto | null | undefined,
+  warnings: ConnectionProfileResolutionWarning[],
+): void {
+  if (!status) return
+
+  if (status.mode === 'unavailable') {
+    warnings.push({
+      code: 'desktop-core-sidecar-unavailable',
+      reason: createDesktopCoreSidecarReason(status),
+    })
+    return
+  }
+
+  if (status.mode !== 'managed-local') return
+
+  if (status.apiStatus !== 'available') {
+    warnings.push({
+      code: 'desktop-core-sidecar-unavailable',
+      reason: createDesktopCoreSidecarReason(status),
+    })
+    return
+  }
+
+  if (status.workerStatus !== 'available') {
+    warnings.push({
+      code: 'desktop-core-sidecar-degraded',
+      reason: createDesktopCoreSidecarReason(status),
+    })
   }
 }
 
@@ -108,17 +152,6 @@ export async function resolveConnectionProfileWithDiagnostics(
   const runtimeOverrides = options.runtimeOverrides ?? (await loadRuntimeOverrides(environment))
   const warnings: ConnectionProfileResolutionWarning[] = []
 
-  if (environment === 'tauri' && hasConfiguredValue(runtimeOverrides.managedLocalHttpOrigin)) {
-    try {
-      return {
-        profile: createManagedLocalConnectionProfile(runtimeOverrides.managedLocalHttpOrigin),
-        warnings,
-      }
-    } catch (error) {
-      warnings.push(createResolutionWarning('invalid-managed-local-runtime-origin', error))
-    }
-  }
-
   if (hasConfiguredValue(runtimeOverrides.backendUrl)) {
     try {
       const profile = createConnectionProfileFromHttpOrigin(
@@ -141,6 +174,21 @@ export async function resolveConnectionProfileWithDiagnostics(
     return {
       profile: applyDesktopGatewayIfAvailable(profile, environment, runtimeOverrides, warnings),
       warnings,
+    }
+  }
+
+  if (environment === 'tauri') {
+    addDesktopCoreSidecarWarnings(runtimeOverrides.coreSidecarStatus, warnings)
+  }
+
+  if (environment === 'tauri' && hasConfiguredValue(runtimeOverrides.managedLocalHttpOrigin)) {
+    try {
+      return {
+        profile: createManagedLocalConnectionProfile(runtimeOverrides.managedLocalHttpOrigin),
+        warnings,
+      }
+    } catch (error) {
+      warnings.push(createResolutionWarning('invalid-managed-local-runtime-origin', error))
     }
   }
 

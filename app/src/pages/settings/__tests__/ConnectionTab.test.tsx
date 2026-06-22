@@ -41,11 +41,14 @@ const connectionTabMocks = vi.hoisted(() => ({
       'settings.connection.status.realtime-failed': 'Realtime channel failed',
       'settings.connection.remoteNotice.title': 'Remote realtime sends local audio',
       'settings.connection.remoteNotice.description': 'Audio is sent to the remote URL.',
-      'settings.connection.warnings.title': 'Connection fallback is active',
+      'settings.connection.warnings.title': 'Connection diagnostics',
       'settings.connection.warnings.invalidManagedLocalRuntimeOrigin':
         'Managed local override ignored.',
       'settings.connection.warnings.invalidBackendRuntimeUrl': 'Runtime backend URL ignored.',
       'settings.connection.warnings.invalidDesktopGatewayRuntimeOrigin': 'Gateway origin ignored.',
+      'settings.connection.warnings.desktopCoreSidecarUnavailable':
+        'Bundled local backend unavailable.',
+      'settings.connection.warnings.desktopCoreSidecarDegraded': 'Bundled worker unavailable.',
       'settings.connection.errors.title': 'Connection setting failed',
       'settings.connection.errors.load': 'Connection settings could not be loaded.',
       'settings.connection.errors.save': 'Connection settings could not be saved.',
