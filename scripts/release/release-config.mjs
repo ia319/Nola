@@ -193,6 +193,10 @@ export function releasePackageFileNamesFor(version) {
   ]
 }
 
+export function releaseAssetFileNamesFor(version) {
+  return [...releasePackageFileNamesFor(version), checksumFileNameFor(version)]
+}
+
 export function toRepoRelativePath(targetPath) {
   return path.relative(repositoryRoot, targetPath).replaceAll(path.sep, '/')
 }

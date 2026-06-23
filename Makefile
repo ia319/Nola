@@ -5,7 +5,7 @@
 	app-dev app-preview app-lint app-lint-fix app-format app-format-check app-typecheck app-test app-test-watch app-test-ci app-build app-storybook app-storybook-build app-gen-types app-gen-types-check app-check \
 	desktop-info desktop-dev desktop-build desktop-build-windows desktop-format desktop-format-check desktop-lint desktop-test desktop-check \
 	core-docker-build core-docker-up core-docker-down \
-	release-set-version release-check-version release-clean release-install-core-build release-build-core-windows release-package-windows-portable release-package-windows-setup release-package-web release-stage-ci-artifacts release-checksums \
+	release-set-version release-check-version release-clean release-install-core-build release-build-core-windows release-package-windows-portable release-package-windows-setup release-package-web release-stage-ci-artifacts release-assert-assets release-checksums \
 	lint lint-fix format format-check typecheck test test-ci build check \
 	api worker dev clean
 
@@ -69,6 +69,7 @@ help:
 	@echo "  make release-package-windows-setup  Stage Windows setup installer"
 	@echo "  make release-package-web  Build and stage Web static archive"
 	@echo "  make release-stage-ci-artifacts  Stage downloaded CI artifacts"
+	@echo "  make release-assert-assets  Check staged Release assets"
 	@echo "  make release-checksums    Generate SHA256 checksums for staged artifacts"
 	@echo ""
 	@echo "Unified:"
@@ -240,6 +241,13 @@ ifeq ($(strip $(CI_ARTIFACTS_DIR)),)
 	node scripts/release/stage-ci-artifacts.mjs
 else
 	node scripts/release/stage-ci-artifacts.mjs --input "$(CI_ARTIFACTS_DIR)"
+endif
+
+release-assert-assets:
+ifeq ($(REQUIRE_CHECKSUMS),1)
+	node scripts/release/assert-release-assets.mjs --require-checksums
+else
+	node scripts/release/assert-release-assets.mjs
 endif
 
 release-checksums:
