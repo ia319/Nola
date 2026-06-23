@@ -185,6 +185,14 @@ export function webFileNameFor(version) {
   return `Nola-${version}-web.zip`
 }
 
+export function releasePackageFileNamesFor(version) {
+  return [
+    windowsSetupFileNameFor(version),
+    windowsPortableFileNameFor(version),
+    webFileNameFor(version),
+  ]
+}
+
 export function toRepoRelativePath(targetPath) {
   return path.relative(repositoryRoot, targetPath).replaceAll(path.sep, '/')
 }
