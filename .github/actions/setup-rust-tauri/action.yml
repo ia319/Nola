@@ -1,0 +1,85 @@
+name: Setup Rust Tauri
+
+description: Setup Rust, Tauri system dependencies, and build caches
+
+inputs:
+  app-dir:
+    description: App project directory
+    required: false
+    default: app
+  tauri-dir:
+    description: Tauri project directory containing Cargo.lock
+    required: false
+    default: app/src-tauri
+  rust-toolchain:
+    description: Rust toolchain to install
+    required: false
+    default: stable
+  rust-target:
+    description: Optional Rust target to add
+    required: false
+    default: ""
+  install-linux-deps:
+    description: Whether to install Linux system packages required by Tauri
+    required: false
+    default: "false"
+  cache-rust:
+    description: Whether to cache Cargo registry, git sources, and target output
+    required: false
+    default: "true"
+  cache-tauri-tools:
+    description: Whether to cache Tauri-downloaded Windows bundler tools
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Install Tauri Linux dependencies
+      if: runner.os == 'Linux' && inputs.install-linux-deps == 'true'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libwebkit2gtk-4.1-dev \
+          build-essential \
+          curl \
+          wget \
+          file \
+          libxdo-dev \
+          libssl-dev \
+          libayatana-appindicator3-dev \
+          librsvg2-dev
+
+    - name: Install Rust toolchain
+      shell: bash
+      env:
+        RUST_TOOLCHAIN: ${{ inputs.rust-toolchain }}
+        RUST_TARGET: ${{ inputs.rust-target }}
+      run: |
+        rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+        rustup default "$RUST_TOOLCHAIN"
+        if [ -n "$RUST_TARGET" ]; then
+          rustup target add "$RUST_TARGET"
+        fi
+
+    - name: Cache Rust build output
+      if: inputs.cache-rust == 'true'
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          ${{ inputs.tauri-dir }}/target
+        key: ${{ runner.os }}-${{ runner.arch }}-rust-${{ inputs.rust-toolchain }}-${{ hashFiles(format('{0}/Cargo.lock', inputs.tauri-dir)) }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-rust-${{ inputs.rust-toolchain }}-
+
+    - name: Cache Tauri Windows tools
+      if: runner.os == 'Windows' && inputs.cache-tauri-tools == 'true'
+      uses: actions/cache@v4
+      with:
+        path: ~/AppData/Local/tauri
+        key: ${{ runner.os }}-${{ runner.arch }}-tauri-tools-${{ hashFiles(format('{0}/pnpm-lock.yaml', inputs.app-dir), format('{0}/tauri.conf.json', inputs.tauri-dir)) }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-tauri-tools-
