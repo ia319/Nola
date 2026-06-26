@@ -56,7 +56,7 @@ await assertTargetFileAbsent(targetSetupPath)
 await writeTauriReleaseConfig()
 
 const result = spawnSync(
-  'pnpm.cmd',
+  'pnpm',
   [
     '--dir',
     'app',
@@ -71,6 +71,7 @@ const result = spawnSync(
   ],
   {
     cwd: repositoryRoot,
+    shell: true,
     stdio: 'inherit',
   },
 )
