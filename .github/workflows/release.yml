@@ -1,0 +1,320 @@
+name: Release
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - labeled
+    paths:
+      - ".github/workflows/release.yml"
+      - ".github/actions/**"
+      - "scripts/release/**"
+      - "app/src-tauri/**"
+      - "app/package.json"
+      - "app/pnpm-lock.yaml"
+      - "core/pyproject.toml"
+      - "core/poetry.lock"
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Release workflow mode
+        required: true
+        type: choice
+        default: dry-run
+        options:
+          - dry-run
+          - draft-release
+      tag:
+        description: Existing SemVer tag for draft-release mode
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate-release:
+    name: validate release inputs
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'release-dry-run')
+    runs-on: ubuntu-24.04
+    outputs:
+      checkout-ref: ${{ steps.resolve-release.outputs.checkout-ref }}
+      mode: ${{ steps.resolve-release.outputs.mode }}
+      tag: ${{ steps.check-release-version.outputs.tag }}
+      version: ${{ steps.check-release-version.outputs.version }}
+    steps:
+      - name: Resolve release mode
+        id: resolve-release
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_MODE: ${{ inputs.mode }}
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_VALUE: ${{ github.ref }}
+        run: |
+          semver_tag_regex='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            mode="dry-run"
+            tag=""
+            checkout_ref="$REF_VALUE"
+          elif [ "$EVENT_NAME" = "push" ]; then
+            if [ "$REF_TYPE" != "tag" ]; then
+              echo "Release push events must use a tag ref."
+              exit 1
+            fi
+
+            mode="draft-release"
+            tag="$REF_NAME"
+            checkout_ref="$REF_VALUE"
+          else
+            mode="${INPUT_MODE:-dry-run}"
+
+            case "$mode" in
+              dry-run)
+                tag=""
+                checkout_ref="$REF_VALUE"
+                ;;
+              draft-release)
+                if [ -z "$INPUT_TAG" ]; then
+                  echo "draft-release mode requires a SemVer tag input."
+                  exit 1
+                fi
+                tag="$INPUT_TAG"
+                checkout_ref="refs/tags/$INPUT_TAG"
+                ;;
+              *)
+                echo "Unsupported release mode: $mode"
+                exit 1
+                ;;
+            esac
+          fi
+
+          if [ -n "$tag" ] && [[ ! "$tag" =~ $semver_tag_regex ]]; then
+            echo "Release tag must be a SemVer tag with a leading v: $tag"
+            exit 1
+          fi
+
+          {
+            echo "checkout-ref=$checkout_ref"
+            echo "mode=$mode"
+            echo "tag=$tag"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve-release.outputs.checkout-ref }}
+
+      - name: Check release version
+        id: check-release-version
+        uses: ./.github/actions/check-release-version
+        with:
+          tag: ${{ steps.resolve-release.outputs.tag }}
+
+  build-web-asset:
+    name: build Web release asset
+    runs-on: ubuntu-24.04
+    needs:
+      - validate-release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-release.outputs.checkout-ref }}
+
+      - name: Setup app runtime
+        uses: ./.github/actions/setup-app-node
+        with:
+          node-version: "24.x"
+          pnpm-version: "10"
+          project-dir: app
+          install-deps: "true"
+
+      - name: Clean release artifacts
+        run: node scripts/release/clean-artifacts.mjs
+
+      - name: Build Web app
+        run: pnpm --dir app build
+
+      - name: Package Web asset
+        run: node scripts/release/package-web.mjs
+
+      - name: Upload Web asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-web-${{ needs.validate-release.outputs.version }}
+          path: release-artifacts/${{ needs.validate-release.outputs.version }}/Nola-${{ needs.validate-release.outputs.version }}-web.zip
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
+
+  build-windows-assets:
+    name: build Windows release assets
+    runs-on: windows-latest
+    needs:
+      - validate-release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-release.outputs.checkout-ref }}
+
+      - name: Setup app runtime
+        uses: ./.github/actions/setup-app-node
+        with:
+          node-version: "24.x"
+          pnpm-version: "10"
+          project-dir: app
+          install-deps: "true"
+
+      - name: Setup core runtime
+        uses: ./.github/actions/setup-core-python
+        with:
+          python-version: "3.11"
+          poetry-version: "2.2.1"
+          project-dir: core
+          install-deps: "false"
+
+      - name: Setup Rust and Tauri runtime
+        uses: ./.github/actions/setup-rust-tauri
+        with:
+          app-dir: app
+          tauri-dir: app/src-tauri
+          rust-toolchain: stable
+          rust-target: x86_64-pc-windows-msvc
+
+      - name: Install core release build dependencies
+        env:
+          POETRY_NO_INTERACTION: "1"
+        run: poetry -C core install --only main,build --no-ansi
+
+      - name: Clean release artifacts
+        run: node scripts/release/clean-artifacts.mjs
+
+      - name: Build Windows core sidecar
+        run: node scripts/release/build-core-windows.mjs
+
+      - name: Package Windows setup asset
+        run: node scripts/release/package-windows-setup.mjs
+
+      - name: Package Windows portable asset
+        run: node scripts/release/package-windows-portable.mjs
+
+      - name: Upload Windows assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-${{ needs.validate-release.outputs.version }}
+          path: |
+            release-artifacts/${{ needs.validate-release.outputs.version }}/Nola-${{ needs.validate-release.outputs.version }}-windows-x64-setup.exe
+            release-artifacts/${{ needs.validate-release.outputs.version }}/Nola-${{ needs.validate-release.outputs.version }}-windows-x64-portable.zip
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
+
+  stage-release-assets:
+    name: stage Release assets
+    runs-on: ubuntu-24.04
+    needs:
+      - validate-release
+      - build-web-asset
+      - build-windows-assets
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-release.outputs.checkout-ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+
+      - name: Clean release artifacts
+        run: node scripts/release/clean-artifacts.mjs
+
+      - name: Download Web package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-web-${{ needs.validate-release.outputs.version }}
+          path: release-artifacts/_ci-artifacts
+
+      - name: Download Windows package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-windows-${{ needs.validate-release.outputs.version }}
+          path: release-artifacts/_ci-artifacts
+
+      - name: Stage package artifacts
+        run: node scripts/release/stage-ci-artifacts.mjs
+
+      - name: Check package assets
+        run: node scripts/release/assert-release-assets.mjs
+
+      - name: Generate checksums
+        run: node scripts/release/generate-checksums.mjs
+
+      - name: Check final Release assets
+        run: node scripts/release/assert-release-assets.mjs --require-checksums
+
+      - name: Upload final Release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ needs.validate-release.outputs.version }}
+          path: release-artifacts/${{ needs.validate-release.outputs.version }}/*
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
+
+  publish-draft-release:
+    name: publish draft GitHub Release
+    if: github.event_name != 'pull_request' && needs.validate-release.outputs.mode == 'draft-release'
+    runs-on: ubuntu-24.04
+    needs:
+      - validate-release
+      - stage-release-assets
+    permissions:
+      contents: write
+    steps:
+      - name: Download final Release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets-${{ needs.validate-release.outputs.version }}
+          path: release-artifacts/${{ needs.validate-release.outputs.version }}
+
+      - name: Publish draft Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+        run: |
+          release_dir="release-artifacts/$RELEASE_VERSION"
+          checksum_file="$release_dir/Nola-$RELEASE_VERSION-checksums.sha256"
+
+          if [ ! -f "$checksum_file" ]; then
+            echo "Missing checksum asset: $checksum_file"
+            exit 1
+          fi
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            is_draft="$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')"
+            if [ "$is_draft" != "true" ]; then
+              echo "Release already exists and is not a draft: $RELEASE_TAG"
+              exit 1
+            fi
+            gh release upload "$RELEASE_TAG" "$release_dir"/* --clobber
+          else
+            gh release create "$RELEASE_TAG" "$release_dir"/* \
+              --draft \
+              --generate-notes \
+              --title "Nola $RELEASE_VERSION" \
+              --verify-tag
+          fi
