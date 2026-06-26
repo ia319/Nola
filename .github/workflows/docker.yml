@@ -1,0 +1,149 @@
+name: Publish Docker Images
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Docker workflow mode
+        required: true
+        type: choice
+        default: dry-run
+        options:
+          - dry-run
+          - publish
+      tag:
+        description: Existing SemVer tag for publish mode
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.event_name }}-${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate-docker-release:
+    name: validate Docker release inputs
+    runs-on: ubuntu-24.04
+    outputs:
+      checkout-ref: ${{ steps.resolve-docker-release.outputs.checkout-ref }}
+      image-name: ${{ steps.resolve-docker-release.outputs.image-name }}
+      mode: ${{ steps.resolve-docker-release.outputs.mode }}
+      tag: ${{ steps.check-release-version.outputs.tag }}
+      version: ${{ steps.check-release-version.outputs.version }}
+    steps:
+      - name: Resolve Docker release inputs
+        id: resolve-docker-release
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_MODE: ${{ inputs.mode }}
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_VALUE: ${{ github.ref }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          docker_tag_regex='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+
+          if [ "$EVENT_NAME" = "release" ]; then
+            mode="publish"
+            tag="$RELEASE_TAG"
+            checkout_ref="refs/tags/$tag"
+          else
+            mode="${INPUT_MODE:-dry-run}"
+
+            case "$mode" in
+              dry-run)
+                tag="$INPUT_TAG"
+                if [ -n "$tag" ]; then
+                  checkout_ref="refs/tags/$tag"
+                else
+                  checkout_ref="$REF_VALUE"
+                fi
+                ;;
+              publish)
+                if [ -z "$INPUT_TAG" ]; then
+                  echo "publish mode requires a SemVer tag input."
+                  exit 1
+                fi
+                tag="$INPUT_TAG"
+                checkout_ref="refs/tags/$tag"
+                ;;
+              *)
+                echo "Unsupported Docker workflow mode: $mode"
+                exit 1
+                ;;
+            esac
+          fi
+
+          if [ -n "$tag" ] && [[ ! "$tag" =~ $docker_tag_regex ]]; then
+            echo "Docker release tag must be SemVer without build metadata and use a leading v: $tag"
+            exit 1
+          fi
+
+          owner="${REPOSITORY_OWNER,,}"
+
+          {
+            echo "checkout-ref=$checkout_ref"
+            echo "image-name=ghcr.io/$owner/nola-core"
+            echo "mode=$mode"
+            echo "tag=$tag"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve-docker-release.outputs.checkout-ref }}
+
+      - name: Check release version
+        id: check-release-version
+        uses: ./.github/actions/check-release-version
+        with:
+          tag: ${{ steps.resolve-docker-release.outputs.tag }}
+
+  build-core-image:
+    name: build core Docker image
+    if: needs.validate-docker-release.outputs.mode == 'dry-run'
+    runs-on: ubuntu-24.04
+    needs:
+      - validate-docker-release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-docker-release.outputs.checkout-ref }}
+
+      - name: Build core Docker image
+        uses: ./.github/actions/build-core-image
+        with:
+          image-name: ${{ needs.validate-docker-release.outputs.image-name }}
+          push: "false"
+          version: ${{ needs.validate-docker-release.outputs.version }}
+
+  publish-core-image:
+    name: publish core Docker image
+    if: needs.validate-docker-release.outputs.mode == 'publish'
+    runs-on: ubuntu-24.04
+    needs:
+      - validate-docker-release
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-docker-release.outputs.checkout-ref }}
+
+      - name: Publish core Docker image
+        uses: ./.github/actions/build-core-image
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          image-name: ${{ needs.validate-docker-release.outputs.image-name }}
+          push: "true"
+          version: ${{ needs.validate-docker-release.outputs.version }}
