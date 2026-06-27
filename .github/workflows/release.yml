@@ -8,6 +8,7 @@ on:
       - synchronize
       - labeled
     paths:
+      - ".github/workflows/ci.yml"
       - ".github/workflows/release.yml"
       - ".github/actions/**"
       - "scripts/release/**"
@@ -35,13 +36,44 @@ on:
         type: string
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
-  validate-release:
-    name: validate release inputs
+  release-gate:
+    name: wait for checks and tests
     if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'release-dry-run')
     runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    outputs:
+      enabled: ${{ steps.resolve-release-gate.outputs.enabled }}
+    steps:
+      - name: Resolve release gate
+        id: resolve-release-gate
+        shell: bash
+        run: |
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workflow actions
+        if: github.event_name == 'pull_request' && steps.resolve-release-gate.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+
+      - name: Wait for Checks and Tests
+        if: github.event_name == 'pull_request' && steps.resolve-release-gate.outputs.enabled == 'true'
+        uses: ./.github/actions/wait-for-workflow-run
+        with:
+          github-token: ${{ github.token }}
+          head-sha: ${{ github.event.pull_request.head.sha }}
+          repository: ${{ github.repository }}
+          workflow-file: ci.yml
+          workflow-name: Checks and Tests
+
+  validate-release:
+    name: validate release inputs
+    runs-on: ubuntu-24.04
+    needs:
+      - release-gate
+    if: needs.release-gate.outputs.enabled == 'true'
     outputs:
       checkout-ref: ${{ steps.resolve-release.outputs.checkout-ref }}
       mode: ${{ steps.resolve-release.outputs.mode }}
