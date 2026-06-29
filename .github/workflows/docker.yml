@@ -23,7 +23,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: docker-${{ github.event_name }}-${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+  group: docker-${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -96,8 +96,9 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          persist-credentials: false
           ref: ${{ steps.resolve-docker-release.outputs.checkout-ref }}
 
       - name: Check release version
@@ -114,8 +115,9 @@ jobs:
       - validate-docker-release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          persist-credentials: false
           ref: ${{ needs.validate-docker-release.outputs.checkout-ref }}
 
       - name: Build core Docker image
@@ -136,8 +138,9 @@ jobs:
       packages: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          persist-credentials: false
           ref: ${{ needs.validate-docker-release.outputs.checkout-ref }}
 
       - name: Publish core Docker image

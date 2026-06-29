@@ -39,6 +39,10 @@ permissions:
   actions: read
   contents: read
 
+concurrency:
+  group: release-${{ github.event.pull_request.number || inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   release-gate:
     name: wait for checks and tests
@@ -56,7 +60,9 @@ jobs:
 
       - name: Checkout workflow actions
         if: github.event_name == 'pull_request' && steps.resolve-release-gate.outputs.enabled == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
 
       - name: Wait for Checks and Tests
         if: github.event_name == 'pull_request' && steps.resolve-release-gate.outputs.enabled == 'true'
@@ -141,8 +147,9 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          persist-credentials: false
           ref: ${{ steps.resolve-release.outputs.checkout-ref }}
 
       - name: Check release version
@@ -158,8 +165,9 @@ jobs:
       - validate-release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          persist-credentials: false
           ref: ${{ needs.validate-release.outputs.checkout-ref }}
 
       - name: Setup app runtime
@@ -180,7 +188,7 @@ jobs:
         run: node scripts/release/package-web.mjs
 
       - name: Upload Web asset
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: release-web-${{ needs.validate-release.outputs.version }}
           path: release-artifacts/${{ needs.validate-release.outputs.version }}/Nola-${{ needs.validate-release.outputs.version }}-web.zip
@@ -195,8 +203,9 @@ jobs:
       - validate-release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          persist-credentials: false
           ref: ${{ needs.validate-release.outputs.checkout-ref }}
 
       - name: Setup app runtime
@@ -241,7 +250,7 @@ jobs:
         run: node scripts/release/package-windows-portable.mjs
 
       - name: Upload Windows assets
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: release-windows-${{ needs.validate-release.outputs.version }}
           path: |
@@ -260,12 +269,13 @@ jobs:
       - build-windows-assets
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          persist-credentials: false
           ref: ${{ needs.validate-release.outputs.checkout-ref }}
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "24.x"
 
@@ -273,13 +283,13 @@ jobs:
         run: node scripts/release/clean-artifacts.mjs
 
       - name: Download Web package artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: release-web-${{ needs.validate-release.outputs.version }}
           path: release-artifacts/_ci-artifacts
 
       - name: Download Windows package artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: release-windows-${{ needs.validate-release.outputs.version }}
           path: release-artifacts/_ci-artifacts
@@ -297,7 +307,7 @@ jobs:
         run: node scripts/release/assert-release-assets.mjs --require-checksums
 
       - name: Upload final Release assets
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: release-assets-${{ needs.validate-release.outputs.version }}
           path: release-artifacts/${{ needs.validate-release.outputs.version }}/*
@@ -316,7 +326,7 @@ jobs:
       contents: write
     steps:
       - name: Download final Release assets
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: release-assets-${{ needs.validate-release.outputs.version }}
           path: release-artifacts/${{ needs.validate-release.outputs.version }}
@@ -342,6 +352,11 @@ jobs:
               echo "Release already exists and is not a draft: $RELEASE_TAG"
               exit 1
             fi
+            gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | while IFS= read -r asset_name; do
+              if [ -n "$asset_name" ]; then
+                gh release delete-asset "$RELEASE_TAG" "$asset_name" --yes
+              fi
+            done
             gh release upload "$RELEASE_TAG" "$release_dir"/* --clobber
           else
             gh release create "$RELEASE_TAG" "$release_dir"/* \
