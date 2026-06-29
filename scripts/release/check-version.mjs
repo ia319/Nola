@@ -1,5 +1,7 @@
+import fs from 'node:fs'
 import {
   findVersionMismatches,
+  readCliValue,
   readVersionSources,
   readReleaseTag,
   releaseArtifactsDirFor,
@@ -10,6 +12,7 @@ import {
 
 const releaseVersion = resolveReleaseVersion()
 const releaseTag = readReleaseTag()
+const githubOutputPath = readCliValue('--github-output')
 const errors = findVersionMismatches(readVersionSources(), releaseVersion)
 
 if (releaseTag !== undefined && releaseTag !== releaseTagFor(releaseVersion)) {
@@ -30,3 +33,11 @@ console.log(
     releaseArtifactsDirFor(releaseVersion),
   )}`,
 )
+
+if (githubOutputPath) {
+  fs.appendFileSync(
+    githubOutputPath,
+    `version=${releaseVersion}\ntag=${releaseTagFor(releaseVersion)}\n`,
+    'utf8',
+  )
+}

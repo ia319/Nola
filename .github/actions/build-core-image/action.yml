@@ -1,0 +1,120 @@
+name: Build Core Docker Image
+
+description: Build and optionally publish the Nola Core Docker image
+
+inputs:
+  context:
+    description: Docker build context
+    required: false
+    default: core
+  file:
+    description: Dockerfile path
+    required: false
+    default: core/Dockerfile
+  github-token:
+    description: GitHub token for registry publishing
+    required: false
+    default: ""
+  image-name:
+    description: Fully qualified Docker image name
+    required: true
+  platforms:
+    description: Target image platforms
+    required: false
+    default: linux/amd64,linux/arm64
+  push:
+    description: Publish the built image
+    required: false
+    default: "false"
+  registry:
+    description: Docker registry host
+    required: false
+    default: ghcr.io
+  version:
+    description: Release version without the leading v
+    required: true
+
+outputs:
+  digest:
+    description: Published image digest
+    value: ${{ steps.build.outputs.digest }}
+  image:
+    description: Docker image name
+    value: ${{ inputs.image-name }}
+  tags:
+    description: Docker image tags
+    value: ${{ steps.meta.outputs.tags }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve Docker tags
+      id: resolve-tags
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        version_regex='^([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.-]+)?$'
+
+        if [[ ! "$VERSION" =~ $version_regex ]]; then
+          echo "Docker image version must be SemVer without build metadata: $VERSION"
+          exit 1
+        fi
+
+        minor="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+        stable="false"
+        if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          stable="true"
+        fi
+
+        {
+          echo "minor=$minor"
+          echo "stable=$stable"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Generate Docker metadata
+      id: meta
+      uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9
+      with:
+        images: ${{ inputs.image-name }}
+        tags: |
+          type=raw,value=${{ inputs.version }}
+          type=raw,value=${{ steps.resolve-tags.outputs.minor }},enable=${{ steps.resolve-tags.outputs.stable == 'true' }}
+          type=raw,value=latest,enable=${{ steps.resolve-tags.outputs.stable == 'true' }}
+        labels: |
+          org.opencontainers.image.title=Nola Core
+          org.opencontainers.image.description=Speech-to-text backend for Nola
+
+    - name: Check registry token
+      if: inputs.push == 'true' && inputs.github-token == ''
+      shell: bash
+      run: |
+        echo "github-token is required when push is true."
+        exit 1
+
+    - name: Login to GitHub Container Registry
+      if: inputs.push == 'true'
+      uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee
+      with:
+        registry: ${{ inputs.registry }}
+        username: ${{ github.repository_owner }}
+        password: ${{ inputs.github-token }}
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
+
+    - name: Build Docker image
+      id: build
+      uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf
+      with:
+        cache-from: type=gha,scope=nola-core
+        cache-to: type=gha,scope=nola-core,mode=max
+        context: ${{ inputs.context }}
+        file: ${{ inputs.file }}
+        labels: ${{ steps.meta.outputs.labels }}
+        platforms: ${{ inputs.platforms }}
+        push: ${{ inputs.push }}
+        tags: ${{ steps.meta.outputs.tags }}

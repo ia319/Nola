@@ -1,0 +1,41 @@
+name: Check Release Version
+
+description: Check release version files and expose release metadata
+
+inputs:
+  node-version:
+    description: Node.js version for release scripts
+    required: false
+    default: "24.x"
+  tag:
+    description: Release tag to validate; defaults to the GitHub tag ref
+    required: false
+    default: ""
+
+outputs:
+  version:
+    description: Release version without the leading v
+    value: ${{ steps.check-version.outputs.version }}
+  tag:
+    description: Release tag with the leading v
+    value: ${{ steps.check-version.outputs.tag }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Check release version
+      id: check-version
+      shell: bash
+      env:
+        RELEASE_TAG_INPUT: ${{ inputs.tag }}
+      run: |
+        if [ -n "$RELEASE_TAG_INPUT" ]; then
+          node scripts/release/check-version.mjs --tag "$RELEASE_TAG_INPUT" --github-output "$GITHUB_OUTPUT"
+        else
+          node scripts/release/check-version.mjs --github-output "$GITHUB_OUTPUT"
+        fi

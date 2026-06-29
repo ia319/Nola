@@ -1,22 +1,22 @@
-name: Run CI
+name: Checks and Tests
 
 on:
   pull_request:
     paths:
-      - 'app/**'
-      - 'core/**'
-      - '.github/actions/setup-core-python/**'
-      - '.github/actions/setup-app-node/**'
-      - '.github/workflows/ci.yml'
+      - "app/**"
+      - "core/**"
+      - ".github/actions/**"
+      - ".github/workflows/**"
+      - "scripts/release/**"
   push:
     branches:
       - main
     paths:
-      - 'app/**'
-      - 'core/**'
-      - '.github/actions/setup-core-python/**'
-      - '.github/actions/setup-app-node/**'
-      - '.github/workflows/ci.yml'
+      - "app/**"
+      - "core/**"
+      - ".github/actions/**"
+      - ".github/workflows/**"
+      - "scripts/release/**"
   workflow_dispatch:
 
 permissions:
@@ -29,8 +29,8 @@ jobs:
     strategy:
       matrix:
         node:
-          - '24.x'
-          - '22.13.x'
+          - "24.x"
+          - "22.13.x"
     defaults:
       run:
         working-directory: app
@@ -42,9 +42,9 @@ jobs:
         uses: ./.github/actions/setup-app-node
         with:
           node-version: ${{ matrix.node }}
-          pnpm-version: '10'
+          pnpm-version: "10"
           project-dir: app
-          install-deps: 'true'
+          install-deps: "true"
 
       - name: Run lint
         run: pnpm lint
@@ -68,11 +68,11 @@ jobs:
       - name: Setup core runtime
         uses: ./.github/actions/setup-core-python
         with:
-          python-version: '3.11'
-          poetry-version: '2.2.1'
+          python-version: "3.11"
+          poetry-version: "2.2.1"
           project-dir: core
           with-groups: dev
-          install-deps: 'true'
+          install-deps: "true"
 
       - name: Run Ruff lint
         run: poetry -C core run ruff check nola tests
@@ -99,10 +99,10 @@ jobs:
       - name: Setup app runtime
         uses: ./.github/actions/setup-app-node
         with:
-          node-version: '24.x'
-          pnpm-version: '10'
+          node-version: "24.x"
+          pnpm-version: "10"
           project-dir: app
-          install-deps: 'true'
+          install-deps: "true"
 
       - name: Run vitest
         run: pnpm test:ci
@@ -120,11 +120,11 @@ jobs:
       - name: Setup core runtime
         uses: ./.github/actions/setup-core-python
         with:
-          python-version: '3.11'
-          poetry-version: '2.2.1'
+          python-version: "3.11"
+          poetry-version: "2.2.1"
           project-dir: core
           with-groups: dev
-          install-deps: 'true'
+          install-deps: "true"
 
       - name: Run pytest
         run: poetry -C core run pytest tests -v --tb=short
@@ -142,19 +142,19 @@ jobs:
       - name: Setup core runtime
         uses: ./.github/actions/setup-core-python
         with:
-          python-version: '3.11'
-          poetry-version: '2.2.1'
+          python-version: "3.11"
+          poetry-version: "2.2.1"
           project-dir: core
           with-groups: dev
-          install-deps: 'true'
+          install-deps: "true"
 
       - name: Setup app runtime
         uses: ./.github/actions/setup-app-node
         with:
-          node-version: '24.x'
-          pnpm-version: '10'
+          node-version: "24.x"
+          pnpm-version: "10"
           project-dir: app
-          install-deps: 'true'
+          install-deps: "true"
 
       - name: Start backend
         run: |
@@ -201,35 +201,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Tauri Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
-
       - name: Setup app runtime
         uses: ./.github/actions/setup-app-node
         with:
-          node-version: '24.x'
-          pnpm-version: '10'
+          node-version: "24.x"
+          pnpm-version: "10"
           project-dir: app
-          install-deps: 'true'
+          install-deps: "true"
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
+      - name: Setup Rust and Tauri runtime
+        uses: ./.github/actions/setup-rust-tauri
         with:
-          workspaces: app/src-tauri -> target
+          app-dir: app
+          tauri-dir: app/src-tauri
+          rust-toolchain: stable
+          install-linux-deps: "true"
 
       - name: Run desktop checks
         run: pnpm --dir app desktop:check
@@ -239,6 +225,7 @@ jobs:
     needs:
       - app-test
       - core-test
+      - schema-drift
       - desktop-rust-check
     runs-on: windows-latest
     steps:
@@ -248,18 +235,18 @@ jobs:
       - name: Setup app runtime
         uses: ./.github/actions/setup-app-node
         with:
-          node-version: '24.x'
-          pnpm-version: '10'
+          node-version: "24.x"
+          pnpm-version: "10"
           project-dir: app
-          install-deps: 'true'
+          install-deps: "true"
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
+      - name: Setup Rust and Tauri runtime
+        uses: ./.github/actions/setup-rust-tauri
         with:
-          workspaces: app/src-tauri -> target
+          app-dir: app
+          tauri-dir: app/src-tauri
+          rust-toolchain: stable
+          rust-target: x86_64-pc-windows-msvc
 
       - name: Build Windows desktop bundle
         run: pnpm --dir app desktop:build:windows

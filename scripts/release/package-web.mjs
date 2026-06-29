@@ -10,6 +10,7 @@ import {
   webFileNameFor,
 } from './release-config.mjs'
 
+const crc32Table = createCrc32Table()
 const releaseVersion = resolveReleaseVersion()
 const releaseArtifactsDir = releaseArtifactsDirFor(releaseVersion)
 const appDistDir = path.join(repositoryRoot, 'app', 'dist')
@@ -225,13 +226,17 @@ function toDosDateTime(date) {
   return { dosDate, dosTime }
 }
 
-const crc32Table = new Uint32Array(256)
-for (let index = 0; index < crc32Table.length; index += 1) {
-  let value = index
-  for (let bit = 0; bit < 8; bit += 1) {
-    value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1
+function createCrc32Table() {
+  const table = new Uint32Array(256)
+  for (let index = 0; index < table.length; index += 1) {
+    let value = index
+    for (let bit = 0; bit < 8; bit += 1) {
+      value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1
+    }
+    table[index] = value >>> 0
   }
-  crc32Table[index] = value >>> 0
+
+  return table
 }
 
 function crc32(buffer) {
