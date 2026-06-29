@@ -78,6 +78,7 @@ runs:
 
         const deadline = Date.now() + timeoutMinutes * 60 * 1000
         const pollMs = pollSeconds * 1000
+        const requestTimeoutMs = Math.min(Math.max(pollMs, 5000), 30000)
 
         function sleep(ms) {
           return new Promise((resolve) => setTimeout(resolve, ms))
@@ -97,6 +98,7 @@ runs:
               Authorization: `Bearer ${token}`,
               'X-GitHub-Api-Version': '2022-11-28',
             },
+            signal: AbortSignal.timeout(requestTimeoutMs),
           })
 
           if (!response.ok) {
