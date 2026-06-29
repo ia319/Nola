@@ -6,11 +6,11 @@ inputs:
   node-version:
     description: Node.js version for release scripts
     required: false
-    default: '24.x'
+    default: "24.x"
   tag:
     description: Release tag to validate; defaults to the GitHub tag ref
     required: false
-    default: ''
+    default: ""
 
 outputs:
   version:
@@ -24,7 +24,7 @@ runs:
   using: composite
   steps:
     - name: Setup Node
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
       with:
         node-version: ${{ inputs.node-version }}
 
