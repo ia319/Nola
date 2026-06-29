@@ -111,9 +111,15 @@ function resolvePnpmCommand() {
     process.exit(result.status ?? 1)
   }
 
-  const pnpmCommand = result.stdout.split(/\r?\n/).find(Boolean)
+  const pnpmCandidates = result.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const pnpmCommand = pnpmCandidates.find((candidate) =>
+    /\.(?:cmd|bat|exe|com)$/i.test(candidate),
+  )
   if (!pnpmCommand) {
-    console.error('Unable to locate pnpm on PATH.')
+    console.error('Unable to locate a cmd-compatible pnpm executable on PATH.')
     process.exit(1)
   }
 
