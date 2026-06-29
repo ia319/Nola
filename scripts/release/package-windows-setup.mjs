@@ -55,26 +55,18 @@ await assertFile(path.join(coreSidecarDir, 'nola-core.exe'), 'Windows core sidec
 await assertTargetFileAbsent(targetSetupPath)
 await writeTauriReleaseConfig()
 
-const result = spawnSync(
-  'pnpm',
-  [
-    '--dir',
-    'app',
-    'tauri',
-    'build',
-    '--target',
-    'x86_64-pc-windows-msvc',
-    '--bundles',
-    'nsis',
-    '--config',
-    tauriReleaseConfigPath,
-  ],
-  {
-    cwd: repositoryRoot,
-    shell: true,
-    stdio: 'inherit',
-  },
-)
+const result = runPnpm([
+  '--dir',
+  'app',
+  'tauri',
+  'build',
+  '--target',
+  'x86_64-pc-windows-msvc',
+  '--bundles',
+  'nsis',
+  '--config',
+  tauriReleaseConfigPath,
+])
 
 if (result.error) {
   throw result.error
@@ -88,6 +80,53 @@ const sourceSetupPath = await findNsisSetupInstaller()
 await fsp.copyFile(sourceSetupPath, targetSetupPath, fs.constants.COPYFILE_EXCL)
 
 console.log(`Packaged Windows setup installer: ${toRepoRelativePath(targetSetupPath)}`)
+
+function runPnpm(args) {
+  const pnpmCommand = resolvePnpmCommand()
+
+  return spawnSync(
+    process.env.ComSpec ?? 'cmd.exe',
+    ['/d', '/c', `call ${[pnpmCommand, ...args].map(quoteCmdArg).join(' ')}`],
+    {
+      cwd: repositoryRoot,
+      stdio: 'inherit',
+      windowsVerbatimArguments: true,
+    },
+  )
+}
+
+function resolvePnpmCommand() {
+  const result = spawnSync(process.env.ComSpec ?? 'cmd.exe', ['/d', '/c', 'where pnpm'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+    windowsVerbatimArguments: true,
+  })
+
+  if (result.error) {
+    throw result.error
+  }
+
+  if (result.status !== 0) {
+    console.error(result.stderr?.trim() || 'Unable to locate pnpm on PATH.')
+    process.exit(result.status ?? 1)
+  }
+
+  const pnpmCommand = result.stdout.split(/\r?\n/).find(Boolean)
+  if (!pnpmCommand) {
+    console.error('Unable to locate pnpm on PATH.')
+    process.exit(1)
+  }
+
+  return pnpmCommand
+}
+
+function quoteCmdArg(arg) {
+  const value = String(arg)
+  if (value.includes('"')) {
+    throw new Error(`Unsupported double quote in command argument: ${value}`)
+  }
+  return `"${value.replaceAll('%', '%%')}"`
+}
 
 async function writeTauriReleaseConfig() {
   const config = {
