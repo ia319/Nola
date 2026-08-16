@@ -1,106 +1,103 @@
 # Windows 桌面发布
 
-## 当前状态
+## 发布产物
 
-- 当前可构建 Windows Tauri NSIS 安装包。
-- 当前可构建 Windows Core one-dir sidecar。
-- 当前桌面运行时已具备 Core sidecar 启动管理器。
-- 当前 Windows 便携包将 Core sidecar 放在桌面 exe 同级的 `nola-core/` 目录。
-- 当前 Tauri 安装包资源目录尚未包含 Core sidecar。
-- 当前桌面音频采集支持 Windows 10/11。
-- 当前未配置 Windows 代码签名。
+桌面发布目标为 Windows x64：
 
-## 构建命令
+| 产物 | 路径 |
+| --- | --- |
+| Core one-dir sidecar | `release-artifacts/<version>/core/windows-x64/dist/nola-core/nola-core.exe` |
+| NSIS 安装包 | `release-artifacts/<version>/Nola-<version>-windows-x64-setup.exe` |
+| 便携包 | `release-artifacts/<version>/Nola-<version>-windows-x64-portable.zip` |
 
-Core sidecar：
+NSIS 安装包在 Tauri bundle 的 `nola-core/` 资源目录中包含 Core sidecar。便携包在 `Nola.exe` 同级的 `nola-core/` 目录中包含同一套 sidecar 文件。
 
-```bash
-make release-build-core-windows
-```
-
-当前输出路径：
-
-```text
-release-artifacts/0.1.0/core/windows-x64/dist/nola-core/nola-core.exe
-```
-
-桌面安装包：
-
-```bash
-make desktop-build-windows
-```
-
-当前输出路径：
-
-```text
-app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/Nola_0.1.0_x64-setup.exe
-```
-
-Release 目标文件名：
-
-```text
-Nola-0.1.0-windows-x64-setup.exe
-```
-
-Windows 便携包：
-
-```bash
-make release-build-core-windows
-make desktop-build-windows
-make release-package-windows-portable
-```
-
-Release 目标文件名：
-
-```text
-Nola-0.1.0-windows-x64-portable.zip
-```
+Windows 安装包和便携包以未签名形式发布，Windows SmartScreen 可能显示安全提示。
 
 便携包目录结构：
 
 ```text
-Nola-0.1.0-windows-x64-portable/
+Nola-<version>-windows-x64-portable/
 ├── Nola.exe
 ├── README.txt
 └── nola-core/
-    └── nola-core.exe
+    ├── nola-core.exe
+    └── _internal/
+        └── ...
 ```
 
-## 构建环境
+首次运行后，便携包会在解压目录中创建 `data/`。
+
+## 构建要求
 
 - Windows 10/11
-- WebView2 Runtime
+- Python 3.10+
+- Poetry 2.x
+- GNU Make
 - Visual Studio C++ MSVC 工具链
 - Rust stable
 - `x86_64-pc-windows-msvc` target
 - Node.js 20.19+、22.13+ 或 24+
 - pnpm 10+
+- WebView2 Runtime，用于本地运行和验收
 - Tauri NSIS 缓存目录：`%LOCALAPPDATA%\tauri\NSIS`
 
-## NSIS 缓存
+首次构建先安装前端、Core 和 PyInstaller 构建依赖：
 
-- Tauri bundler 管理 NSIS 工具。
-- 本地首次构建允许联网拉取。
-- CI 恢复和保存 `%LOCALAPPDATA%\tauri\NSIS`。
-- 离线发布前预热 `%LOCALAPPDATA%\tauri\NSIS`。
-- 仓库不提交 NSIS 二进制文件。
+```bash
+make install
+make release-install-core-build
+```
 
-## 当前连接行为
+## 构建流程
 
-启动优先级：
+构建一套 Windows 发布产物：
+
+```bash
+make release-check-version
+make release-clean
+make release-build-core-windows
+make release-package-windows-setup
+make release-package-windows-portable
+```
+
+`release-clean` 重建 `release-artifacts/<version>/`。每套发布产物在开始构建时执行一次；打包脚本检测到同名目标文件时会终止构建。
+
+`release-package-windows-setup` 构建 Tauri 应用并注入 Core sidecar。随后执行的便携包脚本复用同一个 `nola_desktop.exe`。
+
+单独构建便携包时，先生成 Tauri 可执行文件：
+
+```bash
+make release-check-version
+make release-clean
+make release-build-core-windows
+make desktop-build-windows
+make release-package-windows-portable
+```
+
+## NSIS 工具
+
+- Tauri bundler 在首次 NSIS 构建时下载工具到 `%LOCALAPPDATA%\tauri\NSIS`。
+- GitHub Actions 缓存 Tauri 下载的 Windows 工具。
+- 离线构建使用预热后的 Tauri 工具缓存。
+- NSIS 二进制文件保留在 Tauri 用户缓存中，位于源码和发布附件之外。
+
+## 连接行为
+
+桌面客户端按照以下优先级选择 Core：
 
 1. 桌面进程参数 `--backend-url`。
 2. 用户保存的远程后端或外部本地后端配置。
 3. 桌面内置 Core sidecar。
 4. 默认外部本地后端 `http://127.0.0.1:8000`。
 
-开发调试可通过桌面进程参数 `--core-sidecar <path>` 或环境变量 `NOLA_DESKTOP_CORE_SIDECAR_PATH` 指向 `nola-core.exe`。
+开发调试可通过桌面进程参数 `--core-sidecar <path>` 或环境变量 `NOLA_DESKTOP_CORE_SIDECAR_PATH` 指定 `nola-core.exe`。
 
 远程后端配置见 [app/README.md](../../app/README.md)。
 
 ## Core sidecar 行为
 
-`nola-core` 统一入口：
+`nola-core` 提供两个运行入口：
 
 ```bash
 nola-core api --host 127.0.0.1 --port 8000
@@ -111,9 +108,10 @@ nola-core worker
 
 - API 和 Worker 使用同一 `--data-dir`。
 - API 和 Worker 使用同一 `--model-dir`。
-- API 启动后轮询 `/health`，版本必须匹配桌面版本。
+- 桌面进程为 API 分配动态 loopback 端口，并轮询 `/health`。
+- `/health` 返回的 Core 版本必须匹配桌面版本。
 - API 启动失败时停止已启动的 Core 子进程。
-- Worker 启动失败时 API 保持可用，运行状态返回 Worker failed。
+- Worker 启动失败时 API 保持可用，运行状态返回 `workerStatus: "failed"`。
 - 桌面退出时停止 Worker，再停止 API。
 
 ## 环境变量规则
@@ -128,8 +126,7 @@ nola-core worker
 - 桌面进程启动 Core sidecar 时传入 `--ignore-system-env`。
 - 桌面进程显式传入 `--data-dir`、`--model-dir`、`--host`、`--port` 和 `--cors-origins`。
 - 桌面进程对子进程移除 `NOLA_COMPUTE_TYPE`、`NOLA_CORS_ORIGINS`、`NOLA_DATA_DIR`、`NOLA_DEVICE`、`NOLA_HOST`、`NOLA_LIVE_REALTIME_TRANSCRIBER`、`NOLA_MAX_FILE_SIZE`、`NOLA_MODEL_DIR`、`NOLA_MODEL_SIZE` 和 `NOLA_PORT`。
-- 系统全局 `NOLA_*` 不会覆盖桌面托管目录、端口、模型默认值、设备默认值、计算类型默认值或文件大小上限。
-- 未显式传入的模型和转录业务默认值来自 Core 源码默认值和应用内保存配置。
+- 桌面托管目录和网络参数由桌面进程参数确定；模型和转录业务参数由应用内保存配置与 Core 源码默认值确定。
 
 ## 数据和日志目录
 
@@ -149,22 +146,27 @@ nola-core worker
 - 日志目录：便携目录下的 `data/logs/`。
 - 便携目录不可写时回退到 Tauri 用户数据目录下的 `core/`。
 
-## 本地验证结果
+桌面连接配置 `connection-config.json` 始终存储在 Tauri 用户配置目录，与 Core 数据目录分开管理。
 
-- `make release-build-core-windows` 生成 one-dir sidecar。
-- `make release-package-windows-portable` 生成 Windows 便携 zip。
-- `nola-core.exe --help`、`nola-core.exe api --help` 和 `nola-core.exe worker --help` 可运行。
-- `nola-core.exe api --ignore-system-env ...` 的 `/health` 返回 `{"status":"ok","version":"0.1.0"}`。
-- `nola-core.exe worker --ignore-system-env ...` 可启动并保持运行。
-- smoke test 停止后无残留 `nola-core` 进程。
+## 本地验收
 
-## 便携包手动验收
+1. 运行 `nola-core.exe --help`、`nola-core.exe api --help` 和 `nola-core.exe worker --help`，确认三个 CLI 入口可用。
+2. 解压 `release-artifacts/<version>/Nola-<version>-windows-x64-portable.zip` 到源码目录之外。
+3. 运行 `Nola.exe`，使用以下命令确认 API 和 Worker 从同级 `nola-core/nola-core.exe` 启动：
 
-- 解压 `release-artifacts/0.1.0/Nola-0.1.0-windows-x64-portable.zip` 到非源码目录。
-- 运行 `Nola.exe`。
-- 验证 Core sidecar 从同级 `nola-core/nola-core.exe` 启动。
-- 验证数据目录、模型目录和日志目录默认位于解压目录下的 `data/`。
-- 验证便携目录不可写时回退到 Tauri 用户数据目录。
-- 退出 Nola 后确认没有残留 `nola-core` 进程。
-- 移动解压目录后再次启动。
-- 记录 Windows SmartScreen 提示，当前便携包未签名。
+   ```powershell
+   Get-CimInstance Win32_Process -Filter "Name = 'nola-core.exe'" |
+     Select-Object ProcessId, ExecutablePath, CommandLine
+   ```
+
+4. 确认数据、模型和日志默认写入解压目录下的 `data/`、`data/models/` 和 `data/logs/`。
+5. 下载一个模型并等待完成，随后执行文件转写和字幕导出。
+6. 验证麦克风和系统音频设备枚举，并完成一次实时转写。
+7. 重新启动 Nola，确认模型、连接配置和历史记录保持可用。
+8. 在便携目录缺少写权限时，确认数据目录回退到 Tauri 用户数据目录下的 `core/`。
+9. 退出 Nola，确认 API 和 Worker 进程均已结束。
+10. 移动整个可写的解压目录后再次启动，确认 Core 数据和模型缓存随目录移动。
+
+NSIS 安装包应在一次性 Windows 虚拟机或可还原快照中完成安装、启动、升级和卸载验收。
+
+运行异常时检查 `data/logs/api.stderr.log` 和 `data/logs/worker.stderr.log`。数据目录回退后，从运行状态返回的 `logDir` 定位日志。
