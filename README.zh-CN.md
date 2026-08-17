@@ -12,7 +12,7 @@ FastAPI、React、SQLite、Faster-Whisper、WhisperStreaming、Tauri 技术栈�
 
 [转录流程演示](./docs/media/nola-task-transcription-flow.gif)
 
-[客户端与桌面文档](./app/README.md) · [后端文档](./core/README.md)
+[客户端与桌面文档](./app/README.md) · [后端文档](./core/README.md) · [发布与部署文档](./docs/README.md)
 
 </div>
 
@@ -128,8 +128,9 @@ make app-gen-types
 make desktop-build-windows
 ```
 
-## 开发文档
+## 文档
 
+- `docs/README.md`：发布自动化、发布附件、Windows 打包、Docker 与 Web 部署
 - `app/README.md`：客户端工作区、桌面客户端、连接配置
 - `core/README.md`：后端工作区、API、Worker、部署配置
 - `app/AI_INSTRUCTIONS.md`：前端工作区结构、模块与命令说明
