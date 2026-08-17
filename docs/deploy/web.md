@@ -38,7 +38,7 @@ https://nola.example.com/api/*  -> Core /api/*
 
 ## 后端连接
 
-开发模式通过 Vite 代理连接 `http://127.0.0.1:8000`。该代理仅在 `pnpm --dir app dev` 中生效。
+运行 `pnpm --dir app dev` 时，Vite 将 `/api` 和 `/health` 代理至 `http://localhost:8000`。
 
 静态部署按照以下优先级解析 Core 地址：
 
