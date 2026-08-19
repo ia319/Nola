@@ -37,6 +37,12 @@ const workPath = path.join(coreArtifactsDir, 'build')
 const specPath = path.join(coreArtifactsDir, 'spec')
 const outputPath = path.join(distPath, 'nola-core')
 const entryScript = path.join(repositoryRoot, 'core', 'nola', 'launcher.py')
+const pyinstallerHooksPath = path.join(
+  repositoryRoot,
+  'scripts',
+  'release',
+  'pyinstaller-hooks',
+)
 const developmentOnlyModules = ['mypy', 'pytest', 'ruff', 'pre_commit']
 
 assertEmptyDirectory(outputPath)
@@ -68,6 +74,8 @@ const result = spawnSync(
     specPath,
     '--paths',
     path.join(repositoryRoot, 'core'),
+    '--additional-hooks-dir',
+    pyinstallerHooksPath,
     '--collect-submodules',
     'nola',
     ...developmentOnlyModules.flatMap((moduleName) => [
@@ -95,9 +103,36 @@ if (!fs.existsSync(executablePath)) {
   throw new Error(`Missing PyInstaller output: ${toRepoRelativePath(executablePath)}`)
 }
 
+assertHfXetPackaged(outputPath)
 assertDevelopmentModulesAbsent(outputPath, developmentOnlyModules)
 
 console.log(`Built Windows core sidecar: ${toRepoRelativePath(outputPath)}`)
+
+function assertHfXetPackaged(rootPath) {
+  const internalPath = path.join(rootPath, '_internal')
+  const nativeModulePath = path.join(internalPath, 'hf_xet', 'hf_xet.pyd')
+
+  if (!fs.existsSync(nativeModulePath)) {
+    throw new Error(
+      `Missing packaged hf_xet native module: ${toRepoRelativePath(nativeModulePath)}`,
+    )
+  }
+
+  const metadataEntry = fs
+    .readdirSync(internalPath, { withFileTypes: true })
+    .find((entry) => {
+      const normalizedName = entry.name.toLowerCase().replaceAll('-', '_')
+      return (
+        entry.isDirectory() &&
+        normalizedName.startsWith('hf_xet_') &&
+        normalizedName.endsWith('.dist_info')
+      )
+    })
+
+  if (!metadataEntry) {
+    throw new Error('Missing packaged hf-xet distribution metadata.')
+  }
+}
 
 function assertDevelopmentModulesAbsent(rootPath, moduleNames) {
   const internalPath = path.join(rootPath, '_internal')
