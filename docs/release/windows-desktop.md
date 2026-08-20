@@ -61,6 +61,8 @@ make release-package-windows-setup
 make release-package-windows-portable
 ```
 
+`release-build-core-windows` 加载 `scripts/release/pyinstaller-hooks/` 中的项目 hook，将 Hugging Face Xet 后端及其分发元数据收集到 Core sidecar。构建完成后，脚本验证 `_internal/hf_xet/hf_xet.pyd` 和 `_internal/hf_xet-*.dist-info/`；任一项缺失时终止构建。
+
 `release-clean` 重建 `release-artifacts/<version>/`。每套发布产物在开始构建时执行一次；打包脚本检测到同名目标文件时会终止构建。
 
 `release-package-windows-setup` 构建 Tauri 应用并注入 Core sidecar。随后执行的便携包脚本复用同一个 `nola_desktop.exe`。
