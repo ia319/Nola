@@ -68,6 +68,8 @@ const result = spawnSync(
     specPath,
     '--paths',
     path.join(repositoryRoot, 'core'),
+    '--copy-metadata',
+    'hf_xet',
     '--collect-submodules',
     'nola',
     ...developmentOnlyModules.flatMap((moduleName) => [
