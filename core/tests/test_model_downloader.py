@@ -183,6 +183,28 @@ class _GateTerminalQueue:
         return DownloadWorkerMessage(kind="completed")
 
 
+class _CloseAwareQueue(queue.Queue[DownloadWorkerMessage]):
+    """Reject reads after the watcher closes the IPC queue."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.closed = False
+
+    def get(
+        self,
+        block: bool = True,
+        timeout: float | None = None,
+    ) -> DownloadWorkerMessage:
+        """Match multiprocessing queue behavior after close."""
+        if self.closed:
+            raise ValueError("Queue is closed")
+        return super().get(block=block, timeout=timeout)
+
+    def close(self) -> None:
+        """Mark the queue closed once its watcher exits."""
+        self.closed = True
+
+
 class _TerminalOnTerminateProcess(_FakeProcess):
     """Release one queued terminal message as soon as termination starts."""
 
@@ -304,7 +326,7 @@ def test_model_downloader_drains_terminal_message_after_process_exit(
 def test_model_downloader_cancel_terminates_active_process(tmp_path: Path) -> None:
     """Cancel one active download by terminating the subprocess."""
     progress_updates: list[DownloadProgress] = []
-    message_queue: queue.Queue[DownloadWorkerMessage] = queue.Queue()
+    message_queue = _CloseAwareQueue()
     process = _FakeProcess()
     cache_dir = tmp_path / "model-cache"
 
@@ -320,6 +342,7 @@ def test_model_downloader_cancel_terminates_active_process(tmp_path: Path) -> No
 
     assert cancelled.status == "cancelled"
     assert process.terminated is True
+    assert message_queue.closed is True
     _wait_for(lambda: downloader.is_downloading("small") is False)
     assert progress_updates[-1].status == "cancelled"
 
