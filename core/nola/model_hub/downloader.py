@@ -212,16 +212,7 @@ class ModelDownloader:
         self._terminate_process(active.process)
 
         if active.watcher is not None:
-            active.watcher.join(timeout=0.3)
-            if active.watcher.is_alive():
-                return active.progress
-
-        if active.process.is_alive():
-            return active.progress
-
-        terminal_progress = self._drain_queue_after_exit(active, timeout_seconds=0.05)
-        if terminal_progress is not None:
-            self._publish_terminal_progress(active, terminal_progress)
+            active.watcher.join(timeout=1.0)
 
         return active.progress
 
