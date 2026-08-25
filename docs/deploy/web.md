@@ -26,6 +26,8 @@ Web 静态包仅包含浏览器前端资源。转写、模型下载、任务队�
 
 静态服务器需要提供 SPA fallback。任意前端路由刷新后都应返回 `index.html`。
 
+反向代理或静态服务器路由必须先处理 `/health` 和 `/api/*`，再应用 SPA fallback。不要让这些 Core 路径返回 `index.html`。
+
 推荐部署形态：
 
 ```text
@@ -44,7 +46,7 @@ https://nola.example.com/api/*  -> Core /api/*
 
 1. Web 设置页保存的 Core 地址，存储于浏览器 `localStorage`。
 2. 构建时写入的 `VITE_API_URL` 和 `VITE_WS_URL`。
-3. 静态站点 origin；发布 zip 的构建时地址为空，因此默认使用同域 Core 路由。
+3. 静态站点 origin；官方发布工作流未设置 `VITE_API_URL` 和 `VITE_WS_URL`，构建时地址为空，因此官方发布 zip 默认使用同域 Core 路由。
 
 自定义构建时地址会写入静态资源：
 
@@ -79,3 +81,4 @@ poetry -C core run uvicorn nola.main:app --host 0.0.0.0 --port 8000
 - 设置页连接检查返回可用状态。
 - CORS 配置错误时连接检查显示 `CORS blocked` / `CORS 阻止`。
 - 清除已保存的 Core 地址后，确认同域 Core 路由可用；独立静态服务器应显示连接不可用状态。
+- 确认 `/health` 和 `/api/*` 不会被 SPA fallback 以 HTTP 200 返回 `index.html`；连接检查只判断 HTTP 状态，此类响应会被误判为可用。

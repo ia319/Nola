@@ -12,7 +12,7 @@ FastAPI, React, SQLite, Faster-Whisper, WhisperStreaming, and Tauri stack; offli
 
 [Transcription flow demo](./docs/media/nola-task-transcription-flow.gif)
 
-[Client and desktop docs](./app/README.md) · [Backend docs](./core/README.md) · [Release and deployment docs (简体中文)](./docs/README.md)
+[Client and desktop docs](./app/README.md) · [Backend docs](./core/README.md) · [Release and deployment docs](./docs/README.en.md)
 
 </div>
 
@@ -130,7 +130,7 @@ make desktop-build-windows
 
 ## Documentation
 
-- `docs/README.md`: release automation, release artifacts, Windows packaging, Docker, and Web deployment (Simplified Chinese)
+- `docs/README.en.md`: release automation, release artifacts, Windows packaging, Docker, and Web deployment
 - `app/README.md`: client workspace setup, desktop client, connection settings
 - `core/README.md`: backend workspace setup, API, worker, deployment settings
 - `app/AI_INSTRUCTIONS.md`: frontend workspace structure, modules, command reference

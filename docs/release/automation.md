@@ -4,7 +4,7 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| [ci.yml](../../.github/workflows/ci.yml) | 运行 App、Core 和桌面质量检查，随后运行测试、OpenAPI 类型漂移检查和 Windows 桌面构建 |
+| [ci.yml](../../.github/workflows/ci.yml) | 运行 App、Core 和桌面质量检查；App 与 Core 质量检查通过后运行测试和 OpenAPI 类型漂移检查，全部前置检查通过后运行 Windows 桌面构建 |
 | [release.yml](../../.github/workflows/release.yml) | 校验版本，构建 Windows 与 Web 附件，生成校验和，并创建或更新草稿 GitHub Release |
 | [docker.yml](../../.github/workflows/docker.yml) | 构建 Core 多架构镜像，并在 GitHub Release 发布后推送到 GHCR |
 
@@ -18,7 +18,7 @@
 
 1. 等待同一提交的 `Checks and Tests` 工作流成功完成。
 2. 校验工作区版本一致性。
-3. 并行构建 Windows 安装包、Windows 便携包和 Web 静态包。
+3. 并行运行 Windows 与 Web 构建 job；Windows job 依次生成安装包和便携包，Web job 生成静态包。
 4. 汇总附件并生成 SHA-256 校验和。
 5. 校验附件名称、数量和校验和内容。
 6. 上传保留 14 天的 Actions artifact `release-assets-<version>`。
