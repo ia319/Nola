@@ -134,7 +134,7 @@ nola-core worker
 
 - Core sidecar 目录：`Nola.exe` 同级的 `nola-core/`。
 - 随包提供的 Core sidecar 位于上述目录时，优先使用 `Nola.exe` 同级的 `data/`。
-- `data/` 不可写时，回退到 Tauri 用户数据目录下的 `core/`。
+- `data/`、`data/models/` 或 `data/logs/` 无法创建或写入时，回退到 Tauri 用户数据目录下的 `core/`。
 - 通过 `--core-sidecar` 或 `NOLA_DESKTOP_CORE_SIDECAR_PATH` 指定其他位置的 sidecar 时，使用 Tauri 用户数据目录下的 `core/`。
 
 选定数据目录后：
@@ -147,6 +147,8 @@ nola-core worker
 桌面连接配置 `connection-config.json` 始终存储在 Tauri 用户配置目录，与 Core 数据目录分开管理。
 
 ## 本地验收
+
+使用没有保存 Nola 连接设置的 Windows 测试账户执行以下验收。测试账户已有设置时，先在 `设置 > 连接` 中重置连接设置，确保远程或外部本地后端不会优先于随包提供的 Core sidecar。
 
 1. 运行 `nola-core.exe --help`、`nola-core.exe api --help` 和 `nola-core.exe worker --help`，确认三个 CLI 入口可用。
 2. 解压 `release-artifacts/<version>/Nola-<version>-windows-x64-portable.zip` 到源码目录之外。

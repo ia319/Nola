@@ -134,7 +134,7 @@ Desktop-managed directories are resolved from the Core sidecar location. Both th
 
 - Core sidecar directory: `nola-core/` next to `Nola.exe`.
 - When the bundled Core sidecar is in that directory, Nola first uses `data/` next to `Nola.exe`.
-- When `data/` is not writable, Nola falls back to `core/` under the Tauri app data directory.
+- When `data/`, `data/models/`, or `data/logs/` cannot be created or written, Nola falls back to `core/` under the Tauri app data directory.
 - When `--core-sidecar` or `NOLA_DESKTOP_CORE_SIDECAR_PATH` selects a sidecar in another location, Nola uses `core/` under the Tauri app data directory.
 
 After selecting the data directory:
@@ -147,6 +147,8 @@ After selecting the data directory:
 The desktop connection configuration, `connection-config.json`, is always stored in the Tauri app config directory and managed separately from the Core data directory.
 
 ## Local Verification
+
+Run the following verification with a Windows test account that has no saved Nola connection settings. If the test account has saved settings, reset them in `Settings > Connection` first so a remote or external local backend does not take precedence over the bundled Core sidecar.
 
 1. Run `nola-core.exe --help`, `nola-core.exe api --help`, and `nola-core.exe worker --help`, and confirm that all three CLI entry points work.
 2. Extract `release-artifacts/<version>/Nola-<version>-windows-x64-portable.zip` outside the source tree.
