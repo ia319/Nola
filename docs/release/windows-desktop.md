@@ -31,7 +31,7 @@ Nola-<version>-windows-x64-portable/
 ## 构建要求
 
 - Windows 10/11
-- Python 3.10+
+- Python 3.10–3.14
 - Poetry 2.x
 - GNU Make
 - Visual Studio C++ MSVC 工具链
@@ -130,25 +130,25 @@ nola-core worker
 
 ## 数据和日志目录
 
-安装版桌面托管运行：
-
-- 数据目录：Tauri 用户数据目录下的 `core/`。
-- 模型目录：Tauri 用户数据目录下的 `core/models/`。
-- 日志目录：Tauri 用户数据目录下的 `core/logs/`。
-- API 日志：`api.stdout.log` 和 `api.stderr.log`。
-- Worker 日志：`worker.stdout.log` 和 `worker.stderr.log`。
-
-便携版桌面托管运行：
+桌面托管目录根据 Core sidecar 的位置解析。NSIS 安装包和便携包中的 Core sidecar 均位于 `Nola.exe` 同级的 `nola-core/`。
 
 - Core sidecar 目录：`Nola.exe` 同级的 `nola-core/`。
-- 数据目录：便携目录下的 `data/`。
-- 模型目录：便携目录下的 `data/models/`。
-- 日志目录：便携目录下的 `data/logs/`。
-- 便携目录不可写时回退到 Tauri 用户数据目录下的 `core/`。
+- 随包提供的 Core sidecar 位于上述目录时，优先使用 `Nola.exe` 同级的 `data/`。
+- `data/`、`data/models/` 或 `data/logs/` 无法创建或写入时，回退至 Tauri 用户数据目录下的 `core/`。
+- 通过 `--core-sidecar` 或 `NOLA_DESKTOP_CORE_SIDECAR_PATH` 指定其他位置的 sidecar 时，使用 Tauri 用户数据目录下的 `core/`。
+
+选定数据目录后：
+
+- 模型目录：数据目录下的 `models/`。
+- 日志目录：数据目录下的 `logs/`。
+- API 日志：`api.stdout.log` 和 `api.stderr.log`。
+- Worker 日志：`worker.stdout.log` 和 `worker.stderr.log`。
 
 桌面连接配置 `connection-config.json` 始终存储在 Tauri 用户配置目录，与 Core 数据目录分开管理。
 
 ## 本地验收
+
+使用未保存 Nola 连接设置的 Windows 测试账户执行以下验收。若测试账户已保存 Nola 连接设置，先在 `设置 > 连接` 中重置连接设置，避免远程或外部本地后端优先于随包提供的 Core sidecar。
 
 1. 运行 `nola-core.exe --help`、`nola-core.exe api --help` 和 `nola-core.exe worker --help`，确认三个 CLI 入口可用。
 2. 解压 `release-artifacts/<version>/Nola-<version>-windows-x64-portable.zip` 到源码目录之外。
@@ -163,7 +163,7 @@ nola-core worker
 5. 下载一个模型并等待完成，随后执行文件转写和字幕导出。
 6. 验证麦克风和系统音频设备枚举，并完成一次实时转写。
 7. 重新启动 Nola，确认模型、连接配置和历史记录保持可用。
-8. 在便携目录缺少写权限时，确认数据目录回退到 Tauri 用户数据目录下的 `core/`。
+8. 在便携目录缺少写权限时，确认数据目录回退至 Tauri 用户数据目录下的 `core/`。
 9. 退出 Nola，确认 API 和 Worker 进程均已结束。
 10. 移动整个可写的解压目录后再次启动，确认 Core 数据和模型缓存随目录移动。
 

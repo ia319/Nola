@@ -88,11 +88,16 @@ NOLA_CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
 - `NOLA_CORS_ORIGINS`：允许访问 API 的 Web 前端 origin 列表。
 - `NOLA_MODEL_SIZE`：默认模型。
 - `NOLA_DEVICE`：`cpu`、`cuda` 或 `auto`。
-- `NOLA_COMPUTE_TYPE`：`int8`、`float16`、`default` 等 Faster-Whisper 计算类型。
+- `NOLA_COMPUTE_TYPE`：`default`、`float16` 或 `int8`。
 - `NOLA_LIVE_REALTIME_TRANSCRIBER`：实时转写运行时。
 - `NOLA_MAX_FILE_SIZE`：上传文件大小上限，单位为字节。
 
-Compose 仅提供上表中的主机、端口、数据目录、模型目录和 CORS 默认值。模型、设备、计算类型和转录参数继续遵循 Core 配置层级：应用内保存配置优先于容器环境变量提供的后备值，源码默认值作为最终后备。
+Compose 仅设置上表列出的主机、端口、数据目录、模型目录和 CORS 默认值。
+
+其他配置按以下优先级从高到低解析：
+
+- 模型选择、设备和计算类型：任务请求、已保存的应用默认值、容器环境变量、源码默认值。
+- 转录参数：任务请求、已保存的应用默认值、Core/Faster-Whisper 默认值。容器环境变量不参与转录参数解析。
 
 桌面集成版的 sidecar 环境变量规则见 [Windows 桌面发布](../release/windows-desktop.md)。
 
