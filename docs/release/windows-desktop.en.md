@@ -130,7 +130,7 @@ Desktop-managed execution:
 
 ## Data and Log Directories
 
-Desktop-managed directories are resolved from the Core sidecar location. Both the NSIS installer and portable archive place the bundled Core sidecar in the `nola-core/` directory next to `Nola.exe`.
+Desktop-managed directories are resolved from the Core sidecar location. In both the NSIS installer and portable archive, the bundled Core sidecar is located in the `nola-core/` directory next to `Nola.exe`.
 
 - Core sidecar directory: `nola-core/` next to `Nola.exe`.
 - When the bundled Core sidecar is in that directory, Nola first uses `data/` next to `Nola.exe`.
@@ -148,7 +148,7 @@ The desktop connection configuration, `connection-config.json`, is always stored
 
 ## Local Verification
 
-Run the following verification with a Windows test account that has no saved Nola connection settings. If the test account has saved settings, reset them in `Settings > Connection` first so a remote or external local backend does not take precedence over the bundled Core sidecar.
+Run the following verification with a Windows test account that has no saved Nola connection settings. If the test account has saved Nola connection settings, reset them in `Settings > Connection` before verification to prevent a remote or external local backend from taking precedence over the bundled Core sidecar.
 
 1. Run `nola-core.exe --help`, `nola-core.exe api --help`, and `nola-core.exe worker --help`, and confirm that all three CLI entry points work.
 2. Extract `release-artifacts/<version>/Nola-<version>-windows-x64-portable.zip` outside the source tree.

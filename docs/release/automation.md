@@ -4,7 +4,7 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| [ci.yml](../../.github/workflows/ci.yml) | 运行 App、Core 和桌面质量检查；App 与 Core 质量检查通过后运行测试和 OpenAPI 类型漂移检查，全部前置检查通过后运行 Windows 桌面构建 |
+| [ci.yml](../../.github/workflows/ci.yml) | 运行 App、Core 和桌面质量检查；App 与 Core 质量检查通过后运行 App 测试、Core 测试和 OpenAPI 类型漂移检查；App 测试、Core 测试、OpenAPI 类型漂移检查和桌面质量检查全部通过后构建 Windows 桌面包 |
 | [release.yml](../../.github/workflows/release.yml) | 校验版本，构建 Windows 与 Web 附件，生成校验和，并创建或更新草稿 GitHub Release |
 | [docker.yml](../../.github/workflows/docker.yml) | 构建 Core 多架构镜像，并在 GitHub Release 发布后推送到 GHCR |
 

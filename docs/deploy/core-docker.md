@@ -92,7 +92,12 @@ NOLA_CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
 - `NOLA_LIVE_REALTIME_TRANSCRIBER`：实时转写运行时。
 - `NOLA_MAX_FILE_SIZE`：上传文件大小上限，单位为字节。
 
-Compose 仅提供上表中的主机、端口、数据目录、模型目录和 CORS 默认值。模型选择、设备和计算类型先使用任务请求覆盖；没有请求覆盖时，依次使用已保存的应用默认值、容器环境变量和源码默认值。转录参数不使用容器环境变量，并依次按任务请求覆盖、已保存的应用默认值和 Core/Faster-Whisper 默认值解析。
+Compose 仅设置上表列出的主机、端口、数据目录、模型目录和 CORS 默认值。
+
+其他配置按以下优先级从高到低解析：
+
+- 模型选择、设备和计算类型：任务请求、已保存的应用默认值、容器环境变量、源码默认值。
+- 转录参数：任务请求、已保存的应用默认值、Core/Faster-Whisper 默认值。容器环境变量不参与转录参数解析。
 
 桌面集成版的 sidecar 环境变量规则见 [Windows 桌面发布](../release/windows-desktop.md)。
 

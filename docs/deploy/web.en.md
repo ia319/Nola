@@ -26,7 +26,7 @@ The Web static package contains only browser frontend assets. The Nola Core back
 
 The static server must provide an SPA fallback. Refreshing any frontend route must return `index.html`.
 
-Reverse proxy or static server routing must handle `/health` and `/api/*` before applying the SPA fallback. Do not return `index.html` for these Core paths.
+When configuring reverse proxy or static server routes, forward `/health` and `/api/*` to Core before applying the SPA fallback. The SPA fallback must not return `index.html` for these paths.
 
 Recommended deployment layout:
 
@@ -46,7 +46,9 @@ A static deployment resolves the Core address in this order:
 
 1. The Core address saved on the Web Settings page, stored in browser `localStorage`.
 2. The build-time `VITE_API_URL` and `VITE_WS_URL` values.
-3. The static site origin. The official release workflow does not set `VITE_API_URL` or `VITE_WS_URL`, so their build-time values are empty and the official release zip uses same-origin Core routes by default.
+3. The static site origin.
+
+The repository's `Release` workflow does not set `VITE_API_URL` or `VITE_WS_URL`, so both build-time addresses are empty. The Web release package produced by that workflow therefore uses same-origin Core routes by default.
 
 Custom build-time addresses are embedded in the static assets:
 
@@ -81,4 +83,4 @@ Use `https://` for a remote Core address. When `VITE_WS_URL` is empty, the front
 - Confirm that the Settings connection check reports an available status.
 - Confirm that an invalid CORS configuration shows `CORS blocked` / `CORS 阻止` in the connection check.
 - Clear the saved Core address and confirm that same-origin Core routes work. A standalone static server should report the connection as unavailable.
-- Confirm that the SPA fallback does not return `index.html` with HTTP 200 for `/health` or `/api/*`. The connection check inspects only the HTTP status, so such responses are incorrectly reported as available.
+- Confirm that Core handles `/health` and `/api/*` and that the SPA fallback does not return `index.html` with HTTP 200 for these paths. The connection check treats a successful HTTP response as available but does not validate the response content, so it incorrectly reports an HTTP 200 response containing `index.html` as available.

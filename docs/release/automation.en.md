@@ -4,7 +4,7 @@
 
 | File | Responsibility |
 | --- | --- |
-| [ci.yml](../../.github/workflows/ci.yml) | Run App, Core, and desktop quality checks; run tests and the OpenAPI type drift check after the App and Core quality checks pass, then run the Windows desktop build after all prerequisite checks pass |
+| [ci.yml](../../.github/workflows/ci.yml) | Run App, Core, and desktop quality checks; run the App tests, Core tests, and OpenAPI type drift check after the App and Core quality checks pass; build the Windows desktop bundle after the App tests, Core tests, OpenAPI type drift check, and desktop quality checks all pass |
 | [release.yml](../../.github/workflows/release.yml) | Validate the version, build Windows and Web assets, generate checksums, and create or update a draft GitHub Release |
 | [docker.yml](../../.github/workflows/docker.yml) | Build the multi-architecture Core image and push it to GHCR after the GitHub Release is published |
 

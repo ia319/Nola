@@ -92,7 +92,12 @@ Common overrides:
 - `NOLA_LIVE_REALTIME_TRANSCRIBER`: Live transcription runtime.
 - `NOLA_MAX_FILE_SIZE`: Upload file size limit in bytes.
 
-Compose provides only the host, port, data directory, model directory, and CORS defaults shown above. Model selection, device, and compute type use task request overrides first; without a request override, they use saved application defaults, container environment variables, and source defaults in that order. Transcription parameters do not use container environment variables and resolve in this order: task request overrides, saved application defaults, and Core/Faster-Whisper defaults.
+Compose sets only the host, port, data directory, model directory, and CORS defaults shown above.
+
+Other configuration values resolve according to the following precedence, from highest to lowest:
+
+- Model selection, device, and compute type: task request overrides, saved application defaults, container environment variables, and source defaults.
+- Transcription parameters: task request overrides, saved application defaults, and Core/Faster-Whisper defaults. Container environment variables do not participate in transcription parameter resolution.
 
 See [Windows Desktop Release](../release/windows-desktop.en.md) for the sidecar environment-variable rules in the desktop-integrated version.
 
