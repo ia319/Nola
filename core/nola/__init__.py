@@ -11,4 +11,4 @@ import sys
 if sys.platform == "win32":
     os.environ.setdefault("CT2_CUDA_ALLOCATOR", "cub_caching")
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"

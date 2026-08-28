@@ -1,6 +1,6 @@
 [project]
 name = "nola-core"
-version = "0.1.0"
+version = "0.1.1"
 description = "Speech-to-text engine powered by Faster Whisper"
 authors = [
     {name = "Nola Team"}
