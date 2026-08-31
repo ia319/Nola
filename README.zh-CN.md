@@ -25,9 +25,38 @@ FastAPI、React、SQLite、Faster-Whisper、WhisperStreaming、Tauri 技术栈�
 - 历史管理：转写任务、上传文件、实时会话记录
 - 字幕导出：SRT、VTT、TXT、ASS、单项导出、批量 ZIP 导出
 - 配置管理：后端连接目标、转写默认值、实时转写默认值、导出默认值、模型存储设置
-- 桌面能力：Tauri 桌面客户端、Windows 音频设备枚举、WASAPI 音频采集、远程后端连接
+- Windows 桌面能力：Tauri 桌面客户端、Windows 音频设备枚举、WASAPI 音频采集、远程后端连接
 
-## 环境要求
+## 平台支持
+
+| 平台 | Web 客户端 | 桌面客户端 | 实时音频 |
+| --- | --- | --- | --- |
+| Windows 10/11 | 可用，具体能力取决于浏览器 | 正式支持，提供 Windows x64 安装包与便携包 | 通过 WASAPI 原生采集麦克风和系统音频 |
+| macOS | 可用，具体能力取决于浏览器 | 尚无官方桌面安装包 | 仅支持浏览器采集，尚未实现桌面原生采集 |
+| Linux | 可用，具体能力取决于浏览器 | 实验性源码；Ubuntu CI 会编译并测试 Rust 桌面壳，但没有官方安装包，也未经过实机验证 | 仅支持浏览器采集，尚未实现桌面原生采集 |
+
+Linux Core 交付与 Linux 桌面支持是两个不同范围。Nola 提供 `linux/amd64` 和 `linux/arm64` Core Docker 镜像。
+
+## 下载与安装
+
+[GitHub Releases](https://github.com/ia319/Nola/releases) 提供 Windows x64 NSIS 安装包、Windows x64 便携包、Web 静态包和 SHA-256 校验文件。
+
+- Windows 安装包：下载 `Nola-<version>-windows-x64-setup.exe` 并运行安装程序。
+- Windows 便携包：解压 `Nola-<version>-windows-x64-portable.zip`，然后运行 `Nola.exe`。
+- Web 部署：按照 [Web 部署文档](./docs/deploy/web.md) 部署 `Nola-<version>-web.zip`、Core API 和 Worker。
+- macOS 与 Linux：使用 Web 客户端或下方的源码开发方式。项目尚未发布 macOS 或 Linux 桌面安装包。
+
+Windows 桌面安装包和便携包未签名，Windows SmartScreen 可能显示安全提示。运行下载文件前，使用 `Nola-<version>-checksums.sha256` 核对 SHA-256 值。
+
+## 首次使用
+
+1. 启动 Windows 桌面应用，或分别启动 Core API、Worker 与 Web 客户端。
+2. 打开模型管理，下载模型并选择默认模型。
+3. 上传音频或视频文件，创建转写任务并等待处理完成。
+4. 在历史记录中查看结果，并导出 SRT、VTT、TXT 或 ASS 字幕。
+5. 使用实时转写时，选择麦克风或系统音频源。桌面原生采集需要 Windows 10/11；Web 采集能力取决于浏览器和操作系统。
+
+## 开发环境要求
 
 - Python 3.10+
 - Poetry 2.x
@@ -39,7 +68,7 @@ FastAPI、React、SQLite、Faster-Whisper、WhisperStreaming、Tauri 技术栈�
 - CPU 推理：无需 CUDA
 - NVIDIA GPU 推理：CUDA 12.x、cuBLAS for CUDA 12、cuDNN 9 for CUDA 12
 
-## 快速开始
+## 开发快速开始
 
 在不同终端中运行长驻服务。
 
@@ -85,8 +114,8 @@ make desktop-dev
 ## 运行模式
 
 - 本地 Web：同一开发机器上的后端 API、Worker 与 Web 前端
-- 本地桌面：Tauri 桌面客户端与本机后端
-- 桌面连接远程后端：本机桌面音频采集与已配置远程后端
+- Windows 本地桌面：Tauri 桌面客户端与本机后端
+- Windows 桌面连接远程后端：本机桌面音频采集与已配置远程后端
 - 后端独立部署：面向 Web 或桌面客户端的 API 服务与 Worker 进程
 
 ## 当前限制
@@ -94,6 +123,7 @@ make desktop-dev
 - 单文件大小上限：500 MB
 - 上传格式：mp3, wav, flac, m4a, ogg, webm, aac, mp4, wma
 - 导出格式：srt, vtt, txt, ass
+- 官方桌面版本：Windows x64
 - 桌面音频采集：Windows 10/11
 - 远程/公网部署边界：可信网络或外部认证层必需
 

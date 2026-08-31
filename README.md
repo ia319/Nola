@@ -25,9 +25,38 @@ FastAPI, React, SQLite, Faster-Whisper, WhisperStreaming, and Tauri stack; offli
 - History management: transcription tasks, uploaded files, realtime session records
 - Subtitle export: SRT, VTT, TXT, ASS, single-item export, batch ZIP export
 - Configuration: backend connection target, transcription defaults, realtime transcription defaults, export defaults, model storage settings
-- Desktop support: Tauri desktop client, Windows audio device enumeration, WASAPI audio capture, remote backend connection
+- Windows desktop support: Tauri desktop client, Windows audio device enumeration, WASAPI audio capture, remote backend connection
 
-## Requirements
+## Platform Support
+
+| Platform | Web Client | Desktop Client | Realtime Audio |
+| --- | --- | --- | --- |
+| Windows 10/11 | Available; browser capabilities apply | Supported; Windows x64 installer and portable package | Native microphone and system audio capture through WASAPI |
+| macOS | Available; browser capabilities apply | No official desktop package | Browser capture only; native desktop capture is not implemented |
+| Linux | Available; browser capabilities apply | Experimental source code; the Rust shell is compiled and tested in Ubuntu CI, with no official package or real-device validation | Browser capture only; native desktop capture is not implemented |
+
+Linux Core delivery is separate from Linux desktop support. Nola publishes Core Docker images for `linux/amd64` and `linux/arm64`.
+
+## Downloads
+
+[GitHub Releases](https://github.com/ia319/Nola/releases) provides the Windows x64 NSIS installer, Windows x64 portable package, Web static package, and SHA-256 checksums.
+
+- Windows installer: download `Nola-<version>-windows-x64-setup.exe` and run the installer.
+- Windows portable package: extract `Nola-<version>-windows-x64-portable.zip`, then run `Nola.exe`.
+- Web deployment: deploy `Nola-<version>-web.zip` with a Core API and Worker by following the [Web deployment guide](./docs/deploy/web.en.md).
+- macOS and Linux: use the Web client or the source development setup below. Official macOS and Linux desktop packages are not published.
+
+Windows desktop packages are unsigned, so Windows SmartScreen may display a warning. Verify downloaded files with `Nola-<version>-checksums.sha256` before running them.
+
+## First Use
+
+1. Start the Windows desktop application, or start the Core API, Worker, and Web client.
+2. Open model management, download a model, and select the default model.
+3. Upload an audio or video file, create a transcription task, and wait for processing to finish.
+4. Review the result in history and export subtitles as SRT, VTT, TXT, or ASS.
+5. For realtime transcription, select a microphone or system-audio source. Native desktop capture requires Windows 10/11; Web capture depends on browser and operating-system capabilities.
+
+## Development Requirements
 
 - Python 3.10+
 - Poetry 2.x
@@ -39,7 +68,7 @@ FastAPI, React, SQLite, Faster-Whisper, WhisperStreaming, and Tauri stack; offli
 - CPU inference: no CUDA
 - NVIDIA GPU inference: CUDA 12.x, cuBLAS for CUDA 12, and cuDNN 9 for CUDA 12
 
-## Quick Start
+## Development Quick Start
 
 Run long-lived services in separate terminals.
 
@@ -85,8 +114,8 @@ Remote backend setup: app/README.md
 ## Running Modes
 
 - Local Web: backend API, Worker, and Web frontend on one development machine
-- Local Desktop: Tauri desktop client with local backend
-- Desktop With Remote Backend: local desktop audio capture with configured remote backend
+- Windows Local Desktop: Tauri desktop client with local backend
+- Windows Desktop With Remote Backend: local desktop audio capture with configured remote backend
 - Backend Deployment: API service and Worker processes for Web or desktop clients
 
 ## Current Limits
@@ -94,6 +123,7 @@ Remote backend setup: app/README.md
 - Maximum file size: 500 MB
 - Upload formats: mp3, wav, flac, m4a, ogg, webm, aac, mp4, wma
 - Export formats: srt, vtt, txt, ass
+- Official desktop release: Windows x64
 - Desktop audio capture: Windows 10/11
 - Remote/public deployment boundary: trusted network or external authentication layer required
 
